@@ -1,4 +1,4 @@
-# Multivectors
+# Multivectors.jl
 
 [![Build Status](https://travis-ci.org/chakravala/Multivectors.jl.svg?branch=master)](https://travis-ci.org/chakravala/Multivectors.jl)
 
