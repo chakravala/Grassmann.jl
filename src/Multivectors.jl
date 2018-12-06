@@ -24,6 +24,17 @@ subscripts = Dict(
     '0' => '₀'
 )
 
+binomsum = ( () -> begin
+        Y = Array{Int,1}[Int[1]]
+        return (n::Int,i::Int) -> (begin
+                j = length(Y)
+                for k ∈ j+1:n
+                    push!(Y,cumsum([binomial(n,k) for k ∈ 0:n]))
+                end
+                i ≠ 0 ? Y[n][i] : 0
+            end)
+    end)()
+
 function show(io::IO, e::MultiBasis)
     print(io,"e",[subscripts[i] for i in string(e.n)]...,' ')
 end
@@ -35,7 +46,7 @@ end
 
 function Base.getindex(m::MultiVector,i::Int) 
     0 <= i <= m.n || throw(BoundsError(m, i))
-    r = sum([binomial(Int(m.n),k) for k ∈ 0:i-1])
+    r = binomsum(Int(m.n),i)
     return @view m.v[r+1:r+binomial(Int(m.n),i)]
 end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
