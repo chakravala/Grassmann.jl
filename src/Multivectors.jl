@@ -5,8 +5,8 @@ module Multivectors
 using Combinatorics, StaticArrays
 using ComputedFieldTypes
 
-import Base: show, getindex
-export MultiBasis, MultiVector
+import Base: show, getindex, promote_rule
+export MultiBasis, MultiValue, MultiBlade, MultiVector
 
 subscripts = Dict(
     '1' => '₁',
@@ -32,13 +32,18 @@ binomsum = ( () -> begin
             end)
     end)()
 
-struct MultiBasis{N}
+## MultiBasis{N}
+
+struct MultiBasis{N,G}
     n::BitArray
 end
+MultiBasis{N}(n::BitArray) where N = MultiBasis{N,sum(Int.(n))}(n)
 
 VTI = Union{Vector{<:Integer},Tuple,NTuple}
 MultiBasis{N}(b::VTI) where N = MultiBasis{N}(basisbits(N,b))
 MultiBasis{N}(b::Integer...) where N = MultiBasis{N}(basisbits(N,b))
+MultiBasis{N,G}(b::VTI) where {N,G} = MultiBasis{N,G}(basisbits(N,b))
+MultiBasis{N,G}(b::Integer...) where {N,G} = MultiBasis{N,G}(basisbits(N,b))
 
 basisindices(b::MultiBasis) = findall(b.n)
 function basisbits(d::Integer,b::VTI)
@@ -58,6 +63,28 @@ function printbasis(io::IO,b::VTI)
         #(N > 9) && (i ≠ b[end]) && print(io,",")
     end
 end
+
+## MultiValue{N}
+
+struct MultiValue{N,G,T}
+    v::T
+    b::MultiBasis{N,G}
+end
+
+MultiValue{N}(v::T,b::MultiBasis{N,G}) where {N,T,G} = MultiValue{N,T,G}(v,b)
+MultiValue{N,G}(v::T,b::MultiBasis{N,G}) where {N,T,G} = MultiValue{N,T,G}(v,b)
+MultiValue{N}(v::T) where {N,T} = MultiValue{N,T,0}(v,MultiBasis{N}())
+
+
+#Base.+(v::MultiValue{N}...) = 
+
+## MultiBlades{T,N}
+
+@computed mutable struct MultiBlade{T,N,G}
+    v::MVector{binomial(N,G),T}
+end
+
+## MultiVector{T,N}
 
 @computed mutable struct MultiVector{T,N}
     v::MVector{2^N,T}
@@ -101,5 +128,8 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
         end
     end
 end
+
+
+
 
 end # module
