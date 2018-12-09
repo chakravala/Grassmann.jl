@@ -8,10 +8,6 @@ using ComputedFieldTypes
 import Base: show, getindex
 export MultiBasis, MultiVector
 
-struct MultiBasis
-    n::BitArray
-end
-
 subscripts = Dict(
     '1' => '₁',
     '2' => '₂',
@@ -36,17 +32,47 @@ binomsum = ( () -> begin
             end)
     end)()
 
-function show(io::IO, e::MultiBasis)
+struct MultiBasis{N}
+    n::BitArray
+end
+
+VTI = Union{Vector{<:Integer},Tuple,NTuple}
+MultiBasis{N}(b::VTI) where N = MultiBasis{N}(basisbits(N,b))
+MultiBasis{N}(b::Integer...) where N = MultiBasis{N}(basisbits(N,b))
+
+basisindices(b::MultiBasis) = findall(b.n)
+function basisbits(d::Integer,b::VTI)
+    out = falses(d)
+    for k ∈ b
+        out[k] = true
+    end
+    return out
+end
+
+show(io::IO, e::MultiBasis) = printbasis(io,basisindices(e))
+
+function printbasis(io::IO,b::VTI)
     print(io,"e")
-    se = string(e.n)
-    for i ∈ 1:length(se)
-        print(io,subscripts[i])
-        e.n > 3 && print(io,",")
+    for i ∈ b
+        print(io,subscripts[string(i)[1]])
+        #(N > 9) && (i ≠ b[end]) && print(io,",")
     end
 end
 
 @computed mutable struct MultiVector{T,N}
     v::MVector{2^N,T}
+end
+
+MultiVector{T}(v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(v)
+MultiVector{T}(v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(v)
+MultiVector(v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(v)
+MultiVector(v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(v)
+MultiVector(v::T...) where T = MultiVector{T,intlog(length(v))}(v)
+
+function intlog(M::Integer)
+    lM = log2(M)
+    try; Int(lM)
+    catch; lM end
 end
 
 function Base.getindex(m::MultiVector{T,N},i::Int) where {T,N}
@@ -70,7 +96,8 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
         b = m[i]
         set = combinations(ind,i) |> collect
         for k ∈ 1:length(set)
-            print(io," + ",b[k],"e",[subscripts[s[1]] for s ∈ string.(set[k])]...)
+            print(io," + ",b[k])
+            printbasis(io,set[k])
         end
     end
 end
