@@ -1,5 +1,5 @@
 using Multivectors
-using Base.Test
+using Test
 
 # write your own tests here
-@test 1 == 2
+@test (@multibasis e s "++++"; e₁₂₄ * e₂₃ == e₁₃₄)

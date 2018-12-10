@@ -1,11 +1,12 @@
 module Multivectors
 
-# package code goes here
+#   This file is part of Multivectors.jl. It is licensed under the MIT license
+#   Copyright (C) 2018 Michael Reed
 
 using Combinatorics, StaticArrays
 using ComputedFieldTypes
 
-import Base: show, getindex, promote_rule
+import Base: show, getindex, promote_rule, ==
 export MultiBasis, MultiValue, MultiBlade, MultiVector, MultiGrade, Signature, @S_str
 
 subscripts = Dict(
@@ -59,6 +60,10 @@ MultiBasis{N}(s::Signature,b::VTI) where N = MultiBasis{N}(s,basisbits(N,b))
 MultiBasis{N}(s::Signature,b::Integer...) where N = MultiBasis{N}(s,basisbits(N,b))
 MultiBasis{N,G}(s::Signature,b::VTI) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
 MultiBasis{N,G}(s::Signature,b::Integer...) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
+
+function ==(a::MultiBasis{N,G},b::MultiBasis{N,G}) where {N,G}
+    return (a.s == b.s) && (a.n == b.n)
+end
 
 basisindices(b::MultiBasis) = findall(b.n)
 function basisbits(d::Integer,b::VTI)
@@ -168,5 +173,6 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
     end
 end
 
+include("algebra.jl")
 
 end # module
