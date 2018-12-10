@@ -6,19 +6,19 @@ using Combinatorics, StaticArrays
 using ComputedFieldTypes
 
 import Base: show, getindex, promote_rule
-export MultiBasis, MultiValue, MultiBlade, MultiVector
+export MultiBasis, MultiValue, MultiBlade, MultiVector, MultiGrade, Signature, @S_str
 
 subscripts = Dict(
-    '1' => '₁',
-    '2' => '₂',
-    '3' => '₃',
-    '4' => '₄',
-    '5' => '₅',
-    '6' => '₆',
-    '7' => '₇',
-    '8' => '₈',
-    '9' => '₉',
-    '0' => '₀'
+    1 => '₁',
+    2 => '₂',
+    3 => '₃',
+    4 => '₄',
+    5 => '₅',
+    6 => '₆',
+    7 => '₇',
+    8 => '₈',
+    9 => '₉',
+    0 => '₀'
 )
 
 binomsum = ( () -> begin
@@ -32,18 +32,33 @@ binomsum = ( () -> begin
             end)
     end)()
 
+struct Signature{N}
+    b::BitArray{1}
+end
+
+Signature(s::String) = Signature{length(s)}(BitArray([k ≠ '+' ? 0 : 1 for k ∈ s]))
+
+show(io::IO,s::Signature) = print(io,[k ? '+' : '-' for k ∈ s.b]...)
+
+macro S_str(str)
+    Signature(str)
+end
+
 ## MultiBasis{N}
 
 struct MultiBasis{N,G}
-    n::BitArray
+    s::Signature{N}
+    n::BitArray{1}
 end
-MultiBasis{N}(n::BitArray) where N = MultiBasis{N,sum(Int.(n))}(n)
+MultiBasis{N}(s::Signature,n::BitArray) where N = MultiBasis{N,sum(Int.(n))}(s,n)
 
 VTI = Union{Vector{<:Integer},Tuple,NTuple}
-MultiBasis{N}(b::VTI) where N = MultiBasis{N}(basisbits(N,b))
-MultiBasis{N}(b::Integer...) where N = MultiBasis{N}(basisbits(N,b))
-MultiBasis{N,G}(b::VTI) where {N,G} = MultiBasis{N,G}(basisbits(N,b))
-MultiBasis{N,G}(b::Integer...) where {N,G} = MultiBasis{N,G}(basisbits(N,b))
+MultiBasis(s::Signature,b::VTI) = MultiBasis{length(s.b)}(s,b)
+MultiBasis(s::Signature,b::Integer...) = MultiBasis{length(s.b)}(s,b)
+MultiBasis{N}(s::Signature,b::VTI) where N = MultiBasis{N}(s,basisbits(N,b))
+MultiBasis{N}(s::Signature,b::Integer...) where N = MultiBasis{N}(s,basisbits(N,b))
+MultiBasis{N,G}(s::Signature,b::VTI) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
+MultiBasis{N,G}(s::Signature,b::Integer...) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
 
 basisindices(b::MultiBasis) = findall(b.n)
 function basisbits(d::Integer,b::VTI)
@@ -56,12 +71,29 @@ end
 
 show(io::IO, e::MultiBasis) = printbasis(io,basisindices(e))
 
-function printbasis(io::IO,b::VTI)
-    print(io,"e")
-    for i ∈ b
-        print(io,subscripts[string(i)[1]])
-        #(N > 9) && (i ≠ b[end]) && print(io,",")
+printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
+
+export @multibasis
+
+macro multibasis(label,sig,str)
+    s = Signature(str)
+    N = length(str)
+    ind = collect(1:N)
+    lab = string(label)
+    io = IOBuffer()
+    els = Symbol[sig,label]
+    exp = Expr[Expr(:(=),esc(sig),s),
+        Expr(:(=),esc(label),MultiBasis(s))]
+    for i ∈ 1:N
+        set = combinations(ind,i) |> collect
+        for k ∈ 1:length(set)
+            printbasis(io,set[k],lab)
+            sym = Symbol(String(take!(io)))
+            push!(els,sym)
+            push!(exp,Expr(:(=),esc(sym),MultiBasis(s,set[k])))
+        end
     end
+    return Expr(:block,exp...,Expr(:tuple,esc.(els)...))
 end
 
 ## MultiValue{N}
@@ -71,30 +103,37 @@ struct MultiValue{N,G,T}
     b::MultiBasis{N,G}
 end
 
-MultiValue{N}(v::T,b::MultiBasis{N,G}) where {N,T,G} = MultiValue{N,T,G}(v,b)
-MultiValue{N,G}(v::T,b::MultiBasis{N,G}) where {N,T,G} = MultiValue{N,T,G}(v,b)
-MultiValue{N}(v::T) where {N,T} = MultiValue{N,T,0}(v,MultiBasis{N}())
-
+MultiValue{N}(v::T,b::MultiBasis{N,G}) where {N,G,T} = MultiValue{N,G,T}(v,b)
+MultiValue{N,G}(v::T,b::MultiBasis{N,G}) where {N,G,T} = MultiValue{N,G,T}(v,b)
+MultiValue{N}(v::T) where {N,T} = MultiValue{N,0,T}(v,MultiBasis{N}())
 
 #Base.+(v::MultiValue{N}...) = 
+
+mutable struct MultiGrade{N}
+    v::Vector{MultiValue{N}}
+end
+
+#mutable struct 
 
 ## MultiBlades{T,N}
 
 @computed mutable struct MultiBlade{T,N,G}
+    s::Signature
     v::MVector{binomial(N,G),T}
 end
 
 ## MultiVector{T,N}
 
 @computed mutable struct MultiVector{T,N}
+    s::Signature
     v::MVector{2^N,T}
 end
 
-MultiVector{T}(v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(v)
-MultiVector{T}(v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(v)
-MultiVector(v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(v)
-MultiVector(v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(v)
-MultiVector(v::T...) where T = MultiVector{T,intlog(length(v))}(v)
+MultiVector{T}(s::Signature,v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
+MultiVector{T}(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,v)
+MultiVector(s::Signature,v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
+MultiVector(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,v)
+MultiVector(s::Signature,v::T...) where T = MultiVector{T,intlog(length(v))}(s,v)
 
 function intlog(M::Integer)
     lM = log2(M)
@@ -128,8 +167,6 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
         end
     end
 end
-
-
 
 
 end # module
