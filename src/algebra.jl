@@ -2,7 +2,9 @@
 #   This file is part of Multivectors.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
-function Base.:*(a::MultiBasis{N},b::MultiBasis{N}) where N
+import Base: +, *
+
+function *(a::MultiBasis{N},b::MultiBasis{N}) where N
     a.s ≠ b.s && throw(error("$(a.s) ≠ $(b.s)"))
     (s,c) = indexjoin(basisindices(a),basisindices(b),a.s)
     d = MultiBasis{N}(a.s,c)
@@ -26,4 +28,23 @@ function indexjoin(a::Vector{Int},b::Vector{Int},s::Signature)
         end
     end
     return t, ind
+end
+
+*(a::Number,b::MultiBasis{N}) where N = MultiValue{N}(a,b)
+*(a::MultiBasis{N},b::Number) where N = MultiValue{N}(b,a)
+*(a::Number,b::MultiValue{N}) where N = MultiValue{N}(a*b.v,b)
+*(a::MultiValue{N},b::Number) where N = MultiValue{N}(a.v*b,a)
+*(a::MultiValue{N},b::MultiBasis{N}) where N = MultiValue{N}(a.v,a.b*b)
+*(a::MultiBasis{N},b::MultiValue{N}) where N = MultiValue{N}(b.v,a*b.b)
+
+function +(a::MultiBasis{N,A},b::MultiBasis{N,B}) where {N,A,B}
+    if a.s ≠ b.s
+        throw(error("$(a.s) ≠ $(b.s)"))
+    elseif a == b
+        return MultiValue{N,A}(2,a)
+    elseif A == B
+        return nothing
+    else
+        return MultiGrade{N}([a,b])
+    end
 end
