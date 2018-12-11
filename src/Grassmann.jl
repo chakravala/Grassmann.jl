@@ -1,6 +1,6 @@
-module Multivectors
+module Grassmann
 
-#   This file is part of Multivectors.jl. It is licensed under the MIT license
+#   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
 using Combinatorics, StaticArrays
@@ -19,10 +19,20 @@ struct Signature{N}
     b::BitArray{1}
 end
 
-Signature(s::String) = Signature{length(s)}(BitArray([k ≠ '+' ? 0 : 1 for k ∈ s]))
+getindex(s::Signature,i::Int) = s.b[i]
+setindex!(s::Signature,k::Bool,i::Int) = (s[i] = k)
+Base.firstindex(m::Signature) = 1
+Base.lastindex(m::Signature{N}) where N = N+1
 
-print(io::IO,s::Signature) = print(io,[k ? '+' : '-' for k ∈ s.b]...)
-show(io::IO,s::Signature) = print(io,s)
+hasorigin(s::Signature) = s[end]
+
+Signature(s::String) = Signature{length(s)}(push!([k≠'-' for k∈s],s[end]=='o'))
+
+function print(io::IO,s::Signature{N}) where N
+    print(io,[s[k] ? '+' : '-' for k∈1:N-1]...,s[end] ? 'o' : s[N] ? '+' : '-')
+end
+
+show(io::IO,s::Signature{N}) where N = print(io,s)
 
 macro S_str(str)
     Signature(str)
@@ -35,9 +45,20 @@ struct Basis{N,G} <: AbstractTerm{N,G}
     b::BitArray{1}
 end
 
+getindex(b::Basis,i::Int) = b.b[i]
+setindex!(b::Basis,k::Bool,i::Int) = (b[i] = k)
+Base.firstindex(m::Basis) = 1
+Base.lastindex(m::Basis{N}) where N = N
+
 VTI = Union{Vector{<:Integer},Tuple,NTuple}
 
-basisindices(b::Basis) = findall(b.b)
+function basisindices(b::Basis{N},val::Int=N) where N
+    bi = findall(b.b)
+    b.s[end] && for k ∈ 1:length(bi)
+        bi[k] == N && (bi[k] = val)
+    end
+    return bi
+end
 
 function basisbits(d::Integer,b::VTI)
     out = falses(d)
@@ -47,16 +68,18 @@ function basisbits(d::Integer,b::VTI)
     return out
 end
 
-Basis{N}(s::Signature,b::BitArray) where N = Basis{N,sum(b)}(s,b)
-Basis(s::Signature,b::VTI) = Basis{length(s.b)}(s,b)
-Basis(s::Signature,b::Integer...) = Basis{length(s.b)}(s,b)
+isorigin(e::Basis) = e.s[end] && sum(e.b) == 1 && e.b[end]
+
+Basis{N}(s::Signature{N},b::BitArray) where N = Basis{N,sum(b)}(s,b)
+Basis(s::Signature{N},b::VTI) where N = Basis{N}(s,b)
+Basis(s::Signature{N},b::Integer...) where N = Basis{N}(s,b)
 
 for t ∈ [[:N],[:N,:G]]
     @eval begin
-        function Basis{$(t...)}(s::Signature,b::VTI) where {$(t...)}
+        function Basis{$(t...)}(s::Signature{N},b::VTI) where {$(t...)}
             Basis{$(t...)}(s,basisbits(N,b))
         end
-        function Basis{$(t...)}(s::Signature,b::Integer...) where {$(t...)}
+        function Basis{$(t...)}(s::Signature{N},b::Integer...) where {$(t...)}
             Basis{$(t...)}(s,basisbits(N,b))
         end
     end
@@ -67,7 +90,7 @@ function ==(a::Basis{N,G},b::Basis{N,G}) where {N,G}
 end
 
 printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
-print(io::IO, e::Basis) = printbasis(io,basisindices(e))
+print(io::IO, e::Basis) = printbasis(io,basisindices(e,0))
 show(io::IO, e::Basis) = print(io,e)
 
 export @basis
@@ -81,9 +104,13 @@ macro basis(label,sig,str)
     exp = Expr[Expr(:(=),esc(sig),s),
         Expr(:(=),esc(label),Basis(s))]
     for i ∈ 1:N
-        set = combo(N,i) |> collect
+        set = combo(N,i)
         for k ∈ 1:length(set)
-            print(io,lab,set[k]...)
+            setk = string.(set[k])
+            s[end] && for m ∈ 1:length(set[k])
+                set[k][m] == N && (setk[m] = "o")
+            end
+            print(io,lab,setk...)
             sym = Symbol(String(take!(io)))
             push!(els,sym)
             push!(exp,Expr(:(=),esc(sym),Basis(s,set[k])))

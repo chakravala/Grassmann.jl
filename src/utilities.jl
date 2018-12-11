@@ -1,8 +1,9 @@
 
-#   This file is part of Multivectors.jl. It is licensed under the MIT license
+#   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
-subscripts = Dict(
+subscripts = Dict{Int,Char}(
+    0 => 'o',
     1 => '₁',
     2 => '₂',
     3 => '₃',

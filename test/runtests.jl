@@ -1,5 +1,5 @@
-using Multivectors
+using Grassmann
 using Test
 
 # write your own tests here
-@test (@multibasis e s "++++"; e₁₂₄ * e₂₃ == e₁₃₄)
+@test (@basis e s "++++"; e124 * e23 == e134)

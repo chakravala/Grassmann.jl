@@ -1,5 +1,5 @@
 
-#   This file is part of Multivectors.jl. It is licensed under the MIT license
+#   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
 import Base: +, *
@@ -37,8 +37,8 @@ end
 
 for Value ∈ MSV
     @eval begin
-        *(a::Number,b::$Value{N}) where N = SValue{N}(a*b.v,b)
-        *(a::$Value{N},b::Number) where N = SValue{N}(a.v*b,a)
+        *(a::Number,b::$Value{N}) where N = SValue{N}(a*b.v,b.b)
+        *(a::$Value{N},b::Number) where N = SValue{N}(a.v*b,a.b)
         *(a::$Value{N},b::Basis{N}) where N = SValue{N}(a.v,a.b*b)
         *(a::Basis{N},b::$Value{N}) where N = SValue{N}(b.v,a*b.b)
     end

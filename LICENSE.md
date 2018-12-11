@@ -1,4 +1,4 @@
-The Multivectors.jl package is licensed under the MIT "Expat" License:
+The Grassmann.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2017: Michael Reed.
 > 
