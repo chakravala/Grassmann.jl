@@ -6,61 +6,14 @@ module Multivectors
 using Combinatorics, StaticArrays
 using ComputedFieldTypes
 
-import Base: print, show, getindex, promote_rule, ==
+import Base: print, show, getindex, setindex!, promote_rule, ==, convert
 export AbstractTerm, MultiBasis, MultiValue, MultiBlade, MultiVector, MultiGrade, Signature, @S_str
 
 abstract type AbstractTerm{N,G} end
 
-subscripts = Dict(
-    1 => '₁',
-    2 => '₂',
-    3 => '₃',
-    4 => '₄',
-    5 => '₅',
-    6 => '₆',
-    7 => '₇',
-    8 => '₈',
-    9 => '₉',
-    0 => '₀'
-)
+include("utilities.jl")
 
-const binomsum = ( () -> begin
-        Y = Array{Int,1}[Int[1]]
-        return (n::Int,i::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    push!(Y,cumsum([binomial(k,q) for q ∈ 0:k]))
-                end
-                i ≠ 0 ? Y[n][i] : 0
-            end)
-    end)()
-
-const combo = ( () -> begin
-        Y = Array{Array{Array{Int,1},1},1}[]
-        return (n::Int,g::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    z = 1:k
-                    push!(Y,[collect(combinations(z,q)) for q ∈ z])
-                end
-                g ≠ 0 ? Y[n][g] : [Int[]]
-            end)
-    end)()
-
-const basisindex = ( () -> begin
-        Y = Array{Dict{Array{Int,1},Int},1}[]
-        return (n::Int,i::Array{Int,1}) -> (begin
-                j = length(Y)
-                g = length(i)
-                for k ∈ j+1:n
-                    push!(Y,[Dict{Array{Int,1},Int}() for k ∈ 1:k])
-                end
-                g>0 && !haskey(Y[n][g],i) && 
-                    push!(Y[n][g],i=>findall(x->x==i,combo(n,g))[1])
-                g>0 ? Y[n][g][i] : 1
-            end)
-    end)()
-
+## Signature{N}
 
 struct Signature{N}
     b::BitArray{1}
@@ -68,8 +21,8 @@ end
 
 Signature(s::String) = Signature{length(s)}(BitArray([k ≠ '+' ? 0 : 1 for k ∈ s]))
 
-show(io::IO,s::Signature) = print(io,s)
 print(io::IO,s::Signature) = print(io,[k ? '+' : '-' for k ∈ s.b]...)
+show(io::IO,s::Signature) = print(io,s)
 
 macro S_str(str)
     Signature(str)
@@ -81,21 +34,11 @@ struct MultiBasis{N,G} <: AbstractTerm{N,G}
     s::Signature{N}
     b::BitArray{1}
 end
-MultiBasis{N}(s::Signature,b::BitArray) where N = MultiBasis{N,sum(b)}(s,b)
 
 VTI = Union{Vector{<:Integer},Tuple,NTuple}
-MultiBasis(s::Signature,b::VTI) = MultiBasis{length(s.b)}(s,b)
-MultiBasis(s::Signature,b::Integer...) = MultiBasis{length(s.b)}(s,b)
-MultiBasis{N}(s::Signature,b::VTI) where N = MultiBasis{N}(s,basisbits(N,b))
-MultiBasis{N}(s::Signature,b::Integer...) where N = MultiBasis{N}(s,basisbits(N,b))
-MultiBasis{N,G}(s::Signature,b::VTI) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
-MultiBasis{N,G}(s::Signature,b::Integer...) where {N,G} = MultiBasis{N,G}(s,basisbits(N,b))
-
-function ==(a::MultiBasis{N,G},b::MultiBasis{N,G}) where {N,G}
-    return (a.s == b.s) && (a.b == b.b)
-end
 
 basisindices(b::MultiBasis) = findall(b.b)
+
 function basisbits(d::Integer,b::VTI)
     out = falses(d)
     for k ∈ b
@@ -104,10 +47,28 @@ function basisbits(d::Integer,b::VTI)
     return out
 end
 
-show(io::IO, e::MultiBasis) = print(io,e)
-print(io::IO, e::MultiBasis) = printbasis(io,basisindices(e))
+MultiBasis{N}(s::Signature,b::BitArray) where N = MultiBasis{N,sum(b)}(s,b)
+MultiBasis(s::Signature,b::VTI) = MultiBasis{length(s.b)}(s,b)
+MultiBasis(s::Signature,b::Integer...) = MultiBasis{length(s.b)}(s,b)
+
+for t ∈ [[:N],[:N,:G]]
+    @eval begin
+        function MultiBasis{$(t...)}(s::Signature,b::VTI) where {$(t...)}
+            MultiBasis{$(t...)}(s,basisbits(N,b))
+        end
+        function MultiBasis{$(t...)}(s::Signature,b::Integer...) where {$(t...)}
+            MultiBasis{$(t...)}(s,basisbits(N,b))
+        end
+    end
+end
+
+function ==(a::MultiBasis{N,G},b::MultiBasis{N,G}) where {N,G}
+    return (a.s == b.s) && (a.b == b.b)
+end
 
 printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
+print(io::IO, e::MultiBasis) = printbasis(io,basisindices(e))
+show(io::IO, e::MultiBasis) = print(io,e)
 
 export @multibasis
 
@@ -169,26 +130,25 @@ Base.lastindex(m::MultiBlade{T,N,G}) where {T,N,G} = length(m.v)
 
 (m::MultiBlade{T,N,G})(i) where {T,N,G} = MultiValue{N,G,T}(m[i],MultiBasis(m.s,combo(N,G)[i]))
 
-function MultiBlade(v::MultiBasis{N,G}) where {N,G}
-    out = MultiBlade{Int,N,G}(v.s,zeros(Int,binomial(N,G)))
-    out[basisindex(N,findall(v.b))] = one(Int)
+function MultiBlade{T,N,G}(val::T,v::MultiBasis{N,G}) where {T,N,G}
+    out = MultiBlade{T,N}(v.s,zeros(T,binomial(N,G)))
+    out.v[basisindex(N,findall(v.b))] = val
     return out
 end
+
+MultiBlade(v::MultiBasis{N,G}) where {N,G} = MultiBlade{Int,N,G}(one(Int),v)
+
 for var ∈ [[:T,:N,:G],[:T,:N],[:T]]
     @eval begin
         function MultiBlade{$(var...)}(v::MultiBasis{N,G}) where {T,N,G}
-            out = MultiBlade{T,N,G}(v.s,zeros(T,binomial(N,G)))
-            out[basisindex(N,findall(v.b))] = one(T)
-            return out
+            return MultiBlade{T,N,G}(one(T),v)
         end
     end
 end
 for var ∈ [[:T,:N,:G],[:T,:N],[:T],[]]
     @eval begin
         function MultiBlade{$(var...)}(v::MultiValue{N,G,T}) where {T,N,G}
-            out = MultiBlade{T,N,G}(v.b.s,zeros(T,binomial(N,G)))
-            out[basisindex(N,findall(v.b.b))] = v.v
-            return out
+            return MultiBlade{T,N,G}(v.v,v.b)
         end
     end
 end
@@ -210,55 +170,53 @@ end
     v::MVector{2^N,T}
 end
 
-MultiVector{T}(s::Signature,v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
-MultiVector{T}(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,v)
-MultiVector(s::Signature,v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
-MultiVector(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,v)
-MultiVector(s::Signature,v::T...) where T = MultiVector{T,intlog(length(v))}(s,v)
-
-function intlog(M::Integer)
-    lM = log2(M)
-    try; Int(lM)
-    catch; lM end
-end
-
-function Base.getindex(m::MultiVector{T,N},i::Int) where {T,N}
+function getindex(m::MultiVector{T,N},i::Int) where {T,N}
     0 <= i <= N || throw(BoundsError(m, i))
     r = binomsum(N,i)
     return @view m.v[r+1:r+binomial(N,i)]
 end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
 
-function Base.setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T
-    m[i][j] = k
-end
+setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{T,N}) where {T,N} = N
 
-(m::MultiVector{T,N})(g::Int) where {T,N} = MultiBlade{T,N,g}(m.s,m[g])
-(m::MultiVector{T,N})(g::Int,i::Int) where {T,N} = MultiValue{N,g,T}(m[g][i],MultiBasis{N,g}(m.s,combo(N,g)[i]))
+function (m::MultiVector{T,N})(g::Int) where {T,N}
+    MultiBlade{T,N,g}(m.s,m[g])
+end
+function (m::MultiVector{T,N})(g::Int,i::Int) where {T,N}
+    MultiValue{N,g,T}(m[g][i],MultiBasis{N,g}(m.s,combo(N,g)[i]))
+end
 
-function MultiVector(v::MultiBasis{N,G}) where {N,G}
-    out = MultiVector{Int,N}(v.s,zeros(Int,2^N))
-    out.v[binomsum(N,G-1)+basisindex(N,findall(v.b))] = one(Int)
+MultiVector(s::Signature,v::T...) where T = MultiVector{T,intlog(length(v))}(s,v)
+
+for var ∈ [[:T],[]]
+    @eval begin
+        MultiVector{$(var...)}(s::Signature,v::MVector{M,T}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
+        MultiVector{$(var...)}(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,v)
+    end
+end
+
+function MultiVector{T,N,G}(val::T,v::MultiBasis{N,G}) where {T,N,G}
+    out = MultiVector{T,N}(v.s,zeros(T,2^N))
+    out.v[binomsum(N,G)+basisindex(N,findall(v.b))] = val
     return out
 end
+
+MultiVector(v::MultiBasis{N,G}) where {N,G} = MultiVector{Int,N,G}(one(Int),v)
+
 for var ∈ [[:T,:N,:G],[:T,:N],[:T]]
     @eval begin
         function MultiVector{$(var...)}(v::MultiBasis{N,G}) where {T,N,G}
-            out = MultiVector{T,N}(v.s,zeros(T,2^N))
-            out.v[binomsum(N,G-1)+basisindex(N,findall(v.b))] = one(T)
-            return out
+            return MultiVector{T,N,G}(one(T),v)
         end
     end
 end
 for var ∈ [[:T,:N,:G],[:T,:N],[:T],[]]
     @eval begin
         function MultiVector{$(var...)}(v::MultiValue{N,G,T}) where {T,N,G}
-            out = MultiVector{T,N}(v.b.s,zeros(T,2^N))
-            out.v[binomsum(N,G-1)+basisindex(N,findall(v.b.b))] = v.v
-            return out
+            return MultiVector{T,N,G}(v.v,v.b)
         end
         function MultiVector{$(var...)}(v::MultiBlade{T,N,G}) where {T,N,G}
             out = MultiVector{T,N}(v.s,zeros(T,2^N))
@@ -283,13 +241,64 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
     end
 end
 
+## Generic
+
+typeval(m::MultiBasis) = Int
+typeval(m::MultiValue{N,G,T}) where {N,G,T} = T
+grade(m::AbstractTerm{N,G}) where {N,G} = G
+
+
 ## MultiGrade{N}
 
 struct MultiGrade{N}
     v::Vector{<:AbstractTerm{N}}
 end
 
+convert(::Type{Vector{<:AbstractTerm{N}}},m::Tuple) where N = [m...]
+
 MultiGrade{N}(v::T...) where T <: (AbstractTerm{N,G} where G) where N = MultiGrade{N}(v)
+MultiGrade(v::T...) where T <: (AbstractTerm{N,G} where G) where N = MultiGrade{N}(v)
+
+function bladevalues(s::Signature,m,N::Int,G::Int,T::Type)
+    com = combo(N,G)
+    out = MultiValue{N,G,T}[]
+    for i ∈ 1:binomial(N,G)
+        m[i] ≠ 0 && push!(out,MultiValue{N,G,T}(m[i],MultiBasis{N,G}(s,com[i])))
+    end
+    return out
+end
+
+function MultiGrade{N}(v::MultiVector{T,N}) where {T,N}
+    MultiGrade{N}(vcat([bladevalues(v.s,v[g],N,g,T) for g ∈ 1:N]...))
+end
+
+function MultiGrade{N}(v::MultiBlade{T,N,G}) where {T,N,G}
+    MultiGrade{N}(bladevalues(v.s,v,N,G,T))
+end
+
+MultiGrade(v::MultiVector{T,N}) where {T,N} = MultiGrade{N}(v)
+MultiGrade(v::MultiBlade{T,N,G}) where {T,N,G} = MultiGrade{N}(v)
+
+#=function MultiGrade{N}(v::(MultiBlade{T,N} where T <: Number)...) where N
+    t = typeof.(v)
+    MultiGrade{N}([bladevalues(v[i].s,v[i],N,t[i].parameters[3],t[i].parameters[1]) for i ∈ 1:length(v)])
+end
+
+MultiGrade(v::(MultiBlade{T,N} where T <: Number)...) where N = MultiGrade{N}(v)=#
+
+function MultiVector{N}(v::MultiGrade{N}) where N
+    T = promote_type(typeval.(v.v)...)
+    g = grade.(v.v)
+    s = typeof(v.v[1]) <: MultiBasis ? v.v[1].s : v.v[1].b.s
+    out = MultiVector{T,N}(s,zeros(T,2^N))
+    for k ∈ 1:length(v.v)
+        (val,b) = typeof(v.v[k]) <: MultiBasis ? (one(T),v.v[k]) : (v.v[k].v,v.v[k].b)
+        out.v[binomsum(N,g[k])+basisindex(N,basisindices(b))] = val
+    end
+    return out
+end
+
+MultiVector(v::MultiGrade{N}) where N = MultiVector{N}(v)
 
 function show(io::IO,m::MultiGrade)
     for k ∈ 1:length(m.v)
