@@ -2,7 +2,8 @@
 #   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
-subscripts = Dict{Int,Char}(
+const subscripts = Dict{Int,Char}(
+   -1 => 'ϵ',
     0 => 'o',
     1 => '₁',
     2 => '₂',
@@ -12,8 +13,7 @@ subscripts = Dict{Int,Char}(
     6 => '₆',
     7 => '₇',
     8 => '₈',
-    9 => '₉',
-    0 => '₀'
+    9 => '₉'
 )
 
 const binomsum = ( () -> begin

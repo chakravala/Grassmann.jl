@@ -19,17 +19,18 @@ struct Signature{N}
     b::BitArray{1}
 end
 
-getindex(s::Signature,i::Int) = s.b[i]
-setindex!(s::Signature,k::Bool,i::Int) = (s[i] = k)
+getindex(s::Signature,i::Union{Int,UnitRange{Int}}) = s.b[i]
+setindex!(s::Signature,k::Bool,i::Int) = (s.b[i] = k)
 Base.firstindex(m::Signature) = 1
-Base.lastindex(m::Signature{N}) where N = N+1
+Base.lastindex(m::Signature{N}) where N = N+2
+Base.length(s::Signature{N}) where N = N
 
-hasorigin(s::Signature) = s[end]
+Signature(s::String) = Signature{length(s)}(push!([k=='-' for k∈s],s[1]=='ϵ',s[end]=='o'))
 
-Signature(s::String) = Signature{length(s)}(push!([k≠'-' for k∈s],s[end]=='o'))
+@inline sig(s::Bool) = s ? '-' : '+'
 
-function print(io::IO,s::Signature{N}) where N
-    print(io,[s[k] ? '+' : '-' for k∈1:N-1]...,s[end] ? 'o' : s[N] ? '+' : '-')
+@inline function print(io::IO,s::Signature{N}) where N
+    print(io,s[end-1] ? 'ϵ' : sig(s[1]),sig.(s[2:N-1])...,s[end] ? 'o' : sig(s[N]))
 end
 
 show(io::IO,s::Signature{N}) where N = print(io,s)
@@ -46,29 +47,33 @@ struct Basis{N,G} <: AbstractTerm{N,G}
 end
 
 getindex(b::Basis,i::Int) = b.b[i]
-setindex!(b::Basis,k::Bool,i::Int) = (b[i] = k)
+setindex!(b::Basis,k::Bool,i::Int) = (b.b[i] = k)
 Base.firstindex(m::Basis) = 1
 Base.lastindex(m::Basis{N}) where N = N
+Base.length(b::Basis{N}) where N = N
 
 VTI = Union{Vector{<:Integer},Tuple,NTuple}
 
-function basisindices(b::Basis{N},val::Int=N) where N
-    bi = findall(b.b)
-    b.s[end] && for k ∈ 1:length(bi)
-        bi[k] == N && (bi[k] = val)
+@inline basisindices(b::Basis{N},val::Tuple{Int,Int}=(1,N)) where N = basisindices(b.s,findall(b.b),val)
+
+function basisindices(s::Signature{N},set::Vector{Int},val::Tuple{Int,Int}=(1,N)) where N
+    if !isempty(set)
+        s[end] && set[end] == N && (set[end] = val[end])
+        if s[end-1]
+            set[1] == 1 && (set[1] = val[1])
+            val[1] < 0 && (set[(set[1] < 0 ? 2 : 1):end-(set[end] ≠ 0 ? 0 : 1)] .-= 1)
+        end
     end
-    return bi
+    return set
 end
 
-function basisbits(d::Integer,b::VTI)
+@inline function basisbits(d::Integer,b::VTI)
     out = falses(d)
     for k ∈ b
         out[k] = true
     end
     return out
 end
-
-isorigin(e::Basis) = e.s[end] && sum(e.b) == 1 && e.b[end]
 
 Basis{N}(s::Signature{N},b::BitArray) where N = Basis{N,sum(b)}(s,b)
 Basis(s::Signature{N},b::VTI) where N = Basis{N}(s,b)
@@ -89,8 +94,8 @@ function ==(a::Basis{N,G},b::Basis{N,G}) where {N,G}
     return (a.s == b.s) && (a.b == b.b)
 end
 
-printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
-print(io::IO, e::Basis) = printbasis(io,basisindices(e,0))
+@inline printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
+@inline print(io::IO, e::Basis) = printbasis(io,basisindices(e,(-1,0)))
 show(io::IO, e::Basis) = print(io,e)
 
 export @basis
@@ -106,11 +111,8 @@ macro basis(label,sig,str)
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            setk = string.(set[k])
-            s[end] && for m ∈ 1:length(set[k])
-                set[k][m] == N && (setk[m] = "o")
-            end
-            print(io,lab,setk...)
+            sk = basisindices(s,deepcopy(set[k]),(-1,0))
+            print(io,lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈sk]...)
             sym = Symbol(String(take!(io)))
             push!(els,sym)
             push!(exp,Expr(:(=),esc(sym),Basis(s,set[k])))
@@ -160,6 +162,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         setindex!(m::$Blade{T},k::T,i::Int) where T = (m.v[i] = k)
         Base.firstindex(m::$Blade) = 1
         Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
+        Base.length(s::$Blade{T,N,G}) where {T,N,G} = length(m.v)
 
         function (m::$Blade{T,N,G})(i::Integer,B::Type=SValue) where {T,N,G}
             if B ≠ SValue
@@ -170,7 +173,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         end
 
         function $Blade{T,N,G}(val::T,v::Basis{N,G}) where {T,N,G}
-            out = $Blade{T,N}(v.s,zeros(T,binomial(N,G)))
+            out = MBlade{T,N}(v.s,zeros(T,binomial(N,G)))
             out.v[basisindex(N,findall(v.b))] = val
             return out
         end
@@ -183,7 +186,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
             printbasis(io,set[1])
             for k ∈ 2:length(set)
                 print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
-                printtbasis(io,set[k])
+                printbasis(io,basisindices(m.s,deepcopy(set[k]),(-1,0)))
             end
         end
     end
@@ -280,7 +283,7 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
         for k ∈ 1:length(set)
             if b[k] ≠ 0
                 print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
-                printbasis(io,set[k])
+                printbasis(io,basisindices(m.s,deepcopy(set[k]),(-1,0)))
             end
         end
     end
@@ -288,13 +291,30 @@ end
 
 ## Generic
 
-typeval(m::Basis) = Int
-typeval(m::Union{MValue{N,G,T},SValue{N,G,T}}) where {N,G,T} = T
-typeval(m::Union{MBlade{T},SBlade{T}}) where T = T
-typeval(m::MultiVector{T}) where T = T
+VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
+
+valuetype(m::Basis) = Int
+valuetype(m::Union{MValue{N,G,T},SValue{N,G,T}}) where {N,G,T} = T
+valuetype(m::Union{MBlade{T},SBlade{T}}) where T = T
+valuetype(m::MultiVector{T}) where T = T
+value(m::Basis) = 1
+value(m::VBV) = m.v
+sig(m::Basis) = m.s
+sig(m::VBV) = m.b.s
+basis(m::Basis) = m
+basis(m::Union{MValue,SValue}) = m.b
 grade(m::AbstractTerm{N,G}) where {N,G} = G
 grade(m::Union{MBlade{T,N,G},SBlade{T,N,G}}) where {T,N,G} = G
 grade(m::Number) = 0
+
+isdual(e::Basis) = hasdual(e) && sum(e.b) == 1
+hasdual(e::Basis) = e.s[end-1] && e.b[1]
+
+isorigin(e::Basis) = hasorigin(e) && sum(e.b) == 1
+hasorigin(e::Basis) = e.s[end] && e.b[end]
+hasorigin(s::Signature) = s[end]
+hasorigin(t::Union{MValue,SValue}) = hasorigin(t.b)
+hasorigin(m::VBV) = hasorigin(sig(m))
 
 ## MultiGrade{N}
 
