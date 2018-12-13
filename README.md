@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/src/assets/logo.png" alt="Grassmann.jl"/>
+</p>
+
 # Grassmann.jl
 
 *Static dual multivector types with graded-blade indexing, product algebra, and optional origin*
