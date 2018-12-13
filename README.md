@@ -51,4 +51,13 @@ julia> ans * eϵ
 ```
 It is entirely possible to assign multiple different bases with different signatures without any problems.
 
+Alternatively, if you do not wish to assign these variables to your local workspace, the `Grassmann.Algebra{N}` constructors can be used to contain them.
+```Julia
+julia> G3 = Grassmann.Algebra(S"+++")
+Grassmann.Algebra{3,8}(+++, e, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃)
+
+julia> G3.e13 * G3.e12
+e₂₃
+```
+
 This package is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
