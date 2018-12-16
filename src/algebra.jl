@@ -4,10 +4,15 @@
 
 import Base: +, -, *
 
+## signature compatibility
+
+sigcheck(a::Signature,b::Signature) = a ≠ b && throw(error("$(a.s) ≠ $(b.s)"))
+sigcheck(a,b) = sigcheck(sig(a),sig(b))
+
 ## geometric product
 
 function *(a::Basis{N},b::Basis{N}) where N
-    a.s ≠ b.s && throw(error("$(a.s) ≠ $(b.s)"))
+    sigcheck(a.s,b.s)
     (s,c,t) = indexjoin(basisindices(a),basisindices(b),a.s)
     t && (return SValue{N}(0,Basis{N,0}(a.s)))
     d = Basis{N}(a.s,c)
@@ -49,12 +54,65 @@ end
 *(a::Number,b::Basis{N}) where N = SValue{N}(a,b)
 *(a::Basis{N},b::Number) where N = SValue{N}(b,a)
 
+function *(a::MultiVector{T,N},b::Basis{N,G}) where {T,N,G}
+    sigcheck(a.s,b.s)
+    t = promote_type(T,valuetype(b))
+    out = MultiVector{t,N}(a.s,zeros(t,2^N))
+    for g ∈ 0:N
+        r = binomsum(N,g)
+        for i ∈ 1:binomial(N,g)
+            (s,c,t) = indexjoin(basisindices(a.s,g,i),basisindices(b),a.s)
+            !t && (out[length(c)][basisindex(N,c)] += s ? -(a.v[r+i]) : a.v[r+i])
+        end
+    end
+    return out
+end
+function *(a::Basis{N,G},b::MultiVector{T,N}) where {N,G,T}
+    sigcheck(a.s,b.s)
+    t = promote_type(T,valuetype(a))
+    out = MultiVector{t,N}(a.s,zeros(t,2^N))
+    for g ∈ 0:N
+        r = binomsum(N,g)
+        for i ∈ 1:binomial(N,g)
+            (s,c,t) = indexjoin(basisindices(a),basisindices(a.s,g,i),a.s)
+            !t && (out[length(c)][basisindex(N,c)] += s ? -(b.v[r+i]) : b.v[r+i])
+        end
+    end
+    return out
+end
+
 for Value ∈ MSV
     @eval begin
         *(a::Number,b::$Value{N,G}) where {N,G} = SValue{N,G}(a*b.v,b.b)
         *(a::$Value{N,G},b::Number) where {N,G} = SValue{N,G}(a.v*b,a.b)
         *(a::$Value{N},b::Basis{N}) where N = SValue{N}(a.v,a.b*b)
         *(a::Basis{N},b::$Value{N}) where N = SValue{N}(b.v,a*b.b)
+        function *(a::MultiVector{T,N},b::$Value{N,G,S}) where {T,N,G,S}
+            sigcheck(a.s,b.b.s)
+            t = promote_type(T,S)
+            out = MultiVector{t,N}(a.s,zeros(t,2^N))
+            for g ∈ 0:N
+                r = binomsum(N,g)
+                for i ∈ 1:binomial(N,g)
+                    (s,c,t) = indexjoin(basisindices(a.s,g,i),basisindices(b.b),a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += a.v[r+i]*(s ? -(b.v) : b.v))
+                end
+            end
+            return out
+        end
+        function *(a::$Value{N,G,T},b::MultiVector{S,N}) where {N,G,T,S}
+            sigcheck(a.b.s,b.s)
+            t = promote_type(T,S)
+            out = MultiVector{t,N}(a.s,zeros(t,2^N))
+            for g ∈ 0:N
+                r = binomsum(N,g)
+                for i ∈ 1:binomial(N,g)
+                    (s,c,t) = indexjoin(basisindices(a.b),basisindices(a.s,g,i),a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += (s ? -(a.v) : a.v)*b.v[r+i])
+                end
+            end
+            return out
+        end
     end
 end
 for (A,B) ∈ [(A,B) for A ∈ MSV, B ∈ MSV]
@@ -65,23 +123,128 @@ for Blade ∈ MSB
         *(a::Number,b::$Blade{T,N,G}) where {T,N,G} = SBlade{T,N,G}(a.*b.v,b.b)
         *(a::$Blade{T,N,G},b::Number) where {T,N,G} = SBlade{T,N,G}(a.v.*b,a.b)
         function *(a::$Blade{T,N,G},b::Basis{N}) where {T,N,G}
-            a.s ≠ b.s && throw(error("$(a.s) ≠ $(b.s)"))
-            (s,c,t) = indexjoin(basisindices(s,G,i),basisindices(b),a.s)
-            t && (return SValue{N}(0,Basis{N,0}(a.s)))
-            d = Basis{N}(a.s,c)
-            return s ? SValue{N}(-1,d) : d
+            sigcheck(a.s,b.s)
+            t = promote_type(T,valuetype(b))
+            out = MultiVector{t,N}(a.s,zeros(t,2^N))
+            for i ∈ 1:binomial(N,G)
+                (s,c,t) = indexjoin(basisindices(a.s,G,i),basisindices(b),a.s)
+                !t && (out[length(c)][basisindex(N,c)] += s ? -(a[i]) : a[i])
+            end
+            return out
         end
-        #*(a::Basis{N},b::$Blade{T,N}) where {T,N} = SBlade{T,N}(b.v,a*b.b)
+        function *(a::Basis{N},b::$Blade{T,N,G}) where {T,N,G}
+            sigcheck(a.s,b.s)
+            t = promote_type(T,valuetype(a))
+            out = MultiVector{t,N}(b.s,zeros(t,2^N))
+            for i ∈ 1:binomial(N,G)
+                (s,c,t) = indexjoin(basisindices(a),basisindices(b.s,G,i),a.s)
+                !t && (out[length(c)][basisindex(N,c)] += s ? -(b[i]) : b[i])
+            end
+            return out
+        end
+        function *(a::MultiVector{T,N},b::$Blade{S,N,G}) where {T,N,S,G}
+            sigcheck(a.s,b.s)
+            t = promote_type(T,S)
+            bng = binomial(N,G)
+            out = MultiVector{t,N}(a.s,zeros(t,2^N))
+            B = [basisindices(a.s,G,i) for i ∈ 1:bng]
+            for g ∈ 0:N
+                r = binomsum(N,g)
+                for i ∈ 1:binomial(N,g)
+                    A = basisindices(a.s,g,i)
+                    for j ∈ 1:bng
+                        (s,c,t) = indexjoin(A,B[j],a.s)
+                        !t && (out[length(c)][basisindex(N,c)] += a.v[r+i]*(s ? -(b[j]) : b[j]))
+                    end
+                end
+            end
+            return out
+        end
+        function *(a::$Blade{T,N,G},b::MultiVector{S,N}) where {N,G,S,T}
+            sigcheck(a.s,b.s)
+            t = promote_type(T,S)
+            bng = binomial(N,G)
+            out = MultiVector{t,N}(a.s,zeros(t,2^N))
+            A = [basisindices(a.s,G,i) for i ∈ 1:bng]
+            for g ∈ 0:N
+                r = binomsum(N,g)
+                for i ∈ 1:binomial(N,g)
+                    B = basisindices(a.s,g,i)
+                    for j ∈ 1:bng
+                        (s,c,t) = indexjoin(A[j],B,a.s)
+                        !t && (out[length(c)][basisindex(N,c)] += (s ? -(a[j]) : a[j])*b.v[r+i])
+                    end
+                end
+            end
+            return out
+        end
+    end
+    for Value ∈ MSV
+        @eval begin
+            function *(a::$Blade{T,N,G},b::$Value{N,L,S}) where {T,N,G,L,S}
+                sigcheck(a.s,b.b.s)
+                t = promote_type(T,S)
+                out = MultiVector{t,N}(a.s,zeros(t,2^N))
+                for i ∈ 1:binomial(N,G)
+                    (s,c,t) = indexjoin(basisindices(a.s,G,i),basisindices(b.b),a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += (s ? -(a[i]) : a[i])*b.v)
+                end
+                return out
+            end
+            function *(a::$Value{N,L,S},b::$Blade{T,N,G}) where {T,N,G,L,S}
+                sigcheck(a.b.s,b.s)
+                t = promote_type(T,S)
+                out = MultiVector{t,N}(b.s,zeros(t,2^N))
+                for i ∈ 1:binomial(N,G)
+                    (s,c,t) = indexjoin(basisindices(a.b),basisindices(b.s,G,i),a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += a.v*(s ? -(b[i]) : b[i]))
+                end
+                return out
+            end
+        end
     end
 end
 for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
-    #@eval *(a::$A{T,N},b::$B{T,N}) where N = SBlade{T,N}(a.v*b.v,a.b*b.b)
+    @eval begin
+        function *(a::$A{T,N,G},b::$B{T,N,L}) where {T,N,G,L}
+            sigcheck(a.s,b.s)
+            bnl = binomial(N,L)
+            out = MultiVector{T,N}(a.s,zeros(T,2^N))
+            B = [basisindices(b.s,L,i) for i ∈ bnl]
+            for i ∈ 1:binomial(N,G)
+                A = basisindices(a.s,G,i)
+                for j ∈ 1:bnl
+                    (s,c,t) = indexjoin(A,B[j],a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += (s ? -(a[i]) : a[i])*b[j])
+                end
+            end
+            return out
+        end
+    end
 end
 *(a::Number,b::MultiVector{T,N,G}) where {T,N,G} = MultiVector{T,N,G}(a.*b.v,b.b)
 *(a::MultiVector{T,N,G},b::Number) where {T,N,G} = MultiVector{T,N,G}(a.v.*b,a.b)
-#*(a::MultiVector{T,N},b::Basis{N}) where {T,N} = MultiVector{T,N}(a.v,a.b*b)
-#*(a::Basis{N},b::MultiVector{T,N}) where {T,N} = MultiVector{T,N}(b.v,a*b.b)
-#*(a::MultiVector{T,N},b::MultiVector{T,N}) where {T,N} = MultiVector{T,N}(a.v*b.v,a.b*b.b)
+function *(a::MultiVector{T,N},b::MultiVector{S,N}) where {N,T,S}
+    sigcheck(a.s,b.s)
+    t = promote_type(T,S)
+    bng = [binomial(N,g) for g ∈ 0:N]
+    out = MultiVector{t,N}(a.s,zeros(t,2^N))
+    A = [[basisindices(a.s,g,i) for i ∈ 1:bng[g+1]] for g ∈ 0:N]
+    for g ∈ 0:N
+        r = binomsum(N,g)
+        for i ∈ 1:binomial(N,g)
+            B = basisindices(a.s,g,i)
+            for G ∈ 0:N
+                for j ∈ 1:bng[g+1]
+                    (s,c,t) = indexjoin(A[G][j],B,a.s)
+                    !t && (out[length(c)][basisindex(N,c)] += (s ? -(a[G][j]) : a[G][j])*b.v[r+i])
+                end
+            end
+        end
+    end
+    return out
+end
+
 *(a::Number,b::MultiGrade{N}) where N = MultiGrade{N}(a.s,a.*b.v)
 *(a::MultiGrade{N},b::Number) where N = MultiGrade{N}(a.s,a.v.*b)
 #*(a::MultiGrade{N},b::Basis{N}) where N = MultiGrade{N}(a.v,a.b*b)
@@ -119,7 +282,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
         function $op(a::MultiVector{T,N},b::B) where B<:AbstractTerm{N,G} where {T,N,G}
             sig(a) ≠ sig(b) && throw(error("$(sig(a)) ≠ $(sig(b))"))
             t = promote_type(T,valuetype(b))
-            out = MultiVector{t,N,G}(sig(a),value(a,Vector{t}))
+            out = MultiVector{t,N}(sig(a),value(a,Vector{t}))
             $(Expr(eop,:(out.v[binomsum(N,G)+basisindex(N,findall(basis(b).b))]),:(value(b,t))))
             return out
         end
@@ -175,7 +338,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 sig(a) ≠ sig(b) && throw(error("$(sig(a)) ≠ $(sig(b))"))
                 t = promote_type(T,S)
                 r = binomsum(N,G)
-                out = MultiVector{t,N,G}(sig(a),value(a,Vector{t}))
+                out = MultiVector{t,N}(sig(a),value(a,Vector{t}))
                 $(Expr(eop,:(out.v[r+1:r+binomial(N,G)]),:(value(b,Vector{t}))))
                 return out
             end
