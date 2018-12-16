@@ -40,16 +40,17 @@ const combo = ( () -> begin
     end)()
 
 const basisindex = ( () -> begin
-        Y = Array{Dict{Array{Int,1},Int},1}[]
+        Y = Array{Dict{String,Int},1}[]
         return (n::Int,i::Array{Int,1}) -> (begin
                 j = length(Y)
                 g = length(i)
+                s = string(i...)
                 for k ∈ j+1:n
-                    push!(Y,[Dict{Array{Int,1},Int}() for k ∈ 1:k])
+                    push!(Y,[Dict{String,Int}() for k ∈ 1:k])
                 end
-                g>0 && !haskey(Y[n][g],i) && 
-                    push!(Y[n][g],i=>findall(x->x==i,combo(n,g))[1])
-                g>0 ? Y[n][g][i] : 1
+                g>0 && !haskey(Y[n][g],s) && 
+                    push!(Y[n][g],s=>findall(x->x==i,combo(n,g))[1])
+                g>0 ? Y[n][g][s] : 1
             end)
     end)()
 

@@ -21,7 +21,7 @@ Base.lastindex(m::Signature{N}) where N = N+2
 Base.length(s::Signature{N}) where N = N
 
 Signature{N}(s::String) where N = Signature{N}(push!([k=='-' for k∈s],s[1]=='ϵ',s[end]=='o'))
-Signature(s::String) = Signature{length(s)}(s)
+@inline Signature(s::String) = Signature{length(s)}(s)
 
 @inline sig(s::Bool) = s ? '-' : '+'
 
@@ -33,6 +33,12 @@ show(io::IO,s::Signature{N}) where N = print(io,s)
 
 macro S_str(str)
     Signature(str)
+end
+
+# VectorSpace
+
+@computed struct VectorSpace{N,D,O}
+    s::Signature{N-D-O}
 end
 
 ## MultiBasis{N}
@@ -48,8 +54,15 @@ Base.firstindex(m::Basis) = 1
 Base.lastindex(m::Basis{N}) where N = N
 Base.length(b::Basis{N}) where N = N
 
+function Base.iterate(r::Basis, i::Int=1)
+    Base.@_inline_meta
+    length(r) < i && return nothing
+    Base.unsafe_getindex(r, i), i + 1
+end
+
 const VTI = Union{Vector{<:Integer},Tuple,NTuple}
 
+@inline basisindices(s::Signature{N},G::Int,i::Int,val::Bool=false) where N = basisindices(s,combo(N,G)[i])
 @inline basisindices(b::Basis{N},val::Bool=false) where N = basisindices(b.s,findall(b.b),val)
 
 function basisindices(s::Signature{N},set::Vector{Int},val::Bool=false) where N
@@ -119,7 +132,7 @@ macro basis(label,sig,str)
     basis,sym = generate(s,label)
     exp = Expr[Expr(:(=),esc(sig),s),
         Expr(:(=),esc(label),basis[1])]
-    for i ∈ 1:2^N
+    for i ∈ 2:2^N
         push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
@@ -132,7 +145,7 @@ const MSV = [:MValue,:SValue]
 for Value ∈ MSV
     eval(Expr(:struct,Value ≠ :SValue,:($Value{N,G,T} <: AbstractTerm{N,G}),quote
         v::T
-        b::$Basis{N,G}
+        b::Basis{N,G}
     end))
 end
 for Value ∈ MSV
@@ -214,8 +227,8 @@ end
     v::StaticArray{Tuple{2^N},T,1}
 end
 
-MultiVector{T,N}(s::Signature,v::T...) where {T,N} = MultiVector{T,N}(s,SVector(v))
-MultiVector{T,N}(s::Signature,v::Vector{T}) where {T,N} = MultiVector{T,N}(s,MVector(v))
+MultiVector{T,N}(s::Signature,v::T...) where {T,N} = MultiVector{T,N}(s,SVector{2^N,T}(v))
+MultiVector{T,N}(s::Signature,v::Vector{T}) where {T,N} = MultiVector{T,N}(s,MVector{2^N,T}(v))
 
 function getindex(m::MultiVector{T,N},i::Int) where {T,N}
     0 <= i <= N || throw(BoundsError(m, i))
@@ -301,10 +314,11 @@ valuetype(m::Basis) = Int
 valuetype(m::Union{MValue{N,G,T},SValue{N,G,T}}) where {N,G,T} = T
 valuetype(m::Union{MBlade{T},SBlade{T}}) where T = T
 valuetype(m::MultiVector{T}) where T = T
-value(m::Basis) = 1
-value(m::VBV) = m.v
+value(m::Basis,T=Int) = one(T)
+value(m::VBV,T::DataType=Nothing) = T≠Nothing ? m.v : convert(T,m.v)
 sig(m::Basis) = m.s
-sig(m::VBV) = m.b.s
+sig(m::Union{MValue,SValue}) = m.b.s
+sig(m::Union{MBlade,SBlade,MultiVector}) = m.s
 basis(m::Basis) = m
 basis(m::Union{MValue,SValue}) = m.b
 grade(m::AbstractTerm{N,G}) where {N,G} = G
