@@ -13,7 +13,7 @@ include("algebra.jl")
 ## Algebra{N}
 
 @computed struct Algebra{N}
-    s::Signature{N}
+    s::VectorSpace{N}
     b::SVector{2^N,Basis{N}}
     g::Dict{Symbol,Int}
 end
@@ -24,7 +24,7 @@ Base.lastindex(a::Algebra{N}) where N = 2^N
 Base.length(a::Algebra{N}) where N = 2^N
 Base.getproperty(a::Algebra,v::Symbol) = v ∈ [:s,:b,:g] ? getfield(a,v) : a[a.g[v]]
 
-function Algebra{N}(s::Signature{N}) where N
+function Algebra{N}(s::VectorSpace{N}) where N
     g = Dict{Symbol,Int}()
     basis,sym = generate(s,:e)
     for i ∈ 1:2^N
@@ -33,9 +33,11 @@ function Algebra{N}(s::Signature{N}) where N
     return Algebra{N}(s,basis,g)
 end
 
-Algebra(s::Signature{N}) where N = Algebra{N}(s)
-Algebra(s::String) = Algebra{length(s)}(Signature{length(s)}(s))
-Algebra{N}(s::String) where N = Algebra{N}(Signature{N}(s))
+Algebra(s::VectorSpace{N}) where N = Algebra{N}(s)
+Algebra(N::Int,d::Int=0,o::Int=0) = Algebra{N}(N,d,o)
+Algebra{N}(n::Int,d::Int=0,o::Int=0) where N = Algebra{N}(VectorSpace{N}(n,d,o))
+Algebra(s::String) = Algebra{length(s)}(VectorSpace{length(s)}(s))
+Algebra{N}(s::String) where N = Algebra{N}(VectorSpace{N}(s))
 
 function show(io::IO,a::Algebra{N}) where N
     print(io,"Grassmann.Algebra{$N,$(2^N)}(",a.s,", ")
@@ -44,5 +46,9 @@ function show(io::IO,a::Algebra{N}) where N
     end
     print(io,a[end],")")
 end
+
+export Λ
+
+Λ = Algebra
 
 end # module

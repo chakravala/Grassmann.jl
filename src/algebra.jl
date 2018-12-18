@@ -25,7 +25,7 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
             $(Expr(set,:(out[basisindex(intlog(M),i)]),:val))
             return out
         end
-        @inline function $sm(out::Union{MArray{Tuple{M},T,1,M},Array{T,1}},val::T,i::UInt16,::Dimension{N}) where {M,T,N}
+        @inline function $sm(out::Q,val::T,i::UInt16,::Dimension{N}) where Q<:Union{MArray{Tuple{M},T,1,M},Array{T,1}} where {M,T,N}
             $(Expr(set,:(out[basisindex(N,i)]),:val))
             return out
         end
@@ -37,7 +37,7 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
             $(Expr(set,:(out[basisindexb(intlog(M),i)]),:val))
             return out
         end
-        @inline function $sb(out::Union{MArray{Tuple{M},T,1,M},Array{T,1}},val::T,i::UInt16,::Dimension{N}) where {M,T,N}
+        @inline function $sb(out::Q,val::T,i::UInt16,::Dimension{N}) where Q<:Union{MArray{Tuple{M},T,1,M},Array{T,1}} where {M,T,N}
             $(Expr(set,:(out[basisindexb(N,i)]),:val))
             return out
         end

@@ -4,7 +4,7 @@
 
 
 import Base: print, show, getindex, setindex!, promote_rule, ==, convert
-export AbstractTerm, Basis, MultiVector, MultiGrade, Signature, @S_str
+export AbstractTerm, Basis, MultiVector, MultiGrade, Signature, VectorSpace, @S_str, @V_str
 
 abstract type AbstractTerm{N,G} end
 
@@ -18,18 +18,22 @@ struct Signature{N}
 end
 
 getindex(s::Signature,i::Union{Int,UnitRange{Int}}) = s.b[i]
+getindex(s::Signature{N},i::Colon) where N = s.b[1:N]
 setindex!(s::Signature,k::Bool,i::Int) = (s.b[i] = k)
 Base.firstindex(m::Signature) = 1
 Base.lastindex(m::Signature{N}) where N = N+2
 Base.length(s::Signature{N}) where N = N
 
-Signature{N}(s::String) where N = Signature{N}(push!([k=='-' for k∈s],s[1]=='ϵ',s[end]=='o'))
+Signature{N}(s::String) where N = Signature{N}(push!([k=='-' for k∈s],s[1]=='ϵ',s[(s[1]=='ϵ')+1]=='o'))
+Signature{N}(s::String,b::Bool...) where N = Signature{N}(push!([k=='-' for k∈s],b...))
 @inline Signature(s::String) = Signature{length(s)}(s)
 
 @inline sig(s::Bool) = s ? '-' : '+'
 
 @inline function print(io::IO,s::Signature{N}) where N
-    print(io,s[end-1] ? 'ϵ' : sig(s[1]),sig.(s[2:N-1])...,s[end] ? 'o' : sig(s[N]))
+    s[end-1] && print(io,'ϵ')
+    s[end] && print(io,'o')
+    print(io,sig.(s[s[end-1]+s[end]+1:N])...)
 end
 
 show(io::IO,s::Signature{N}) where N = print(io,s)
@@ -43,17 +47,44 @@ end
 struct VectorSpace{N,D,O}
     s::Signature{N}
 end
-
-getindex(vs::VectorSpace,i::Union{Int,UnitRange{Int}}) = vs.s.b[i]
+getindex(vs::VectorSpace{N,D,O},i::Union{Int,UnitRange{Int}}) where {N,D,O} = i > N ? Bool(i≠N+1 ? O : D) : vs.s.b[i]
+getindex(vs::VectorSpace{N},i::Colon) where N = vs.s[:]
 setindex!(s::VectorSpace,k::Bool,i::Int) = (s.s.b[i] = k)
 Base.firstindex(m::VectorSpace) = 1
 Base.lastindex(m::VectorSpace{N}) where N = N+2
 Base.length(s::VectorSpace{N}) where N = N
 
+hasdual(vs::VectorSpace{N,D}) where {N,D} = Bool(D)
+hasorigin(vs::VectorSpace{N,D,O}) where {N,D,O} = Bool(O)
+
 VectorSpace{N}(s::Signature{N}) where N = VectorSpace{N,Int(s[end-1]),Int(s[end])}(s)
+VectorSpace(s::Signature{N}) where N = VectorSpace{N}(s)
+
+VectorSpace{N,D,O}(str::String) where {N,D,O} = VectorSpace{N,D,O}(Signature{N}(replace(replace(str,'ϵ'=>'+'),'o'=>'+'),Bool(D),Bool(O)))
+VectorSpace(n::Int,d::Int=0,o::Int=0) = VectorSpace(int2vs(n,d,o))
+VectorSpace{N}(n::Int,d::Int=0,o::Int=0) where N = VectorSpace{N}(int2vs(n,d,o))
+VectorSpace(str::String) = VectorSpace{length(str)}(str)
+function VectorSpace{N}(str::String) where N
+    try
+        VectorSpace(parse(Int,str))
+    catch
+        VectorSpace{N,Int('ϵ'∈str),Int('o'∈str)}(str)
+    end
+end
+
+function int2vs(n::Int,d::Int=0,o::Int=0)
+    str = join(['+' for s ∈ 1:n-d-o])
+    o>0 && (str = 'o'*str)
+    d>0 && (str = 'ϵ'*str)
+    return str
+end
 
 print(io::IO,vs::VectorSpace{N}) where N = print(io,vs.s)
 show(io::IO,vs::VectorSpace{N}) where N = print(io,vs)
+
+macro V_str(str)
+    VectorSpace(str)
+end
 
 ## MultiBasis{N}
 
@@ -123,18 +154,18 @@ end
 @inline print(io::IO, e::Basis) = printbasis(io,shiftbasis(e))
 show(io::IO, e::Basis) = print(io,e)
 
-function generate(s::Signature{N},label::Symbol) where N
+function generate(s::VectorSpace{N},label::Symbol) where N
     lab = string(label)
     io = IOBuffer()
     els = Symbol[label]
-    exp = Basis{N}[Basis{N}(s)]
+    exp = Basis{N}[Basis{N}(s.s)]
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            sk = shiftbasis(s,deepcopy(set[k]))
+            sk = shiftbasis(s.s,deepcopy(set[k]))
             print(io,lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈sk]...)
             push!(els,Symbol(String(take!(io))))
-            push!(exp,Basis(s,set[k]))
+            push!(exp,Basis(s.s,set[k]))
         end
     end
     return exp,els
@@ -144,7 +175,7 @@ export @basis
 
 macro basis(label,sig,str)
     N = length(str)
-    s = Signature{N}(str)
+    s = VectorSpace{N}(str)
     basis,sym = generate(s,label)
     exp = Expr[Expr(:(=),esc(sig),s),
         Expr(:(=),esc(label),basis[1])]
