@@ -12,8 +12,14 @@ sigcheck(a,b) = sigcheck(sig(a),sig(b))
 ## mutating operations
 
 function add!(out::MultiVector{T,N},val::T,A::Vector{Int},B::Vector{Int}) where {T,N}
-     (s,c,t) = indexjoin(A,B,out.s)
-     !t && (out[length(c)][basisindex(N,c)] += s ? -(val) : val)
+    (s,c,t) = indexjoin(A,B,out.s)
+    !t && (out[length(c)][basisindex(N,c)] += s ? -(val) : val)
+    return out
+end
+
+@inline add!(out::MultiVector{T,N},val::T,a::Int,b::Int) where {T,N} = add!(out,val,UInt16(a),UInt16(b))
+@inline function add!(out::MultiVector{T,N},val::T,A::UInt16,B::UInt16) where {T,N}
+    !(out.s[end-1] && isodd(A) && isodd(B)) && (out.v[basisindex(N,A .⊻ B)] += parity(A,B,out.s) ? -(val) : val)
      return out
 end
 
@@ -21,15 +27,17 @@ end
 
 function *(a::Basis{N},b::Basis{N}) where N
     sigcheck(a.s,b.s)
-    (s,c,t) = indexjoin(basisindices(a),basisindices(b),a.s)
-    t && (return SValue{N}(0,Basis{N,0}(a.s)))
-    d = Basis{N}(a.s,c)
-    return s ? SValue{N}(-1,d) : d
-    #d = Basis{N}(a.s,indexjoin(a.b,b.b,a.s))
-    #return parity(a,b) ? SValue{N}(-1,d) : d
+    #(s,c,t) = indexjoin(basisindices(a),basisindices(b),a.s)
+    #t && (return SValue{N}(0,Basis{N,0}(a.s)))
+    #d = Basis{N}(a.s,c)
+    #return s ? SValue{N}(-1,d) : d
+    (a.s[end-1] && a[1] && b[1]) && (return SValue{N}(0,Basis{N,0}(a.s)))
+    c = a.i ⊻ b.i
+    d = Basis{N,basisgrade(N,c)}(a.s,c)
+    return parity(a,b) ? SValue{N}(-1,d) : d
 end
 
-function indexjoin(a::Vector{Int},b::Vector{Int},s::Signature)
+function indexjoin(a::Vector{Int},b::Vector{Int},s::Signature{N}) where N
     ind = [a;b]
     k = 1
     t = false
@@ -49,15 +57,12 @@ function indexjoin(a::Vector{Int},b::Vector{Int},s::Signature)
     return t, ind, false
 end
 
-@inline function indexjoin(a::BitArray{1},b::BitArray{1},s::Signature{N}) where N
-    (s[end-1] && a[1] && b[1]) ? (return BitArray{1}(falses(N))) : a .⊻ b
+@inline function parity(a::UInt16, b::UInt16,s::Signature{N}) where N
+    B = digits(b<<1,base=2,pad=N+1)
+    isodd(sum(digits(a,base=2,pad=N+1) .* cumsum!(B,B))+sum(digits((a .& b) .& s.i,base=2)))
 end
 
-@inline function parity(a::Basis, b::Basis)
-    B = [0,Int.(b.b)...]
-    c = a .& b
-    isodd(sum([Int.(a.b)...,0] .* cumsum!(B,B))+sum((c .⊻ a.s[1:N]) .& c))
-end
+@inline parity(a::Basis{N}, b::Basis{N}) where N = parity(a.i,b.i,a.s)
 
 *(a::Number,b::Basis{N}) where N = SValue{N}(a,b)
 *(a::Basis{N},b::Number) where N = SValue{N}(b,a)
@@ -258,8 +263,8 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
             elseif A == B
                 T = promote_type(valuetype(a),valuetype(b))
                 out = MBlade{T,N,A}(sig(a),zeros(T,binomial(N,A)))
-                out.v[basisindex(N,findall(basis(a).b))] = value(a,T)
-                out.v[basisindex(N,findall(basis(b).b))] = $op(value(b,T))
+                out.v[basisindexb(N,basisindices(basis(a)))] = value(a,T)
+                out.v[basisindexb(N,basisindices(basis(b)))] = $op(value(b,T))
                 return out
             else
                 warn("sparse MultiGrade{N} objects not properly handled yet")
@@ -271,14 +276,14 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
             sigcheck(sig(a),sig(b))
             t = promote_type(T,valuetype(a))
             out = MultiVector{t,N}(sig(b),$op(value(b,Vector{t})))
-            out.v[binomsum(N,G)+basisindex(N,findall(basis(a).b))] += value(b,Vector{t})
+            out.v[basisindex(N,basisindices(basis(a)))] += value(b,Vector{t})
             return out
         end
         function $op(a::MultiVector{T,N},b::B) where B<:AbstractTerm{N,G} where {T,N,G}
             sigcheck(sig(a),sig(b))
             t = promote_type(T,valuetype(b))
             out = MultiVector{t,N}(sig(a),value(a,Vector{t}))
-            $(Expr(eop,:(out.v[binomsum(N,G)+basisindex(N,findall(basis(b).b))]),:(value(b,t))))
+            $(Expr(eop,:(out.v[basisindex(N,basisindices(basis(b)))]),:(value(b,t))))
             return out
         end
     end
@@ -293,14 +298,14 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 sigcheck(sig(a),sig(b))
                 t = promote_type(T,valuetype(b))
                 out = MBlade{t,N,G}(sig(a),value(a,Vector{t}))
-                $(Expr(eop,:(out.v[basisindex(N,findall(basis(b).b))]),:(value(b,t))))
+                $(Expr(eop,:(out.v[basisindexb(N,basisindices(basis(b)))]),:(value(b,t))))
                 return out
             end
             function $op(a::A,b::$Blade{T,N,G}) where A<:AbstractTerm{N,G} where {T,N,G}
                 sigcheck(sig(a),sig(b))
                 t = promote_type(T,valuetype(a))
                 out = MBlade{t,N,G}(sig(b),$op(value(b,Vector{t})))
-                out.v[basisindex(N,findall(basis(a).b))] += value(a,t)
+                out.v[basisindexb(N,basisindices(basis(a)))] += value(a,t)
                 return out
             end
             function $op(a::$Blade{T,N,G},b::B) where B<:AbstractTerm{N,L} where {T,N,G,L}
@@ -309,7 +314,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 r = binomsum(N,G)
                 out = MultiVector{t,N}(sig(a),zeros(t,2^N))
                 out.v[r+1:r+binomial(N,G)] = value(a,Vector{t})
-                out.v[binomsum(N,L)+basisindex(N,findall(basis(b).b))] = $op(value(b,t))
+                out.v[basisindex(N,basisindices(basis(b)))] = $op(value(b,t))
                 return out
             end
             function $op(a::A,b::$Blade{T,N,G}) where A<:AbstractTerm{N,L} where {T,N,G,L}
@@ -318,7 +323,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 r = binomsum(N,G)
                 out = MultiVector{t,N}(sig(b),zeros(t,2^N))
                 out.v[r+1:r+binomial(N,G)] = $op(value(b,Vector{t}))
-                out.v[binomsum(N,L)+basisindex(N,findall(basis(a).b))] = value(a,t)
+                out.v[basisindex(N,basisindices(basis(a)))] = value(a,t)
                 return out
             end
             function $op(a::$Blade{T,N,G},b::MultiVector{S,N}) where {T,N,G,S}
