@@ -104,13 +104,13 @@ const basisgrade = ( () -> begin
     end)()
 
 const indexbasis = ( () -> begin
-        Y = Array{Array{Int,1},1}[]
+        Y = Array{Array{UInt16,1},1}[]
         return (n::Int,g::Int) -> (begin
                 j = length(Y)
                 for k ∈ j+1:n
-                    push!(Y,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
+                    push!(Y,[[UInt16(bit2int(basisbits(k,combo(k,G)[q]))) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
                 end
-                g>0 ? Y[n][g] : [1]
+                g>0 ? Y[n][g] : [0x0001]
             end)
     end)()
 

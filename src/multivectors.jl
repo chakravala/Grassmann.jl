@@ -179,6 +179,14 @@ for Value ∈ MSV
     end
 end
 
+## Grade{G}
+
+struct Grade{G} end
+
+## Dimension{N}
+
+struct Dimension{N} end
+
 ## S/MBlade{T,N}
 
 const MSB = [:MBlade,:SBlade]
@@ -201,14 +209,12 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
             if B ≠ SValue
                 MValue{N,G,T}(m[i],Basis(m.s,UInt16(indexbasis(N,G)[i])))
             else
-                MValue{N,G,T}(m[i],Basis(m.s,UInt16(indexbasis(N,G)[i])))
+                SValue{N,G,T}(m[i],Basis(m.s,UInt16(indexbasis(N,G)[i])))
             end
         end
 
         function $Blade{T,N,G}(val::T,v::Basis{N,G}) where {T,N,G}
-            out = MBlade{T,N}(v.s,zeros(T,binomial(N,G)))
-            out.v[basisindexb(N,basisindices(v))] = val
-            return out
+            SBlade{T,N}(v.s,setblade!(zeros(T,binomial(N,G)),val,basisindices(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{N,G}) where {N,G} = $Blade{Int,N,G}(one(Int),v)
@@ -244,7 +250,7 @@ end
 end
 
 MultiVector{T,N}(s::Signature,v::T...) where {T,N} = MultiVector{T,N}(s,SVector{2^N,T}(v))
-MultiVector{T,N}(s::Signature,v::Vector{T}) where {T,N} = MultiVector{T,N}(s,MVector{2^N,T}(v))
+MultiVector{T,N}(s::Signature,v::Vector{T}) where {T,N} = MultiVector{T,N}(s,SVector{2^N,T}(v))
 
 function getindex(m::MultiVector{T,N},i::Int) where {T,N}
     0 <= i <= N || throw(BoundsError(m, i))
@@ -272,15 +278,13 @@ end
 for var ∈ [[:T],[]]
     @eval begin
         MultiVector{$(var...)}(s::Signature,v::StaticArray{Tuple{M},T,1}) where {T,M} = MultiVector{T,intlog(M)}(s,v)
-        MultiVector{$(var...)}(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,MVector(v))
+        MultiVector{$(var...)}(s::Signature,v::Vector{T}) where T = MultiVector{T,intlog(length(v))}(s,SVector(v))
         MultiVector{$(var...)}(s::Signature,v::T...) where T = MultiVector{T,intlog(length(v))}(s,SVector(v))
     end
 end
 
 function MultiVector{T,N}(val::T,v::Basis{N,G}) where {T,N,G}
-    out = MultiVector{T,N}(v.s,zeros(T,2^N))
-    out.v[basisindex(N,basisindices(v))] = val
-    return out
+    MultiVector{T,N}(v.s,setmulti!(zeros(T,2^N),val,basisindices(v),Dimension{N}()))
 end
 
 MultiVector(v::Basis{N,G}) where {N,G} = MultiVector{Int,N}(one(Int),v)
@@ -299,10 +303,10 @@ for var ∈ [[:T,:N],[:T],[]]
                 return MultiVector{T,N}(v.v,v.b)
             end
             function MultiVector{$(var...)}(v::$Blade{T,N,G}) where {T,N,G}
-                out = MultiVector{T,N}(v.s,zeros(T,2^N))
+                out = zeros(T,2^N)
                 r = binomsum(N,G)
                 out.v[r+1:r+binomial(N,G)] = v.v
-                return out
+                return MultiVector{T,N}(v.s,out)
             end
         end
     end
@@ -395,12 +399,12 @@ MultiGrade(v::(MultiBlade{T,N} where T <: Number)...) where N = MultiGrade{N}(v)
 function MultiVector{T,N}(v::MultiGrade{N}) where {T,N}
     g = grade.(v.v)
     s = typeof(v.v[1]) <: Basis ? v.v[1].s : v.v[1].b.s
-    out = MultiVector{T,N}(s,zeros(T,2^N))
+    out = zeros(T,2^N)
     for k ∈ 1:length(v.v)
         (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,v.v[k].b)
-        out.v[basisindex(N,basisindices(b))] = convert(T,val)
+        setmulti!(out,convert(T,val),basisindices(b),Dimension{N}())
     end
-    return out
+    return MultiVector{T,N}(s,out)
 end
 
 MultiVector{T}(v::MultiGrade{N}) where {T,N} = MultiVector{T,N}(v)
