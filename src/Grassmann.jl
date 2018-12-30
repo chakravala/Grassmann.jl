@@ -3,7 +3,7 @@ module Grassmann
 #   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
-using Combinatorics, StaticArrays
+using Combinatorics, StaticArrays #, Requires
 using ComputedFieldTypes
 
 include("utilities.jl")
@@ -50,5 +50,9 @@ end
 export Λ
 
 Λ = Algebra
+
+#=function __init__()
+    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
+end=#
 
 end # module

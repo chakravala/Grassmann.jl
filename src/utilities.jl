@@ -87,22 +87,6 @@ const basisindex = ( () -> begin
             end)
     end)()
 
-const basisgrade = ( () -> begin
-        Y = Array{Int,1}[]
-        return (n::Int,s::UInt16) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    y = Array{Int,1}(undef,2^k-1)
-                    for d ∈ 1:2^k-1
-                        H = findall(digits(d,base=2).==1)
-                        y[d] = length(H)
-                    end
-                    push!(Y,y)
-                end
-                s>0 ? Y[n][s] : 0
-            end)
-    end)()
-
 const indexbasis = ( () -> begin
         Y = Array{Array{UInt16,1},1}[]
         return (n::Int,g::Int) -> (begin

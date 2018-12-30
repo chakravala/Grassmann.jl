@@ -31,9 +31,9 @@ Signature{N}(s::String,b::Bool...) where N = Signature{N}(push!([k=='-' for k∈
 @inline sig(s::Bool) = s ? '-' : '+'
 
 @inline function print(io::IO,s::Signature{N}) where N
-    s[end-1] && print(io,'ϵ')
-    s[end] && print(io,'o')
-    print(io,sig.(s[s[end-1]+s[end]+1:N])...)
+    hasdual(s) && print(io,'ϵ')
+    hasorigin(s) && print(io,'o')
+    print(io,sig.(s[hasdual(s)+hasorigin(s)+1:N])...)
 end
 
 show(io::IO,s::Signature{N}) where N = print(io,s)
@@ -44,18 +44,22 @@ end
 
 # VectorSpace
 
-struct VectorSpace{N,D,O}
+struct VectorSpace{N,D,O,S}
     s::Signature{N}
+    VectorSpace{N,D,O}(s::Signature{N}) where {N,D,O} = new{N,D,O,s.i}(s)
 end
-getindex(vs::VectorSpace{N,D,O},i::Union{Int,UnitRange{Int}}) where {N,D,O} = i > N ? Bool(i≠N+1 ? O : D) : vs.s.b[i]
-getindex(vs::VectorSpace{N},i::Colon) where N = vs.s[:]
-setindex!(s::VectorSpace,k::Bool,i::Int) = (s.s.b[i] = k)
-Base.firstindex(m::VectorSpace) = 1
-Base.lastindex(m::VectorSpace{N}) where N = N+2
-Base.length(s::VectorSpace{N}) where N = N
 
-hasdual(vs::VectorSpace{N,D}) where {N,D} = Bool(D)
-hasorigin(vs::VectorSpace{N,D,O}) where {N,D,O} = Bool(O)
+function getindex(::VectorSpace{N,D,O,S} where {D,O},i::Int) where {N,S}
+    d = 0x2^(i-1)
+    return (d & S) == d
+end
+
+getindex(vs::VectorSpace{N,D,O,S} where {N,D,O},i::UnitRange{Int}) where S = [getindex(vs,j) for j ∈ i]
+getindex(vs::VectorSpace{N,D,O,S} where {D,O},i::Colon) where {N,S} = [getindex(vs,j) for j ∈ 1:N]
+#getindex(vs::VectorSpace{N,D,O},i::Union{Int,UnitRange{Int}}) where {N,D,O} = i > N ? Bool(i≠N+1 ? O : D) : vs.s.b[i]
+Base.firstindex(m::VectorSpace) = 1
+Base.lastindex(m::VectorSpace{N}) where N = N
+Base.length(s::VectorSpace{N}) where N = N
 
 VectorSpace{N}(s::Signature{N}) where N = VectorSpace{N,Int(s[end-1]),Int(s[end])}(s)
 VectorSpace(s::Signature{N}) where N = VectorSpace{N}(s)
@@ -93,7 +97,13 @@ struct Basis{N,G} <: AbstractTerm{N,G}
     i::UInt16
 end
 
-getindex(b::Basis,i::Int) = digits(b.i,base=2)[i] == 1
+function getindex(b::Basis{N},i::Int) where N
+    d = 0x2^(i-1)
+    return (d & b.i) == d
+end
+
+getindex(b::Basis,i::UnitRange{Int}) = [getindex(b,j) for j ∈ i]
+getindex(b::Basis{N},i::Colon) where N = [getindex(b,j) for j ∈ 1:N]
 Base.firstindex(m::Basis) = 1
 Base.lastindex(m::Basis{N}) where N = N
 Base.length(b::Basis{N}) where N = N
@@ -113,9 +123,9 @@ const VTI = Union{Vector{Int},Tuple,NTuple}
 function shiftbasis(s::Signature{N},set::Vector{Int}) where N
     if !isempty(set)
         k = 1
-        s[end-1] && set[1] == 1 && (set[1] = -1; k += 1)
-        shift = sum(s[end-1:end])
-        s[end] && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
+        hasdual(s) && set[1] == 1 && (set[1] = -1; k += 1)
+        shift = hasdual(s)+hasorigin(s)
+        hasorigin(s) && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
         shift > 0 && (set[k:end] .-= shift)
     end
     return set
@@ -130,7 +140,7 @@ end
 end
 
 Basis{N,G}(s::Signature{N},b::BitArray{1}) where {N,G} = Basis{N,G}(s,bit2int(b))
-Basis{N}(s::Signature{N},i::UInt16) where N = new{N,basisgrade(i)}(s,i)
+Basis{N}(s::Signature{N},i::UInt16) where N = new{N,count_ones(i)}(s,i)
 Basis{N}(s::Signature{N},b::BitArray) where N = Basis{N,sum(b)}(s,b)
 Basis(s::Signature{N},b::VTI) where N = Basis{N}(s,b)
 Basis(s::Signature{N},b::Int...) where N = Basis{N}(s,b)
@@ -253,10 +263,10 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         function show(io::IO, m::$Blade{T,N,G}) where {T,N,G}
             set = combo(N,G)
             print(io,m.v[1])
-            printbasis(io,set[1])
+            printbasis(io,shiftbasis(m.s,copy(set[1])))
             for k ∈ 2:length(set)
                 print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
-                printbasis(io,shiftbasis(m.s,deepcopy(set[k])))
+                printbasis(io,shiftbasis(m.s,copy(set[k])))
             end
         end
     end
@@ -351,7 +361,7 @@ function show(io::IO, m::MultiVector{T,N}) where {T,N}
         for k ∈ 1:length(set)
             if b[k] ≠ 0
                 print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
-                printbasis(io,shiftbasis(m.s,deepcopy(set[k])))
+                printbasis(io,shiftbasis(m.s,copy(set[k])))
             end
         end
     end
@@ -361,27 +371,33 @@ end
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
-valuetype(m::Basis) = Int
-valuetype(m::Union{MValue{N,G,T},SValue{N,G,T}}) where {N,G,T} = T
-valuetype(m::Union{MBlade{T},SBlade{T}}) where T = T
-valuetype(m::MultiVector{T}) where T = T
-value(m::Basis,T=Int) = one(T)
-value(m::VBV,T::DataType=Nothing) = T≠Nothing ? m.v : convert(T,m.v)
-sig(m::Basis) = m.s
-sig(m::Union{MValue,SValue}) = m.b.s
-sig(m::Union{MBlade,SBlade,MultiVector}) = m.s
-basis(m::Basis) = m
-basis(m::Union{MValue,SValue}) = m.b
-grade(m::AbstractTerm{N,G}) where {N,G} = G
-grade(m::Union{MBlade{T,N,G},SBlade{T,N,G}}) where {T,N,G} = G
-grade(m::Number) = 0
+@inline dimension(::VectorSpace{N}) where N = N
+@inline valuetype(m::Basis) = Int
+@inline valuetype(m::Union{MValue{N,G,T},SValue{N,G,T}}) where {N,G,T} = T
+@inline valuetype(m::Union{MBlade{T},SBlade{T}}) where T = T
+@inline valuetype(m::MultiVector{T}) where T = T
+@inline value(m::Basis,T=Int) = one(T)
+@inline value(m::VBV,T::DataType=Nothing) = T≠Nothing ? m.v : convert(T,m.v)
+@inline sig(m::Basis) = m.s
+@inline sig(m::Union{MValue,SValue}) = m.b.s
+@inline sig(m::Union{MBlade,SBlade,MultiVector}) = m.s
+@inline basis(m::Basis) = m
+@inline basis(m::Union{MValue,SValue}) = m.b
+@inline grade(m::AbstractTerm{N,G}) where {N,G} = G
+@inline grade(m::Union{MBlade{T,N,G},SBlade{T,N,G}}) where {T,N,G} = G
+@inline grade(m::Number) = 0
 
-isdual(e::Basis) = hasdual(e) && sum(digits(e.i,base=2)) == 1
-hasdual(e::Basis) = e.s[end-1] && isodd(e.i)
-
-isorigin(e::Basis) = e.s[end] && (d=digits(e.i,base=2); d[e.s[end-1]+1]≠0 && sum(d) == 1)
-hasorigin(e::Basis) = e.s[end] && (e.s[end-1] ? e[2] : isodd(e.i))
+hasdual(s::Signature) = s[end-1]
 hasorigin(s::Signature) = s[end]
+
+hasdual(vs::VectorSpace{N,D} where N) where D = Bool(D)
+hasorigin(vs::VectorSpace{N,D,O} where {N,D}) where O = Bool(O)
+
+isdual(e::Basis) = hasdual(e) && count_ones(e.i) == 1
+hasdual(e::Basis) = hasdual(e.s) && isodd(e.i)
+
+isorigin(e::Basis) = hasorigin(e.s) && count_ones(e.i) == 1 && e[hasdual(e.s)+1]
+hasorigin(e::Basis) = hasorigin(e.s) && (hasdual(e.s) ? e[2] : isodd(e.i))
 hasorigin(t::Union{MValue,SValue}) = hasorigin(t.b)
 hasorigin(m::VBV) = hasorigin(sig(m))
 
