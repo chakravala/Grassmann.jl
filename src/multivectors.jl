@@ -13,7 +13,7 @@ abstract type AbstractTerm{V,G} end
 struct VectorSpace{N,D,O,S} end
 
 function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
-    d = 0x2^(i-1)
+    d = 0x0001 << (i-1)
     return (d & S) == d
 end
 
@@ -60,13 +60,14 @@ end
 
 ## MultiBasis{N}
 
-struct Basis{V,G} <: AbstractTerm{V,G}
-    i::UInt16
-end
+primitive type Basis{V,G} <: AbstractTerm{V,G} 16 end
+
+@inline Basis{V,G}(i::UInt16) where {V,G} = reinterpret(Basis{V,G},i)
+@inline UInt16(b::Basis) = reinterpret(UInt16,b)
 
 function getindex(b::Basis,i::Int)
-    d = 0x2^(i-1)
-    return (d & b.i) == d
+    d = 0x0001 << (i-1)
+    return (d & UInt16(b)) == d
 end
 
 getindex(b::Basis,i::UnitRange{Int}) = [getindex(b,j) for j ∈ i]
@@ -83,9 +84,8 @@ end
 
 const VTI = Union{Vector{Int},Tuple,NTuple}
 
-@inline basisindices(v::VectorSpace{N},G::Int,i::Int) where N = indexbasis(N,G)[i]
-@inline basisindices(b::Basis) = b.i
-@inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,findall(digits(b.i,base=2).==1))
+@inline basisindices(b::Basis) = findall(digits(UInt16(b),base=2).==1)
+@inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,basisindices(b))
 
 function shiftbasis(s::VectorSpace{N,D,O} where N,set::Vector{Int}) where {D,O}
     if !isempty(set)
@@ -121,7 +121,7 @@ for t ∈ [[:V],[:V,:G]]
     end
 end
 
-==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = a.i == b.i
+==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = UInt16(a) == UInt16(b)
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
@@ -219,7 +219,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         end
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
-            SBlade{T,V}(setblade!(@MVector(zeros(T,binomial(ndims(V),G))),val,basisindices(v),Dimension{N}()))
+            SBlade{T,V}(setblade!(@MVector(zeros(T,binomial(ndims(V),G))),val,UInt16(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
@@ -294,13 +294,13 @@ for var ∈ [[:T,:V],[:V]]
         MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         function MultiVector{$(var...)}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,basisindices(v),Dimension{N}()))
+            MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,UInt16(v),Dimension{N}()))
         end
     end
 end
 function MultiVector(val::T,v::Basis{V,G}) where {T,V,G}
     N = ndims(V)
-    MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,basisindices(v),Dimension{N}()))
+    MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,UInt16(v),Dimension{N}()))
 end
 
 MultiVector(v::Basis{V,G}) where {V,G} = MultiVector{Int,V}(one(Int),v)
@@ -368,11 +368,11 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 hasdual(::VectorSpace{N,D} where N) where D = Bool(D)
 hasorigin(::VectorSpace{N,D,O} where {N,D}) where O = Bool(O)
 
-isdual(e::Basis{V}) where V = hasdual(e) && count_ones(e.i) == 1
-hasdual(e::Basis{V}) where V = hasdual(V) && isodd(e.i)
+isdual(e::Basis{V}) where V = hasdual(e) && count_ones(UInt16(e)) == 1
+hasdual(e::Basis{V}) where V = hasdual(V) && isodd(UInt16(e))
 
-isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(e.i) == 1 && e[hasdual(V)+1]
-hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(e.i))
+isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(UInt16(e))==1 && e[hasdual(V)+1]
+hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(UInt16(e)))
 hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 hasorigin(m::VBV) = hasorigin(sig(m))
 
@@ -419,7 +419,7 @@ function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
     out = @MVector zeros(T,2^N)
     for k ∈ 1:length(v.v)
         (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,v.v[k].b)
-        setmulti!(out,convert(T,val),basisindices(b),Dimension{N}())
+        setmulti!(out,convert(T,val),UInt16(b),Dimension{N}())
     end
     return MultiVector{T,V}(out)
 end

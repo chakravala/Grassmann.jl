@@ -75,7 +75,7 @@ function *(a::Basis{V},b::Basis{V}) where V
     #d = Basis{V}(c)
     #return s ? SValue{V}(-1,d) : d
     hasdual(V) && hasdual(a) && hasdual(b) && (return SValue{V}(0,Basis{V,0}()))
-    c = a.i ⊻ b.i
+    c = UInt16(a) ⊻ UInt16(b)
     d = Basis{V,count_ones(c)}(c)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
@@ -130,7 +130,7 @@ const parity_cache = ( () -> begin
     end)()
 
 @inline parity(a,b,s::VectorSpace{N,D,O,S} where {D,O}) where {N,S} = parity_cache(N,S,a,b)
-@inline parity(a::Basis{V},b::Basis{V}) where V = parity(a.i,b.i,V)
+@inline parity(a::Basis{V},b::Basis{V}) where V = parity(UInt16(a),UInt16(b),V)
 
 *(a::Field,b::Basis{V}) where V = SValue{V}(a,b)
 *(a::Basis{V},b::Field) where V = SValue{V}(b,a)
@@ -143,7 +143,7 @@ function *(a::MultiVector{T,V},b::Basis{V,G}) where {T<:Field,V,G}
         r = binomsum(N,g)
         ib = indexbasis(N,g)
         for i ∈ 1:binomial(N,g)
-            addmulti!(V,out,a.v[r+i],ib[i],b.i)
+            addmulti!(V,out,a.v[r+i],ib[i],UInt16(b))
         end
     end
     return MultiVector{t,V}(out)
@@ -156,7 +156,7 @@ function *(a::Basis{V,G},b::MultiVector{T,V}) where {V,G,T<:Field}
         r = binomsum(N,g)
         ib = indexbasis(N,g)
         for i ∈ 1:binomial(N,g)
-            addmulti!(V,out,b.v[r+i],a.i,ib[i])
+            addmulti!(V,out,b.v[r+i],UInt16(a),ib[i])
         end
     end
     return MultiVector{t,V}(out)
@@ -176,7 +176,7 @@ for Value ∈ MSV
                 r = binomsum(N,g)
                 ib = indexbasis(N,g)
                 for i ∈ 1:binomial(N,g)
-                    addmulti!(V,out,a.v[r+i]*b.v,ib[i],b.b.i)
+                    addmulti!(V,out,a.v[r+i]*b.v,ib[i],UInt16(b.b))
                 end
             end
             return MultiVector{t,V}(out)
@@ -189,7 +189,7 @@ for Value ∈ MSV
                 r = binomsum(N,g)
                 ib = indexbasis(N,g)
                 for i ∈ 1:binomial(N,g)
-                    addmulti!(V,out,a.v*b.v[r+i],a.b.i,ib[i])
+                    addmulti!(V,out,a.v*b.v[r+i],UInt16(a.b),ib[i])
                 end
             end
             return MultiVector{t,V}(out)
@@ -209,7 +209,7 @@ for Blade ∈ MSB
             out = @MVector zeros(t,2^N)
             ib = indexbasis(N,G)
             for i ∈ 1:binomial(N,G)
-                addmulti!(V,out,a[i],ib[i],b.i)
+                addmulti!(V,out,a[i],ib[i],UInt16(b))
             end
             return MultiVector{t,V}(out)
         end
@@ -219,7 +219,7 @@ for Blade ∈ MSB
             out = @MVector zeros(t,2^N)
             ib = indexbasis(N,G)
             for i ∈ 1:binomial(N,G)
-                addmulti!(V,out,b[i],a.i,ib[i])
+                addmulti!(V,out,b[i],UInt16(a),ib[i])
             end
             return MultiVector{t,V}(out)
         end
@@ -266,7 +266,7 @@ for Blade ∈ MSB
                 out = @MVector zeros(t,2^N)
                 ib = indexbasis(N,G)
                 for i ∈ 1:binomial(N,G)
-                    addmulti!(V,out,a[i]*b.v,ib[i],b.b.i)
+                    addmulti!(V,out,a[i]*b.v,ib[i],UInt16(b.b))
                 end
                 return MultiVector{t,V}(out)
             end
@@ -276,7 +276,7 @@ for Blade ∈ MSB
                 out = @MVector zeros(t,2^N)
                 ib = indexbasis(N,G)
                 for i ∈ 1:binomial(N,G)
-                    addmulti!(V,ut,a.v*b[i],a.b.i,ib[i])
+                    addmulti!(V,ut,a.v*b[i],UInt16(a.b),ib[i])
                 end
                 return MultiVector{t,V}(out)
             end
@@ -340,8 +340,8 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 N = ndims(V)
                 T = promote_type(valuetype(a),valuetype(b))
                 out = @MVector zeros(T,binomial(N,A))
-                setblade!(out,value(a,T),basis(a).i,Dimension{N}())
-                setblade!(out,$op(value(b,T)),basis(b).i,Dimension{N}())
+                setblade!(out,value(a,T),UInt16(basis(a)),Dimension{N}())
+                setblade!(out,$op(value(b,T)),UInt16(basis(b)),Dimension{N}())
                 return MBlade{T,V,A}(out)
             else
                 @warn("sparse MultiGrade{V} objects not properly handled yet")
@@ -353,14 +353,14 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
             N = ndims(V)
             t = promote_type(T,valuetype(a))
             out = $op(value(b,MVector{2^N,t}))
-            addmulti!(out,value(b,t),basis(a).i,Dimension{N}())
+            addmulti!(out,value(b,t),UInt16(basis(a)),Dimension{N}())
             return MultiVector{t,V}(out)
         end
         function $op(a::MultiVector{T,V},b::B) where B<:AbstractTerm{V,G} where {T<:Field,V,G}
             N = ndims(V)
             t = promote_type(T,valuetype(b))
             out = copy(value(a,MVector{2^N,t}))
-            addmulti!(out,$op(value(b,t)),basis(b).i,Dimension{N}())
+            addmulti!(out,$op(value(b,t)),UInt16(basis(b)),Dimension{N}())
             return MultiVector{t,V}(out)
         end
     end
@@ -395,14 +395,14 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 N = ndims(V)
                 t = promote_type(T,valuetype(b))
                 out = copy(value(a,MVector{binomial(N,G),t}))
-                addblade!(out,$op(value(b,t)),basis(b).i,Dimension{N}())
+                addblade!(out,$op(value(b,t)),UInt16(basis(b)),Dimension{N}())
                 return MBlade{t,V,G}(out)
             end
             function $op(a::A,b::$Blade{T,V,G}) where A<:AbstractTerm{V,G} where {T<:Field,V,G}
                 N = ndims(V)
                 t = promote_type(T,valuetype(a))
                 out = $op(value(b,MVector{binomial(N,G),t}))
-                addblade!(out,value(a,t),basis(a).i,Dimension{N}())
+                addblade!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
                 return MBlade{t,V,G}(out)
             end
             function $op(a::$Blade{T,V,G},b::B) where B<:AbstractTerm{V,L} where {T<:Field,V,G,L}
@@ -412,7 +412,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 R = binomial(N,G)
                 out = @MVector zeros(t,2^N)
                 out[r+1:r+R] = value(a,MVector{R,t})
-                addmulti!(out,$op(value(b,t)),basis(b).i,Dimension{N}())
+                addmulti!(out,$op(value(b,t)),UInt16(basis(b)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
             function $op(a::A,b::$Blade{T,V,G}) where A<:AbstractTerm{V,L} where {T<:Field,V,G,L}
@@ -422,7 +422,7 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 R = binomial(N,G)
                 out = @MVector zeros(t,2^N)
                 out[r+1:r+R] = $op(value(b,MVector{R,t}))
-                addmulti!(out,value(a,t),basis(a).i,Dimension{N}())
+                addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
             function $op(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T<:Field,V,G,S}
