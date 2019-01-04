@@ -2,6 +2,13 @@
 #   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
+import Base: @pure
+
+@pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
+@pure binomial(N,G) = Base.binomial(N,G)
+@pure mvec(N,G,t) = MVector{binomial(N,G),t}
+@pure mvec(N,t) = MVector{2^N,t}
+
 const subscripts = Dict{Int,Char}(
    -1 => 'ϵ',
     0 => 'o',
@@ -16,7 +23,7 @@ const subscripts = Dict{Int,Char}(
     9 => '₉'
 )
 
-const binomsum = ( () -> begin
+const binomsum_cache = ( () -> begin
         Y = Array{Int,1}[Int[1]]
         return (n::Int,i::Int) -> (begin
                 j = length(Y)
@@ -26,6 +33,8 @@ const binomsum = ( () -> begin
                 i ≠ 0 ? Y[n][i] : 0
             end)
     end)()
+
+Base.@pure binomsum(n::Int,i::Int) = binomsum_cache(n,i)
 
 const combo = ( () -> begin
         Y = Array{Array{Array{Int,1},1},1}[]
@@ -55,7 +64,7 @@ const combo = ( () -> begin
 end)()=#
 
 const basisindexb = ( () -> begin
-        Y = Array{Int,1}[]
+        Y = Vector{Int}[]
         return (n::Int,s::UInt16) -> (begin
                 j = length(Y)
                 for k ∈ j+1:n
@@ -71,7 +80,7 @@ const basisindexb = ( () -> begin
     end)()
 
 const basisindex = ( () -> begin
-        Y = Array{Int,1}[]
+        Y = Vector{Int}[]
         return (n::Int,s::UInt16) -> (begin
                 j = length(Y)
                 for k ∈ j+1:n
@@ -87,17 +96,6 @@ const basisindex = ( () -> begin
             end)
     end)()
 
-const indexbasis = ( () -> begin
-        Y = Array{Array{UInt16,1},1}[]
-        return (n::Int,g::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    push!(Y,[[UInt16(bit2int(basisbits(k,combo(k,G)[q]))) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
-                end
-                g>0 ? Y[n][g] : [0x0001]
-            end)
-    end)()
-
 function intlog(M::Integer)
     lM = log2(M)
     try; Int(lM)
@@ -105,3 +103,5 @@ function intlog(M::Integer)
 end
 
 bit2int(b::BitArray{1}) = parse(UInt16,join(reverse([t ? '1' : '0' for t ∈ b])),base=2)
+
+Base.@pure promote_type(t...) = Base.promote_type(t...)
