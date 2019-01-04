@@ -10,7 +10,9 @@ abstract type AbstractTerm{V,G} end
 
 # VectorSpace
 
-struct VectorSpace{N,D,O,S} end
+struct VectorSpace{N,D,O,S}
+    @pure VectorSpace{N,D,O,S}() where {N,D,O,S} = new{N,D,O,S}()
+end
 
 function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
     d = 0x0001 << (i-1)
@@ -25,34 +27,29 @@ Base.length(s::VectorSpace{N}) where N = N
 
 @inline sig(s::Bool) = s ? '-' : '+'
 
-VectorSpace{N,D,O}(b::BitArray{1}) where {N,D,O} = VectorSpace{N,D,O,bit2int(b[1:N])}()
-VectorSpace{N,D,O}(b::Array{Bool,1}) where {N,D,O} = VectorSpace{N,D,O}(convert(BitArray{1},b))
-VectorSpace{N,D,O}(s::String) where {N,D,O} = VectorSpace{N,D,O}([k=='-' for k∈s])
-VectorSpace(n::Int,d::Int=0,o::Int=0) = VectorSpace(int2vs(n,d,o))
-VectorSpace{N}(n::Int,d::Int=0,o::Int=0) where N = VectorSpace{N}(int2vs(n,d,o))
-VectorSpace(str::String) = VectorSpace{length(str)}(str)
-function VectorSpace{N}(s::String) where N
+@pure VectorSpace{N,D,O}(b::BitArray{1}) where {N,D,O} = VectorSpace{N,D,O,bit2int(b[1:N])}()
+@pure VectorSpace{N,D,O}(b::Array{Bool,1}) where {N,D,O} = VectorSpace{N,D,O}(convert(BitArray{1},b))
+@pure VectorSpace{N,D,O}(s::String) where {N,D,O} = VectorSpace{N,D,O}([k=='-' for k∈s])
+@pure VectorSpace(n::Int,d::Int=0,o::Int=0,s::UInt16=0x0000) = VectorSpace{n,d,o,s}()
+@pure VectorSpace(str::String) = VectorSpace{length(str)}(str)
+
+@pure function VectorSpace{N}(s::String) where N
     try
-        VectorSpace(parse(Int,s))
+        parse(Int,s)
+        length(s) < 4 && (s *= join(zeros(Int,5-length(s))))
+        VectorSpace(parse(Int,s[1]),do2m(parse(Int,s[2]),parse(Int,s[3])),parse(Int,s[4:end]))
     catch
         VectorSpace{N,Int('ϵ'∈s),Int('o'∈s)}(replace(replace(s,'ϵ'=>'+'),'o'=>'+'))
     end
 end
 
-function int2vs(n::Int,d::Int=0,o::Int=0)
-    str = join(['+' for s ∈ 1:n-d-o])
-    o>0 && (str = 'o'*str)
-    d>0 && (str = 'ϵ'*str)
-    return str
-end
-
-@inline function print(io::IO,s::VectorSpace{N}) where N
+@inline function print(io::IO,s::VectorSpace)
     hasdual(s) && print(io,'ϵ')
     hasorigin(s) && print(io,'o')
-    print(io,sig.(s[hasdual(s)+hasorigin(s)+1:N])...)
+    print(io,sig.(s[hasdual(s)+hasorigin(s)+1:ndims(s)])...)
 end
 
-show(io::IO,vs::VectorSpace{N}) where N = print(io,vs)
+show(io::IO,vs::VectorSpace) = print(io,vs)
 
 macro V_str(str)
     VectorSpace(str)
@@ -92,9 +89,9 @@ const VTI = Union{Vector{Int},Tuple,NTuple}
 function shiftbasis(s::VectorSpace{N,D,O} where N,set::Vector{Int}) where {D,O}
     if !isempty(set)
         k = 1
-        Bool(D) && set[1] == 1 && (set[1] = -1; k += 1)
+        hasdual(s) && set[1] == 1 && (set[1] = -1; k += 1)
         shift = D + O
-        Bool(O) && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
+        hasorigin(s) && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
         shift > 0 && (set[k:end] .-= shift)
     end
     return set
@@ -128,10 +125,9 @@ end
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
 @inline printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
-@inline print(io::IO, e::Basis) = printbasis(io,shiftbasis(e))
-show(io::IO, e::Basis) = print(io,e)
+@inline show(io::IO, e::Basis) = printbasis(io,shiftbasis(e))
 
-function generate(V::VectorSpace{N},label::Symbol) where N
+@pure function generate(V::VectorSpace{N},label::Symbol) where N
     lab = string(label)
     io = IOBuffer()
     els = Symbol[label]
@@ -139,7 +135,7 @@ function generate(V::VectorSpace{N},label::Symbol) where N
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            sk = shiftbasis(V,deepcopy(set[k]))
+            sk = shiftbasis(V,copy(set[k]))
             print(io,lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈sk]...)
             push!(els,Symbol(String(take!(io))))
             push!(exp,Basis{V}(set[k]))
