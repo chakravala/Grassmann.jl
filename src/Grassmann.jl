@@ -21,7 +21,20 @@ end
 Base.firstindex(a::Algebra) = 1
 Base.lastindex(a::Algebra{V}) where V = 2^ndims(V)
 Base.length(a::Algebra{V}) where V = 2^ndims(V)
-@pure Base.getproperty(a::Algebra,v::Symbol) = v ∈ (:b,:g) ? getfield(a,v) : a[a.g[v]]
+
+@pure function Base.getproperty(a::Algebra{V},v::Symbol) where V
+    if v ∈ (:b,:g)
+        return getfield(a,v)
+    elseif haskey(a.g,v)
+        return a[a.g[v]]
+    else
+        e = string(v)
+        (s,c,t) = indexjoin(Int[],[parse(Int,e[k]) for k∈2:length(e)],V)
+        t && (return SValue{V}(0,getbasis(V,0)))
+        d = Basis{V}(c)
+        return s ? SValue{V}(-1,d) : d
+    end
+end
 
 @pure function Base.collect(s::VectorSpace)
     g = Dict{Symbol,Int}()
@@ -68,7 +81,10 @@ end
 
 const algebra_cache = ( () -> begin
         Y = Vector{Dict{UInt16,Λ}}[]
+        V=VectorSpace(0)
+        Λ0=Λ{V}(SVector{1,Basis{V}}(Basis{V,0,0x0000}()),Dict{Symbol,Int}(:e=>1))
         return (n::Int,m::Int,s::UInt16) -> (begin
+                n==0 && (return Λ0)
                 for N ∈ length(Y)+1:n
                     push!(Y,[Dict{Int,Λ}() for k∈1:4])
                 end

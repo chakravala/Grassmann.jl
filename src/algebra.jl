@@ -2,7 +2,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the MIT license
 #   Copyright (C) 2018 Michael Reed
 
-import Base: +, -, *
+import Base: +, -, *, ^, /, inv
 
 Field = Number
 
@@ -92,7 +92,7 @@ function *(a::Basis{V},b::Basis{V}) where V
     #return s ? SValue{V}(-1,d) : d
     hasdual(V) && hasdual(a) && hasdual(b) && (return SValue{V}(0,Basis{V}()))
     c = UInt16(a) ⊻ UInt16(b)
-    d = Basis{V,count_ones(c)}(c)
+    d = Basis{V}(c)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
 
@@ -294,7 +294,7 @@ for Blade ∈ MSB
             function *(a::$Value{V,L,B,S},b::$Blade{T,V,G}) where {T<:Field,V,G,L,B,S<:Field}
                 N = ndims(V)
                 t = promote_type(T,S)
-                out = @MVector zeros(t,2^N)
+                out = zeros(mvec(N,t))
                 ib = indexbasis(N,G)
                 for i ∈ 1:binomial(N,G)
                     γ = a.v*b[i]
@@ -470,6 +470,43 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
         end
     end
 end
+
+## exponentiation
+
+function ^(v::AbstractTerm,i::Integer)
+    i == 0 && (return getbasis(sig(v),0))
+    out = v
+    for k ∈ 1:(i-1)%4
+        out *= v
+    end
+    return out
+end
+for Term ∈ [MSB...,:MultiVector,:MultiGrade]
+    @eval begin
+        function ^(v::$Term,i::Integer)
+            i == 0 && (return getbasis(sig(v),0))
+            out = v
+            for k ∈ 1:i-1
+                out *= v
+            end
+            return out
+        end
+    end
+end
+
+## division
+
+@pure inv_parity(G) = isodd(Int((G*(G-1))/2))
+@pure inv(b::Basis) = inv_parity(grade(b)) ? -1*b : b
+function inv(b::SValue{V,G,B,T}) where {V,G,B,T}
+    SValue{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
+end
+for Term ∈ [:AbstractTerm,MSB...,:MultiVector,:MultiGrade]
+    @eval begin
+        @pure /(a::$Term,b::AbstractTerm) = a*inv(b)
+    end
+end
+
 
 ## outer product
 

@@ -39,10 +39,10 @@ julia> V
 ϵ+++
 
 julia> typeof(V)
-VectorSpace{4,1,0}
+VectorSpace{4,1,0,0x0000}
 
 julia> typeof(e13)
-Basis{4,2}
+Basis{ϵ+++,2,0x000a}
 
 julia> e13*e2
 -1e₁₂₃
@@ -75,10 +75,19 @@ julia> let k = (b1+b2)-b3
 Alternatively, if you do not wish to assign these variables to your local workspace, the `Grassmann.Algebra{N}` constructors can be used to contain them, which is exported to the user as the method `Λ(V)`,
 ```Julia
 julia> G3 = Λ(3) # equivalent to Λ(V"+++")
-Grassmann.Algebra{3,8}(+++, e, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃)
+[ Info: Precomputing 8×Basis{VectorSpace{3,0,0,0},...}
+Grassmann.Algebra{+++,8}(e, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃)
 
 julia> G3.e13 * G3.e12
 e₂₃
 ```
+Then it is possible to assign the quaternion generators `i,j,k` with
+```Julia
+julia> i,j,k = Λ.G3.e32, Λ.G3.e13, Λ.G3.e21
+(-1e₂₃, e₁₃, -1e₁₂)
 
+julia> @btime i^2, j^2, k^2, i*j*k
+  158.925 ns (5 allocations: 112 bytes)
+(-1e, -1e, -1e, -1e)
+```
 This package is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.

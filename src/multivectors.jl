@@ -55,13 +55,16 @@ macro V_str(str)
     VectorSpace(str)
 end
 
+@pure function Base.adjoint(V::VectorSpace{N,D,O,S}) where {N,D,O,S}
+    VectorSpace{N,D,O,UInt16(2^N-1) & (~S)}()
+end
+
 ## MultiBasis{N}
 
 struct Basis{V,G,B} <: AbstractTerm{V,G}
     @pure Basis{V,G,B}() where {V,G,B} = new{V,G,B}()
 end
 
-@pure Basis{V,G}(i::UInt16) where {V,G} = Basis{V,G,i}()
 @pure UInt16(b::Basis{V,G,B} where {V,G}) where B = B
 
 function getindex(b::Basis,i::Int)
@@ -105,17 +108,16 @@ end
     return out
 end
 
-Basis{V,G}(b::BitArray{1}) where {V,G} = Basis{V,G}(bit2int(b))
-Basis{V}(i::UInt16) where V = Basis{V,count_ones(i)}(i)
-Basis{V}(b::BitArray{1}) where V = Basis{V,sum(b)}(b)
+Basis{V}(i::UInt16) where V = getbasis(V,i)
+Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
 for t ∈ [[:V],[:V,:G]]
     @eval begin
         function Basis{$(t...)}(b::VTI) where {$(t...)}
-            Basis{$(t...)}(basisbits(ndims(V),b))
+            Basis{V}(basisbits(ndims(V),b))
         end
         function Basis{$(t...)}(b::Int...) where {$(t...)}
-            Basis{$(t...)}(basisbits(ndims(V),b))
+            Basis{V}(basisbits(ndims(V),b))
         end
     end
 end
@@ -131,14 +133,14 @@ end
     lab = string(label)
     io = IOBuffer()
     els = Symbol[label]
-    exp = Basis{V}[Basis{V}()]
+    exp = Basis{V}[Basis{V,0,0x0000}()]
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
             sk = shiftbasis(V,copy(set[k]))
             print(io,lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈sk]...)
             push!(els,Symbol(String(take!(io))))
-            push!(exp,Basis{V}(set[k]))
+            push!(exp,Basis{V,length(set[k]),bit2int(basisbits(N,set[k]))}())
         end
     end
     return exp,els
@@ -190,6 +192,7 @@ for Value ∈ MSV
         $Value{V}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
         $Value{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
+        $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
         $Value(v,b::AbstractTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
         show(io::IO,m::$Value) = print(io,m.v,basis(m))
@@ -234,7 +237,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         end
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
-            SBlade{T,V}(setblade!(@MVector(zeros(T,binomial(ndims(V),G))),val,UInt16(v),Dimension{N}()))
+            SBlade{T,V}(setblade!(zeros(mvec(ndims(V),G,T)),val,UInt16(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
@@ -311,13 +314,13 @@ for var ∈ [[:T,:V],[:V]]
         MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         function MultiVector{$(var...)}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,UInt16(v),Dimension{N}()))
+            MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,UInt16(v),Dimension{N}()))
         end
     end
 end
 function MultiVector(val::T,v::Basis{V,G}) where {T,V,G}
     N = ndims(V)
-    MultiVector{T,V}(setmulti!(@MVector(zeros(T,2^N)),val,UInt16(v),Dimension{N}()))
+    MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,UInt16(v),Dimension{N}()))
 end
 
 MultiVector(v::Basis{V,G}) where {V,G} = MultiVector{Int,V}(one(Int),v)
@@ -337,7 +340,7 @@ for var ∈ [[:T,:V],[:T],[]]
             end
             function MultiVector{$(var...)}(v::$Blade{T,V,G}) where {T,V,G}
                 N = ndims(V)
-                out = @MVector zeros(T,2^N)
+                out = zeros(mvec(N,T))
                 r = binomsum(N,G)
                 out.v[r+1:r+binomial(N,G)] = v.v
                 return MultiVector{T,V}(out)
@@ -434,7 +437,7 @@ function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
     N = ndims(V)
     sigcheck(v.s,V)
     g = grade.(v.v)
-    out = @MVector zeros(T,2^N)
+    out = zeros(mvec(N,T))
     for k ∈ 1:length(v.v)
         (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
         setmulti!(out,convert(T,val),UInt16(b),Dimension{N}())
