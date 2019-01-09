@@ -17,22 +17,42 @@ include("algebra.jl")
     g::Dict{Symbol,Int}
 end
 
-@pure getindex(a::Algebra,i::Int) = a.b[i]
+@pure getindex(a::Algebra,i::Int) = getfield(a,:b)[i]
 Base.firstindex(a::Algebra) = 1
 Base.lastindex(a::Algebra{V}) where V = 2^ndims(V)
 Base.length(a::Algebra{V}) where V = 2^ndims(V)
+
+@noinline function lookup_basis(V::VectorSpace,v::Symbol)::Union{SValue,Basis}
+    vs = string(v)
+    vt = vs[1]≠'e'
+    ef = split(vs,r"(e|f)")
+    let W = V,fs=false
+        C = dualtype(V)
+        C≥0 && (W = C>0 ? V'⊕V : V⊕V')
+        V2 = (vt ⊻ (vt ? C≠0 : C>0)) ? V' : V
+        L = length(ef) > 2
+        M = Int(ndims(W)/2)
+        m = ((!L) && vt && (C<0)) ? M : 0
+        (es,e,et) = indexjoin(Int[],[parse(Int,ef[2][k]) for k∈1:length(ef[2])].+m,C<0 ? V : V2)
+        et && (return SValue{V}(0,getbasis(V,0)))
+        d = if L
+            (fs,f,ft) = indexjoin(Int[],[parse(Int,ef[3][k]) for k∈1:length(ef[3])].+M,W)
+            ft && (return SValue{V}(0,getbasis(V,0)))
+            Basis{W}([e;f])
+        else
+            Basis{V2}(e)
+        end
+        return (es⊻fs) ? SValue(-1,d) : d
+    end
+end
 
 @pure function Base.getproperty(a::Algebra{V},v::Symbol) where V
     if v ∈ (:b,:g)
         return getfield(a,v)
     elseif haskey(a.g,v)
-        return a[a.g[v]]
+        return a[getfield(a,:g)[v]]
     else
-        e = string(v)
-        (s,c,t) = indexjoin(Int[],[parse(Int,e[k]) for k∈2:length(e)],V)
-        t && (return SValue{V}(0,getbasis(V,0)))
-        d = Basis{V}(c)
-        return s ? SValue{V}(-1,d) : d
+        return lookup_basis(V,v)
     end
 end
 
@@ -67,16 +87,17 @@ macro Λ_str(str)
     Algebra(str)
 end
 
-@pure do2m(d,o) = (1<<(d-1))+(1<<(2*o-1))
-@pure getalgebra(n::Int,d::Int,o::Int,s) = getalgebra(n,do2m(d,o),s)
+@pure do2m(d,o,c) = (1<<(d-1))+(1<<(2*o-1))+(c<0 ? 8 : (1<<(3*c-1)))
+@pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,do2m(d,o,c),s)
 @pure getalgebra(n::Int,m::Int,s) = algebra_cache(n,m,UInt16(s))
-@pure getalgebra(V::VectorSpace) = algebra_cache(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V))),value(V))
+@pure getalgebra(V::VectorSpace) = algebra_cache(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
 
 @pure function Base.getproperty(λ::typeof(Λ),v::Symbol)
     v ∈ (:body,:var) && (return getfield(λ,v))
     V = string(v)
+    C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
-    getalgebra(parse(Int,V[2]),do2m(parse(Int,V[3]),parse(Int,V[4])),parse(Int,V[5:end]))
+    getalgebra(parse(Int,V[2]),do2m(parse(Int,V[3]),parse(Int,V[4]),C),parse(Int,V[5:end]))
 end
 
 const algebra_cache = ( () -> begin
@@ -86,13 +107,15 @@ const algebra_cache = ( () -> begin
         return (n::Int,m::Int,s::UInt16) -> (begin
                 n==0 && (return Λ0)
                 for N ∈ length(Y)+1:n
-                    push!(Y,[Dict{Int,Λ}() for k∈1:4])
+                    push!(Y,[Dict{Int,Λ}() for k∈1:12])
                 end
                 if !haskey(Y[n][m+1],s)
-                    D = Int(m ∈ (1,3))
-                    O = Int(m ∈ (2,3))
-                    @info("Precomputing $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))},...}")
-                    push!(Y[n][m+1],s=>collect(VectorSpace{n,D,O,s}()))
+                    D = Int(m ∈ (1,3,5,7,9,11))
+                    O = Int(m ∈ (2,3,6,7,10,11))
+                    C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
+                    c = C>0 ? "'" : C<0 ? "*" : ""
+                    @info("Precomputing $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
+                    push!(Y[n][m+1],s=>collect(VectorSpace{n,D,O,s,C}()))
                 end
                 Y[n][m+1][s]
             end)

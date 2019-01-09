@@ -10,9 +10,11 @@ abstract type AbstractTerm{V,G} end
 
 # VectorSpace
 
-struct VectorSpace{N,D,O,S}
-    @pure VectorSpace{N,D,O,S}() where {N,D,O,S} = new{N,D,O,S}()
+struct VectorSpace{N,D,O,S,C}
+    @pure VectorSpace{N,D,O,S,C}() where {N,D,O,S,C} = new{N,D,O,S,C}()
 end
+
+@pure VectorSpace{N,D,O,S}() where {N,D,O,S} = VectorSpace{N,D,O,S,0}()
 
 function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
     d = 0x0001 << (i-1)
@@ -37,7 +39,7 @@ Base.length(s::VectorSpace{N}) where N = N
     try
         parse(Int,s)
         length(s) < 4 && (s *= join(zeros(Int,5-length(s))))
-        VectorSpace(parse(Int,s[1]),do2m(parse(Int,s[2]),parse(Int,s[3])),parse(Int,s[4:end]))
+        VectorSpace(parse(Int,s[1]),do2m(parse(Int,s[2]),parse(Int,s[3]),0),parse(Int,s[4:end]))
     catch
         VectorSpace{N,Int('ϵ'∈s),Int('o'∈s)}(replace(replace(s,'ϵ'=>'+'),'o'=>'+'))
     end
@@ -55,9 +57,55 @@ macro V_str(str)
     VectorSpace(str)
 end
 
-@pure function Base.adjoint(V::VectorSpace{N,D,O,S}) where {N,D,O,S}
-    VectorSpace{N,D,O,UInt16(2^N-1) & (~S)}()
+@pure flip_sig(N,S::UInt16) = UInt16(2^N-1) & (~S)
+
+@pure function Base.adjoint(V::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C}
+    C < 0 && throw(error("$V is the direct sum of a vector space and its dual space"))
+    VectorSpace{N,D,O,flip_sig(N,S),Int(!Bool(C))}()
 end
+
+export ⊕, ℝ #, ℂ, ℍ
+
+for op ∈ [:(Base.:+),:⊕]
+    @eval begin
+        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{N,0,0,B,1}) where {N,A,B}
+            VectorSpace{2N,0,0,bit2int(BitArray([a[:]; b[:]])),B ≠ flip_sig(N,A) ? 0 : -1}()
+        end
+        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{N,0,0,B,0}) where {N,A,B}
+            VectorSpace{2N,0,0,bit2int(BitArray([a[:]; b[:]])),A ≠ flip_sig(N,B) ? 0 : -1}()
+        end
+        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{M,0,0,B,0}) where {N,A,M,B}
+            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
+        end
+        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{M,0,0,B,1}) where {N,A,M,B}
+            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),1}()
+        end
+        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{M,0,0,B,1}) where {N,A,M,B}
+            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
+        end
+        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{M,0,0,B,0}) where {N,A,M,B}
+            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
+        end
+    end
+end
+for C ∈ [0,1]
+    @eval begin
+        @pure function Base.:^(v::VectorSpace{N,0,0,S,$C},i::I) where {N,S,I<:Integer}
+            let V = v
+                for k ∈ 2:i
+                    V = V⊕v
+                end
+                return V
+            end
+        end
+    end
+end
+
+ℝ = VectorSpace(1)
+#ℂ = VectorSpace(2)
+#ℍ = VectorSpace(4)
+
+dualtype(V::VectorSpace{N,D,O,S,C} where {N,D,O,S}) where C = C
 
 ## MultiBasis{N}
 
@@ -91,8 +139,10 @@ end
 
 const VTI = Union{Vector{Int},Tuple,NTuple}
 
-@inline basisindices(b::Basis) = findall(digits(UInt16(b),base=2).==1)
+@inline basisindices(b::UInt16) = findall(digits(UInt16(b),base=2).==1)
+@inline basisindices(b::Basis) = basisindices(UInt16(b))
 @inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,basisindices(b))
+@inline shiftbasis(V::VectorSpace,b::UInt16) = shiftbasis(V,basisindices(b))
 
 function shiftbasis(s::VectorSpace{N,D,O} where N,set::Vector{Int}) where {D,O}
     if !isempty(set)
@@ -131,19 +181,48 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
-@inline printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[subscripts[i] for i ∈ b]...)
-@inline show(io::IO, e::Basis) = printbasis(io,shiftbasis(e))
+@inline printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[e≠"e" ? super[i] : subscripts[i] for i ∈ b]...)
+@inline function printbasis(io::IO,a::VTI,b::VTI,e::String="e",f::String="f")
+    F = !isempty(b)
+    !(F && isempty(a)) && printbasis(io,a,e)
+    F && printbasis(io,b,f)
+end
+@inline function show(io::IO, e::Basis{V}) where V
+    C = dualtype(V)
+    if C < 0
+        N = Int(ndims(V)/2)
+        printbasis(io,shiftbasis(V,UInt16(e) & UInt16(2^N-1)),shiftbasis(V,UInt16(e)>>N))
+    else
+        printbasis(io,shiftbasis(e),C>0 ? "f" : "e")
+    end
+end
 
-@pure function generate(V::VectorSpace{N},label::Symbol) where N
+@pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
     lab = string(label)
     io = IOBuffer()
     els = Symbol[label]
     exp = Basis{V}[Basis{V,0,0x0000}()]
+    C = dualtype(V)
+    C < 0 && (M = Int(N/2))
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            sk = shiftbasis(V,copy(set[k]))
-            print(io,lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈sk]...)
+            sk = copy(set[k])
+            if C < 0
+                a = Int[]
+                b = Int[]
+                for j ∈ sk
+                    push!(j ≤ M ? a : b, j)
+                end
+                b .-= M
+                e = shiftbasis(V,a)
+                f = shiftbasis(V,b)
+                F = !isempty(f)
+                !(F && isempty(e)) && print(io,lab,a...)
+                F && print(io,string(dual),b...)
+            else
+                print(io,C>0 ? string(dual) : lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈shiftbasis(V,sk)]...)
+            end
             push!(els,Symbol(String(take!(io))))
             push!(exp,Basis{V,length(set[k]),bit2int(basisbits(N,set[k]))}())
         end
@@ -153,10 +232,9 @@ end
 
 export @basis, @basis_str
 
-function basis(label::Symbol,sig::Symbol,str::String)
-    V = VectorSpace{length(str)}(str)
+function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
     N = ndims(V)
-    basis,sym = generate(V,label)
+    basis,sym = generate(V,label,dual)
     exp = Expr[Expr(:(=),esc(sig),V),
         Expr(:(=),esc(label),basis[1])]
     for i ∈ 2:2^N
@@ -165,12 +243,13 @@ function basis(label::Symbol,sig::Symbol,str::String)
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
 end
 
-macro basis(label,sig,str)
-    basis(label,sig,str)
+macro basis(q,sig=:V,label=:e,dual=:f)
+    mod = stacktrace()[end].linfo.def.module
+    basis(typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q),sig,label,dual)
 end
 
 macro basis_str(str)
-    basis(:e,:V,str)
+    basis(VectorSpace(str))
 end
 
 const indexbasis_cache = ( () -> begin

@@ -23,6 +23,20 @@ const subscripts = Dict{Int,Char}(
     9 => '₉'
 )
 
+const super = Dict{Int,Char}(
+   -1 => 'ϵ',
+    0 => 'o',
+    1 => '¹',
+    2 => '²',
+    3 => '³',
+    4 => '⁴',
+    5 => '⁵',
+    6 => '⁶',
+    7 => '⁷',
+    8 => '⁸',
+    9 => '⁹'
+)
+
 const binomsum_cache = ( () -> begin
         Y = Array{Int,1}[Int[1]]
         return (n::Int,i::Int) -> (begin
