@@ -84,6 +84,11 @@ function Base.iterate(r::Basis, i::Int=1)
     Base.unsafe_getindex(r, i), i + 1
 end
 
+function (a::Basis{V,1,A})(b::Basis{V,1,B}) where {V,A,B}
+    T = valuetype(a)
+    UInt16(a) ≠ UInt16(b) ? zero(T) : V[intlog(UInt16(a))+1] ? -one(T) : one(T)
+end
+
 const VTI = Union{Vector{Int},Tuple,NTuple}
 
 @inline basisindices(b::Basis) = findall(digits(UInt16(b),base=2).==1)
@@ -146,11 +151,11 @@ end
     return exp,els
 end
 
-export @basis
+export @basis, @basis_str
 
-macro basis(label,sig,str)
-    N = length(str)
-    V = VectorSpace{N}(str)
+function basis(label::Symbol,sig::Symbol,str::String)
+    V = VectorSpace{length(str)}(str)
+    N = ndims(V)
     basis,sym = generate(V,label)
     exp = Expr[Expr(:(=),esc(sig),V),
         Expr(:(=),esc(label),basis[1])]
@@ -158,6 +163,14 @@ macro basis(label,sig,str)
         push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
+end
+
+macro basis(label,sig,str)
+    basis(label,sig,str)
+end
+
+macro basis_str(str)
+    basis(:e,:V,str)
 end
 
 const indexbasis_cache = ( () -> begin
@@ -196,6 +209,19 @@ for Value ∈ MSV
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
         $Value(v,b::AbstractTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
         show(io::IO,m::$Value) = print(io,m.v,basis(m))
+        function (a::Basis{V,1,A})(b::$Value{V,1,X,T} where X) where {V,A,T}
+            UInt16(a) ≠ UInt16(basis(b)) && (return SValue{V}(zero(T),Basis{V}()))
+            (V[intlog(UInt16(a))+1] ? -(b.v) : b.v) * Basis{V}()
+        end
+        function (a::$Value{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
+            UInt16(basis(a)) ≠ UInt16(b) && (return SValue{V}(zero(T),Basis{V}()))
+            (V[intlog(UInt16(b))+1] ? -(a.v) : a.v) * Basis{V}()
+        end
+        function (a::$Value{V,1,X,A} where X)(b::$Value{V,1,Y,B} where Y) where {V,A,B}
+            T = promote_type(A,B)
+            UInt16(basis(a)) ≠ UInt16(basis(b)) && (return SValue{V}(zero(T),Basis{V}()))
+            SValue{V}((a.v*(V[intlog(UInt16(basis(a)))+1] ? -(b.v) : b.v))::T,Basis{V}())
+        end
     end
 end
 
@@ -228,6 +254,16 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
         Base.length(s::$Blade{T,N,G}) where {T,N,G} = length(m.v)
 
+
+        function (a::Basis{V,1,A})(b::$Blade{T,V,1}) where {V,A,T}
+            out = b.v[basisindexb(ndims(V),UInt16(a))]
+            SValue{V}((V[intlog(UInt16(a))+1] ? -(out) : out),Basis{V}())
+        end
+        function (a::$Blade{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
+            out = a.v[basisindexb(ndims(V),UInt16(b))]
+            SValue{V}((V[intlog(UInt16(b))+1] ? -(out) : out),Basis{V}())
+        end
+        
         function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
             if B ≠ SValue
                 MValue{V,G,indexbasis(ndims(V),G)[i],T}(m[i])
@@ -252,6 +288,22 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
             end
         end
     end
+    for Valu ∈ MSV
+        @eval begin
+            function (a::$Valu{V,1,X,A} where X)(b::$Blade{B,V,1}) where {V,A,B}
+                Γ = UInt16(basis(a))
+                out = b.v[basisindexb(ndims(V),Γ)]
+                T = promote_type(A,B)
+                SValue{V}((a.v*(V[intlog(Γ)+1] ? -(out) : out))::T,Basis{V}())
+            end
+            function (a::$Blade{A,V,1})(b::$Valu{V,1,X,B} where X) where {V,A,B}
+                Γ = UInt16(basis(b))
+                out = a.v[basisindexb(ndims(V),Γ)]
+                T = promote_type(A,B)
+                SValue{V}((b.v*(V[intlog(Γ)+1] ? -(out) : out))::T,Basis{V}())
+            end
+        end
+    end
     for var ∈ [[:T,:V,:G],[:T,:V],[:T]]
         @eval begin
             $Blade{$(var...)}(v::Basis{V,G}) where {T,V,G} = $Blade{T,V,G}(one(T),v)
@@ -268,6 +320,20 @@ for (Blade,Other,Vec) ∈ [(MSB...,:MVector),(reverse(MSB)...,:SVector)]
     for var ∈ [[:T,:V,:G],[:T,:V],[:T],[]]
         @eval begin
             $Blade{$(var...)}(v::$Other{T,V,G}) where {T,V,G} = $Blade{T,V,G}($Vec{binomial(ndims(V),G),T}(v.v))
+        end
+    end
+    for other ∈ MSB
+        Final = ((Blade == MSB[1]) && (other == MSB[1])) ? MSV[1] : MSV[2]
+        @eval begin
+            function (a::$Blade{A,V,1})(b::$other{B,V,1}) where {V,A,B}
+                T = promote_type(A,B)
+                out = zeros(mvec(ndims(V),1,T))
+                out .= a.v .* b.v
+                for i ∈ 1:ndims(V)
+                    V[i] && (out[i] *= -(one(T)))
+                end
+                $Final{V}(sum(out),Basis{V}())
+            end
         end
     end
 end
