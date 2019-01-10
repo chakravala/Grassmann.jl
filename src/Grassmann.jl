@@ -38,7 +38,8 @@ Base.length(a::Algebra{V}) where V = 2^ndims(V)
         d = if L
             (fs,f,ft) = indexjoin(Int[],[parse(Int,ef[3][k]) for k∈1:length(ef[3])].+M,W)
             ft && (return SValue{V}(0,getbasis(V,0)))
-            Basis{W}([e;f])
+            ef = [e;f]
+            Basis{W,length(ef),bit2int(basisbits(ndims(W),ef))}()
         else
             Basis{V2}(e)
         end

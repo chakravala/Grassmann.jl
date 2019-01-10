@@ -368,8 +368,14 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
                 setblade!(out,$op(value(b,T)),UInt16(basis(b)),Dimension{N}())
                 return MBlade{T,V,A}(out)
             else
-                @warn("sparse MultiGrade{V} objects not properly handled yet")
-                return MultiGrade{V}(a,b)
+                #@warn("sparse MultiGrade{V} objects not properly handled yet")
+                #return MultiGrade{V}(a,b)
+                N = ndims(V)
+                T = promote_type(valuetype(a),valuetype(b))
+                out = zeros(mvec(N,T))
+                setmulti!(out,value(a,T),UInt16(basis(a)),Dimension{N}())
+                setmulti!(out,$op(value(b,T)),UInt16(basis(b)),Dimension{N}())
+                return MultiVector{T,V}(out)
             end
         end
 

@@ -187,15 +187,16 @@ end
     !(F && isempty(a)) && printbasis(io,a,e)
     F && printbasis(io,b,f)
 end
-@inline function show(io::IO, e::Basis{V}) where V
+@inline function printbasis(io::IO,V::VectorSpace,e::UInt16)
     C = dualtype(V)
     if C < 0
         N = Int(ndims(V)/2)
-        printbasis(io,shiftbasis(V,UInt16(e) & UInt16(2^N-1)),shiftbasis(V,UInt16(e)>>N))
+        printbasis(io,shiftbasis(V,e & UInt16(2^N-1)),shiftbasis(V,e>>N))
     else
-        printbasis(io,shiftbasis(e),C>0 ? "f" : "e")
+        printbasis(io,shiftbasis(V,e),C>0 ? "f" : "e")
     end
 end
+@inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,UInt16(e))
 
 @pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
     lab = string(label)
@@ -230,7 +231,7 @@ end
     return exp,els
 end
 
-export @basis, @basis_str
+export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
 
 function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
     N = ndims(V)
@@ -259,12 +260,32 @@ const indexbasis_cache = ( () -> begin
                 for k ∈ j+1:n
                     push!(Y,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
                 end
-                g>0 ? Y[n][g] : [0x0001]
+                g>0 ? Y[n][g] : [0x0000]
             end)
     end)()
 
 @pure indexbasis(n::Int,g::Int) = indexbasis_cache(n,g)
 @pure indexbasis_set(N) = SVector(Vector{UInt16}[indexbasis(N,g) for g ∈ 0:N]...)
+
+macro dualbasis(q,sig=:VV,label=:e,dual=:f)
+    mod = stacktrace()[end].linfo.def.module
+    basis((typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q))',sig,label,dual)
+end
+
+macro dualbasis_str(str)
+    basis(VectorSpace(str)',:VV)
+end
+
+macro mixedbasis(q,sig=:W,label=:e,dual=:f)
+    mod = stacktrace()[end].linfo.def.module
+    V = typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q)
+    basis(V⊕V',sig,label,dual)
+end
+
+macro mixedbasis_str(str)
+    V = VectorSpace(str)
+    basis(V⊕V',:W)
+end
 
 ## S/MValue{N}
 
@@ -358,12 +379,12 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
 
         function show(io::IO, m::$Blade{T,V,G}) where {T,V,G}
-            set = combo(ndims(V),G)
+            ib = indexbasis(ndims(V),G)
             print(io,m.v[1])
-            printbasis(io,shiftbasis(V,copy(set[1])))
-            for k ∈ 2:length(set)
+            printbasis(io,V,ib[1])
+            for k ∈ 2:length(ib)
                 print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
-                printbasis(io,shiftbasis(V,copy(set[k])))
+                printbasis(io,V,ib[k])
             end
         end
     end
@@ -499,11 +520,11 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
     print(io,m[0][1])
     for i ∈ 1:N
         b = m[i]
-        set = combo(N,i)
-        for k ∈ 1:length(set)
+        ib = indexbasis(N,i)
+        for k ∈ 1:length(ib)
             if b[k] ≠ 0
                 print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
-                printbasis(io,shiftbasis(V,copy(set[k])))
+                printbasis(io,V,ib[k])
             end
         end
     end
