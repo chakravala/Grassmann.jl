@@ -1,13 +1,15 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the MIT license
-#   Copyright (C) 2018 Michael Reed
+#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   Grassmann Copyright (C) 2019 Michael Reed
 
-import Base: @pure
+import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
 
 @pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
 @pure binomial(N,G) = Base.binomial(N,G)
 @pure mvec(N,G,t) = MVector{binomial(N,G),t}
 @pure mvec(N,t) = MVector{2^N,t}
+@pure svec(N,G,t) = SizedArray{Tuple{binomial(N,G)},t,1,1}
+@pure svec(N,t) = SizedArray{Tuple{2^N},t,1,1}
 
 const subscripts = Dict{Int,Char}(
    -1 => 'ϵ',
@@ -110,11 +112,7 @@ const basisindex = ( () -> begin
             end)
     end)()
 
-function intlog(M::Integer)
-    lM = log2(M)
-    try; Int(lM)
-    catch; lM end
-end
+intlog(M::Integer) = Int(log2(M))
 
 bit2int(b::BitArray{1}) = parse(UInt16,join(reverse([t ? '1' : '0' for t ∈ b])),base=2)
 

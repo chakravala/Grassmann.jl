@@ -1,111 +1,10 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the MIT license
-#   Copyright (C) 2018 Michael Reed
+#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   Grassmann Copyright (C) 2019 Michael Reed
 
-
-import Base: print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-export AbstractTerm, Basis, MultiVector, MultiGrade, Signature, VectorSpace, @S_str, @V_str
+export AbstractTerm, Basis, MultiVector, MultiGrade, @S_str, @V_str
 
 abstract type AbstractTerm{V,G} end
-
-# VectorSpace
-
-struct VectorSpace{N,D,O,S,C}
-    @pure VectorSpace{N,D,O,S,C}() where {N,D,O,S,C} = new{N,D,O,S,C}()
-end
-
-@pure VectorSpace{N,D,O,S}() where {N,D,O,S} = VectorSpace{N,D,O,S,0}()
-
-function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
-    d = 0x0001 << (i-1)
-    return (d & S) == d
-end
-
-getindex(vs::VectorSpace{N,D,O,S} where {N,D,O},i::UnitRange{Int}) where S = [getindex(vs,j) for j ∈ i]
-getindex(vs::VectorSpace{N,D,O,S} where {D,O},i::Colon) where {N,S} = [getindex(vs,j) for j ∈ 1:N]
-Base.firstindex(m::VectorSpace) = 1
-Base.lastindex(m::VectorSpace{N}) where N = N
-Base.length(s::VectorSpace{N}) where N = N
-
-@inline sig(s::Bool) = s ? '-' : '+'
-
-@pure VectorSpace{N,D,O}(b::BitArray{1}) where {N,D,O} = VectorSpace{N,D,O,bit2int(b[1:N])}()
-@pure VectorSpace{N,D,O}(b::Array{Bool,1}) where {N,D,O} = VectorSpace{N,D,O}(convert(BitArray{1},b))
-@pure VectorSpace{N,D,O}(s::String) where {N,D,O} = VectorSpace{N,D,O}([k=='-' for k∈s])
-@pure VectorSpace(n::Int,d::Int=0,o::Int=0,s::UInt16=0x0000) = VectorSpace{n,d,o,s}()
-@pure VectorSpace(str::String) = VectorSpace{length(str)}(str)
-
-@pure function VectorSpace{N}(s::String) where N
-    try
-        parse(Int,s)
-        length(s) < 4 && (s *= join(zeros(Int,5-length(s))))
-        VectorSpace(parse(Int,s[1]),do2m(parse(Int,s[2]),parse(Int,s[3]),0),parse(Int,s[4:end]))
-    catch
-        VectorSpace{N,Int('ϵ'∈s),Int('o'∈s)}(replace(replace(s,'ϵ'=>'+'),'o'=>'+'))
-    end
-end
-
-@inline function print(io::IO,s::VectorSpace)
-    hasdual(s) && print(io,'ϵ')
-    hasorigin(s) && print(io,'o')
-    print(io,sig.(s[hasdual(s)+hasorigin(s)+1:ndims(s)])...)
-end
-
-show(io::IO,vs::VectorSpace) = print(io,vs)
-
-macro V_str(str)
-    VectorSpace(str)
-end
-
-@pure flip_sig(N,S::UInt16) = UInt16(2^N-1) & (~S)
-
-@pure function Base.adjoint(V::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C}
-    C < 0 && throw(error("$V is the direct sum of a vector space and its dual space"))
-    VectorSpace{N,D,O,flip_sig(N,S),Int(!Bool(C))}()
-end
-
-export ⊕, ℝ #, ℂ, ℍ
-
-for op ∈ [:(Base.:+),:⊕]
-    @eval begin
-        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{N,0,0,B,1}) where {N,A,B}
-            VectorSpace{2N,0,0,bit2int(BitArray([a[:]; b[:]])),B ≠ flip_sig(N,A) ? 0 : -1}()
-        end
-        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{N,0,0,B,0}) where {N,A,B}
-            VectorSpace{2N,0,0,bit2int(BitArray([a[:]; b[:]])),A ≠ flip_sig(N,B) ? 0 : -1}()
-        end
-        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{M,0,0,B,0}) where {N,A,M,B}
-            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
-        end
-        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{M,0,0,B,1}) where {N,A,M,B}
-            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),1}()
-        end
-        @pure function $op(a::VectorSpace{N,0,0,A,0},b::VectorSpace{M,0,0,B,1}) where {N,A,M,B}
-            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
-        end
-        @pure function $op(a::VectorSpace{N,0,0,A,1},b::VectorSpace{M,0,0,B,0}) where {N,A,M,B}
-            VectorSpace{N+M,0,0,bit2int(BitArray([a[:]; b[:]])),0}()
-        end
-    end
-end
-for C ∈ [0,1]
-    @eval begin
-        @pure function Base.:^(v::VectorSpace{N,0,0,S,$C},i::I) where {N,S,I<:Integer}
-            let V = v
-                for k ∈ 2:i
-                    V = V⊕v
-                end
-                return V
-            end
-        end
-    end
-end
-
-ℝ = VectorSpace(1)
-#ℂ = VectorSpace(2)
-#ℍ = VectorSpace(4)
-
-dualtype(V::VectorSpace{N,D,O,S,C} where {N,D,O,S}) where C = C
 
 ## MultiBasis{N}
 
@@ -130,11 +29,6 @@ function Base.iterate(r::Basis, i::Int=1)
     Base.@_inline_meta
     length(r) < i && return nothing
     Base.unsafe_getindex(r, i), i + 1
-end
-
-function (a::Basis{V,1,A})(b::Basis{V,1,B}) where {V,A,B}
-    T = valuetype(a)
-    UInt16(a) ≠ UInt16(b) ? zero(T) : V[intlog(UInt16(a))+1] ? -one(T) : one(T)
 end
 
 const VTI = Union{Vector{Int},Tuple,NTuple}
@@ -245,8 +139,7 @@ function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
 end
 
 macro basis(q,sig=:V,label=:e,dual=:f)
-    mod = stacktrace()[end].linfo.def.module
-    basis(typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q),sig,label,dual)
+    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q),sig,label,dual)
 end
 
 macro basis_str(str)
@@ -268,8 +161,7 @@ const indexbasis_cache = ( () -> begin
 @pure indexbasis_set(N) = SVector(Vector{UInt16}[indexbasis(N,g) for g ∈ 0:N]...)
 
 macro dualbasis(q,sig=:VV,label=:e,dual=:f)
-    mod = stacktrace()[end].linfo.def.module
-    basis((typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q))',sig,label,dual)
+    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q))',sig,label,dual)
 end
 
 macro dualbasis_str(str)
@@ -277,8 +169,7 @@ macro dualbasis_str(str)
 end
 
 macro mixedbasis(q,sig=:W,label=:e,dual=:f)
-    mod = stacktrace()[end].linfo.def.module
-    V = typeof(q)∈(Symbol,Expr) ? (@eval(mod,$q)) : VectorSpace(q)
+    V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q)
     basis(V⊕V',sig,label,dual)
 end
 
@@ -308,20 +199,7 @@ for Value ∈ MSV
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
         $Value(v,b::AbstractTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
-        show(io::IO,m::$Value) = print(io,m.v,basis(m))
-        function (a::Basis{V,1,A})(b::$Value{V,1,X,T} where X) where {V,A,T}
-            UInt16(a) ≠ UInt16(basis(b)) && (return SValue{V}(zero(T),Basis{V}()))
-            (V[intlog(UInt16(a))+1] ? -(b.v) : b.v) * Basis{V}()
-        end
-        function (a::$Value{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
-            UInt16(basis(a)) ≠ UInt16(b) && (return SValue{V}(zero(T),Basis{V}()))
-            (V[intlog(UInt16(b))+1] ? -(a.v) : a.v) * Basis{V}()
-        end
-        function (a::$Value{V,1,X,A} where X)(b::$Value{V,1,Y,B} where Y) where {V,A,B}
-            T = promote_type(A,B)
-            UInt16(basis(a)) ≠ UInt16(basis(b)) && (return SValue{V}(zero(T),Basis{V}()))
-            SValue{V}((a.v*(V[intlog(UInt16(basis(a)))+1] ? -(b.v) : b.v))::T,Basis{V}())
-        end
+        show(io::IO,m::$Value) = print(io,(valuetype(m)≠Expr ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
 
@@ -353,17 +231,8 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         Base.firstindex(m::$Blade) = 1
         Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
         Base.length(s::$Blade{T,N,G}) where {T,N,G} = length(m.v)
-
-
-        function (a::Basis{V,1,A})(b::$Blade{T,V,1}) where {V,A,T}
-            out = b.v[basisindexb(ndims(V),UInt16(a))]
-            SValue{V}((V[intlog(UInt16(a))+1] ? -(out) : out),Basis{V}())
-        end
-        function (a::$Blade{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
-            out = a.v[basisindexb(ndims(V),UInt16(b))]
-            SValue{V}((V[intlog(UInt16(b))+1] ? -(out) : out),Basis{V}())
-        end
-        
+    end
+    @eval begin
         function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
             if B ≠ SValue
                 MValue{V,G,indexbasis(ndims(V),G)[i],T}(m[i])
@@ -380,27 +249,19 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
 
         function show(io::IO, m::$Blade{T,V,G}) where {T,V,G}
             ib = indexbasis(ndims(V),G)
-            print(io,m.v[1])
+            if T == Any && typeof(m.v[1]) ∈ (Expr,Symbol)
+                typeof(m.v[1])≠Expr ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
+            else
+                print(io,m.v[1])
+            end
             printbasis(io,V,ib[1])
             for k ∈ 2:length(ib)
-                print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
+                if T == Any && typeof(m.v[k]) ∈ (Expr,Symbol)
+                    typeof(m.v[k])≠Expr ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
+                else
+                    print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
+                end
                 printbasis(io,V,ib[k])
-            end
-        end
-    end
-    for Valu ∈ MSV
-        @eval begin
-            function (a::$Valu{V,1,X,A} where X)(b::$Blade{B,V,1}) where {V,A,B}
-                Γ = UInt16(basis(a))
-                out = b.v[basisindexb(ndims(V),Γ)]
-                T = promote_type(A,B)
-                SValue{V}((a.v*(V[intlog(Γ)+1] ? -(out) : out))::T,Basis{V}())
-            end
-            function (a::$Blade{A,V,1})(b::$Valu{V,1,X,B} where X) where {V,A,B}
-                Γ = UInt16(basis(b))
-                out = a.v[basisindexb(ndims(V),Γ)]
-                T = promote_type(A,B)
-                SValue{V}((b.v*(V[intlog(Γ)+1] ? -(out) : out))::T,Basis{V}())
             end
         end
     end
@@ -422,24 +283,17 @@ for (Blade,Other,Vec) ∈ [(MSB...,:MVector),(reverse(MSB)...,:SVector)]
             $Blade{$(var...)}(v::$Other{T,V,G}) where {T,V,G} = $Blade{T,V,G}($Vec{binomial(ndims(V),G),T}(v.v))
         end
     end
-    for other ∈ MSB
-        Final = ((Blade == MSB[1]) && (other == MSB[1])) ? MSV[1] : MSV[2]
-        @eval begin
-            function (a::$Blade{A,V,1})(b::$other{B,V,1}) where {V,A,B}
-                T = promote_type(A,B)
-                out = zeros(mvec(ndims(V),1,T))
-                out .= a.v .* b.v
-                for i ∈ 1:ndims(V)
-                    V[i] && (out[i] *= -(one(T)))
-                end
-                $Final{V}(sum(out),Basis{V}())
-            end
-        end
-    end
 end
 for (Blade,Vec1,Vec2) ∈ [(MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector)]
     @eval begin
         $Blade{T,V,G}(v::$Vec1{M,T} where M) where {T,V,G} = $Blade{T,V,G}($Vec2{binomial(ndims(V),G),T}(v))
+    end
+end
+for Blade ∈ MSB, Other ∈ MSB
+    @eval begin
+        ==(a::$Blade{T,V,G},b::$Other{T,V,G}) where {T,V,G} = a.v == b.v
+        ==(a::$Blade{T,V} where T,b::$Other{S,V} where S) where V = false
+        ==(a::$Blade{T,V} where T,b::$Other{S,W} where S) where {V,W,G} = throw(error("not implemented yet"))
     end
 end
 
@@ -523,12 +377,20 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
         ib = indexbasis(N,i)
         for k ∈ 1:length(ib)
             if b[k] ≠ 0
-                print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
+                if T == Any && typeof(b[k]) ∈ (Expr,Symbol)
+                    typeof(m.v[k])≠Expr ? print(io," + ",b[k]) : print(io," + (",b[k],")")
+                else
+                    print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
+                end
                 printbasis(io,V,ib[k])
             end
         end
     end
 end
+
+==(a::MultiVector{T,V},b::MultiVector{T,V}) where {T,V} = a.v == b.v
+==(a::MultiVector{T,V} where T,b::MultiVector{S,V} where S) where V = false
+==(a::MultiVector{T,V} where T,b::MultiVector{S,W} where S) where {V,W,G} = throw(error("not implemented yet"))
 
 ## Generic
 

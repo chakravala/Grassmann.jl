@@ -1,14 +1,16 @@
 module Grassmann
 
-#   This file is part of Grassmann.jl. It is licensed under the MIT license
-#   Copyright (C) 2018 Michael Reed
+#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   Grassmann Copyright (C) 2019 Michael Reed
 
-using Combinatorics, StaticArrays #, Requires
+using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes
 
 include("utilities.jl")
+include("direct_sum.jl")
 include("multivectors.jl")
 include("algebra.jl")
+include("forms.jl")
 
 ## Algebra{N}
 
@@ -96,9 +98,10 @@ end
 @pure function Base.getproperty(λ::typeof(Λ),v::Symbol)
     v ∈ (:body,:var) && (return getfield(λ,v))
     V = string(v)
+    N = parse(Int,V[2])
     C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
-    getalgebra(parse(Int,V[2]),do2m(parse(Int,V[3]),parse(Int,V[4]),C),parse(Int,V[5:end]))
+    getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),flip_sig(N,UInt16(parse(Int,V[5:end]))))
 end
 
 const algebra_cache = ( () -> begin
@@ -125,8 +128,8 @@ const algebra_cache = ( () -> begin
 @pure getbasis(V::VectorSpace,b) = getalgebra(V).b[basisindex(ndims(V),UInt16(b))]
 @pure getbasis(V::VectorSpace,v::Symbol) = getproperty(getalgebra(V),v)
 
-#=function __init__()
+function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
-end=#
+end
 
 end # module
