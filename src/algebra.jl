@@ -331,7 +331,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         A = indexbasis(N,g)
                         for i ∈ 1:binomial(N,g)
                             for j ∈ 1:bng
-                                $product!(V,out,A[i],ib[i],$MUL(a.v[r+i],b[j]))
+                                $product!(V,out,A[i],ib[j],$MUL(a.v[r+i],b[j]))
                             end
                         end
                     end

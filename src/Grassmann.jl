@@ -101,7 +101,8 @@ end
     N = parse(Int,V[2])
     C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
-    getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),flip_sig(N,UInt16(parse(Int,V[5:end]))))
+    S = UInt16(parse(Int,V[5:end]))
+    getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
 end
 
 const algebra_cache = ( () -> begin

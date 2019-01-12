@@ -203,6 +203,9 @@ for Value ∈ MSV
     end
 end
 
+==(a::AbstractTerm{V,G},b::AbstractTerm{V,G}) where {V,G} = basis(a) == basis(b) && value(a) == value(b)
+==(a::AbstractTerm,b::AbstractTerm) = false
+
 ## Grade{G}
 
 struct Grade{G}

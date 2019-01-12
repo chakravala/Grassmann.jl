@@ -156,7 +156,7 @@ The element `ℒ` is a linear form which can take `Grade{1}` vectors as input,
 julia> ℒ(e1+e2)
 7e₁ + 14e₂ + 0f¹ + 0f²
 
-julia> [3 4; 6 8] * [1,1]
+julia> L = [1,2] * [3,4]'; L * [1,1]
 2-element Array{Int64,1}:
   7
  14
