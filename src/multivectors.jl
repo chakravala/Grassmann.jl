@@ -333,6 +333,7 @@ end
 MultiVector{V}(v::StaticArray{Tuple{M},T,1}) where {V,T,M} = MultiVector{T,V}(v)
 for var ∈ [[:T,:V],[:V]]
     @eval begin
+        MultiVector{$(var...)}(v::SizedArray) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         MultiVector{$(var...)}(v::Vector{T}) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         function MultiVector{$(var...)}(val::T,v::Basis{V,G}) where {T,V,G}
@@ -381,7 +382,7 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
         for k ∈ 1:length(ib)
             if b[k] ≠ 0
                 if T == Any && typeof(b[k]) ∈ (Expr,Symbol)
-                    typeof(m.v[k])≠Expr ? print(io," + ",b[k]) : print(io," + (",b[k],")")
+                    typeof(b[k])≠Expr ? print(io," + ",b[k]) : print(io," + (",b[k],")")
                 else
                     print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
                 end

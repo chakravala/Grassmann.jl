@@ -217,8 +217,8 @@ end
 function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
     for Value ∈ MSV
         @eval begin
-            *(a::$Field,b::$Value{V,G}) where {V,G} = SValue{V,G}($MUL(a,b.v),basis(b))
-            *(a::$Value{V,G},b::$Field) where {V,G} = SValue{V,G}($MUL(a.v,b),basis(a))
+            *(a::$Field,b::$Value{V,G,B,T} where B) where {V,G,T<:$Field} = SValue{V,G}($MUL(a,b.v),basis(b))
+            *(a::$Value{V,G,B,T} where B,b::$Field) where {V,G,T<:$Field} = SValue{V,G}($MUL(a.v,b),basis(a))
         end
     end
     for (A,B) ∈ [(A,B) for A ∈ MSV, B ∈ MSV]
@@ -230,8 +230,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
     end
     for Blade ∈ MSB
         @eval begin
-            *(a::Field,b::$Blade{T,V,G}) where {T<:Field,V,G} = SBlade{T,V,G}(a.*b.v)
-            *(a::$Blade{T,V,G},b::Field) where {T<:Field,V,G} = SBlade{T,V,G}(a.v.*b)
+            *(a::Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(a.*b.v)
+            *(a::$Blade{T,V,G},b::Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
         end
     end
     @eval begin
@@ -242,8 +242,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
         *(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
         *(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)
         ∧(::$Field,::$Field) = 0
-        ∧(a::$Field,b::B) where B<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
-        ∧(a::A,b::$Field) where A<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
+        ∧(a,b::B) where B<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
+        ∧(a::A,b) where A<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
         #=
         ∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
@@ -473,20 +473,36 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                 end
             end
         end
+        for Value ∈ MSV
+            @eval begin
+                function $op(a::$Value{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
+                    $(insert_expr((:N,:t),VEC)...)
+                    out = $bop(value(b,$VEC(N,t)))
+                    addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                    return MultiVector{t,V}(out)
+                end
+                function $op(a::MultiVector{T,V},b::$Value{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                    $(insert_expr((:N,:t),VEC)...)
+                    out = copy(value(a,$VEC(N,t)))
+                    addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                    return MultiVector{t,V}(out)
+                end
+            end
+        end
         @eval begin
-            function $op(a::A,b::MultiVector{T,V}) where A<:AbstractTerm{V,G} where {T<:$Field,V,G}
+            function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = $bop(value(b,$VEC(N,t)))
                 addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
-            function $op(a::MultiVector{T,V},b::B) where B<:AbstractTerm{V,G} where {T<:$Field,V,G}
+            function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
-            function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {T<:$Field,V,S}
+            function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {T<:$Field,V,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 $(Expr(eop,:out,:(value(b,mvec(N,t)))))
@@ -511,26 +527,58 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
         for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
             C = (A == MSB[1] && B == MSB[1]) ? MSB[1] : MSB[2]
             @eval begin
-                function $op(a::$A{T,V,G},b::$B{S,V,G}) where {T<:Field,V,G,S<:Field}
+                function $op(a::$A{T,V,G},b::$B{S,V,G}) where {T<:$Field,V,G,S<:$Field}
                     return $C{promote_type(valuetype(a),valuetype(b)),V,G}($bop(a.v,b.v))
                 end
             end
         end
         for Blade ∈ MSB
+            for Value ∈ MSV
+                @eval begin
+                    function $op(a::$Blade{T,V,G},b::$Value{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                        $(insert_expr((:N,:t),VEC)...)
+                        out = copy(value(a,$VEC(N,G,t)))
+                        addblade!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                        return MBlade{t,V,G}(out)
+                    end
+                    function $op(a::$Value{V,G,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,S<:$Field}
+                        $(insert_expr((:N,:t),VEC)...)
+                        out = $bop(value(b,$VEC(N,G,t)))
+                        addblade!(out,value(a,t),basis(a),Dimension{N}())
+                        return MBlade{t,V,G}(out)
+                    end
+                    function $op(a::$Blade{T,V,G},b::$Value{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
+                        $(insert_expr((:N,:t,:out),VEC)...)
+                        r = binomsum(N,G)
+                        R = binomial(N,G)
+                        out[r+1:r+R] = value(a,MVector{R,t})
+                        addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                        return MultiVector{t,V}(out)
+                    end
+                    function $op(a::$Value{V,L,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
+                        $(insert_expr((:N,:t,:out),VEC)...)
+                        r = binomsum(N,G)
+                        R = binomial(N,G)
+                        out[r+1:r+R] = $bop(value(b,MVector{R,t}))
+                        addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                        return MultiVector{t,V}(out)
+                    end
+                end
+            end
             @eval begin
-                function $op(a::$Blade{T,V,G},b::B) where B<:AbstractTerm{V,G} where {T<:$Field,V,G}
+                function $op(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,G,t)))
                     addblade!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
                     return MBlade{t,V,G}(out)
                 end
-                function $op(a::A,b::$Blade{T,V,G}) where A<:AbstractTerm{V,G} where {T<:$Field,V,G}
+                function $op(a::Basis{V,G},b::$Blade{T,V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
                     out = $bop(value(b,$VEC(N,G,t)))
                     addblade!(out,value(a,t),basis(a),Dimension{N}())
                     return MBlade{t,V,G}(out)
                 end
-                function $op(a::$Blade{T,V,G},b::B) where B<:AbstractTerm{V,L} where {T<:$Field,V,G,L}
+                function $op(a::$Blade{T,V,G},b::Basis{V,L}) where {T<:$Field,V,G,L}
                     $(insert_expr((:N,:t,:out),VEC)...)
                     r = binomsum(N,G)
                     R = binomial(N,G)
@@ -538,7 +586,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
-                function $op(a::A,b::$Blade{T,V,G}) where A<:AbstractTerm{V,L} where {T<:$Field,V,G,L}
+                function $op(a::Basis{V,L},b::$Blade{T,V,G}) where {T<:$Field,V,G,L}
                     $(insert_expr((:N,:t,:out),VEC)...)
                     r = binomsum(N,G)
                     R = binomial(N,G)

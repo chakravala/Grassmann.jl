@@ -13,6 +13,8 @@
 
 This package is a work in progress providing the necessary tools to work with arbitrary dual `MultiVector` elements with optional origin. Due to the parametric type system for the generating `VectorSpace`, the Julia compiler can fully preallocate and often cache values efficiently. Both static and mutable vector types are supported.
 
+It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded.
+
 ### Requirements
 
 This requires my forked version of `ComputedFieldTypes` at https://github.com/chakravala/ComputedFieldTypes.jl
@@ -168,13 +170,31 @@ This package is still a work in progress, and the API and implementation may cha
 ## Symbolic coefficients by declaring an alternative scalar algebra
 
 Due to the abstract generality of the code generation of the `Grassmann` product algebra, it is easily possible to extend the entire set of operations to other kinds of scalar coefficient types.
-By default, the coefficients are required to be `<:Number`. However, if this does not suit your needs, an alternative scalar product algebra can be specified with
+By default, the coefficients are required to be `<:Number`. However, if this does not suit your needs, alternative scalar product algebras can be specified with
 ```Julia
 generate_product_algebra(SymField,:(Sym.:*),:(Sym.:+),:(Sym.:-),:svec)
 ```
-where `SymField` is the desired scalar field and `Sym` is the scope which contains the scalar field algebra for `SymField`. Currently, it is feasible to enable symbolic scalar computation with `Reduce`, which is in the experimental testing phase for compatibility with this package.
+where `SymField` is the desired scalar field and `Sym` is the scope which contains the scalar field algebra for `SymField`.
 
-However, it should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
+Currently, with the use of `Requires` it is feasible to automatically enable symbolic scalar computation with [Reduce.jl](https://github.com/chakravala/Reduce.jl), e.g.
+```Julia
+julia> using Reduce, Grassmann
+Reduce (Free CSL version, revision 4590), 11-May-18 ...
+```
+It is **essential** that the `Reduce` package was precompiled without the extra precompilation enabled if using a Linux operating system (`ENV["RED_PRE"]=0`), since the extra precompilation causes a segfault when used with `StaticArrays`.
+```Julia
+julia> basis"2"
+(++, e, e₁, e₂, e₁₂)
+
+julia> (:a*e1 + :b*e2) ∧ (:c*e1 + :d*e2)
+0.0 + (a * d - b * c)e₁₂
+
+julia> (:a*e1 + :b*e2) * (:c*e1 + :d*e2)
+a * c + b * d + (a * d - b * c)e₁₂
+```
+If these compatiblity steps are followed, then `Grassmann` will automatically declare the product algebra to use the `Reduce.Algebra` symbolic field operation scope.
+
+It should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
 
 ## References
 * C. Doran, D. Hestenes, F. SOmmen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
