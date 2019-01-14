@@ -13,7 +13,7 @@
 
 This package is a work in progress providing the necessary tools to work with arbitrary dual `MultiVector` elements with optional origin. Due to the parametric type system for the generating `VectorSpace`, the Julia compiler can fully preallocate and often cache values efficiently. Both static and mutable vector types are supported.
 
-It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded.
+It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
 
 ### Requirements
 
@@ -181,7 +181,7 @@ Currently, with the use of `Requires` it is feasible to automatically enable sym
 julia> using Reduce, Grassmann
 Reduce (Free CSL version, revision 4590), 11-May-18 ...
 ```
-It is **essential** that the `Reduce` package was precompiled without the extra precompilation enabled if using a Linux operating system (`ENV["RED_PRE"]=0`), since the extra precompilation causes a segfault when used with `StaticArrays`.
+It is **essential** that the `Reduce` package was precompiled without the extra precompilation enabled if using a Linux operating system (`ENV["REDPRE"]=0`), since the extra precompilation causes a segfault when used with `StaticArrays`.
 ```Julia
 julia> basis"2"
 (++, e, e₁, e₂, e₁₂)
@@ -197,6 +197,6 @@ If these compatiblity steps are followed, then `Grassmann` will automatically de
 It should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
 
 ## References
-* C. Doran, D. Hestenes, F. SOmmen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
+* C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
 * David Hestenes, [Universal Geometric Algebra](http://lomont.org/Math/GeometricAlgebra/Universal%20Geometric%20Algebra%20-%20Hestenes%20-%201988.pdf), Pure and Applied (1988)
 * Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)

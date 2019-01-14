@@ -13,6 +13,8 @@ sigcheck(a::VectorSpace,b::VectorSpace) = a ≠ b && throw(error("$(a.s) ≠ $(b
 
 ## mutating operations
 
+add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
+
 function add!(out::MultiVector{T,V},val::T,A::Vector{Int},B::Vector{Int}) where {T<:Field,V}
     (s,c,t) = indexjoin(A,B,V)
     !t && (out[length(c)][basisindex(N,c)] += s ? -(val) : val)
@@ -230,17 +232,17 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
     end
     for Blade ∈ MSB
         @eval begin
-            *(a::Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(a.*b.v)
-            *(a::$Blade{T,V,G},b::Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
+            *(a::Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(broadcast($MUL,a,b.v))
+            *(a::$Blade{T,V,G},b::Field) where {T<:$Field,V,G} = SBlade{T,V,G}(broadcast(a.v,b))
         end
     end
     @eval begin
         *(a::$Field,b::Basis{V}) where V = SValue{V}(a,b)
         *(a::Basis{V},b::$Field) where V = SValue{V}(b,a)
-        *(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
-        *(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
-        *(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
-        *(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)
+        *(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(broadcast($MUL,a,b.v))
+        *(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(broadcast($MUL,a.v,b))
+        *(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast($MUL,a,b.v))
+        *(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(broadcast($MUL,a.v,b))
         ∧(::$Field,::$Field) = 0
         ∧(a,b::B) where B<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
         ∧(a::A,b) where A<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
@@ -505,7 +507,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {T<:$Field,V,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
-                $(Expr(eop,:out,:(value(b,mvec(N,t)))))
+                $(add_val(eop,:out,:(value(b,mvec(N,t))),bop))
                 return MultiVector{t,V}(out)
             end
         end
@@ -673,6 +675,7 @@ end
 for Term ∈ [:AbstractTerm,MSB...,:MultiVector,:MultiGrade]
     @eval begin
         @pure /(a::$Term,b::AbstractTerm) = a*inv(b)
+        @pure /(a::$Term,b::Number) = a*inv(b)
     end
 end
 
