@@ -17,7 +17,7 @@ It is currently possible to do both high-performance numerical computations with
 
 ### Requirements
 
-This requires my forked version of `ComputedFieldTypes` at https://github.com/chakravala/ComputedFieldTypes.jl
+This requires a merged version of `ComputedFieldTypes` at https://github.com/vtjnash/ComputedFieldTypes.jl
 
 ## Direct-sum yields `VectorSpace` parametric type polymorphism ⨁
 
@@ -168,6 +168,24 @@ which is a computation equivalent to a matrix computation.
 This package is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
 
 ## Symbolic coefficients by declaring an alternative scalar algebra
+
+```Julia
+julia> using GaloisFields,Grassmann
+
+julia> const F = GaloisField(7)
+𝔽₇
+
+julia> basis"2"
+(++, e, e₁, e₂, e₁₂)
+
+julia> @btime F(3)*e1
+  21.076 ns (2 allocations: 32 bytes)
+3e₁
+
+julia> @btime inv($ans)
+  26.636 ns (0 allocations: 0 bytes)
+5e₁
+```
 
 Due to the abstract generality of the code generation of the `Grassmann` product algebra, it is easily possible to extend the entire set of operations to other kinds of scalar coefficient types.
 By default, the coefficients are required to be `<:Number`. However, if this does not suit your needs, alternative scalar product algebras can be specified with

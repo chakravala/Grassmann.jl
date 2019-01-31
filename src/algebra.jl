@@ -3,6 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: +, -, *, ^, /, inv
+import AbstractLattices: ∧, ∨, dist
 
 Field = Number
 
@@ -363,8 +364,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         return MultiVector{t,V}(out)
                     end
                     function $op(a::$Value{V,L,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
-                        $(insert_expr((:N,:t,:out,:ib),VEC,:T,:S)...)
-                        #t = promote_type(T,S)
+                        $(insert_expr((:N,:t,:out,:ib),VEC)...)
                         for i ∈ 1:binomial(N,G)
                             $product!(V,out,UInt16(basis(a)),ib[i],$MUL(a.v,b[i]))
                         end

@@ -3,3 +3,4 @@ Combinatorics
 StaticArrays
 ComputedFieldTypes
 Requires
+AbstractLattices

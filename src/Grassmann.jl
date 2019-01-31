@@ -4,7 +4,7 @@ module Grassmann
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 using Combinatorics, StaticArrays, Requires
-using ComputedFieldTypes
+using ComputedFieldTypes, AbstractLattices
 
 include("utilities.jl")
 include("direct_sum.jl")
