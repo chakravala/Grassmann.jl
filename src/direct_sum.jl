@@ -13,7 +13,7 @@ end
 @pure VectorSpace{N,D,O,S}() where {N,D,O,S} = VectorSpace{N,D,O,S,0}()
 
 function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
-    d = 0x0001 << (i-1)
+    d = one(Bits) << (i-1)
     return (d & S) == d
 end
 
@@ -28,7 +28,7 @@ Base.length(s::VectorSpace{N}) where N = N
 @pure VectorSpace{N,D,O}(b::BitArray{1}) where {N,D,O} = VectorSpace{N,D,O,bit2int(b[1:N])}()
 @pure VectorSpace{N,D,O}(b::Array{Bool,1}) where {N,D,O} = VectorSpace{N,D,O}(convert(BitArray{1},b))
 @pure VectorSpace{N,D,O}(s::String) where {N,D,O} = VectorSpace{N,D,O}([k=='-' for k∈s])
-@pure VectorSpace(n::Int,d::Int=0,o::Int=0,s::UInt16=0x0000) = VectorSpace{n,d,o,s}()
+@pure VectorSpace(n::Int,d::Int=0,o::Int=0,s::Bits=zero(Bits)) = VectorSpace{n,d,o,s}()
 @pure VectorSpace(str::String) = VectorSpace{length(str)}(str)
 
 @pure function VectorSpace{N}(s::String) where N
@@ -53,7 +53,7 @@ macro V_str(str)
     VectorSpace(str)
 end
 
-@pure flip_sig(N,S::UInt16) = UInt16(2^N-1) & (~S)
+@pure flip_sig(N,S::Bits) = Bits(2^N-1) & (~S)
 
 @pure function Base.adjoint(V::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C}
     C < 0 && throw(error("$V is the direct sum of a vector space and its dual space"))
@@ -99,9 +99,9 @@ for C ∈ [0,1]
     end
 end
 
-ℝ = VectorSpace(1)
-#ℂ = VectorSpace(2)
-#ℍ = VectorSpace(4)
+const ℝ = VectorSpace(1)
+#const ℂ = VectorSpace(2)
+#const ℍ = VectorSpace(4)
 
 dualtype(V::VectorSpace{N,D,O,S,C} where {N,D,O,S}) where C = C
 

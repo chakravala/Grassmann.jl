@@ -63,16 +63,12 @@ end
 end
 
 @pure function Base.collect(s::VectorSpace)
-    g = Dict{Symbol,Int}()
     basis,sym = generate(s,:e),labels(s,:e)
-    for i ∈ 1:2^ndims(s)
-        push!(g,sym[i]=>i)
-    end
-    return Algebra{s}(basis,g)
+    Algebra{s}(basis,Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:2^ndims(s)]))
 end
 
 Algebra(s::VectorSpace) = getalgebra(s)
-Algebra(n::Int,d::Int=0,o::Int=0,s=0x0000) = getalgebra(n,d,o,s)
+Algebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getalgebra(n,d,o,s)
 Algebra(s::String) = getalgebra(VectorSpace(s))
 Algebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
 
@@ -95,7 +91,7 @@ end
 
 @pure do2m(d,o,c) = (1<<(d-1))+(1<<(2*o-1))+(c<0 ? 8 : (1<<(3*c-1)))
 @pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,do2m(d,o,c),s)
-@pure getalgebra(n::Int,m::Int,s) = getalgebra(n,m,UInt16(s))
+@pure getalgebra(n::Int,m::Int,s) = getalgebra(n,m,Bits(s))
 @pure getalgebra(V::VectorSpace) = getalgebra(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
 
 @pure function Base.getproperty(λ::typeof(Λ),v::Symbol)
@@ -104,16 +100,16 @@ end
     N = parse(Int,V[2])
     C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
-    S = UInt16(parse(Int,V[5:end]))
+    S = Bits(parse(Int,V[5:end]))
     getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
 end
 
 const V0 = VectorSpace(0)
-const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,0x0000}()),Dict(:e=>1))
-const algebra_cache = Vector{Dict{UInt16,Λ}}[]
-@pure function getalgebra(n::Int,m::Int,s::UInt16)
+const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,zero(Bits)}()),Dict(:e=>1))
+const algebra_cache = Vector{Dict{Bits,Λ}}[]
+@pure function getalgebra(n::Int,m::Int,s::Bits)
     n==0 && (return Λ0)
-    n > 8 && (return getsparse(n::Int,m::Int,s::UInt16))
+    n > 8 && (return getsparse(n::Int,m::Int,s::Bits))
     for N ∈ length(algebra_cache)+1:n
         push!(algebra_cache,[Dict{Int,Λ}() for k∈1:12])
     end
@@ -130,7 +126,7 @@ end
 
 @pure getbasis(V::VectorSpace,v::Symbol) = getproperty(getalgebra(V),v)
 @pure function getbasis(V::VectorSpace{N},b) where N
-    B = UInt16(b)
+    B = Bits(b)
     if N ≤ 8
         getalgebra(V).b[basisindex(ndims(V),B)]
     else
@@ -146,12 +142,8 @@ end
 end
 
 @pure function SparseAlgebra(s::VectorSpace)
-    g = Dict{Symbol,Int}()
     sym = labels(s,:e)
-    for i ∈ 1:2^ndims(s)
-        push!(g,sym[i]=>i)
-    end
-    return SparseAlgebra{s}(sym,g)
+    SparseAlgebra{s}(sym,Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:2^ndims(s)]))
 end
 
 @pure function getindex(a::SparseAlgebra{V},i::Int) where V
@@ -176,7 +168,7 @@ end
     end
 end
 
-SparseAlgebra(n::Int,d::Int=0,o::Int=0,s=0x0000) = getsparse(n,d,o,s)
+SparseAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getsparse(n,d,o,s)
 SparseAlgebra(s::String) = getsparse(VectorSpace(s))
 SparseAlgebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
 
@@ -186,8 +178,8 @@ function show(io::IO,a::SparseAlgebra{V}) where V
     print(io,[subscripts[i] for i ∈ shiftbasis(V,collect(1:N))]...,")")
 end
 
-const sparse_cache = Vector{Dict{UInt16,SparseAlgebra}}[]
-@pure function getsparse(n::Int,m::Int,s::UInt16)
+const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
+@pure function getsparse(n::Int,m::Int,s::Bits)
     n==0 && (return SparseAlgebra(V0))
     for N ∈ length(sparse_cache)+1:n
         push!(sparse_cache,[Dict{Int,SparseAlgebra}() for k∈1:12])
@@ -202,8 +194,6 @@ const sparse_cache = Vector{Dict{UInt16,SparseAlgebra}}[]
     end
     sparse_cache[n][m+1][s]
 end
-
-
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")

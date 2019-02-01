@@ -121,14 +121,15 @@ function basisindex(n::Int,i::Array{Int,1})
     g>0 ? basisindex_cache[n][g][s] : 1
 end=#
 
-const cache_limit = 12
+const Bits = UInt
 
+const cache_limit = 12
 @inline function basisindexb_calc(d,k)
     H = findall(digits(d,base=2).==1)
     findall(x->x==H,combo(k,length(H)))[1]
 end
 const basisindexb_cache = Vector{Int}[]
-@pure function basisindexb(n::Int,s::UInt16)
+@pure function basisindexb(n::Int,s::Bits)
     j = length(basisindexb_cache)+1
     for k ∈ j:min(n,cache_limit)
         y = Array{Int,1}(undef,2^k-1)
@@ -147,7 +148,7 @@ end
     binomsum(k,lh)+findall(x->x==H,combo(k,lh))[1]
 end
 const basisindex_cache = Vector{Int}[]
-@pure function basisindex(n::Int,s::UInt16)
+@pure function basisindex(n::Int,s::Bits)
     j = length(basisindex_cache)+1
     for k ∈ j:min(n,cache_limit)
         y = Array{Int,1}(undef,2^k-1)
@@ -160,11 +161,11 @@ const basisindex_cache = Vector{Int}[]
     s>0 ? (n>cache_limit ? basisindex_calc(s,n) : basisindex_cache[n][s]) : 1
 end
 
-basisindexb(cache_limit,0x0001)
-basisindex(cache_limit,0x0001)
+basisindexb(cache_limit,one(Bits))
+basisindex(cache_limit,one(Bits))
 
 intlog(M::Integer) = Int(log2(M))
 
-bit2int(b::BitArray{1}) = parse(UInt16,join(reverse([t ? '1' : '0' for t ∈ b])),base=2)
+bit2int(b::BitArray{1}) = parse(Bits,join(reverse([t ? '1' : '0' for t ∈ b])),base=2)
 
 Base.@pure promote_type(t...) = Base.promote_type(t...)

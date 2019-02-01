@@ -26,35 +26,35 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
     sm = Symbol(op,:multi!)
     sb = Symbol(op,:blade!)
     @eval begin
-        @inline function $sm(out::MArray{Tuple{M},T,1,M},val::T,i::UInt16) where {M,T<:Field}
+        @inline function $sm(out::MArray{Tuple{M},T,1,M},val::T,i::Bits) where {M,T<:Field}
             $(Expr(set,:(out[basisindex(intlog(M),i)]),:val))
             return out
         end
-        @inline function $sm(out::Q,val::T,i::UInt16,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
+        @inline function $sm(out::Q,val::T,i::Bits,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
             $(Expr(set,:(out[basisindex(N,i)]),:val))
             return out
         end
-        @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::UInt16,B::UInt16) where {N,D,T<:Field,M}
+        @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::Bits,B::Bits) where {N,D,T<:Field,M}
             !(Bool(D) && isodd(A) && isodd(B)) && $sm(m,parity(A,B,V) ? -(v) : v,A .⊻ B,Dimension{N}())
             return m
         end
         @inline function $(Symbol(:join,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-            !(hasdual(V) && hasdual(A) && hasdual(B)) && $sm(m,parity(A,B) ? -(v) : v,UInt16(A) .⊻ UInt16(B),Dimension{ndims(V)}())
+            !(hasdual(V) && hasdual(A) && hasdual(B)) && $sm(m,parity(A,B) ? -(v) : v,bits(A) .⊻ bits(B),Dimension{ndims(V)}())
             return m
         end
         @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::Basis) where {M,T<:Field}
-            $(Expr(set,:(out[basisindexb(intlog(M),UInt16(i))]),:val))
+            $(Expr(set,:(out[basisindexb(intlog(M),bits(i))]),:val))
             return out
         end
         @inline function $sb(out::Q,val::T,i::Basis,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            $(Expr(set,:(out[basisindexb(N,UInt16(i))]),:val))
+            $(Expr(set,:(out[basisindexb(N,bits(i))]),:val))
             return out
         end
         @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::UInt16) where {M,T<:Field}
             $(Expr(set,:(out[basisindexb(intlog(M),i)]),:val))
             return out
         end
-        @inline function $sb(out::Q,val::T,i::UInt16,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
+        @inline function $sb(out::Q,val::T,i::Bits,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
             $(Expr(set,:(out[basisindexb(N,i)]),:val))
             return out
         end
@@ -62,12 +62,12 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
 end
 
 @inline function add!(out::MultiVector{T,V},val::T,a::Int,b::Int) where {T,V}
-    ua = UInt16(a)
-    ub = UInt16(b)
+    ua = Bits(a)
+    ub = Bits(b)
     add!(out,val,Basis{V,count_ones(ua),ua},Basis{V,count_ones(ub),ub})
 end
 @inline function add!(m::MultiVector{T,V},v::T,A::Basis{V},B::Basis{V}) where {T<:Field,V}
-    !(hasdual(V) && isodd(A) && isodd(B)) && addmulti!(m.v,parity(A,B) ? -(v) : v,UInt16(A).⊻UInt16(B))
+    !(hasdual(V) && isodd(A) && isodd(B)) && addmulti!(m.v,parity(A,B) ? -(v) : v,bits(A).⊻bits(B))
     return out
 end
 
@@ -76,8 +76,7 @@ end
 @inline assign_expr!(e,x::Vector{Any},v::Symbol,expr) = v ∈ e && push!(x,Expr(:(=),v,expr))
 
 @pure function insert_expr(e,vec=:mvec,T=:(valuetype(a)),S=:(valuetype(b)),L=:(2^N))
-    #x = Any[:(sigcheck(sig(a),sig(b)))]
-    x = Any[]
+    x = Any[] # Any[:(sigcheck(sig(a),sig(b)))]
     assign_expr!(e,x,:N,:(ndims(V)))
     assign_expr!(e,x,:t,vec≠:mvec ? :Any : :(promote_type($T,$S)))
     assign_expr!(e,x,:out,:(zeros($vec(N,t))))
@@ -91,12 +90,8 @@ end
 ## geometric product
 
 function *(a::Basis{V},b::Basis{V}) where V
-    #(s,c,t) = indexjoin(basisindices(a),basisindices(b),V)
-    #t && (return SValue{V}(0,Basis{V,0}()))
-    #d = Basis{V}(c)
-    #return s ? SValue{V}(-1,d) : d
     hasdual(V) && hasdual(a) && hasdual(b) && (return SValue{V}(0,Basis{V}()))
-    c = UInt16(a) ⊻ UInt16(b)
+    c = bits(a) ⊻ bits(b)
     d = Basis{V}(c)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
@@ -150,8 +145,8 @@ const parity_cache = ( () -> begin
             end)
     end)()
 
-Base.@pure parity(a::UInt16,b::UInt16,v::VectorSpace) = parity_cache(ndims(v),value(v),a,b)
-Base.@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity_cache(ndims(V),value(V),UInt16(a),UInt16(b))
+Base.@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity_cache(ndims(v),value(v),a,b)
+Base.@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity_cache(ndims(V),value(V),bits(a),bits(b))
 
 for Value ∈ MSV
     @eval begin
@@ -171,8 +166,8 @@ end
 export ∧
 
 function ∧(a::Basis{V},b::Basis{V}) where V
-    A = UInt16(a)
-    B = UInt16(b)
+    A = bits(a)
+    B = bits(b)
     (count_ones(A&B)>0 || A+B==0) && (return zero(V))
     d = Basis{V}(A⊻B)
     return parity(a,b) ? SValue{V}(-1,d) : d
@@ -181,8 +176,8 @@ end
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     x = basis(a)
     y = basis(b)
-    A = UInt16(x)
-    B = UInt16(y)
+    A = bits(x)
+    B = bits(y)
     (count_ones(A&B)>0 || A+B==0) && (return zero(V))
     v = value(a)*value(b)
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
@@ -268,7 +263,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     r = binomsum(N,g)
                     ib = indexbasis(N,g)
                     for i ∈ 1:binomial(N,g)
-                        $product!(V,out,ib[i],UInt16(b),a.v[r+i])
+                        $product!(V,out,ib[i],bits(b),a.v[r+i])
                     end
                 end
                 return MultiVector{t,V}(out)
@@ -279,7 +274,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     r = binomsum(N,g)
                     ib = indexbasis(N,g)
                     for i ∈ 1:binomial(N,g)
-                        $product!(V,out,UInt16(a),ib[i],b.v[r+i])
+                        $product!(V,out,bits(a),ib[i],b.v[r+i])
                     end
                 end
                 return MultiVector{t,V,2^N}(out)::MultiVector{t,V,2^N}
@@ -293,7 +288,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         r = binomsum(N,g)
                         ib = indexbasis(N,g)
                         for i ∈ 1:binomial(N,g)
-                            $product!(V,out,ib[i],UInt16(basis(b)),$MUL(a.v[r+i],b.v))
+                            $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[r+i],b.v))
                         end
                     end
                     return MultiVector{t,V}(out)
@@ -304,7 +299,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         r = binomsum(N,g)
                         ib = indexbasis(N,g)
                         for i ∈ 1:binomial(N,g)
-                            $product!(V,out,UInt16(basis(s)),ib[i],$MUL(a.v,b.v[r+i]))
+                            $product!(V,out,bits(basis(s)),ib[i],$MUL(a.v,b.v[r+i]))
                         end
                     end
                     return MultiVector{t,V,2^N}(out)
@@ -316,14 +311,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                 function $op(a::$Blade{T,V,G},b::Basis{V}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t,:out,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        $product!(V,out,ib[i],UInt16(b),a[i])
+                        $product!(V,out,ib[i],bits(b),a[i])
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::Basis{V},b::$Blade{T,V,G}) where {V,T<:$Field,G}
                     $(insert_expr((:N,:t,:out,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        $product!(V,out,UInt16(a),ib[i],b[i])
+                        $product!(V,out,bits(a),ib[i],b[i])
                     end
                     return MultiVector{t,V}(out)
                 end
@@ -359,14 +354,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     function $op(a::$Blade{T,V,G},b::$Value{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
                         $(insert_expr((:N,:t,:out,:ib),VEC)...)
                         for i ∈ 1:binomial(N,G)
-                            $product!(V,out,ib[i],UInt16(basis(b)),$MUL(a[i],b.v))
+                            $product!(V,out,ib[i],bits(basis(b)),$MUL(a[i],b.v))
                         end
                         return MultiVector{t,V}(out)
                     end
                     function $op(a::$Value{V,L,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
                         $(insert_expr((:N,:t,:out,:ib),VEC)...)
                         for i ∈ 1:binomial(N,G)
-                            $product!(V,out,UInt16(basis(a)),ib[i],$MUL(a.v,b[i]))
+                            $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
                         end
                         return MultiVector{t,V}(out)
                     end
@@ -421,15 +416,15 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     elseif A == B
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
-                        setblade!(out,value(a,t),UInt16(X),Dimension{N}())
-                        setblade!(out,$bop(value(b,t)),UInt16(Y),Dimension{N}())
+                        setblade!(out,value(a,t),bits(X),Dimension{N}())
+                        setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
                         return MBlade{t,V,A}(out)
                     else
                         #@warn("sparse MultiGrade{V} objects not properly handled yet")
                         #return MultiGrade{V}(a,b)
                         $(insert_expr((:N,:t,:out),VEC)...)
-                        setmulti!(out,value(a,t),UInt16(X),Dimension{N}())
-                        setmulti!(out,$bop(value(b,t)),UInt16(Y),Dimension{N}())
+                        setmulti!(out,value(a,t),bits(X),Dimension{N}())
+                        setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
                 end
@@ -443,14 +438,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     elseif A == B
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
-                        setblade!(out,value(a,t),UInt16(X),Dimension{N}())
+                        setblade!(out,value(a,t),bits(X),Dimension{N}())
                         setblade!(out,$bop(value(b,t)),Y,Dimension{N}())
                         return MBlade{t,V,A}(out)
                     else
                         #@warn("sparse MultiGrade{V} objects not properly handled yet")
                         #return MultiGrade{V}(a,b)
                         $(insert_expr((:N,:t,:out),VEC)...)
-                        setmulti!(out,value(a,t),UInt16(X),Dimension{N}())
+                        setmulti!(out,value(a,t),bits(X),Dimension{N}())
                         setmulti!(out,$bop(value(b,t)),Y,Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
@@ -462,14 +457,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
                         setblade!(out,value(a,t),X,Dimension{N}())
-                        setblade!(out,$bop(value(b,t)),UInt16(Y),Dimension{N}())
+                        setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
                         return MBlade{t,V,A}(out)
                     else
                         #@warn("sparse MultiGrade{V} objects not properly handled yet")
                         #return MultiGrade{V}(a,b)
                         $(insert_expr((:N,:t,:out),VEC)...)
                         setmulti!(out,value(a,t),X,Dimension{N}())
-                        setmulti!(out,$bop(value(b,t)),UInt16(Y),Dimension{N}())
+                        setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
                 end
@@ -480,13 +475,13 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                 function $op(a::$Value{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = $bop(value(b,$VEC(N,t)))
-                    addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                    addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::MultiVector{T,V},b::$Value{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
-                    addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                    addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
             end
@@ -495,13 +490,13 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = $bop(value(b,$VEC(N,t)))
-                addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
-                addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {T<:$Field,V,S<:$Field}
@@ -540,7 +535,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     function $op(a::$Blade{T,V,G},b::$Value{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
                         $(insert_expr((:N,:t),VEC)...)
                         out = copy(value(a,$VEC(N,G,t)))
-                        addblade!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                        addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                         return MBlade{t,V,G}(out)
                     end
                     function $op(a::$Value{V,G,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,S<:$Field}
@@ -554,7 +549,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         r = binomsum(N,G)
                         R = binomial(N,G)
                         out[r+1:r+R] = value(a,MVector{R,t})
-                        addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                        addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
                     function $op(a::$Value{V,L,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
@@ -562,7 +557,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                         r = binomsum(N,G)
                         R = binomial(N,G)
                         out[r+1:r+R] = $bop(value(b,MVector{R,t}))
-                        addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                        addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
                 end
@@ -571,7 +566,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                 function $op(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,G,t)))
-                    addblade!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                    addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MBlade{t,V,G}(out)
                 end
                 function $op(a::Basis{V,G},b::$Blade{T,V,G}) where {T<:$Field,V,G}
@@ -585,7 +580,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     r = binomsum(N,G)
                     R = binomial(N,G)
                     out[r+1:r+R] = value(a,MVector{R,t})
-                    addmulti!(out,$bop(value(b,t)),UInt16(basis(b)),Dimension{N}())
+                    addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::Basis{V,L},b::$Blade{T,V,G}) where {T<:$Field,V,G,L}
@@ -593,7 +588,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                     r = binomsum(N,G)
                     R = binomial(N,G)
                     out[r+1:r+R] = $bop(value(b,MVector{R,t}))
-                    addmulti!(out,value(a,t),UInt16(basis(a)),Dimension{N}())
+                    addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
@@ -627,15 +622,15 @@ for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
             elseif A == B
                 $(insert_expr((:N,:t))...)
                 out = zeros(mvec(N,A,t))
-                setblade!(out,value(a,t),UInt16(a),Dimension{N}())
-                setblade!(out,$op(value(b,t)),UInt16(b),Dimension{N}())
+                setblade!(out,value(a,t),bits(a),Dimension{N}())
+                setblade!(out,$op(value(b,t)),bits(b),Dimension{N}())
                 return MBlade{t,V,A}(out)
             else
                 #@warn("sparse MultiGrade{V} objects not properly handled yet")
                 #return MultiGrade{V}(a,b)
                 $(insert_expr((:N,:t,:out))...)
-                setmulti!(out,value(a,t),UInt16(a),Dimension{N}())
-                setmulti!(out,$op(value(b,t)),UInt16(b),Dimension{N}())
+                setmulti!(out,value(a,t),bits(a),Dimension{N}())
+                setmulti!(out,$op(value(b,t)),bits(b),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
         end

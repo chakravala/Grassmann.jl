@@ -13,12 +13,12 @@ struct Basis{V,G,B} <: TensorTerm{V,G}
     @pure Basis{V,G,B}() where {V,G,B} = new{V,G,B}()
 end
 
-@pure UInt16(b::Basis{V,G,B} where {V,G}) where B = B
-@pure Base.one(b::Type{Basis{V}}) where V = getbasis(V,UInt16(b))
+@pure bits(b::Basis{V,G,B} where {V,G}) where B = B
+@pure Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
 
 function getindex(b::Basis,i::Int)
-    d = 0x0001 << (i-1)
-    return (d & UInt16(b)) == d
+    d = one(Bits) << (i-1)
+    return (d & bits(b)) == d
 end
 
 getindex(b::Basis,i::UnitRange{Int}) = [getindex(b,j) for j ∈ i]
@@ -35,10 +35,10 @@ end
 
 const VTI = Union{Vector{Int},Tuple,NTuple}
 
-@inline basisindices(b::UInt16) = findall(digits(UInt16(b),base=2).==1)
-@inline basisindices(b::Basis) = basisindices(UInt16(b))
+@inline basisindices(b::Bits) = findall(digits(b,base=2).==1)
+@inline basisindices(b::Basis) = basisindices(bits(b))
 @inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,basisindices(b))
-@inline shiftbasis(V::VectorSpace,b::UInt16) = shiftbasis(V,basisindices(b))
+@inline shiftbasis(V::VectorSpace,b::Bits) = shiftbasis(V,basisindices(b))
 
 function shiftbasis(s::VectorSpace{N,D,O} where N,set::Vector{Int}) where {D,O}
     if !isempty(set)
@@ -59,7 +59,7 @@ end
     return out
 end
 
-Basis{V}(i::UInt16) where V = getbasis(V,i)
+Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
 for t ∈ [[:V],[:V,:G]]
@@ -73,7 +73,7 @@ for t ∈ [[:V],[:V,:G]]
     end
 end
 
-==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = UInt16(a) == UInt16(b)
+==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = bits(a) == bits(b)
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
@@ -83,16 +83,16 @@ end
     !(F && isempty(a)) && printbasis(io,a,e)
     F && printbasis(io,b,f)
 end
-@inline function printbasis(io::IO,V::VectorSpace,e::UInt16)
+@inline function printbasis(io::IO,V::VectorSpace,e::Bits)
     C = dualtype(V)
     if C < 0
         N = Int(ndims(V)/2)
-        printbasis(io,shiftbasis(V,e & UInt16(2^N-1)),shiftbasis(V,e>>N))
+        printbasis(io,shiftbasis(V,e & Bits(2^N-1)),shiftbasis(V,e>>N))
     else
         printbasis(io,shiftbasis(V,e),C>0 ? "f" : "e")
     end
 end
-@inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,UInt16(e))
+@inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,bits(e))
 
 @pure function labels(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
     lab = string(label)
@@ -142,7 +142,7 @@ end
 end
 
 @pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
-    exp = Basis{V}[Basis{V,0,0x0000}()]
+    exp = Basis{V}[Basis{V,0,zero(Bits)}()]
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
@@ -180,17 +180,17 @@ macro basis_str(str)
     basis(VectorSpace(str))
 end
 
-const indexbasis_cache = Vector{Vector{UInt16}}[]
+const indexbasis_cache = Vector{Vector{Bits}}[]
 @pure function indexbasis(n::Int,g::Int)
     for k ∈ length(indexbasis_cache)+1:n
         push!(indexbasis_cache,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
     end
-    g>0 ? indexbasis_cache[n][g] : [0x0000]
+    g>0 ? indexbasis_cache[n][g] : [zero(Bits)]
 end
 
 indexbasis(16,1)
 
-@pure indexbasis_set(N) = SVector(Vector{UInt16}[indexbasis(N,g) for g ∈ 0:N]...)
+@pure indexbasis_set(N) = SVector(Vector{Bits}[indexbasis(N,g) for g ∈ 0:N]...)
 
 macro dualbasis(q,sig=:VV,label=:e,dual=:f)
     basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q))',sig,label,dual)
@@ -277,7 +277,7 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         end
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
-            SBlade{T,V}(setblade!(zeros(mvec(ndims(V),G,T)),val,UInt16(v),Dimension{N}()))
+            SBlade{T,V}(setblade!(zeros(mvec(ndims(V),G,T)),val,bits(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
@@ -370,13 +370,13 @@ for var ∈ [[:T,:V],[:V]]
         MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
         function MultiVector{$(var...)}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,UInt16(v),Dimension{N}()))
+            MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Dimension{N}()))
         end
     end
 end
 function MultiVector(val::T,v::Basis{V,G}) where {T,V,G}
     N = ndims(V)
-    MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,UInt16(v),Dimension{N}()))
+    MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Dimension{N}()))
 end
 
 MultiVector(v::Basis{V,G}) where {V,G} = MultiVector{Int,V}(one(Int),v)
@@ -453,11 +453,11 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 hasdual(::VectorSpace{N,D} where N) where D = Bool(D)
 hasorigin(::VectorSpace{N,D,O} where {N,D}) where O = Bool(O)
 
-isdual(e::Basis{V}) where V = hasdual(e) && count_ones(UInt16(e)) == 1
-hasdual(e::Basis{V}) where V = hasdual(V) && isodd(UInt16(e))
+isdual(e::Basis{V}) where V = hasdual(e) && count_ones(bits(e)) == 1
+hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
 
-isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(UInt16(e))==1 && e[hasdual(V)+1]
-hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(UInt16(e)))
+isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasdual(V)+1]
+hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(bits(e)))
 hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 hasorigin(m::VBV) = hasorigin(sig(m))
 
@@ -504,7 +504,7 @@ function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
     out = zeros(mvec(N,T))
     for k ∈ 1:length(v.v)
         (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
-        setmulti!(out,convert(T,val),UInt16(b),Dimension{N}())
+        setmulti!(out,convert(T,val),bits(b),Dimension{N}())
     end
     return MultiVector{T,V}(out)
 end
