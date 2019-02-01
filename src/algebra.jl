@@ -178,7 +178,7 @@ function ∧(a::Basis{V},b::Basis{V}) where V
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
 
-function ∧(a::X,b::Y) where {X<:AbstractTerm{V},Y<:AbstractTerm{V}} where V
+function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     x = basis(a)
     y = basis(b)
     A = UInt16(x)
@@ -200,7 +200,7 @@ end
 
 export ⋅
 
-⋅(a::A,b::B) where {A<:AbstractTerm{V,1},B<:AbstractTerm{V,1}} where V = (a*b+b*a)/(2*Basis{V}())
+⋅(a::A,b::B) where {A<:TensorTerm{V,1},B<:TensorTerm{V,1}} where V = (a*b+b*a)/(2*Basis{V}())
 for Blade ∈ MSB
     for Other ∈ MSB
         @eval begin
@@ -208,8 +208,8 @@ for Blade ∈ MSB
         end
     end
     @eval begin
-        ⋅(a::$Blade{T,V,1},b::AbstractTerm{V,1}) where {T,V,S} = (a*b+b*a)/(2*Basis{V}())
-        ⋅(a::AbstractTerm{V,1},b::$Blade{T,V,1}) where {T,V} = (a*b+b*a)/(2*Basis{V}())
+        ⋅(a::$Blade{T,V,1},b::TensorTerm{V,1}) where {T,V,S} = (a*b+b*a)/(2*Basis{V}())
+        ⋅(a::TensorTerm{V,1},b::$Blade{T,V,1}) where {T,V} = (a*b+b*a)/(2*Basis{V}())
     end
 end
 
@@ -245,8 +245,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
         *(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast($MUL,a,b.v))
         *(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(broadcast($MUL,a.v,b))
         ∧(::$Field,::$Field) = 0
-        ∧(a,b::B) where B<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
-        ∧(a::A,b) where A<:AbstractTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
+        ∧(a,b::B) where B<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
+        ∧(a::A,b) where A<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
         #=
         ∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
@@ -644,7 +644,7 @@ end
 
 ## exponentiation
 
-function ^(v::AbstractTerm,i::Integer)
+function ^(v::TensorTerm,i::Integer)
     i == 0 && (return getbasis(sig(v),0))
     out = v
     for k ∈ 1:(i-1)%4
@@ -672,9 +672,9 @@ end
 function inv(b::SValue{V,G,B,T}) where {V,G,B,T}
     SValue{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
 end
-for Term ∈ [:AbstractTerm,MSB...,:MultiVector,:MultiGrade]
+for Term ∈ [:TensorTerm,MSB...,:MultiVector,:MultiGrade]
     @eval begin
-        @pure /(a::$Term,b::AbstractTerm) = a*inv(b)
+        @pure /(a::$Term,b::TensorTerm) = a*inv(b)
         @pure /(a::$Term,b::Number) = a*inv(b)
     end
 end

@@ -2,17 +2,19 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export AbstractTerm, Basis, MultiVector, MultiGrade, @S_str, @V_str
+export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade, @S_str, @V_str
 
-abstract type AbstractTerm{V,G} end
+abstract type TensorTerm{V,G} <: TensorAlgebra{V} end
+abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 ## MultiBasis{N}
 
-struct Basis{V,G,B} <: AbstractTerm{V,G}
+struct Basis{V,G,B} <: TensorTerm{V,G}
     @pure Basis{V,G,B}() where {V,G,B} = new{V,G,B}()
 end
 
 @pure UInt16(b::Basis{V,G,B} where {V,G}) where B = B
+@pure Base.one(b::Type{Basis{V}}) where V = getbasis(V,UInt16(b))
 
 function getindex(b::Basis,i::Int)
     d = 0x0001 << (i-1)
@@ -92,11 +94,12 @@ end
 end
 @inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,UInt16(e))
 
-@pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
+@pure function labels(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
     lab = string(label)
     io = IOBuffer()
-    els = Symbol[label]
-    exp = Basis{V}[Basis{V,0,0x0000}()]
+    els = Array{Symbol,1}(undef,2^N)
+    els[1] = label
+    icr = 1
     C = dualtype(V)
     C < 0 && (M = Int(N/2))
     for i ∈ 1:N
@@ -113,23 +116,54 @@ end
                 e = shiftbasis(V,a)
                 f = shiftbasis(V,b)
                 F = !isempty(f)
-                !(F && isempty(e)) && print(io,lab,a...)
-                F && print(io,string(dual),b...)
+                if !(F && isempty(e))
+                    print(io,lab,a[1:min(9,end)]...)
+                    for j ∈ 10:length(a)
+                        print(io,subscripts[j])
+                    end
+                end
+                if F
+                    print(io,string(dual),b[1:min(9,end)]...)
+                    for j ∈ 10:length(b)
+                        print(io,super[j])
+                    end
+                end
             else
-                print(io,C>0 ? string(dual) : lab,[j≠0 ? (j > 0 ? j : 'ϵ') : 'o' for j∈shiftbasis(V,sk)]...)
+                print(io,C>0 ? string(dual) : lab)
+                for j ∈ shiftbasis(V,sk)
+                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? super[j] : subscripts[j]) : j) : 'ϵ') : 'o')
+                end
             end
-            push!(els,Symbol(String(take!(io))))
-            push!(exp,Basis{V,length(set[k]),bit2int(basisbits(N,set[k]))}())
+            icr += 1
+            els[icr] = Symbol(String(take!(io)))
         end
     end
-    return exp,els
+    return els
+end
+
+@pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
+    exp = Basis{V}[Basis{V,0,0x0000}()]
+    for i ∈ 1:N
+        set = combo(N,i)
+        for k ∈ 1:length(set)
+            push!(exp,Basis{V,i,bit2int(basisbits(N,set[k]))}())
+        end
+    end
+    return exp
 end
 
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
 
 function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
     N = ndims(V)
-    basis,sym = generate(V,label,dual)
+    if N > 8
+        Λ(V)
+        basis = generate(V,label,dual)
+        sym = labels(V,label,dual)
+    else
+        basis = Λ(V).b
+        sym = labels(V,label,dual)
+    end
     exp = Expr[Expr(:(=),esc(sig),V),
         Expr(:(=),esc(label),basis[1])]
     for i ∈ 2:2^N
@@ -146,18 +180,16 @@ macro basis_str(str)
     basis(VectorSpace(str))
 end
 
-const indexbasis_cache = ( () -> begin
-        Y = Vector{Vector{UInt16}}[]
-        return (n::Int,g::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    push!(Y,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
-                end
-                g>0 ? Y[n][g] : [0x0000]
-            end)
-    end)()
+const indexbasis_cache = Vector{Vector{UInt16}}[]
+@pure function indexbasis(n::Int,g::Int)
+    for k ∈ length(indexbasis_cache)+1:n
+        push!(indexbasis_cache,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
+    end
+    g>0 ? indexbasis_cache[n][g] : [0x0000]
+end
 
-@pure indexbasis(n::Int,g::Int) = indexbasis_cache(n,g)
+indexbasis(16,1)
+
 @pure indexbasis_set(N) = SVector(Vector{UInt16}[indexbasis(N,g) for g ∈ 0:N]...)
 
 macro dualbasis(q,sig=:VV,label=:e,dual=:f)
@@ -183,7 +215,7 @@ end
 const MSV = [:MValue,:SValue]
 
 for Value ∈ MSV
-    eval(Expr(:struct,Value ≠ :SValue,:($Value{V,G,B,T} <: AbstractTerm{V,G}),quote
+    eval(Expr(:struct,Value ≠ :SValue,:($Value{V,G,B,T} <: TensorTerm{V,G}),quote
         v::T
     end))
 end
@@ -198,13 +230,13 @@ for Value ∈ MSV
         $Value{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
-        $Value(v,b::AbstractTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
+        $Value(v,b::TensorTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
         show(io::IO,m::$Value) = print(io,(valuetype(m)≠Expr ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
 
-==(a::AbstractTerm{V,G},b::AbstractTerm{V,G}) where {V,G} = basis(a) == basis(b) && value(a) == value(b)
-==(a::AbstractTerm,b::AbstractTerm) = false
+==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) && value(a) == value(b)
+==(a::TensorTerm,b::TensorTerm) = false
 
 ## Grade{G}
 
@@ -224,7 +256,7 @@ const MSB = [:MBlade,:SBlade]
 
 for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
     @eval begin
-        @computed struct $Blade{T,V,G}
+        @computed struct $Blade{T,V,G} <: TensorMixed{T,V}
             v::$vector{binomial(ndims(V),G),T}
         end
 
@@ -302,7 +334,7 @@ end
 
 ## MultiVector{T,N}
 
-struct MultiVector{T,V,E}
+struct MultiVector{T,V,E} <: TensorMixed{T,V}
     v::Union{MArray{Tuple{E},T,1,E},SArray{Tuple{E},T,1,E}}
 end
 MultiVector{T,V}(v::MArray{Tuple{E},T,1,E}) where {T,V,E} = MultiVector{T,V,E}(v)
@@ -414,7 +446,7 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @inline sig(m::Union{MBlade{T,V},SBlade{T,V},MultiVector{T,V}} where T) where V = V
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B
-@inline grade(m::AbstractTerm{V,G} where V) where G = G
+@inline grade(m::TensorTerm{V,G} where V) where G = G
 @inline grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
 @inline grade(m::Number) = 0
 
@@ -432,13 +464,13 @@ hasorigin(m::VBV) = hasorigin(sig(m))
 ## MultiGrade{N}
 
 struct MultiGrade{V}
-    v::Vector{<:AbstractTerm{V}}
+    v::Vector{<:TensorTerm{V}}
 end
 
-#convert(::Type{Vector{<:AbstractTerm{V}}},m::Tuple) where V = [m...]
+#convert(::Type{Vector{<:TensorTerm{V}}},m::Tuple) where V = [m...]
 
-MultiGrade{V}(v::T...) where T <: (AbstractTerm{V,G} where G) where V = MultiGrade{V}(v)
-MultiGrade(v::T...) where T <: (AbstractTerm{V,G} where G) where V = MultiGrade{V}(v)
+MultiGrade{V}(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
+MultiGrade(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
 
 function bladevalues(V::VectorSpace{N},m,G::Int,T::Type) where N
     com = indexbasis(N,G)

@@ -2,7 +2,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using Reduce
+import Reduce
 Sym = Reduce.Algebra
 SymField = Any
 

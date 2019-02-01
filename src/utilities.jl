@@ -22,7 +22,33 @@ const subscripts = Dict{Int,Char}(
     6 => '₆',
     7 => '₇',
     8 => '₈',
-    9 => '₉'
+    9 => '₉',
+    10 => 'a',
+    11 => 'b',
+    12 => 'c',
+    13 => 'd',
+    14 => 'e',
+    15 => 'f',
+    16 => 'g',
+    17 => 'h',
+    18 => 'i',
+    19 => 'j',
+    20 => 'k',
+    21 => 'l',
+    22 => 'm',
+    23 => 'n',
+    24 => 'o',
+    25 => 'p',
+    26 => 'q',
+    27 => 'r',
+    28 => 's',
+    29 => 't',
+    30 => 'u',
+    31 => 'v',
+    32 => 'w',
+    33 => 'x',
+    34 => 'y',
+    35 => 'z'
 )
 
 const super = Dict{Int,Char}(
@@ -36,81 +62,106 @@ const super = Dict{Int,Char}(
     6 => '⁶',
     7 => '⁷',
     8 => '⁸',
-    9 => '⁹'
+    9 => '⁹',
+    10 => 'A',
+    11 => 'B',
+    12 => 'C',
+    13 => 'D',
+    14 => 'E',
+    15 => 'F',
+    16 => 'G',
+    17 => 'H',
+    18 => 'I',
+    19 => 'J',
+    20 => 'K',
+    21 => 'L',
+    22 => 'M',
+    23 => 'N',
+    24 => 'O',
+    25 => 'P',
+    26 => 'Q',
+    27 => 'R',
+    28 => 'S',
+    29 => 'T',
+    30 => 'U',
+    31 => 'V',
+    32 => 'W',
+    33 => 'X',
+    34 => 'Y',
+    35 => 'Z'
 )
 
-const binomsum_cache = ( () -> begin
-        Y = Array{Int,1}[Int[1]]
-        return (n::Int,i::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    push!(Y,cumsum([binomial(k,q) for q ∈ 0:k]))
-                end
-                i ≠ 0 ? Y[n][i] : 0
-            end)
-    end)()
+const binomsum_cache = [[1]]
+@pure function binomsum(n::Int, i::Int)
+    for k=length(binomsum_cache)+1:n
+        push!(binomsum_cache, cumsum([binomial(k,q) for q=0:k]))
+    end
+    i ≠ 0 ? binomsum_cache[n][i] : 0
+end
 
-Base.@pure binomsum(n::Int,i::Int) = binomsum_cache(n,i)
+const combo_limit = 22
+const combo_cache = Array{Array{Array{Int,1},1},1}[]
+function combo(n::Int,g::Int)
+    for k ∈ length(combo_cache)+1:min(n,combo_limit)
+        z = 1:k
+        push!(combo_cache,[collect(combinations(z,q)) for q ∈ z])
+    end
+    g≠0 ? (n>combo_limit ? collect(combinations(n,g)) : combo_cache[n][g]) : [Int[]]
+end
 
-const combo = ( () -> begin
-        Y = Array{Array{Array{Int,1},1},1}[]
-        return (n::Int,g::Int) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    z = 1:k
-                    push!(Y,[collect(combinations(z,q)) for q ∈ z])
-                end
-                g ≠ 0 ? Y[n][g] : [Int[]]
-            end)
-    end)()
+#=const basisindex_cache = Array{Dict{String,Int},1}[]
+function basisindex(n::Int,i::Array{Int,1})
+    g = length(i)
+    s = string(i...)
+    for k ∈ length(basisindex_cache)+1:n
+        push!(basisindex_cache,[Dict{String,Int}() for k ∈ 1:k])
+    end
+    g>0 && !haskey(basisindex_cache[n][g],s) &&
+        push!(basisindex_cache[n][g],s=>findall(x->x==i,combo(n,g))[1])
+    g>0 ? basisindex_cache[n][g][s] : 1
+end=#
 
-#=const basisindex = ( () -> begin
-        Y = Array{Dict{String,Int},1}[]
-        return (n::Int,i::Array{Int,1}) -> (begin
-                j = length(Y)
-                g = length(i)
-                s = string(i...)
-                for k ∈ j+1:n
-                    push!(Y,[Dict{String,Int}() for k ∈ 1:k])
-                end
-                g>0 && !haskey(Y[n][g],s) && 
-                    push!(Y[n][g],s=>findall(x->x==i,combo(n,g))[1])
-                g>0 ? Y[n][g][s] : 1
-            end)
-end)()=#
+const cache_limit = 12
 
-const basisindexb = ( () -> begin
-        Y = Vector{Int}[]
-        return (n::Int,s::UInt16) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    y = Array{Int,1}(undef,2^k-1)
-                    for d ∈ 1:2^k-1
-                        H = findall(digits(d,base=2).==1)
-                        y[d] = findall(x->x==H,combo(k,length(H)))[1]
-                    end
-                    push!(Y,y)
-                end
-                s>0 ? Y[n][s] : 1
-            end)
-    end)()
+@inline function basisindexb_calc(d,k)
+    H = findall(digits(d,base=2).==1)
+    findall(x->x==H,combo(k,length(H)))[1]
+end
+const basisindexb_cache = Vector{Int}[]
+@pure function basisindexb(n::Int,s::UInt16)
+    j = length(basisindexb_cache)+1
+    for k ∈ j:min(n,cache_limit)
+        y = Array{Int,1}(undef,2^k-1)
+        for d ∈ 1:2^k-1
+            y[d] = basisindexb_calc(d,k)
+        end
+        push!(basisindexb_cache,y)
+        GC.gc()
+    end
+    s>0 ? (n>cache_limit ? basisindexb_calc(s,n) : basisindexb_cache[n][s]) : 1
+end
 
-const basisindex = ( () -> begin
-        Y = Vector{Int}[]
-        return (n::Int,s::UInt16) -> (begin
-                j = length(Y)
-                for k ∈ j+1:n
-                    y = Array{Int,1}(undef,2^k-1)
-                    for d ∈ 1:2^k-1
-                        H = findall(digits(d,base=2).==1)
-                        lh = length(H)
-                        y[d] = binomsum(k,lh)+findall(x->x==H,combo(k,lh))[1]
-                    end
-                    push!(Y,y)
-                end
-                s>0 ? Y[n][s] : 1
-            end)
-    end)()
+@inline function basisindex_calc(d,k)
+    H = findall(digits(d,base=2).==1)
+    lh = length(H)
+    binomsum(k,lh)+findall(x->x==H,combo(k,lh))[1]
+end
+const basisindex_cache = Vector{Int}[]
+@pure function basisindex(n::Int,s::UInt16)
+    j = length(basisindex_cache)+1
+    for k ∈ j:min(n,cache_limit)
+        y = Array{Int,1}(undef,2^k-1)
+        for d ∈ 1:2^k-1
+            y[d] = basisindex_calc(d,k)
+        end
+        push!(basisindex_cache,y)
+        GC.gc()
+    end
+    s>0 ? (n>cache_limit ? basisindex_calc(s,n) : basisindex_cache[n][s]) : 1
+end
+
+basisindexb(cache_limit,0x0001)
+basisindex(cache_limit,0x0001)
 
 intlog(M::Integer) = Int(log2(M))
 
