@@ -93,14 +93,14 @@ for Blade ∈ MSB
             x = bits(a)
             X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x
             Y = 0≠X ? X : x
-            out = b.v[basisindexb(ndims(V),Y)]
+            out = b.v[bladeindex(ndims(V),Y)]
             SValue{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
         end
         function (a::$Blade{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
             x = bits(b)
             X = dualtype(V)<0 ? x<<Int(ndims(V)/2) : x
             Y = X>2^ndims(V) ? x : X
-            out = a.v[basisindexb(ndims(V),Y)]
+            out = a.v[bladeindex(ndims(V),Y)]
             SValue{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
         end
         function (a::Basis{V,2,A})(b::$Blade{T,V,1}) where {V,A,T}
@@ -123,7 +123,7 @@ for Blade ∈ MSB
             out = zero(mvec(N,1,T))
             for i ∈ 1:N
                 if i≠m
-                    F = basisindexb(N,bit2int(basisbits(N,[i,m])))
+                    F = bladeindex(N,bit2int(basisbits(N,[i,m])))
                     setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],0x0001<<(i-1),Dimension{N}())
                 end
             end
@@ -137,7 +137,7 @@ for Blade ∈ MSB
                 x = bits(basis(b))
                 X = dualtype(V)<0 ? x<<Int(ndims(V)/2) : x
                 Y = X>2^ndims(V) ? x : X
-                out = a.v[basisindexb(ndims(V),Y)]
+                out = a.v[bladeindex(ndims(V),Y)]
                 SValue{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
             end
             function (a::$Value{V,1,X,T} where X)(b::$Blade{S,V,1}) where {V,T,S}
@@ -145,7 +145,7 @@ for Blade ∈ MSB
                 x = bits(basis(a))
                 X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x
                 Y = 0≠X ? X : x
-                out = b.v[basisindexb(ndims(V),Y)]
+                out = b.v[bladeindex(ndims(V),Y)]
                 SValue{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
             end
             function (a::$Value{V,2,A,T})(b::$Blade{S,V,1}) where {V,A,T,S}
@@ -170,7 +170,7 @@ for Blade ∈ MSB
                 out = zero(mvec(N,1,T))
                 for i ∈ 1:N
                     if i≠m
-                        F = basisindexb(N,bit2int(basisbits(N,[i,m])))
+                        F = bladeindex(N,bit2int(basisbits(N,[i,m])))
                         setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),0x0001<<(i-1),Dimension{N}())
                     end
                 end
@@ -211,7 +211,7 @@ for Blade ∈ MSB
                     m = intlog(Y)+1
                     for i ∈ 1:N
                         if i≠m
-                            F = basisindexb(N,bit2int(basisbits(N,[i,m])))
+                            F = bladeindex(N,bit2int(basisbits(N,[i,m])))
                             addblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v[Q]) : b.v[Q]),0x0001<<(i-1),Dimension{N}())
                         end
                     end

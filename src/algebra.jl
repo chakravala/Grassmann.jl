@@ -43,19 +43,19 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
             return m
         end
         @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::Basis) where {M,T<:Field}
-            $(Expr(set,:(out[basisindexb(intlog(M),bits(i))]),:val))
+            $(Expr(set,:(out[bladeindex(intlog(M),bits(i))]),:val))
             return out
         end
         @inline function $sb(out::Q,val::T,i::Basis,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            $(Expr(set,:(out[basisindexb(N,bits(i))]),:val))
+            $(Expr(set,:(out[bladeindex(N,bits(i))]),:val))
             return out
         end
         @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::UInt16) where {M,T<:Field}
-            $(Expr(set,:(out[basisindexb(intlog(M),i)]),:val))
+            $(Expr(set,:(out[bladeindex(intlog(M),i)]),:val))
             return out
         end
         @inline function $sb(out::Q,val::T,i::Bits,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            $(Expr(set,:(out[basisindexb(N,i)]),:val))
+            $(Expr(set,:(out[bladeindex(N,i)]),:val))
             return out
         end
     end
@@ -212,7 +212,51 @@ end
 
 ### Product Algebra Constructor
 
-function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
+function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CONJ=:conj)
+    TF = Field ≠ Number ? :Any : :T
+    for Value ∈ MSV
+        @eval begin
+            adjoint(b::$Value{V,G,B,T}) where {V,G,B,T<:$Field} = $Value{dual(V),G,B',$TF}($CONJ(value(b)))
+        end
+    end
+    for Blade ∈ MSB
+        @eval begin
+            function adjoint(m::$Blade{T,V,G}) where {T<:$Field,V,G}
+                if dualtype(V)<0
+                    N = ndims(V)
+                    M = Int(N/2)
+                    ib = indexbasis(N,G)
+                    out = zeros(mvec(N,G,$TF))
+                    for i ∈ 1:binomial(N,G)
+                        setblade!(out,$CONJ(m.v[i]),dual(V,ib[i],M),Dimension{N}())
+                    end
+                else
+                    out = $CONJ.(value(m))
+                end
+                $Blade{$TF,dual(V),G}(out)
+            end
+        end
+    end
+    @eval begin
+        function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
+            if dualtype(V)<0
+                N = ndims(V)
+                M = Int(N/2)
+                out = zeros(mvec(N,$TF))
+                bng = binomial_set(N)
+                ib = indexbasis_set(N)
+                for g ∈ 0:N
+                    r = binomsum(N,g)
+                    for i ∈ 1:bng[g+1]
+                        setmulti!(out,$CONJ(m.v[r+i]),dual(V,ib[g+1][i],M))
+                    end
+                end
+            else
+                out = $CONJ.(value(m))
+            end
+            MultiVector{$TF,dual(V)}(out)
+        end
+    end
     for Value ∈ MSV
         @eval begin
             *(a::$Field,b::$Value{V,G,B,T} where B) where {V,G,T<:$Field} = SValue{V,G}($MUL(a,b.v),basis(b))
@@ -432,6 +476,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
         end
         for Value ∈ MSV
             @eval begin
+                $op(a::$Value{V,G,B,T}) where {V,G,B,T<:$Field} = $Value{V,G,B,$TF}($bop(value(a)))
                 function $op(a::$Value{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
                     if X == b
                         return SValue{V,A}($bop(value(a),value(b)),b)
@@ -487,6 +532,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
             end
         end
         @eval begin
+            $op(a::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{$TF,V}($bop.(value(a)))
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = $bop(value(b,$VEC(N,t)))
@@ -563,6 +609,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec)
                 end
             end
             @eval begin
+                $op(a::$Blade{T,V,G}) where {T<:$Field,V,G} = $Blade{$TF,V,G}($bop.(value(a)))
                 function $op(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,G,t)))
@@ -616,6 +663,7 @@ generate_product_algebra()
 
 for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
     @eval begin
+        $op(a::Basis{V,G,B} where G) where {V,B} = SValue($op(value(a)),a)
         function $op(a::Basis{V,A},b::Basis{V,B}) where {V,A,B}
             if a == b
                 return SValue{V,A}($op(value(a),value(b)),basis(a))

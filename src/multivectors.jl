@@ -2,7 +2,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade, @S_str, @V_str
+export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade, @V_str
 
 abstract type TensorTerm{V,G} <: TensorAlgebra{V} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
@@ -77,8 +77,9 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
-@inline printbasis(io::IO,b::VTI,e::String="e") = print(io,e,[e≠"e" ? super[i] : subscripts[i] for i ∈ b]...)
-@inline function printbasis(io::IO,a::VTI,b::VTI,e::String="e",f::String="f")
+@inline printindex(i,e::String=pre[1],t=i>35) = (e≠pre[1])⊻t ? super[t ? i-26 : i] : subscripts[t ? i-26 : i]
+@inline printbasis(io::IO,b::VTI,e::String=pre[1]) = print(io,e,[printindex(i,e) for i ∈ b]...)
+@inline function printbasis(io::IO,a::VTI,b::VTI,e::String=pre[1],f::String=pre[2])
     F = !isempty(b)
     !(F && isempty(a)) && printbasis(io,a,e)
     F && printbasis(io,b,f)
@@ -89,15 +90,15 @@ end
         N = Int(ndims(V)/2)
         printbasis(io,shiftbasis(V,e & Bits(2^N-1)),shiftbasis(V,e>>N))
     else
-        printbasis(io,shiftbasis(V,e),C>0 ? "f" : "e")
+        printbasis(io,shiftbasis(V,e),C>0 ? pre[2] : pre[1])
     end
 end
 @inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,bits(e))
 
-@pure function labels(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
+@pure function labels(V::VectorSpace{N},label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2])) where N
     lab = string(label)
     io = IOBuffer()
-    els = Array{Symbol,1}(undef,2^N)
+    els = Array{Symbol,1}(undef,1<<N)
     els[1] = label
     icr = 1
     C = dualtype(V)
@@ -141,7 +142,7 @@ end
     return els
 end
 
-@pure function generate(V::VectorSpace{N},label::Symbol,dual::Symbol=:f) where N
+@pure function generate(V::VectorSpace{N}) where N
     exp = Basis{V}[Basis{V,0,zero(Bits)}()]
     for i ∈ 1:N
         set = combo(N,i)
@@ -154,11 +155,11 @@ end
 
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
 
-function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
+function basis(V::VectorSpace,sig::Symbol=vsn[1],label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2]))
     N = ndims(V)
-    if N > 8
+    if N > algebra_limit
         Λ(V)
-        basis = generate(V,label,dual)
+        basis = generate(V)
         sym = labels(V,label,dual)
     else
         basis = Λ(V).b
@@ -166,13 +167,13 @@ function basis(V::VectorSpace,sig::Symbol=:V,label::Symbol=:e,dual::Symbol=:f)
     end
     exp = Expr[Expr(:(=),esc(sig),V),
         Expr(:(=),esc(label),basis[1])]
-    for i ∈ 2:2^N
+    for i ∈ 2:1<<N
         push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
 end
 
-macro basis(q,sig=:V,label=:e,dual=:f)
+macro basis(q,sig=vsn[1],label=Symbol(pre[1]),dual=Symbol(pre[2]))
     basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q),sig,label,dual)
 end
 
@@ -182,32 +183,33 @@ end
 
 const indexbasis_cache = Vector{Vector{Bits}}[]
 @pure function indexbasis(n::Int,g::Int)
+    n>sparse_limit && (return [bit2int(basisbits(n,combo(n,g)[q])) for q ∈ 1:binomial(n,g)])
     for k ∈ length(indexbasis_cache)+1:n
         push!(indexbasis_cache,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
     end
     g>0 ? indexbasis_cache[n][g] : [zero(Bits)]
 end
 
-indexbasis(16,1)
+indexbasis(Int((sparse_limit+cache_limit)/2),1)
 
 @pure indexbasis_set(N) = SVector(Vector{Bits}[indexbasis(N,g) for g ∈ 0:N]...)
 
-macro dualbasis(q,sig=:VV,label=:e,dual=:f)
+macro dualbasis(q,sig=vsn[2],label=Symbol(pre[1]),dual=Symbol(pre[2]))
     basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q))',sig,label,dual)
 end
 
 macro dualbasis_str(str)
-    basis(VectorSpace(str)',:VV)
+    basis(VectorSpace(str)',vsn[2])
 end
 
-macro mixedbasis(q,sig=:W,label=:e,dual=:f)
+macro mixedbasis(q,sig=vsn[3],label=Symbol(pre[1]),dual=Symbol(pre[2]))
     V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q)
     basis(V⊕V',sig,label,dual)
 end
 
 macro mixedbasis_str(str)
     V = VectorSpace(str)
-    basis(V⊕V',:W)
+    basis(V⊕V',vsn[3])
 end
 
 ## S/MValue{N}
@@ -231,7 +233,7 @@ for Value ∈ MSV
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
         $Value(v,b::TensorTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
-        show(io::IO,m::$Value) = print(io,(valuetype(m)≠Expr ? [m.v] : ['(',m.v,')'])...,basis(m))
+        show(io::IO,m::$Value) = print(io,(valuetype(m)∉(Expr,Any) ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
 
@@ -365,9 +367,9 @@ end
 MultiVector{V}(v::StaticArray{Tuple{M},T,1}) where {V,T,M} = MultiVector{T,V}(v)
 for var ∈ [[:T,:V],[:V]]
     @eval begin
-        MultiVector{$(var...)}(v::SizedArray) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
-        MultiVector{$(var...)}(v::Vector{T}) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
-        MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{2^ndims(V),T}(v))
+        MultiVector{$(var...)}(v::SizedArray) where {T,V} = MultiVector{T,V}(SVector{1<<ndims(V),T}(v))
+        MultiVector{$(var...)}(v::Vector{T}) where {T,V} = MultiVector{T,V}(SVector{1<<ndims(V),T}(v))
+        MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{T,V}(SVector{1<<ndims(V),T}(v))
         function MultiVector{$(var...)}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
             MultiVector{T,V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Dimension{N}()))
@@ -430,6 +432,8 @@ end
 
 ## Generic
 
+export grade, hasdual, hasorigin, isudal, isorigin
+
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
 @pure ndims(::VectorSpace{N}) where N = N
@@ -463,7 +467,7 @@ hasorigin(m::VBV) = hasorigin(sig(m))
 
 ## MultiGrade{N}
 
-struct MultiGrade{V}
+struct MultiGrade{V} <: TensorAlgebra{V}
     v::Vector{<:TensorTerm{V}}
 end
 
@@ -526,5 +530,16 @@ function show(io::IO,m::MultiGrade)
         end
         show(io,t ? basis(x) : x)
     end
+end
+
+## Adjoint
+
+import Base: adjoint # conj
+
+dual(V::VectorSpace) = dualtype(V)<0 ? V : V'
+dual(V::VectorSpace{N},B,M=Int(N/2)) where N = ((B<<M)&((1<<N)-1))|(B>>M)
+
+function adjoint(b::Basis{V,G,B}) where {V,G,B}
+    Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
 end
 
