@@ -14,7 +14,7 @@ import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert,
 const Bits = UInt
 const pre = ("v","w")
 const vsn = (:V,:VV,:W)
-const digs = "123456789"
+const digs = "1234567890"
 const low_case,upp_case = "abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const low_greek,upp_greek = "αβγδϵζηθικΛμνξοπρστυφχψω","ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΡΣΤΥΦΨΩ"
 const alphanumv = digs*low_case*upp_case #*low_greek*upp_greek
@@ -32,7 +32,8 @@ const subscripts = Dict{Int,Char}(
     7 => '₇',
     8 => '₈',
     9 => '₉',
-    [j=>alphanumv[j] for j ∈ 10:35]...
+    10 => '₀',
+    [j=>alphanumv[j] for j ∈ 11:36]...
 )
 
 const super = Dict{Int,Char}(
@@ -47,7 +48,8 @@ const super = Dict{Int,Char}(
     7 => '⁷',
     8 => '⁸',
     9 => '⁹',
-    [j=>alphanumw[j] for j ∈ 10:35]...
+    10 => '₀',
+    [j=>alphanumw[j] for j ∈ 11:36]...
 )
 
 const algebra_limit = 8

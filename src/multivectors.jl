@@ -77,7 +77,7 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
-@inline printindex(i,e::String=pre[1],t=i>35) = (e≠pre[1])⊻t ? super[t ? i-26 : i] : subscripts[t ? i-26 : i]
+@inline printindex(i,e::String=pre[1],t=i>36) = (e≠pre[1])⊻t ? super[t ? i-26 : i] : subscripts[t ? i-26 : i]
 @inline printbasis(io::IO,b::VTI,e::String=pre[1]) = print(io,e,[printindex(i,e) for i ∈ b]...)
 @inline function printbasis(io::IO,a::VTI,b::VTI,e::String=pre[1],f::String=pre[2])
     F = !isempty(b)
@@ -432,7 +432,7 @@ end
 
 ## Generic
 
-export grade, hasdual, hasorigin, isudal, isorigin
+export grade, hasdual, hasorigin, isdual, isorigin
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 

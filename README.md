@@ -123,18 +123,18 @@ The parametric type formalism in `Grassmann` is highly expressive to enable the 
 
 ### Reaching ∞ dimensions with `SparseAlgebra` and `ExtendedAlgebra`
 
-It is possible to reach `Basis` elements up to `N=61` indices with `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+It is possible to reach `Basis` elements up to `N=62` indices with `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 ```Julia
-julia> Λ(61)
-[ Info: Extending thread-safe 2305843009213693952×Basis{VectorSpace{61,0,0,0},...}
-Grassmann.ExtendedAlgebra{+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,2305843009213693952}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
+julia> Λ(62)
+[ Info: Extending thread-safe 4611686018427387904×Basis{VectorSpace{62,0,0,0},...}
+Grassmann.ExtendedAlgebra{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,4611686018427387904}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
 
-julia> Λ(61).v32a87Ng
+julia> Λ(62).v32a87Ng
 -1v₂₃₇₈agN
 ```
-The 61 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to `2,305,843,009,213,693,952` dimensions with Julia `using Grassmann`. Then the volume element is
+The 62 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to `4,611,686,018,427,387,904` dimensions with Julia `using Grassmann`. Then the volume element is
 ```Julia
-v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 ```
 However, Julia is only able to allocate full `MultiVector` for `N≤22`, with sparse operations only available at higher dimension.
 
@@ -144,7 +144,7 @@ For a `VectorSpace{N}` of dimension `8<N≤22`, the `Grassmann.SparseAlgebra` ty
 ```Julia
 julia> Λ(22)
 [ Info: Declaring thread-safe 4194304×Basis{VectorSpace{22,0,0,0},...}
-Grassmann.SparseAlgebra{++++++++++++++++++++++,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklm)
+Grassmann.SparseAlgebra{++++++++++++++++++++++,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)
 ```
 This is the largest `SparseAlgebra` that can be generated with Julia, due to array size limitations.
 
@@ -156,14 +156,7 @@ julia> V = ℝ^22
 
 julia> Λ(V+V')
 [ Info: Extending thread-safe 17592186044416×Basis{VectorSpace{44,0,0,17592181850112}*,...}
-Grassmann.ExtendedAlgebra{++++++++++++++++++++++----------------------*,17592186044416}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmw¹²³⁴⁵⁶⁷⁸⁹ABCDEFGHIJKLM)
-
-julia> Λ(61)
-[ Info: Extending thread-safe 2305843009213693952×Basis{VectorSpace{61,0,0,0},...}
-Grassmann.ExtendedAlgebra{+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,2305843009213693952}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
-
-julia> Λ(61).v32a87Ng
--1v₂₃₇₈agN
+Grassmann.ExtendedAlgebra{++++++++++++++++++++++----------------------*,17592186044416}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklw¹²³⁴⁵⁶⁷⁸⁹⁰ABCDEFGHIJKL)
 ```
 Currently, up to `N=62` is supported with alpha-numeric indexing. This is due to the defaults of the bit depth from the computer, so if you are 32-bit it is more limited.
 
