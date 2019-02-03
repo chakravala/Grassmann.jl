@@ -123,6 +123,21 @@ The parametric type formalism in `Grassmann` is highly expressive to enable the 
 
 ### Reaching ∞ dimensions with `SparseAlgebra` and `ExtendedAlgebra`
 
+It is possible to reach `Basis` elements up to `N=61` indices with `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+```Julia
+julia> Λ(61)
+[ Info: Extending thread-safe 2305843009213693952×Basis{VectorSpace{61,0,0,0},...}
+Grassmann.ExtendedAlgebra{+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,2305843009213693952}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
+
+julia> Λ(61).v32a87Ng
+-1v₂₃₇₈agN
+```
+The 61 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to `2,305,843,009,213,693,952` dimensions with Julia `using Grassmann`. Then the volume element is
+```Julia
+v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+```
+However, Julia is only able to allocate full `MultiVector` for `N≤22`, with sparse operations only available at higher dimension.
+
 While `Grassmann.Algebra{V}` is a container for the `TensorAlgebra` generators of `V`, the `Grassmann.Algebra` is only cached for `N≤8`.
 For a `VectorSpace{N}` of dimension `8<N≤22`, the `Grassmann.SparseAlgebra` type is used.
 
@@ -132,21 +147,31 @@ julia> Λ(22)
 Grassmann.SparseAlgebra{++++++++++++++++++++++,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklm)
 ```
 This is the largest `SparseAlgebra` that can be generated with Julia, due to array size limitations.
+
 To reach higher dimensions, for `N>22` the `Grassmann.ExtendedAlgebra` type is used.
+It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 61 standard keyboard characters, this fits nicely. Since 22 is the limit for the largest fully representable `MultiVector` with Julia, having a 64-bit representation still lets you extend to 44 generating `Basis` elements if you suddenly want to decide to have a dual vector space also.
 ```Julia
-julia> V = ℝ^31
-+++++++++++++++++++++++++++++++
+julia> V = ℝ^22
+++++++++++++++++++++++
 
-julia> Λ(V⊕V')
-[ Info: Extending thread-safe 4611686018427387904×Basis{VectorSpace{62,0,0,4611686016279904256}*,...}
-Grassmann.ExtendedAlgebra{+++++++++++++++++++++++++++++++-------------------------------*,4611686018427387904}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvw¹²³⁴⁵⁶⁷⁸⁹ABCDEFGHIJKLMNOPQRSTU)
+julia> Λ(V+V')
+[ Info: Extending thread-safe 17592186044416×Basis{VectorSpace{44,0,0,17592181850112}*,...}
+Grassmann.ExtendedAlgebra{++++++++++++++++++++++----------------------*,17592186044416}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmw¹²³⁴⁵⁶⁷⁸⁹ABCDEFGHIJKLM)
 
-julia> Λ(62)
-[ Info: Extending thread-safe 4611686018427387904×Basis{VectorSpace{62,0,0,0},...}
-Grassmann.ExtendedAlgebra{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,4611686018427387904}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
+julia> Λ(61)
+[ Info: Extending thread-safe 2305843009213693952×Basis{VectorSpace{61,0,0,0},...}
+Grassmann.ExtendedAlgebra{+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++,2305843009213693952}(v, ..., v₁₂₃₄₅₆₇₈₉abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
+
+julia> Λ(61).v32a87Ng
+-1v₂₃₇₈agN
 ```
-Currently, up to `N=62` is supported with alpha-numeric indexing. Thus, the largest Hilbert dimension reachable of 4611686018427387904 is approximately `2^117` times smaller than the order of the Monster group.
-Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used, but the performance of the `Basis` and sparse elements is just as fast as for lower dimensions.
+Currently, up to `N=62` is supported with alpha-numeric indexing. This is due to the defaults of the bit depth from the computer, so if you are 32-bit it is more limited.
+
+At 22 dimensions and lower, you have better caching, and 8 dimensions or less have extra caching.
+Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 2,305,843,009,213,693,952 dimensions with the `ExtendedAlgebra` built in.
+This is approximately `2^117` times smaller than the order of the Monster group. It is still feasible to extend to a further super-extended 128-bit representation using the `UInt128` type (but this will require further modifications of internals and helper functions.
+To reach into infinity even further, it is theoretically possible to construct ultra-extensions also using dictionaries.
+Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
 The sparse representations are a work in progress to be improved with time.
 
 In order to work with multithreading using a `TensorAlgebra{V}`, it is necessary for it to be declared as thread-safe. This is usually done automatically by accessing it.

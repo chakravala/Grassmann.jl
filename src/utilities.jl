@@ -11,10 +11,14 @@ import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert,
 @pure svec(N,G,t) = SizedArray{Tuple{binomial(N,G)},t,1,1}
 @pure svec(N,t) = SizedArray{Tuple{1<<N},t,1,1}
 
+const Bits = UInt
 const pre = ("v","w")
 const vsn = (:V,:VV,:W)
-const alphanumv = "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const alphanumw = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const digs = "123456789"
+const low_case,upp_case = "abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const low_greek,upp_greek = "αβγδϵζηθικΛμνξοπρστυφχψω","ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΡΣΤΥΦΨΩ"
+const alphanumv = digs*low_case*upp_case #*low_greek*upp_greek
+const alphanumw = digs*upp_case*low_case #*upp_greek*low_greek
 
 const subscripts = Dict{Int,Char}(
    -1 => 'ϵ',
@@ -80,8 +84,6 @@ function basisindex(n::Int,i::Array{Int,1})
         push!(basisindex_cache[n][g],s=>findall(x->x==i,combo(n,g))[1])
     g>0 ? basisindex_cache[n][g][s] : 1
 end=#
-
-const Bits = UInt
 
 @inline function bladeindex_calc(d,k)
     H = findall(digits(d,base=2).==1)
