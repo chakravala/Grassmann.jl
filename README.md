@@ -168,6 +168,16 @@ Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used
 The sparse representations are a work in progress to be improved with time.
 
 In order to work with multithreading using a `TensorAlgebra{V}`, it is necessary for it to be declared as thread-safe. This is usually done automatically by accessing it.
+```Julia
+julia> Λ(7) + Λ(7)'
+[ Info: Allocating thread-safe 128×Basis{VectorSpace{7,0,0,0},...}
+[ Info: Allocating thread-safe 128×Basis{VectorSpace{7,0,0,127}',...}
+[ Info: Declaring thread-safe 16384×Basis{VectorSpace{14,0,0,16256}*,...}
+Grassmann.SparseAlgebra{+++++++-------*,16384}(v, ..., v₁₂₃₄₅₆₇w¹²³⁴⁵⁶⁷)
+```
+One way of declaring all 3 combinations of a `VectorSpace{N}` and its dual is to ask for the sum `Λ(N) + Λ(N)'` or `Λ(V) + Λ(V)'`, which is equivalent to `Λ(V⊕V')`.
+
+The staging of the precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
 
 ## Constructing linear transformations from mixed tensor product ⊗
 

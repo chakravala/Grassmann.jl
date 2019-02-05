@@ -45,10 +45,10 @@ Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
         M = X ? Int(ndims(W)/2) : ndims(W)
         m = ((!L) && vt && (C<0)) ? M : 0
         chars = (L || (Z[2] ≠ nothing)) ? alphanumv : alphanumw
-        (es,e,et) = indexjoin(Int[],[findfirst(x->x==ef[1][k],chars) for k∈1:length(ef[1])].+m,C<0 ? V : V2)
+        (es,e,et) = indexjoin(Int[],[findfirst(isequal(ef[1][k]),chars) for k∈1:length(ef[1])].+m,C<0 ? V : V2)
         et && (return zero(V))
         d = if L
-            (fs,f,ft) = indexjoin(Int[],[findfirst(x->x==ef[2][k],alphanumw) for k∈1:length(ef[2])].+M,W)
+            (fs,f,ft) = indexjoin(Int[],[findfirst(isequal(ef[2][k]),alphanumw) for k∈1:length(ef[2])].+M,W)
             ft && (return zero(V))
             out = [e;f]
             Basis{W}(bit2int(basisbits(ndims(W),out)))
@@ -242,7 +242,7 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
 @pure function getextended(n::Int,m::Int,s::Bits)
     n==0 && (return ExtendedAlgebra(V0))
     for N ∈ length(extended_cache)+1:n
-        push!(extended_cache,[Dict{Int,ExtendedAlgebra}() for k∈1:12])
+        push!(extended_cache,[Dict{Bits,ExtendedAlgebra}() for k∈1:12])
     end
     if !haskey(extended_cache[n][m+1],s)
         D = Int(m ∈ (1,3,5,7,9,11))
@@ -254,6 +254,11 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
     end
     extended_cache[n][m+1][s]
 end
+
+## sums
+
+⊕(::TensorAlgebra{V},::TensorAlgebra{W}) where {V,W} = getalgebra(V⊕W)
++(::TensorAlgebra{V},::TensorAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")

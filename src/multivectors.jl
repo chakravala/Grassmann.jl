@@ -353,10 +353,10 @@ setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 
-function (m::MultiVector{T,V})(g::Int,B::Type=SBlade) where {T,V}
+function (m::MultiVector{T,V})(g::Int,::Type{B}=SBlade) where {T,V,B}
     B ≠ SBlade ? MBlade{T,V,g}(m[g]) : SBlade{T,V,g}(m[g])
 end
-function (m::MultiVector{T,V})(g::Int,i::Int,B::Type=SValue) where {T,V}
+function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SValue) where {T,V,B}
     if B ≠ SValue
         MValue{V,g,indexbasis(ndims(V),g)[i],T}(m[g][i])
     else
@@ -440,14 +440,11 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure ndims(::Basis{V}) where V = ndims(V)
 @pure valuetype(::Basis) = Int
 @pure valuetype(::Union{MValue{V,G,B,T},SValue{V,G,B,T}} where {V,G,B}) where T = T
-@pure valuetype(::Union{MBlade{T},SBlade{T}}) where T = T
-@pure valuetype(::MultiVector{T}) where T = T
+@pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T≠valuetype(m) ? convert(T,m.v) : m.v
 @inline value(::VectorSpace{N,D,O,S}) where {N,D,O,S} = S
-@inline sig(::Basis{V}) where V = V
-@inline sig(::Union{MValue{V},SValue{V}}) where V = V
-@inline sig(m::Union{MBlade{T,V},SBlade{T,V},MultiVector{T,V}} where T) where V = V
+@inline sig(::TensorAlgebra{V}) where V = V
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B
 @inline grade(m::TensorTerm{V,G} where V) where G = G
@@ -463,7 +460,7 @@ hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
 isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasdual(V)+1]
 hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(bits(e)))
 hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
-hasorigin(m::VBV) = hasorigin(sig(m))
+hasorigin(m::TensorAlgebra) = hasorigin(sig(m))
 
 ## MultiGrade{N}
 

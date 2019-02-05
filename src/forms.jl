@@ -1,6 +1,44 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
+#### need separate storage for m and F for caching
+
+const dualform_cache = Vector{Tuple{Int,Bool}}[]
+const dualformC_cache = Vector{Tuple{Int,Bool}}[]
+function dualform(V::VectorSpace{N}) where {N}
+    C = dualtype(V)<0
+    for n ∈ 2length(C ? dualformC_cache : dualform_cache)+2:2:N
+        M = Int(n/2)
+        ib = indexbasis(n,1)
+        mV = Array{Tuple{Int,Bool},1}(undef,M)
+        for Q ∈ 1:M
+            x = ib[Q]
+            X = C ? x<<M : x
+            Y = X>(1<<N) ? x : X
+            mV[Q] = (intlog(Y)+1,V[intlog(x)+1])
+        end
+        push!(C ? dualformC_cache : dualform_cache,mV)
+    end
+    (C ? dualformC_cache : dualform_cache)[Int(N/2)]
+end
+
+const dualindex_cache = Vector{Vector{Int}}[]
+const dualindexC_cache = Vector{Vector{Int}}[]
+function dualindex(V::VectorSpace{N}) where N
+    C = dualtype(V)<0
+    for n ∈ 2length(C ? dualindexC_cache : dualindex_cache)+2:2:N
+        M = Int(n/2)
+        df = dualform(C ? VectorSpace(M)⊕VectorSpace(M)' : VectorSpace(n))
+        di = Array{Vector{Int},1}(undef,M)
+        for Q ∈ 1:M
+            m = df[Q][1]
+            di[Q] = [bladeindex(n,bit2int(basisbits(n,[i,m]))) for i ∈ 1:n]
+        end
+        push!(C ? dualindexC_cache : dualindex_cache,di)
+    end
+    (C ? dualindexC_cache : dualindex_cache)[Int(N/2)]
+end
+
 ## Basis forms
 
 function (a::Basis{V,1,A})(b::Basis{V,1,B}) where {V,A,B}
@@ -171,7 +209,7 @@ for Blade ∈ MSB
                 for i ∈ 1:N
                     if i≠m
                         F = bladeindex(N,bit2int(basisbits(N,[i,m])))
-                        setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),0x0001<<(i-1),Dimension{N}())
+                        setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
                 return $Blade{t,V,1}(out)
@@ -185,14 +223,10 @@ for Blade ∈ MSB
                 T = promote_type(A,B)
                 N = ndims(V)
                 M = Int(N/2)
-                ib = indexbasis(N,1)
+                df = dualform(V)
                 out = zero(T)
                 for Q ∈ 1:M
-                    x = ib[Q]
-                    X = dualtype(V)<0 ? x<<M : x
-                    Y = X>2^N ? x : X
-                    m = intlog(Y)+1
-                    out += a.v[m]*(V[intlog(x)+1] ? -(b.v[Q]) : b.v[Q])
+                    out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
                 end
                 return $Final{V}(out::T,Basis{V}())
             end
@@ -201,19 +235,14 @@ for Blade ∈ MSB
                 (C ≥ 0) && throw(error("wrong basis"))
                 t = promote_type(T,S)
                 N = ndims(V)
-                M = Int(N/2)
-                ib = indexbasis(N,1)
+                df = dualform(V)
+                di = dualindex(V)
                 out = zero(mvec(N,1,t))
-                for Q ∈ 1:M
-                    x = ib[Q]
-                    X = C<0 ? x<<M : x
-                    Y = X>2^N ? x : X
-                    m = intlog(Y)+1
+                for Q ∈ 1:Int(N/2)
+                    m = df[Q][1]
+                    id = di[Q]
                     for i ∈ 1:N
-                        if i≠m
-                            F = bladeindex(N,bit2int(basisbits(N,[i,m])))
-                            addblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v[Q]) : b.v[Q]),0x0001<<(i-1),Dimension{N}())
-                        end
+                        i≠m && addblade!(out,a.v[id[i]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q]),one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
                 return $Blade{t,V,1}(out)
@@ -221,5 +250,4 @@ for Blade ∈ MSB
         end
     end
 end
-
 

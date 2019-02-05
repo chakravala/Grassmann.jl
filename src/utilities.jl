@@ -48,7 +48,7 @@ const super = Dict{Int,Char}(
     7 => '⁷',
     8 => '⁸',
     9 => '⁹',
-    10 => '₀',
+    10 => '⁰',
     [j=>alphanumw[j] for j ∈ 11:36]...
 )
 
