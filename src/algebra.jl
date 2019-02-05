@@ -265,8 +265,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     end
     for (A,B) ∈ [(A,B) for A ∈ MSV, B ∈ MSV]
         @eval begin
-            function *(a::$A{V,G,A,T} where {G,A},b::$B{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
-                SValue{V}($MUL(a.v,b.v),basis(a)*basis(b))
+            function *(a::$A{V,G,A,T} where {V,G,A},b::$B{W,L,B,S} where {W,L,B}) where {T<:$Field,S<:$Field}
+                SValue($MUL(a.v,b.v),basis(a)*basis(b))
             end
         end
     end

@@ -118,6 +118,7 @@ end
     getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
 end
 
+#@info("Allocating thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
 const V0 = VectorSpace(0)
 const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,zero(Bits)}()),Dict(:e=>1))
 const algebra_cache = Vector{Dict{Bits,Λ}}[]
@@ -133,7 +134,6 @@ const algebra_cache = Vector{Dict{Bits,Λ}}[]
         O = Int(m ∈ (2,3,6,7,10,11))
         C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
         c = C>0 ? "'" : C<0 ? "*" : ""
-        @info("Allocating thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
         push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,D,O,s,C}()))
     end
     algebra_cache[n][m+1][s]
@@ -192,6 +192,7 @@ function show(io::IO,a::SparseAlgebra{V}) where V
     print(io,"Grassmann.SparseAlgebra{$V,$(1<<ndims(V))}($(a[1]), ..., $(a[end]))")
 end
 
+#@info("Declaring thread-safe $(1<<n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
 const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
 @pure getsparse(n::Int,d::Int,o::Int,s,c::Int=0) = getsparse(n,do2m(d,o,c),s)
 @pure getsparse(n::Int,m::Int,s) = getsparse(n,m,Bits(s))
@@ -206,7 +207,6 @@ const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
         O = Int(m ∈ (2,3,6,7,10,11))
         C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
         c = C>0 ? "'" : C<0 ? "*" : ""
-        @info("Declaring thread-safe $(1<<n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
         push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,D,O,s,C}()))
     end
     sparse_cache[n][m+1][s]
@@ -235,6 +235,7 @@ function show(io::IO,a::ExtendedAlgebra{V}) where V
     print(io,"Grassmann.ExtendedAlgebra{$V,$N}($(getbasis(V,0)), ..., $(getbasis(V,N-1)))")
 end
 
+#@info("Extending thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
 const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
 @pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,do2m(d,o,c),s)
 @pure getextended(n::Int,m::Int,s) = getextended(n,m,Bits(s))
@@ -249,7 +250,6 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
         O = Int(m ∈ (2,3,6,7,10,11))
         C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
         c = C>0 ? "'" : C<0 ? "*" : ""
-        @info("Extending thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
         push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,D,O,s,C}()))
     end
     extended_cache[n][m+1][s]
