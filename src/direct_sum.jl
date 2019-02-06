@@ -12,13 +12,13 @@ end
 
 @pure VectorSpace{N,D,O,S}() where {N,D,O,S} = VectorSpace{N,D,O,S,0}()
 
-function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
+@pure function getindex(::VectorSpace{N,D,O,S} where {N,D,O},i::Int) where S
     d = one(Bits) << (i-1)
     return (d & S) == d
 end
 
-getindex(vs::VectorSpace{N,D,O,S} where {N,D,O},i::UnitRange{Int}) where S = [getindex(vs,j) for j ∈ i]
-getindex(vs::VectorSpace{N,D,O,S} where {D,O},i::Colon) where {N,S} = [getindex(vs,j) for j ∈ 1:N]
+@pure getindex(vs::VectorSpace{N,D,O,S} where {N,D,O},i::UnitRange{Int}) where S = [getindex(vs,j) for j ∈ i]
+@pure getindex(vs::VectorSpace{N,D,O,S} where {D,O},i::Colon) where {N,S} = [getindex(vs,j) for j ∈ 1:N]
 Base.firstindex(m::VectorSpace) = 1
 Base.lastindex(m::VectorSpace{N}) where N = N
 Base.length(s::VectorSpace{N}) where N = N
@@ -107,4 +107,21 @@ dualtype(V::VectorSpace{N,D,O,S,C} where {N,D,O,S}) where C = C
 
 @pure Base.zero(V::VectorSpace) = 0*one(V)
 @pure Base.one(V::VectorSpace) = Basis{V}()
+
+## set theory ∪,∩,⊂,⊆,⊃,⊇
+
+for op ∈ (:(Base.:*),:(Base.:∪))
+    @eval begin
+        @pure $op(a::VectorSpace{N,D,O,S,C},::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C} = a
+        @pure function $op(a::VectorSpace{N1,D1,O1,S1,C1},b::VectorSpace{N2,D2,O2,S2,C2}) where {N1,D1,O1,S1,C1,N2,D2,O2,S2,C2}
+            if a==b'
+                return a⊕b
+            elseif ((N1,D1,O1)==(N2,D2,O2)) || (N1==N2)
+                throw(error("VectorSpace intersection ⟨$(a)⟩∩⟨$(b)⟩ incompatible!"))
+            else
+                throw(error("Arbitrary VectorSpace union not yet implemented."))
+            end
+        end
+    end
+end
 

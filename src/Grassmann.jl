@@ -23,6 +23,8 @@ include("forms.jl")
 end
 
 @pure getindex(a::Algebra,i::Int) = getfield(a,:b)[i]
+@pure getindex(a::Algebra,i::Colon) = getfield(a,:b)
+@pure getindex(a::Algebra,i::UnitRange{Int}) = [getindex(a,j) for j ∈ i]
 Base.firstindex(a::T) where T<:TensorAlgebra = 1
 Base.lastindex(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
 Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
@@ -45,10 +47,10 @@ Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
         M = X ? Int(ndims(W)/2) : ndims(W)
         m = ((!L) && vt && (C<0)) ? M : 0
         chars = (L || (Z[2] ≠ nothing)) ? alphanumv : alphanumw
-        (es,e,et) = indexjoin(Int[],[findfirst(isequal(ef[1][k]),chars) for k∈1:length(ef[1])].+m,C<0 ? V : V2)
+        (es,e,et) = indexjoin([findfirst(isequal(ef[1][k]),chars) for k∈1:length(ef[1])].+m,C<0 ? V : V2)
         et && (return zero(V))
         d = if L
-            (fs,f,ft) = indexjoin(Int[],[findfirst(isequal(ef[2][k]),alphanumw) for k∈1:length(ef[2])].+M,W)
+            (fs,f,ft) = indexjoin([findfirst(isequal(ef[2][k]),alphanumw) for k∈1:length(ef[2])].+M,W)
             ft && (return zero(V))
             out = [e;f]
             Basis{W}(bit2int(basisbits(ndims(W),out)))
@@ -142,9 +144,8 @@ end
 @pure getbasis(V::VectorSpace,v::Symbol) = getproperty(getalgebra(V),v)
 @pure function getbasis(V::VectorSpace{N},b) where N
     B = Bits(b)
-    G = getalgebra(V)
     if N ≤ algebra_limit
-        G.b[basisindex(ndims(V),B)]
+        getalgebra(V).b[basisindex(ndims(V),B)]
     else
         Basis{V,count_ones(B),B}()
     end

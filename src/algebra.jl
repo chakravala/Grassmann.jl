@@ -12,12 +12,18 @@ Field = Number
 sigcheck(a::VectorSpace,b::VectorSpace) = a ≠ b && throw(error("$(a.s) ≠ $(b.s)"))
 @inline sigcheck(a,b) = sigcheck(sig(a),sig(b))
 
+@inline interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = op(a,b)
+@inline function interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{W}} where {V,W}
+    VW = V∪W
+    return op(VW(a),VW(b))
+end
+
 ## mutating operations
 
 add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
 
 function add!(out::MultiVector{T,V},val::T,A::Vector{Int},B::Vector{Int}) where {T<:Field,V}
-    (s,c,t) = indexjoin(A,B,V)
+    (s,c,t) = indexjoin([A;B],V)
     !t && (out[length(c)][basisindex(N,c)] += s ? -(val) : val)
     return out
 end
@@ -90,14 +96,15 @@ end
 ## geometric product
 
 function *(a::Basis{V},b::Basis{V}) where V
-    hasdual(V) && hasdual(a) && hasdual(b) && (return SValue{V}(0,Basis{V}()))
+    hasdual(V) && hasdual(a) && hasdual(b) && (return zero(V))
     c = bits(a) ⊻ bits(b)
     d = Basis{V}(c)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
 
-function indexjoin(a::Vector{Int},b::Vector{Int},s::VectorSpace{N,D,O} where {N,O}) where D
-    ind = [a;b]
+*(a::Basis{V},b::Basis{W}) where {V,W} = interop(*,a,b)
+
+function indexjoin(ind::Vector{Int},s::VectorSpace{N,D,O} where {N,O}) where D
     k = 1
     t = false
     while k < length(ind)
@@ -116,37 +123,35 @@ function indexjoin(a::Vector{Int},b::Vector{Int},s::VectorSpace{N,D,O} where {N,
     return t, ind, false
 end
 
-function parity_calc(N,S,a,b)
+@pure function parity_calc(N,S,a,b)
     B = digits(b<<1,base=2,pad=N+1)
     isodd(sum(digits(a,base=2,pad=N+1) .* cumsum!(B,B))+count_ones((a .& b) .& S))
 end
 
-const parity_cache = ( () -> begin
-        Y = Vector{Vector{Vector{Bool}}}[]
-        return (n,s,a,b) -> (begin
-                s1,a1,b1 = s+1,a+1,b+1
-                N = length(Y)
-                for k ∈ N+1:n
-                    push!(Y,Vector{Vector{Bool}}[])
-                end
-                S = length(Y[n])
-                for k ∈ S+1:s1
-                    push!(Y[n],Vector{Bool}[])
-                end
-                A = length(Y[n][s1])
-                for k ∈ A+1:a1
-                    push!(Y[n][s1],Bool[])
-                end
-                B = length(Y[n][s1][a1])
-                for k ∈ B+1:b1
-                    push!(Y[n][s1][a1],parity_calc(n,s,a,k-1))
-                end
-                Y[n][s1][a1][b1]
-            end)
-    end)()
+const parity_cache = Vector{Vector{Vector{Bool}}}[]
+@pure function parity(n,s,a,b)
+    s1,a1,b1 = s+1,a+1,b+1
+    N = length(parity_cache)
+    for k ∈ N+1:n
+        push!(parity_cache,Vector{Vector{Bool}}[])
+    end
+    S = length(parity_cache[n])
+    for k ∈ S+1:s1
+        push!(parity_cache[n],Vector{Bool}[])
+    end
+    A = length(parity_cache[n][s1])
+    for k ∈ A+1:a1
+        push!(parity_cache[n][s1],Bool[])
+    end
+    B = length(parity_cache[n][s1][a1])
+    for k ∈ B+1:b1
+        push!(parity_cache[n][s1][a1],parity_calc(n,s,a,k-1))
+    end
+    parity_cache[n][s1][a1][b1]
+end
 
-Base.@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity_cache(ndims(v),value(v),a,b)
-Base.@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity_cache(ndims(V),value(V),bits(a),bits(b))
+Base.@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(ndims(v),value(v),a,b)
+Base.@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(ndims(V),value(V),bits(a),bits(b))
 
 for Value ∈ MSV
     @eval begin
@@ -183,6 +188,8 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
 
+∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{W}} where {V,W} = interop(Λ,a,b)
+
 @inline function exterior_product!(V::VectorSpace,out,α,β,γ)
     (γ≠0) && (count_ones(α&β)==0) && (α+β≠0) && joinaddmulti!(V,out,γ,α,β)
 end
@@ -196,6 +203,7 @@ end
 export ⋅
 
 ⋅(a::A,b::B) where {A<:TensorTerm{V,1},B<:TensorTerm{V,1}} where V = (a*b+b*a)/(2*Basis{V}())
+⋅(a::A,b::B) where {A<:TensorTerm{V,1},B<:TensorTerm{W,1}} where {V,W} = interop(⋅,a,b)
 for Blade ∈ MSB
     for Other ∈ MSB
         @eval begin
