@@ -102,7 +102,7 @@ function *(a::Basis{V},b::Basis{V}) where V
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
 
-*(a::Basis{V},b::Basis{W}) where {V,W} = interop(*,a,b)
+*(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = interop(*,a,b)
 
 function indexjoin(ind::Vector{Int},s::VectorSpace{N,D,O} where {N,O}) where D
     k = 1
@@ -188,7 +188,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
 
-∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{W}} where {V,W} = interop(Λ,a,b)
+∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 
 @inline function exterior_product!(V::VectorSpace,out,α,β,γ)
     (γ≠0) && (count_ones(α&β)==0) && (α+β≠0) && joinaddmulti!(V,out,γ,α,β)

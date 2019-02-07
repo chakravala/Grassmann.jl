@@ -432,7 +432,7 @@ end
 
 ## Generic
 
-export grade, hasdual, hasorigin, isdual, isorigin
+export basis, grade, hasdual, hasorigin, isdual, isorigin
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
@@ -542,7 +542,8 @@ end
 
 ## conversions
 
-function (W::VectorSpace)(b::Basis{V}) where V
+@pure function (W::VectorSpace)(b::Basis{V}) where V
+    V==W && (return B)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
     WC,VC = dualtype(W),dualtype(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
@@ -553,6 +554,57 @@ function (W::VectorSpace)(b::Basis{V}) where V
         throw(error("arbitrary VectorSpace intersection not yet implemented."))
     end
 end
-(W::VectorSpace)(b::SValue) = SValue{W}(value(b),W(basis(b)))
+@pure (W::VectorSpace)(b::SValue) = SValue{W}(value(b),W(basis(b)))
 (W::VectorSpace)(b::MValue) = MValue{W}(value(b),W(basis(b)))
+
+for Blade ∈ MSB
+    @eval begin
+        function (W::VectorSpace)(b::$Blade{T,V,G}) where {T,V,G}
+            V==W && (return b)
+            !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
+            WC,VC = dualtype(W),dualtype(V)
+            #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+            #    return V0
+            if WC<0 && VC≥0
+                N,M = ndims(V),ndims(W)
+                out = zeros(mvec(M,G,T))
+                ib = indexbasis(N,G)
+                for k ∈ 1:length(ib)
+                    if b[k] ≠ 0
+                        setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                    end
+                end
+                return $Blade{T,W,G}(out)
+            else
+                throw(error("arbitrary VectorSpace intersection not yet implemented."))
+            end
+        end
+
+    end
+end
+
+function (W::VectorSpace)(m::MultiVector{T,V}) where {T,V}
+    V==W && (return m)
+    !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
+    WC,VC = dualtype(W),dualtype(V)
+    #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+    #    return V0
+    if WC<0 && VC≥0
+        N,M = ndims(V),ndims(W)
+        out = zeros(mvec(M,T))
+        ib = indexbasis_set(N)
+        for i ∈ 1:N+1
+            b = binomsum(N,i-1)
+            for k ∈ 1:length(ib[i])
+                s = b+k
+                if m.v[s] ≠ 0
+                    setmulti!(out,m.v[s],VC>0 ? ib[i][k]<<N : ib[i][k],Dimension{M}())
+                end
+            end
+        end
+        return MultiVector{T,W}(out)
+    else
+        throw(error("arbitrary VectorSpace intersection not yet implemented."))
+    end
+end
 
