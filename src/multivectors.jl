@@ -224,7 +224,8 @@ end
 for Value ∈ MSV
     @eval begin
         export $Value
-        $Value(b::Basis{V,G}) where {V,G} = $Value{V,G,b,Int}(1)
+        $Value(b::Basis{V,G}) where {V,G} = $Value{V}(b)
+        $Value(v,b::TensorTerm{V}) where V = $Value{V}(v,b)
         $Value{V}(b::Basis{V,G}) where {V,G} = $Value{V,G,b,Int}(1)
         $Value{V}(v,b::SValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
@@ -232,7 +233,6 @@ for Value ∈ MSV
         $Value{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
-        $Value(v,b::TensorTerm{V,G}) where {V,G} = $Value{V,G,b}(v)
         show(io::IO,m::$Value) = print(io,(valuetype(m)∉(Expr,Any) ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
@@ -272,9 +272,9 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
     @eval begin
         function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
             if B ≠ SValue
-                MValue{V,G,indexbasis(ndims(V),G)[i],T}(m[i])
+                MValue{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             else
-                SValue{V,G,indexbasis(ndims(V),G)[i],T}(m[i])
+                SValue{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             end
         end
 
@@ -358,9 +358,9 @@ function (m::MultiVector{T,V})(g::Int,::Type{B}=SBlade) where {T,V,B}
 end
 function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SValue) where {T,V,B}
     if B ≠ SValue
-        MValue{V,g,indexbasis(ndims(V),g)[i],T}(m[g][i])
+        MValue{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     else
-        SValue{V,g,indexbasis(ndims(V),g)[i],T}(m[g][i])
+        SValue{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     end
 end
 
@@ -539,4 +539,20 @@ dual(V::VectorSpace{N},B,M=Int(N/2)) where N = ((B<<M)&((1<<N)-1))|(B>>M)
 function adjoint(b::Basis{V,G,B}) where {V,G,B}
     Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
 end
+
+## conversions
+
+function (W::VectorSpace)(b::Basis{V}) where V
+    !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
+    WC,VC = dualtype(W),dualtype(V)
+    #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+    #    return V0
+    if WC<0 && VC≥0
+        return getbasis(W,VC>0 ? bits(b)<<ndims(V) : bits(b))
+    else
+        throw(error("arbitrary VectorSpace intersection not yet implemented."))
+    end
+end
+(W::VectorSpace)(b::SValue) = SValue{W}(value(b),W(basis(b)))
+(W::VectorSpace)(b::MValue) = MValue{W}(value(b),W(basis(b)))
 

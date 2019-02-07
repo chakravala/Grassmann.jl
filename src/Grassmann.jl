@@ -52,8 +52,7 @@ Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
         d = if L
             (fs,f,ft) = indexjoin([findfirst(isequal(ef[2][k]),alphanumw) for k∈1:length(ef[2])].+M,W)
             ft && (return zero(V))
-            out = [e;f]
-            Basis{W}(bit2int(basisbits(ndims(W),out)))
+            Basis{W}([e;f])
         else
             Basis{V2}(e)
         end
@@ -255,6 +254,8 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
     end
     extended_cache[n][m+1][s]
 end
+
+# ParaAlgebra
 
 ## sums
 

@@ -42,9 +42,11 @@ Base.length(s::VectorSpace{N}) where N = N
 end
 
 @inline function show(io::IO,s::VectorSpace)
+    print(io,'⟨')
     hasdual(s) && print(io,'ϵ')
     hasorigin(s) && print(io,'o')
     print(io,sig.(s[hasdual(s)+hasorigin(s)+1:ndims(s)])...)
+    print(io,'⟩')
     C = dualtype(s)
     C ≠ 0 ? print(io, C < 0 ? '*' : ''') : nothing
 end
@@ -108,20 +110,51 @@ dualtype(V::VectorSpace{N,D,O,S,C} where {N,D,O,S}) where C = C
 @pure Base.zero(V::VectorSpace) = 0*one(V)
 @pure Base.one(V::VectorSpace) = Basis{V}()
 
-## set theory ∪,∩,⊂,⊆,⊃,⊇
+## set theory ∪,∩,⊆,⊇
 
 for op ∈ (:(Base.:*),:(Base.:∪))
     @eval begin
         @pure $op(a::VectorSpace{N,D,O,S,C},::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C} = a
         @pure function $op(a::VectorSpace{N1,D1,O1,S1,C1},b::VectorSpace{N2,D2,O2,S2,C2}) where {N1,D1,O1,S1,C1,N2,D2,O2,S2,C2}
-            if a==b'
-                return a⊕b
+            if ((C1≠C2)&&(C1≥0)&&(C2≥0)) && a==b'
+                return C1>0 ? b⊕a : a⊕b
+            elseif min(C1,C2)<0 && max(C1,C2)≥0
+                Y = C1<0 ? b⊆a : a⊆b
+                !Y && throw(error("VectorSpace union $(a)∪$(b) incompatible!"))
+                return C1<0 ? a : b
             elseif ((N1,D1,O1)==(N2,D2,O2)) || (N1==N2)
-                throw(error("VectorSpace intersection ⟨$(a)⟩∩⟨$(b)⟩ incompatible!"))
+                throw(error("VectorSpace intersection $(a)∩$(b) incompatible!"))
             else
-                throw(error("Arbitrary VectorSpace union not yet implemented."))
+                throw(error("arbitrary VectorSpace union not yet implemented."))
             end
         end
     end
 end
 
+Base.:∩(a::VectorSpace{N,D,O,S,C},::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C} = a
+Base.:∩(a::VectorSpace{N,D,O},::VectorSpace{N,D,O}) where {N,D,O} = V0
+Base.:∩(a::VectorSpace{N},::VectorSpace{N}) where N = V0
+@pure function Base.:∩(a::VectorSpace{N1,D1,O1,S1,C1},b::VectorSpace{N2,D2,O2,S2,C2}) where {N1,D1,O1,S1,C1,N2,D2,O2,S2,C2}
+    if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+        return V0
+    elseif min(C1,C2)<0 && max(C1,C2)≥0
+        Y = C1<0
+        return (Y ? b⊕b' : a⊕a') == (Y ? a : b) ? Y ? b : a : V0
+    else
+        throw(error("arbitrary VectorSpace intersection not yet implemented."))
+    end
+end
+
+@pure Base.:⊇(a::VectorSpace,b::VectorSpace) = b ⊂ a
+Base.:⊆(::VectorSpace{N,D,O,S,C},::VectorSpace{N,D,O,S,C}) where {N,D,O,S,C} = true
+Base.:⊆(::VectorSpace{N,D,O},::VectorSpace{N,D,O}) where {N,D,O} = false
+Base.:⊆(::VectorSpace{N},::VectorSpace{N}) where N = false
+@pure function Base.:⊆(a::VectorSpace{N1,D1,O1,S1,C1},b::VectorSpace{N2,D2,O2,S2,C2}) where {N1,D1,O1,S1,C1,N2,D2,O2,S2,C2}
+    if ((C1≠C2)&&(C1≥0)&&(C2≥0)) || ((C1<0)&&(C2≥0))
+        return false
+    elseif C2<0 && C1≥0
+        return (C1>0 ? a'⊕a : a⊕a') == b
+    else
+        throw(error("arbitrary VectorSpace subsets not yet implemented."))
+    end
+end
