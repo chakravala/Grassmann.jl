@@ -1,6 +1,12 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
+@inline interform(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = a(b)
+@inline function interform(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{W}} where {V,W}
+    VW = V∪W
+    return VW(a)(VW(b))
+end
+
 #### need separate storage for m and F for caching
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
@@ -41,6 +47,7 @@ end
 
 ## Basis forms
 
+(a::Basis)(b::T) where {T<:TensorAlgebra} = interform(a,b)
 function (a::Basis{V,1,A})(b::Basis{V,1,B}) where {V,A,B}
     T = valuetype(a)
     x = bits(a)
@@ -63,6 +70,7 @@ end
 
 for Value ∈ MSV
     @eval begin
+        (a::$Value)(b::T) where {T<:TensorAlgebra} = interform(a,b)
         function (a::Basis{V,1,A})(b::$Value{V,1,X,T} where X) where {V,A,T}
             x = bits(a)
             X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x
@@ -127,6 +135,7 @@ end
 
 for Blade ∈ MSB
     @eval begin
+        (a::$Blade)(b::T) where {T<:TensorAlgebra} = interform(a,b)
         function (a::Basis{V,1,A})(b::$Blade{T,V,1}) where {V,A,T}
             x = bits(a)
             X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x

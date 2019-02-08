@@ -48,3 +48,10 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
 end
 
 generate_product_algebra(SymField,:(Sym.:*),:(Sym.:+),:(Sym.:-),:svec,:(Sym.conj))
+
+for op ∈ (:+,:-)
+    Sym.bypass(op,:(Grassmann.TensorAlgebra),(1,2))
+end
+for op ∈ (:*,:/)
+    Sym.bypass(op,:(Grassmann.TensorAlgebra),(2,))
+end

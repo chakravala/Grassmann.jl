@@ -9,9 +9,6 @@ Field = Number
 
 ## signature compatibility
 
-sigcheck(a::VectorSpace,b::VectorSpace) = a ≠ b && throw(error("$(a.s) ≠ $(b.s)"))
-@inline sigcheck(a,b) = sigcheck(sig(a),sig(b))
-
 @inline interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = op(a,b)
 @inline function interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{W}} where {V,W}
     VW = V∪W
@@ -41,7 +38,7 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
             return out
         end
         @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::Bits,B::Bits) where {N,D,T<:Field,M}
-            !(Bool(D) && isodd(A) && isodd(B)) && $sm(m,parity(A,B,V) ? -(v) : v,A .⊻ B,Dimension{N}())
+            !(hasdual(V) && isodd(A) && isodd(B)) && $sm(m,parity(A,B,V) ? -(v) : v,A .⊻ B,Dimension{N}())
             return m
         end
         @inline function $(Symbol(:join,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
@@ -104,12 +101,12 @@ end
 
 *(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = interop(*,a,b)
 
-function indexjoin(ind::Vector{Int},s::VectorSpace{N,D,O} where {N,O}) where D
+function indexjoin(ind::Vector{Int},s::VectorSpace{N,M} where N) where M
     k = 1
     t = false
     while k < length(ind)
         if ind[k] == ind[k+1]
-            ind[k] == 1 && Bool(D) && (return t, ind, true)
+            ind[k] == 1 && hasdual(s) && (return t, ind, true)
             s[ind[k]] && (t = !t)
             deleteat!(ind,[k,k+1])
         elseif ind[k] > ind[k+1]
@@ -252,11 +249,11 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 M = Int(N/2)
                 out = zeros(mvec(N,$TF))
                 bng = binomial_set(N)
-                ib = indexbasis_set(N)
-                for g ∈ 0:N
-                    r = binomsum(N,g)
-                    for i ∈ 1:bng[g+1]
-                        setmulti!(out,$CONJ(m.v[r+i]),dual(V,ib[g+1][i],M))
+                bs = binomsum_set(N)
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    for i ∈ 1:bng[g]
+                        setmulti!(out,$CONJ(m.v[bs[g]+i]),dual(V,ib[i],M))
                     end
                 end
             else
@@ -311,22 +308,24 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:out),VEC)...)
-                for g ∈ 0:N
-                    r = binomsum(N,g)
-                    ib = indexbasis(N,g)
-                    for i ∈ 1:binomial(N,g)
-                        $product!(V,out,ib[i],bits(b),a.v[r+i])
+                bs = binomsum_set(N)
+                bn = binomial_set(N)
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    for i ∈ 1:bn[g]
+                        $product!(V,out,ib[i],bits(b),a.v[bs[g]+i])
                     end
                 end
                 return MultiVector{t,V}(out)
             end
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t,:out),VEC)...)
-                for g ∈ 0:N
-                    r = binomsum(N,g)
-                    ib = indexbasis(N,g)
-                    for i ∈ 1:binomial(N,g)
-                        $product!(V,out,bits(a),ib[i],b.v[r+i])
+                bs = binomsum_set(N)
+                bn = binomial_set(N)
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    for i ∈ 1:bn[g]
+                        $product!(V,out,bits(a),ib[i],b.v[bs[g]+i])
                     end
                 end
                 return MultiVector{t,V,2^N}(out)::MultiVector{t,V,2^N}
@@ -336,22 +335,25 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             @eval begin
                 function $op(a::MultiVector{T,V},b::$Value{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:out),VEC)...)
-                    for g ∈ 0:N
-                        r = binomsum(N,g)
-                        ib = indexbasis(N,g)
-                        for i ∈ 1:binomial(N,g)
-                            $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[r+i],b.v))
+                    bs = binomsum_set(N)
+                    bn = binomial_set(N)
+                    ib = indexbasis_set(N)
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        for i ∈ 1:bn[g]
+                            $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[bs[g]+i],b.v))
                         end
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::$Value{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
                     $(insert_expr((:N,:t,:out),VEC)...)
-                    for g ∈ 0:N
-                        r = binomsum(N,g)
-                        ib = indexbasis(N,g)
-                        for i ∈ 1:binomial(N,g)
-                            $product!(V,out,bits(basis(s)),ib[i],$MUL(a.v,b.v[r+i]))
+                    bs = binomsum_set(N)
+                    bn = binomial_set(N)
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        for i ∈ 1:bn[g]
+                            $product!(V,out,bits(basis(s)),ib[i],$MUL(a.v,b.v[bs[g]+i]))
                         end
                     end
                     return MultiVector{t,V,2^N}(out)
@@ -376,12 +378,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::MultiVector{T,V},b::$Blade{S,V,G}) where {T<:$Field,V,S<:$Field,G}
                     $(insert_expr((:N,:t,:out,:bng,:ib),VEC)...)
-                    for g ∈ 0:N
-                        r = binomsum(N,g)
-                        A = indexbasis(N,g)
-                        for i ∈ 1:binomial(N,g)
+                    bs = binomsum_set(N)
+                    bn = binomial_set(N)
+                    for g ∈ 1:N+1
+                        A = indexbasis(N,g-1)
+                        for i ∈ 1:bn[g]
+                            r = bs[g]+i
                             for j ∈ 1:bng
-                                $product!(V,out,A[i],ib[j],$MUL(a.v[r+i],b[j]))
+                                $product!(V,out,A[i],ib[j],$MUL(a.v[r],b[j]))
                             end
                         end
                     end
@@ -389,12 +393,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::$Blade{T,V,G},b::MultiVector{S,V}) where {V,G,S<:$Field,T<:$Field}
                     $(insert_expr((:N,:t,:out,:bng,:ib),VEC)...)
-                    for g ∈ 0:N
-                        r = binomsum(N,g)
-                        B = indexbasis(N,g)
-                        for i ∈ 1:binomial(N,g)
+                    bs = binomsum_set(N)
+                    bn = binomial_set(N)
+                    for g ∈ 1:N+1
+                        B = indexbasis(N,g-1)
+                        for i ∈ 1:bn[g]
+                            r = bs[g]+i
                             for j ∈ 1:bng
-                                $product!(V,out,ib[j],B[i],$MUL(a[j],b.v[r+i]))
+                                $product!(V,out,ib[j],B[i],$MUL(a[j],b.v[r]))
                             end
                         end
                     end
@@ -439,15 +445,16 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t,:out),VEC)...)
                 bng = binomial_set(N)
-                A = indexbasis_set(N)
-                for g ∈ 0:N
-                    r = binomsum(N,g)
-                    B = A[g+1]
-                    for i ∈ 1:bng[g+1]
-                        for G ∈ 0:N
-                            R = binomsum(N,G)
-                            for j ∈ 1:bng[G+1]
-                                $product!(V,out,A[G+1][j],B[i],$MUL(a.v[R+j],b.v[r+i]))
+                bs = binomsum_set(N)
+                for g ∈ 1:N+1
+                    Y = indexbasis(N,g-1)
+                    for i ∈ 1:bng[g]
+                        r = bs[g]+i
+                        for G ∈ 1:N+1
+                            R = bs[G]
+                            X = indexbasis(N,G-1)
+                            for j ∈ 1:bng[G]
+                                $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],b.v[r]))
                             end
                         end
                     end

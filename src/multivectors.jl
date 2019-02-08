@@ -40,11 +40,11 @@ const VTI = Union{Vector{Int},Tuple,NTuple}
 @inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,basisindices(b))
 @inline shiftbasis(V::VectorSpace,b::Bits) = shiftbasis(V,basisindices(b))
 
-function shiftbasis(s::VectorSpace{N,D,O} where N,set::Vector{Int}) where {D,O}
+function shiftbasis(s::VectorSpace{N,M} where N,set::Vector{Int}) where M
     if !isempty(set)
         k = 1
         hasdual(s) && set[1] == 1 && (set[1] = -1; k += 1)
-        shift = D + O
+        shift = hasdual(s) + hasorigin(s)
         hasorigin(s) && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
         shift > 0 && (set[k:end] .-= shift)
     end
@@ -204,12 +204,14 @@ end
 
 macro mixedbasis(q,sig=vsn[3],label=Symbol(pre[1]),dual=Symbol(pre[2]))
     V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q)
-    basis(V⊕V',sig,label,dual)
+    bases = basis(V⊕V',sig,label,dual)
+    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
 macro mixedbasis_str(str)
     V = VectorSpace(str)
-    basis(V⊕V',vsn[3])
+    bases = basis(V⊕V',vsn[3])
+    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
 ## S/MValue{N}
@@ -410,15 +412,16 @@ end
 function show(io::IO, m::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     print(io,m[0][1])
-    for i ∈ 1:N
-        b = m[i]
-        ib = indexbasis(N,i)
+    bs = binomsum_set(N)
+    for i ∈ 2:N+1
+        ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
-            if b[k] ≠ 0
-                if T == Any && typeof(b[k]) ∈ (Expr,Symbol)
-                    typeof(b[k])≠Expr ? print(io," + ",b[k]) : print(io," + (",b[k],")")
+            s = k+bs[i]
+            if m.v[s] ≠ 0
+                if T == Any && typeof(m.v[s]) ∈ (Expr,Symbol)
+                    typeof(m.v[s])≠Expr ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
                 else
-                    print(io,signbit(b[k]) ? " - " : " + ",abs(b[k]))
+                    print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
                 printbasis(io,V,ib[k])
             end
@@ -436,23 +439,18 @@ export basis, grade, hasdual, hasorigin, isdual, isorigin
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
-@pure ndims(::VectorSpace{N}) where N = N
 @pure ndims(::Basis{V}) where V = ndims(V)
 @pure valuetype(::Basis) = Int
 @pure valuetype(::Union{MValue{V,G,B,T},SValue{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T≠valuetype(m) ? convert(T,m.v) : m.v
-@inline value(::VectorSpace{N,D,O,S}) where {N,D,O,S} = S
 @inline sig(::TensorAlgebra{V}) where V = V
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B
 @inline grade(m::TensorTerm{V,G} where V) where G = G
 @inline grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
 @inline grade(m::Number) = 0
-
-hasdual(::VectorSpace{N,D} where N) where D = Bool(D)
-hasorigin(::VectorSpace{N,D,O} where {N,D}) where O = Bool(O)
 
 isdual(e::Basis{V}) where V = hasdual(e) && count_ones(bits(e)) == 1
 hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
@@ -533,9 +531,6 @@ end
 
 import Base: adjoint # conj
 
-dual(V::VectorSpace) = dualtype(V)<0 ? V : V'
-dual(V::VectorSpace{N},B,M=Int(N/2)) where N = ((B<<M)&((1<<N)-1))|(B>>M)
-
 function adjoint(b::Basis{V,G,B}) where {V,G,B}
     Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
 end
@@ -592,13 +587,13 @@ function (W::VectorSpace)(m::MultiVector{T,V}) where {T,V}
     if WC<0 && VC≥0
         N,M = ndims(V),ndims(W)
         out = zeros(mvec(M,T))
-        ib = indexbasis_set(N)
+        bs = binomsum_set(N)
         for i ∈ 1:N+1
-            b = binomsum(N,i-1)
+            ib = indexbasis(N,i-1)
             for k ∈ 1:length(ib[i])
-                s = b+k
+                s = k+bs[i]
                 if m.v[s] ≠ 0
-                    setmulti!(out,m.v[s],VC>0 ? ib[i][k]<<N : ib[i][k],Dimension{M}())
+                    setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
                 end
             end
         end

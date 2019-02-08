@@ -29,7 +29,7 @@ Base.firstindex(a::T) where T<:TensorAlgebra = 1
 Base.lastindex(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
 Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
 
-@noinline function lookup_basis(V::VectorSpace,v::Symbol)::Union{SValue,Basis}
+@pure @noinline function lookup_basis(V::VectorSpace,v::Symbol)::Union{SValue,Basis}
     vs = string(v)
     vt = vs[1:1]≠pre[1]
     Z=match(Regex("([$(pre[1])]([0-9a-vx-zA-VX-Z]+))?([$(pre[2])]([0-9a-zA-Z]+))?"),vs)
@@ -100,13 +100,13 @@ macro Λ_str(str)
     Algebra(str)
 end
 
-@pure do2m(d,o,c) = (1<<(d-1))+(1<<(2*o-1))+(c<0 ? 8 : (1<<(3*c-1)))
-@pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,do2m(d,o,c),s)
+#@pure do2m(d,o,c) = (1<<(d-1))+(1<<(2*o-1))+(c<0 ? 8 : (1<<(3*c-1)))
+@pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,doc2m(d,o,c),s)
 @pure getalgebra(n::Int,m::Int,s) = getalgebra(n,m,Bits(s))
 @pure function getalgebra(V::VectorSpace)
     N,C = ndims(V),dualtype(V)
     C<0 && N>2algebra_limit && (return getextended(V))
-    getalgebra(N,do2m(Int(hasdual(V)),Int(hasorigin(V)),C),value(V))
+    getalgebra(N,doc2m(Int(hasdual(V)),Int(hasorigin(V)),C),value(V))
 end
 
 @pure function Base.getproperty(λ::typeof(Λ),v::Symbol)
@@ -116,10 +116,10 @@ end
     C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
     S = Bits(parse(Int,V[5:end]))
-    getalgebra(N,do2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
+    getalgebra(N,doc2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
 end
 
-#@info("Allocating thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
+#@info("Allocating thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
 const V0 = VectorSpace(0)
 const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,zero(Bits)}()),Dict(:e=>1))
 const algebra_cache = Vector{Dict{Bits,Λ}}[]
@@ -131,11 +131,7 @@ const algebra_cache = Vector{Dict{Bits,Λ}}[]
         push!(algebra_cache,[Dict{Int,Λ}() for k∈1:12])
     end
     if !haskey(algebra_cache[n][m+1],s)
-        D = Int(m ∈ (1,3,5,7,9,11))
-        O = Int(m ∈ (2,3,6,7,10,11))
-        C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
-        c = C>0 ? "'" : C<0 ? "*" : ""
-        push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,D,O,s,C}()))
+        push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,m,s}()))
     end
     algebra_cache[n][m+1][s]
 end
@@ -192,9 +188,9 @@ function show(io::IO,a::SparseAlgebra{V}) where V
     print(io,"Grassmann.SparseAlgebra{$V,$(1<<ndims(V))}($(a[1]), ..., $(a[end]))")
 end
 
-#@info("Declaring thread-safe $(1<<n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
+#@info("Declaring thread-safe $(1<<n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
 const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
-@pure getsparse(n::Int,d::Int,o::Int,s,c::Int=0) = getsparse(n,do2m(d,o,c),s)
+@pure getsparse(n::Int,d::Int,o::Int,s,c::Int=0) = getsparse(n,doc2m(d,o,c),s)
 @pure getsparse(n::Int,m::Int,s) = getsparse(n,m,Bits(s))
 @pure getsparse(V::VectorSpace) = getsparse(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
 @pure function getsparse(n::Int,m::Int,s::Bits)
@@ -203,11 +199,7 @@ const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
         push!(sparse_cache,[Dict{Int,SparseAlgebra}() for k∈1:12])
     end
     if !haskey(sparse_cache[n][m+1],s)
-        D = Int(m ∈ (1,3,5,7,9,11))
-        O = Int(m ∈ (2,3,6,7,10,11))
-        C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
-        c = C>0 ? "'" : C<0 ? "*" : ""
-        push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,D,O,s,C}()))
+        push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,m,s}()))
     end
     sparse_cache[n][m+1][s]
 end
@@ -235,9 +227,9 @@ function show(io::IO,a::ExtendedAlgebra{V}) where V
     print(io,"Grassmann.ExtendedAlgebra{$V,$N}($(getbasis(V,0)), ..., $(getbasis(V,N-1)))")
 end
 
-#@info("Extending thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$c,...}")
+#@info("Extending thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
 const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
-@pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,do2m(d,o,c),s)
+@pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,doc2m(d,o,c),s)
 @pure getextended(n::Int,m::Int,s) = getextended(n,m,Bits(s))
 @pure getextended(V::VectorSpace) = getextended(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
 @pure function getextended(n::Int,m::Int,s::Bits)
@@ -246,11 +238,7 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
         push!(extended_cache,[Dict{Bits,ExtendedAlgebra}() for k∈1:12])
     end
     if !haskey(extended_cache[n][m+1],s)
-        D = Int(m ∈ (1,3,5,7,9,11))
-        O = Int(m ∈ (2,3,6,7,10,11))
-        C = m ∈ 8:11 ? -1 : Int(m ∈ (4,5,6,7))
-        c = C>0 ? "'" : C<0 ? "*" : ""
-        push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,D,O,s,C}()))
+        push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,m,s}()))
     end
     extended_cache[n][m+1][s]
 end

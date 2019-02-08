@@ -64,6 +64,13 @@ const binomsum_cache = [[1]]
     end
     i ≠ 0 ? binomsum_cache[n][i] : 0
 end
+@pure function binomsum_set(n::Int)
+    n>sparse_limit && (return cumsum([binomial(n,q) for q=0:n]))
+    for k=length(binomsum_cache)+1:n
+        push!(binomsum_cache, cumsum([binomial(k,q) for q=0:k]))
+    end
+    [0;binomsum_cache[n]]
+end
 
 const combo_cache = Array{Array{Array{Int,1},1},1}[]
 function combo(n::Int,g::Int)
