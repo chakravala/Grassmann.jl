@@ -19,6 +19,8 @@ It is currently possible to do both high-performance numerical computations with
 
 This requires a merged version of `ComputedFieldTypes` at https://github.com/vtjnash/ComputedFieldTypes.jl
 
+Interoperability of `TensorAlgebra` with other packages is automatically enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
+
 ## Direct-sum yields `VectorSpace` parametric type polymorphism ⨁
 
 Let `N` be the dimension of a `VectorSpace{N}`.
@@ -72,10 +74,10 @@ julia> V # Minkowski spacetime
 ⟨-+++⟩
 
 julia> typeof(V) # dispatch by vector space
-VectorSpace{4,0,0,0x0001,0}
+VectorSpace{4,0,0x0000000000000001}
 
 julia> typeof(v13) # extensive type info
-Basis{⟨-+++⟩,2,0x0005}
+Basis{⟨-+++⟩,2,0x0000000000000005}
 
 julia> v13∧v2 # exterior tensor product
 -1v₁₂₃
@@ -158,7 +160,7 @@ Grassmann.ExtendedAlgebra{⟨++++++++++++++++++++++----------------------⟩*,17
 Currently, up to `N=62` is supported with alpha-numeric indexing. This is due to the defaults of the bit depth from the computer, so if you are 32-bit it is more limited.
 
 At 22 dimensions and lower, you have better caching, and 8 dimensions or less have extra caching.
-Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 2,305,843,009,213,693,952 dimensions with the `ExtendedAlgebra` built in.
+Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the `ExtendedAlgebra` built in.
 This is approximately `2^117` times smaller than the order of the Monster group. It is still feasible to extend to a further super-extended 128-bit representation using the `UInt128` type (but this will require further modifications of internals and helper functions.
 To reach into infinity even further, it is theoretically possible to construct ultra-extensions also using dictionaries.
 Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
@@ -192,7 +194,7 @@ julia> mixedbasis"2"
 (⟨++--⟩*, v, v₁, v₂, w¹, w², v₁₂, v₁w¹, v₁w², v₂w¹, v₂w², w¹², v₁₂w¹, v₁₂w², v₁w¹², v₂w¹², v₁₂w¹²)
 
 julia> w1+2w2
-0v₁ + 0v₂ + 1w¹ + 2w²
+1w¹ + 2w²
 
 julia> ans(v1+v2)
 3v
@@ -249,7 +251,7 @@ Currently, with the use of `Requires` it is feasible to automatically enable sym
 julia> using Reduce, Grassmann
 Reduce (Free CSL version, revision 4590), 11-May-18 ...
 ```
-It is **essential** that the `Reduce` package was precompiled without the extra precompilation enabled if using a Linux operating system (`ENV["REDPRE"]=0`), since the extra precompilation causes a segfault when used with `StaticArrays`.
+Additionally, due to the interoperability of the `AbstractTensors` package, the `Reduce` package automatically bypasses mixed symbolic operations with `TensorAlgebra` elements within the `Reduce.Algebra` scope to the correct methods.
 ```Julia
 julia> basis"2"
 (⟨++⟩, v, v₁, v₂, v₁₂)

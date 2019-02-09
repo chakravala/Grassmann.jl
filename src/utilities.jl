@@ -3,6 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
+#import DirectSum: bit2int, doc2m, Bits, pre, alphanumv, alphanumw, vsn, subs, sups
 
 @pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
 @pure binomial(N,G) = Base.binomial(N,G)
@@ -10,47 +11,6 @@ import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert,
 @pure mvec(N,t) = MVector{2^N,t}
 @pure svec(N,G,t) = SizedArray{Tuple{binomial(N,G)},t,1,1}
 @pure svec(N,t) = SizedArray{Tuple{1<<N},t,1,1}
-
-const Bits = UInt
-const pre = ("v","w")
-const vsn = (:V,:VV,:W)
-const digs = "1234567890"
-const low_case,upp_case = "abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const low_greek,upp_greek = "αβγδϵζηθικΛμνξοπρστυφχψω","ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΡΣΤΥΦΨΩ"
-const alphanumv = digs*low_case*upp_case #*low_greek*upp_greek
-const alphanumw = digs*upp_case*low_case #*upp_greek*low_greek
-
-const subscripts = Dict{Int,Char}(
-   -1 => 'ϵ',
-    0 => 'o',
-    1 => '₁',
-    2 => '₂',
-    3 => '₃',
-    4 => '₄',
-    5 => '₅',
-    6 => '₆',
-    7 => '₇',
-    8 => '₈',
-    9 => '₉',
-    10 => '₀',
-    [j=>alphanumv[j] for j ∈ 11:36]...
-)
-
-const super = Dict{Int,Char}(
-   -1 => 'ϵ',
-    0 => 'o',
-    1 => '¹',
-    2 => '²',
-    3 => '³',
-    4 => '⁴',
-    5 => '⁵',
-    6 => '⁶',
-    7 => '⁷',
-    8 => '⁸',
-    9 => '⁹',
-    10 => '⁰',
-    [j=>alphanumw[j] for j ∈ 11:36]...
-)
 
 const algebra_limit = 8
 const sparse_limit = 22
@@ -137,7 +97,5 @@ bladeindex(cache_limit,one(Bits))
 basisindex(cache_limit,one(Bits))
 
 intlog(M::Integer) = Int(log2(M))
-
-bit2int(b::BitArray{1}) = parse(Bits,join(reverse([t ? '1' : '0' for t ∈ b])),base=2)
 
 Base.@pure promote_type(t...) = Base.promote_type(t...)

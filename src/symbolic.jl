@@ -2,13 +2,12 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-import Reduce
-Sym = Reduce.Algebra
-SymField = Any
+Sym = :(Reduce.Algebra)
+SymField = Union{Expr,Symbol,<:Number}
 
 set_val(set,expr) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:(Sym.:+),expr,:val) : :val)
 
-for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
+for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
     sm = Symbol(op,:multi!)
     sb = Symbol(op,:blade!)
     @eval begin
@@ -47,11 +46,4 @@ for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
     end
 end
 
-generate_product_algebra(SymField,:(Sym.:*),:(Sym.:+),:(Sym.:-),:svec,:(Sym.conj))
-
-for op ∈ (:+,:-)
-    Sym.bypass(op,:(Grassmann.TensorAlgebra),(1,2))
-end
-for op ∈ (:*,:/)
-    Sym.bypass(op,:(Grassmann.TensorAlgebra),(2,))
-end
+generate_product_algebra(SymField,:($Sym.:*),:($Sym.:+),:($Sym.:-),:svec,:($Sym.conj))

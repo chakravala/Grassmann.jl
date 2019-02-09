@@ -1,12 +1,6 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-@inline interform(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = a(b)
-@inline function interform(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{W}} where {V,W}
-    VW = V∪W
-    return VW(a)(VW(b))
-end
-
 #### need separate storage for m and F for caching
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
@@ -38,7 +32,7 @@ function dualindex(V::VectorSpace{N}) where N
         di = Array{Vector{Int},1}(undef,M)
         for Q ∈ 1:M
             m = df[Q][1]
-            di[Q] = [bladeindex(n,bit2int(basisbits(n,[i,m]))) for i ∈ 1:n]
+            di[Q] = [bladeindex(n,bit2int(indexbits(n,[i,m]))) for i ∈ 1:n]
         end
         push!(C ? dualindexC_cache : dualindex_cache,di)
     end
@@ -58,7 +52,7 @@ function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
     C = dualtype(V)
     (C ≥ 0) && throw(error("wrong basis"))
     T = valuetype(a)
-    bi = basisindices(a)
+    bi = indices(a)
     ib = indexbasis(ndims(V),1)
     M = Int(ndims(V)/2)
     v = ib[bi[2]>M ? bi[2]-M : bi[2]]
@@ -88,7 +82,7 @@ for Value ∈ MSV
         function (a::$Value{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
-            bi = basisindices(basis(a))
+            bi = indices(basis(a))
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
             v = ib[bi[2]>M ? bi[2]-M : bi[2]]
@@ -98,7 +92,7 @@ for Value ∈ MSV
         function (a::$Basis{V,2,A})(b::$Value{V,1,B,T}) where {V,A,B,T}
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
-            bi = basisindices(a)
+            bi = indices(a)
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
             v = ib[bi[2]>M ? bi[2]-M : bi[2]]
@@ -120,7 +114,7 @@ for Value ∈ MSV
                 C = dualtype(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 t = promote_type(T,S)
-                bi = basisindices(basis(a))
+                bi = indices(basis(a))
                 ib = indexbasis(ndims(V),1)
                 M = Int(ndims(V)/2)
                 v = ib[bi[2]>M ? bi[2]-M : bi[2]]
@@ -153,7 +147,7 @@ for Blade ∈ MSB
         function (a::Basis{V,2,A})(b::$Blade{T,V,1}) where {V,A,T}
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
-            bi = basisindices(basis(a))
+            bi = indices(basis(a))
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
             m = bi[2]>M ? bi[2]-M : bi[2]
@@ -170,7 +164,7 @@ for Blade ∈ MSB
             out = zero(mvec(N,1,T))
             for i ∈ 1:N
                 if i≠m
-                    F = bladeindex(N,bit2int(basisbits(N,[i,m])))
+                    F = bladeindex(N,bit2int(indexbits(N,[i,m])))
                     setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],0x0001<<(i-1),Dimension{N}())
                 end
             end
@@ -199,7 +193,7 @@ for Blade ∈ MSB
                 C = dualtype(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 t = promote_type(T,S)
-                bi = basisindices(basis(a))
+                bi = indices(basis(a))
                 ib = indexbasis(ndims(V),1)
                 M = Int(ndims(V)/2)
                 m = bi[2]>M ? bi[2]-M : bi[2]
@@ -217,7 +211,7 @@ for Blade ∈ MSB
                 out = zero(mvec(N,1,T))
                 for i ∈ 1:N
                     if i≠m
-                        F = bladeindex(N,bit2int(basisbits(N,[i,m])))
+                        F = bladeindex(N,bit2int(indexbits(N,[i,m])))
                         setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),one(Bits)<<(i-1),Dimension{N}())
                     end
                 end

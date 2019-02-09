@@ -5,15 +5,20 @@ module Grassmann
 
 using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
+#using DirectSum, AbstractTensors
 
-abstract type TensorAlgebra{V} end
+include("direct_sum.jl")
+#export VectorSpace, vectorspace, ⊕, ℝ, @V_str
+#import DirectSum: hasdual, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
+
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
 include("utilities.jl")
-include("direct_sum.jl")
 include("multivectors.jl")
 include("algebra.jl")
 include("forms.jl")
+### + extra dispatch
+include("symbolic.jl")
 
 ## Algebra{N}
 
@@ -100,7 +105,6 @@ macro Λ_str(str)
     Algebra(str)
 end
 
-#@pure do2m(d,o,c) = (1<<(d-1))+(1<<(2*o-1))+(c<0 ? 8 : (1<<(3*c-1)))
 @pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,doc2m(d,o,c),s)
 @pure getalgebra(n::Int,m::Int,s) = getalgebra(n,m,Bits(s))
 @pure function getalgebra(V::VectorSpace)
@@ -119,8 +123,7 @@ end
     getalgebra(N,doc2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
 end
 
-#@info("Allocating thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
-const V0 = VectorSpace(0)
+# Allocating thread-safe $(2^n)×Basis{VectorSpace}
 const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,zero(Bits)}()),Dict(:e=>1))
 const algebra_cache = Vector{Dict{Bits,Λ}}[]
 @pure function getalgebra(n::Int,m::Int,s::Bits)
@@ -188,7 +191,7 @@ function show(io::IO,a::SparseAlgebra{V}) where V
     print(io,"Grassmann.SparseAlgebra{$V,$(1<<ndims(V))}($(a[1]), ..., $(a[end]))")
 end
 
-#@info("Declaring thread-safe $(1<<n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
+# Declaring thread-safe $(1<<n)×Basis{VectorSpace}
 const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
 @pure getsparse(n::Int,d::Int,o::Int,s,c::Int=0) = getsparse(n,doc2m(d,o,c),s)
 @pure getsparse(n::Int,m::Int,s) = getsparse(n,m,Bits(s))
@@ -227,7 +230,7 @@ function show(io::IO,a::ExtendedAlgebra{V}) where V
     print(io,"Grassmann.ExtendedAlgebra{$V,$N}($(getbasis(V,0)), ..., $(getbasis(V,N-1)))")
 end
 
-#@info("Extending thread-safe $(2^n)×Basis{VectorSpace{$n,$D,$O,$(Int(s))}$(C>0 ? "'" : C<0 ? "*" : ""),...}")
+# Extending thread-safe $(2^n)×Basis{VectorSpace}
 const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
 @pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,doc2m(d,o,c),s)
 @pure getextended(n::Int,m::Int,s) = getextended(n,m,Bits(s))
@@ -247,11 +250,9 @@ end
 
 ## sums
 
-⊕(::TensorAlgebra{V},::TensorAlgebra{W}) where {V,W} = getalgebra(V⊕W)
-+(::TensorAlgebra{V},::TensorAlgebra{W}) where {V,W} = getalgebra(V⊕W)
+⊕(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
++(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 
-function __init__()
-    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
-end
+__init__() = @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" import Reduce
 
 end # module

@@ -2,10 +2,14 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade, @V_str
+export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade
 
 abstract type TensorTerm{V,G} <: TensorAlgebra{V} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
+
+# print tools
+
+#import DirectSum: indexbits, indices, shift_indices, printindex, printindices, VTI
 
 ## MultiBasis{N}
 
@@ -15,6 +19,8 @@ end
 
 @pure bits(b::Basis{V,G,B} where {V,G}) where B = B
 @pure Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
+@pure Base.zero(V::VectorSpace) = 0*one(V)
+@pure Base.one(V::VectorSpace) = Basis{V}()
 
 function getindex(b::Basis,i::Int)
     d = one(Bits) << (i-1)
@@ -33,42 +39,19 @@ function Base.iterate(r::Basis, i::Int=1)
     Base.unsafe_getindex(r, i), i + 1
 end
 
-const VTI = Union{Vector{Int},Tuple,NTuple}
-
-@inline basisindices(b::Bits) = findall(digits(b,base=2).==1)
-@inline basisindices(b::Basis) = basisindices(bits(b))
-@inline shiftbasis(b::Basis{V}) where V = shiftbasis(V,basisindices(b))
-@inline shiftbasis(V::VectorSpace,b::Bits) = shiftbasis(V,basisindices(b))
-
-function shiftbasis(s::VectorSpace{N,M} where N,set::Vector{Int}) where M
-    if !isempty(set)
-        k = 1
-        hasdual(s) && set[1] == 1 && (set[1] = -1; k += 1)
-        shift = hasdual(s) + hasorigin(s)
-        hasorigin(s) && length(set)>=k && set[k]==shift && (set[k]=0;k+=1)
-        shift > 0 && (set[k:end] .-= shift)
-    end
-    return set
-end
-
-@inline function basisbits(d::Integer,b::VTI)
-    out = falses(d)
-    for k ∈ b
-        out[k] = true
-    end
-    return out
-end
+@inline indices(b::Basis) = indices(bits(b))
+@inline shift_indices(b::Basis{V}) where V = shift_indices(V,indices(b))
 
 Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
-for t ∈ [[:V],[:V,:G]]
+for t ∈ ((:V,),(:V,:G))
     @eval begin
         function Basis{$(t...)}(b::VTI) where {$(t...)}
-            Basis{V}(basisbits(ndims(V),b))
+            Basis{V}(indexbits(ndims(V),b))
         end
         function Basis{$(t...)}(b::Int...) where {$(t...)}
-            Basis{V}(basisbits(ndims(V),b))
+            Basis{V}(indexbits(ndims(V),b))
         end
     end
 end
@@ -77,23 +60,7 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
-@inline printindex(i,e::String=pre[1],t=i>36) = (e≠pre[1])⊻t ? super[t ? i-26 : i] : subscripts[t ? i-26 : i]
-@inline printbasis(io::IO,b::VTI,e::String=pre[1]) = print(io,e,[printindex(i,e) for i ∈ b]...)
-@inline function printbasis(io::IO,a::VTI,b::VTI,e::String=pre[1],f::String=pre[2])
-    F = !isempty(b)
-    !(F && isempty(a)) && printbasis(io,a,e)
-    F && printbasis(io,b,f)
-end
-@inline function printbasis(io::IO,V::VectorSpace,e::Bits)
-    C = dualtype(V)
-    if C < 0
-        N = Int(ndims(V)/2)
-        printbasis(io,shiftbasis(V,e & Bits(2^N-1)),shiftbasis(V,e>>N))
-    else
-        printbasis(io,shiftbasis(V,e),C>0 ? pre[2] : pre[1])
-    end
-end
-@inline show(io::IO, e::Basis{V}) where V = printbasis(io,V,bits(e))
+@inline show(io::IO, e::Basis{V}) where V = printindices(io,V,bits(e))
 
 @pure function labels(V::VectorSpace{N},label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2])) where N
     lab = string(label)
@@ -114,25 +81,25 @@ end
                     push!(j ≤ M ? a : b, j)
                 end
                 b .-= M
-                e = shiftbasis(V,a)
-                f = shiftbasis(V,b)
+                e = shift_indices(V,a)
+                f = shift_indices(V,b)
                 F = !isempty(f)
                 if !(F && isempty(e))
                     print(io,lab,a[1:min(9,end)]...)
                     for j ∈ 10:length(a)
-                        print(io,subscripts[j])
+                        print(io,subs[j])
                     end
                 end
                 if F
                     print(io,string(dual),b[1:min(9,end)]...)
                     for j ∈ 10:length(b)
-                        print(io,super[j])
+                        print(io,sups[j])
                     end
                 end
             else
                 print(io,C>0 ? string(dual) : lab)
-                for j ∈ shiftbasis(V,sk)
-                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? super[j] : subscripts[j]) : j) : 'ϵ') : 'o')
+                for j ∈ shift_indices(V,sk)
+                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? sups[j] : subs[j]) : j) : 'ϵ') : 'o')
                 end
             end
             icr += 1
@@ -147,7 +114,7 @@ end
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            push!(exp,Basis{V,i,bit2int(basisbits(N,set[k]))}())
+            push!(exp,Basis{V,i,bit2int(indexbits(N,set[k]))}())
         end
     end
     return exp
@@ -183,9 +150,9 @@ end
 
 const indexbasis_cache = Vector{Vector{Bits}}[]
 @pure function indexbasis(n::Int,g::Int)
-    n>sparse_limit && (return [bit2int(basisbits(n,combo(n,g)[q])) for q ∈ 1:binomial(n,g)])
+    n>sparse_limit && (return [bit2int(indexbits(n,combo(n,g)[q])) for q ∈ 1:binomial(n,g)])
     for k ∈ length(indexbasis_cache)+1:n
-        push!(indexbasis_cache,[[bit2int(basisbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
+        push!(indexbasis_cache,[[bit2int(indexbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
     end
     g>0 ? indexbasis_cache[n][g] : [zero(Bits)]
 end
@@ -216,7 +183,7 @@ end
 
 ## S/MValue{N}
 
-const MSV = [:MValue,:SValue]
+const MSV = (:MValue,:SValue)
 
 for Value ∈ MSV
     eval(Expr(:struct,Value ≠ :SValue,:($Value{V,G,B,T} <: TensorTerm{V,G}),quote
@@ -256,9 +223,9 @@ end
 
 ## S/MBlade{T,N}
 
-const MSB = [:MBlade,:SBlade]
+const MSB = (:MBlade,:SBlade)
 
-for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
+for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
     @eval begin
         @computed struct $Blade{T,V,G} <: TensorMixed{T,V}
             v::$vector{binomial(ndims(V),G),T}
@@ -293,18 +260,18 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
             else
                 print(io,m.v[1])
             end
-            printbasis(io,V,ib[1])
+            printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
                 if T == Any && typeof(m.v[k]) ∈ (Expr,Symbol)
                     typeof(m.v[k])≠Expr ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
                 else
                     print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
                 end
-                printbasis(io,V,ib[k])
+                printindices(io,V,ib[k])
             end
         end
     end
-    for var ∈ [[:T,:V,:G],[:T,:V],[:T]]
+    for var ∈ ((:T,:V,:G),(:T,:V),(:T,))
         @eval begin
             $Blade{$(var...)}(v::Basis{V,G}) where {T,V,G} = $Blade{T,V,G}(one(T),v)
         end
@@ -316,14 +283,14 @@ for (Blade,vector,Value) ∈ [(MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2])]
         end
     end
 end
-for (Blade,Other,Vec) ∈ [(MSB...,:MVector),(reverse(MSB)...,:SVector)]
-    for var ∈ [[:T,:V,:G],[:T,:V],[:T],[]]
+for (Blade,Other,Vec) ∈ ((MSB...,:MVector),(reverse(MSB)...,:SVector))
+    for var ∈ ((:T,:V,:G),(:T,:V),(:T,),())
         @eval begin
             $Blade{$(var...)}(v::$Other{T,V,G}) where {T,V,G} = $Blade{T,V,G}($Vec{binomial(ndims(V),G),T}(v.v))
         end
     end
 end
-for (Blade,Vec1,Vec2) ∈ [(MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector)]
+for (Blade,Vec1,Vec2) ∈ ((MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector))
     @eval begin
         $Blade{T,V,G}(v::$Vec1{M,T} where M) where {T,V,G} = $Blade{T,V,G}($Vec2{binomial(ndims(V),G),T}(v))
     end
@@ -367,7 +334,7 @@ function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SValue) where {T,V,B}
 end
 
 MultiVector{V}(v::StaticArray{Tuple{M},T,1}) where {V,T,M} = MultiVector{T,V}(v)
-for var ∈ [[:T,:V],[:V]]
+for var ∈ ((:T,:V),(:V,))
     @eval begin
         MultiVector{$(var...)}(v::SizedArray) where {T,V} = MultiVector{T,V}(SVector{1<<ndims(V),T}(v))
         MultiVector{$(var...)}(v::Vector{T}) where {T,V} = MultiVector{T,V}(SVector{1<<ndims(V),T}(v))
@@ -385,15 +352,15 @@ end
 
 MultiVector(v::Basis{V,G}) where {V,G} = MultiVector{Int,V}(one(Int),v)
 
-for var ∈ [[:T,:V],[:T]]
+for var ∈ ((:T,:V),(:T,))
     @eval begin
         function MultiVector{$(var...)}(v::Basis{V,G}) where {T,V,G}
             return MultiVector{T,V}(one(T),v)
         end
     end
 end
-for var ∈ [[:T,:V],[:T],[]]
-    for (Value,Blade) ∈ [(MSV[1],MSB[1]),(MSV[2],MSB[2])]
+for var ∈ ((:T,:V),(:T,),())
+    for (Value,Blade) ∈ ((MSV[1],MSB[1]),(MSV[2],MSB[2]))
         @eval begin
             function MultiVector{$(var...)}(v::$Value{V,G,B,T}) where {V,G,B,T}
                 return MultiVector{T,V}(v.v,basis(v))
@@ -423,7 +390,7 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
                 else
                     print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
-                printbasis(io,V,ib[k])
+                printindices(io,V,ib[k])
             end
         end
     end

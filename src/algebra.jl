@@ -4,16 +4,9 @@
 
 import Base: +, -, *, ^, /, inv
 import AbstractLattices: ∧, ∨, dist
+#import AbstractTensors: ⊗
 
 Field = Number
-
-## signature compatibility
-
-@inline interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = op(a,b)
-@inline function interop(op::Function,a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{W}} where {V,W}
-    VW = V∪W
-    return op(VW(a),VW(b))
-end
 
 ## mutating operations
 
@@ -25,7 +18,7 @@ function add!(out::MultiVector{T,V},val::T,A::Vector{Int},B::Vector{Int}) where 
     return out
 end
 
-for (op,set) ∈ [(:add,:(+=)),(:set,:(=))]
+for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
     sm = Symbol(op,:multi!)
     sb = Symbol(op,:blade!)
     @eval begin
@@ -99,7 +92,7 @@ function *(a::Basis{V},b::Basis{V}) where V
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
 
-*(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = interop(*,a,b)
+#*(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = interop(*,a,b)
 
 function indexjoin(ind::Vector{Int},s::VectorSpace{N,M} where N) where M
     k = 1
@@ -288,9 +281,9 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         *(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(broadcast($MUL,a.v,b))
         *(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast($MUL,a,b.v))
         *(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(broadcast($MUL,a.v,b))
-        ∧(::$Field,::$Field) = 0
-        ∧(a,b::B) where B<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
-        ∧(a::A,b) where A<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
+        #∧(::$Field,::$Field) = 0
+        ∧(a::$Field,b::B) where B<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
+        ∧(a::A,b::$Field) where A<:TensorTerm{V,G} where {V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
         #=
         ∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
@@ -304,7 +297,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             ∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
         end
     end=#
-    for (op,product!) ∈ [(:*,:geometric_product!),(:∧,:exterior_product!)]
+    for (op,product!) ∈ ((:*,:geometric_product!),(:∧,:exterior_product!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:out),VEC)...)
@@ -466,7 +459,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
 
     ## term addition
 
-    for (op,eop,bop) ∈ [(:+,:(+=),ADD),(:-,:(-=),SUB)]
+    for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
         for (Value,Other) ∈ [(a,b) for a ∈ MSV, b ∈ MSV]
             @eval begin
                 function $op(a::$Value{V,A,X,T},b::$Other{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
@@ -676,7 +669,7 @@ end
 
 generate_product_algebra()
 
-for (op,eop) ∈ [(:+,:(+=)),(:-,:(-=))]
+for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     @eval begin
         $op(a::Basis{V,G,B} where G) where {V,B} = SValue($op(value(a)),a)
         function $op(a::Basis{V,A},b::Basis{V,B}) where {V,A,B}
@@ -710,7 +703,7 @@ function ^(v::TensorTerm,i::Integer)
     end
     return out
 end
-for Term ∈ [MSB...,:MultiVector,:MultiGrade]
+for Term ∈ (MSB...,:MultiVector,:MultiGrade)
     @eval begin
         function ^(v::$Term,i::Integer)
             i == 0 && (return getbasis(sig(v),0))
@@ -730,7 +723,7 @@ end
 function inv(b::SValue{V,G,B,T}) where {V,G,B,T}
     SValue{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
 end
-for Term ∈ [:TensorTerm,MSB...,:MultiVector,:MultiGrade]
+for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
         @pure /(a::$Term,b::TensorTerm) = a*inv(b)
         @pure /(a::$Term,b::Number) = a*inv(b)
