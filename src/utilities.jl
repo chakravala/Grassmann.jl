@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-#import DirectSum: bit2int, doc2m, Bits, pre, alphanumv, alphanumw, vsn, subs, sups
+import DirectSum: bit2int, doc2m, Bits, pre, alphanumv, alphanumw, vsn, subs, sups
 
 @pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
 @pure binomial(N,G) = Base.binomial(N,G)

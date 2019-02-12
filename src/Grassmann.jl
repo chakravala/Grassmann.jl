@@ -5,11 +5,11 @@ module Grassmann
 
 using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
-#using DirectSum, AbstractTensors
+using DirectSum #, AbstractTensors
 
+export VectorSpace, vectorspace, ⊕, ℝ, @V_str
+import DirectSum: hasdual, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
 include("direct_sum.jl")
-#export VectorSpace, vectorspace, ⊕, ℝ, @V_str
-#import DirectSum: hasdual, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
 
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 

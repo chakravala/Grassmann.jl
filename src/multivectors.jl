@@ -9,7 +9,7 @@ abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 # print tools
 
-#import DirectSum: indexbits, indices, shift_indices, printindex, printindices, VTI
+import DirectSum: indexbits, indices, shift_indices, printindex, printindices, VTI
 
 ## MultiBasis{N}
 
