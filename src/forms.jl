@@ -12,14 +12,14 @@ function dualform(V::VectorSpace{N}) where {N}
         ib = indexbasis(n,1)
         mV = Array{Tuple{Int,Bool},1}(undef,M)
         for Q ∈ 1:M
-            x = ib[Q]
+            @inbounds x = ib[Q]
             X = C ? x<<M : x
             Y = X>(1<<N) ? x : X
-            mV[Q] = (intlog(Y)+1,V[intlog(x)+1])
+            @inbounds mV[Q] = (intlog(Y)+1,V[intlog(x)+1])
         end
         push!(C ? dualformC_cache : dualform_cache,mV)
     end
-    (C ? dualformC_cache : dualform_cache)[Int(N/2)]
+    @inbounds (C ? dualformC_cache : dualform_cache)[Int(N/2)]
 end
 
 const dualindex_cache = Vector{Vector{Int}}[]
@@ -31,12 +31,12 @@ function dualindex(V::VectorSpace{N}) where N
         df = dualform(C ? VectorSpace(M)⊕VectorSpace(M)' : VectorSpace(n))
         di = Array{Vector{Int},1}(undef,M)
         for Q ∈ 1:M
-            m = df[Q][1]
-            di[Q] = [bladeindex(n,bit2int(indexbits(n,[i,m]))) for i ∈ 1:n]
+            @inbounds m = df[Q][1]
+            @inbounds di[Q] = [bladeindex(n,bit2int(indexbits(n,[i,m]))) for i ∈ 1:n]
         end
         push!(C ? dualindexC_cache : dualindex_cache,di)
     end
-    (C ? dualindexC_cache : dualindex_cache)[Int(N/2)]
+    @inbounds (C ? dualindexC_cache : dualindex_cache)[Int(N/2)]
 end
 
 ## Basis forms
@@ -55,9 +55,9 @@ function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
     bi = indices(a)
     ib = indexbasis(ndims(V),1)
     M = Int(ndims(V)/2)
-    v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+    @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
     t = bits(b)≠v
-    t ? zero(V) : ((V[intlog(v)+1] ? -one(T) : one(T))*getbasis(V,ib[bi[1]]))
+    @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -one(T) : one(T))*getbasis(V,ib[bi[1]]))
 end
 
 # Value forms
@@ -85,9 +85,9 @@ for Value ∈ MSV
             bi = indices(basis(a))
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
-            v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+            @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
             t = bits(b)≠v
-            t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
+            @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
         end
         function (a::$Basis{V,2,A})(b::$Value{V,1,B,T}) where {V,A,B,T}
             C = dualtype(V)
@@ -95,9 +95,9 @@ for Value ∈ MSV
             bi = indices(a)
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
-            v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+            @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
             t = bits(basis(b))≠v
-            t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
+            @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
         end
     end
     for Other ∈ MSV
@@ -117,9 +117,9 @@ for Value ∈ MSV
                 bi = indices(basis(a))
                 ib = indexbasis(ndims(V),1)
                 M = Int(ndims(V)/2)
-                v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+                @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
                 t = bits(basis(b))≠v
-                t ? zero(V) : (a.v*(V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
+                @inbounds t ? zero(V) : (a.v*(V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
             end
         end
     end
@@ -134,14 +134,14 @@ for Blade ∈ MSB
             x = bits(a)
             X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x
             Y = 0≠X ? X : x
-            out = b.v[bladeindex(ndims(V),Y)]
+            @inbounds out = b.v[bladeindex(ndims(V),Y)]
             SValue{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
         end
         function (a::$Blade{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
             x = bits(b)
             X = dualtype(V)<0 ? x<<Int(ndims(V)/2) : x
             Y = X>2^ndims(V) ? x : X
-            out = a.v[bladeindex(ndims(V),Y)]
+            @inbounds out = a.v[bladeindex(ndims(V),Y)]
             SValue{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
         end
         function (a::Basis{V,2,A})(b::$Blade{T,V,1}) where {V,A,T}
@@ -150,8 +150,8 @@ for Blade ∈ MSB
             bi = indices(basis(a))
             ib = indexbasis(ndims(V),1)
             M = Int(ndims(V)/2)
-            m = bi[2]>M ? bi[2]-M : bi[2]
-            ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
+            @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
+            @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
         end
         function (a::$Blade{T,V,2})(b::Basis{V,1,B}) where {T,V,B}
             C = dualtype(V)
@@ -165,7 +165,7 @@ for Blade ∈ MSB
             for i ∈ 1:N
                 if i≠m
                     F = bladeindex(N,bit2int(indexbits(N,[i,m])))
-                    setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],0x0001<<(i-1),Dimension{N}())
+                    @inbounds setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],0x0001<<(i-1),Dimension{N}())
                 end
             end
             return $Blade{T,V,1}(out)
@@ -178,7 +178,7 @@ for Blade ∈ MSB
                 x = bits(basis(b))
                 X = dualtype(V)<0 ? x<<Int(ndims(V)/2) : x
                 Y = X>2^ndims(V) ? x : X
-                out = a.v[bladeindex(ndims(V),Y)]
+                @inbounds out = a.v[bladeindex(ndims(V),Y)]
                 SValue{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
             end
             function (a::$Value{V,1,X,T} where X)(b::$Blade{S,V,1}) where {V,T,S}
@@ -186,7 +186,7 @@ for Blade ∈ MSB
                 x = bits(basis(a))
                 X = dualtype(V)<0 ? x>>Int(ndims(V)/2) : x
                 Y = 0≠X ? X : x
-                out = b.v[bladeindex(ndims(V),Y)]
+                @inbounds out = b.v[bladeindex(ndims(V),Y)]
                 SValue{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
             end
             function (a::$Value{V,2,A,T})(b::$Blade{S,V,1}) where {V,A,T,S}
@@ -196,8 +196,8 @@ for Blade ∈ MSB
                 bi = indices(basis(a))
                 ib = indexbasis(ndims(V),1)
                 M = Int(ndims(V)/2)
-                m = bi[2]>M ? bi[2]-M : bi[2]
-                (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])
+                @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
+                @inbounds (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])
             end
             function (a::$Blade{T,V,2})(b::$Value{V,1,B,S}) where {V,T,S,B}
                 C = dualtype(V)
@@ -212,7 +212,7 @@ for Blade ∈ MSB
                 for i ∈ 1:N
                     if i≠m
                         F = bladeindex(N,bit2int(indexbits(N,[i,m])))
-                        setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),one(Bits)<<(i-1),Dimension{N}())
+                        @inbounds setblade!(out,a.v[F]*(V[intlog(x)+1] ? -(b.v) : b.v),one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
                 return $Blade{t,V,1}(out)
@@ -229,7 +229,7 @@ for Blade ∈ MSB
                 df = dualform(V)
                 out = zero(T)
                 for Q ∈ 1:M
-                    out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
+                    @inbounds out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
                 end
                 return $Final{V}(out::T,Basis{V}())
             end
@@ -242,10 +242,10 @@ for Blade ∈ MSB
                 di = dualindex(V)
                 out = zero(mvec(N,1,t))
                 for Q ∈ 1:Int(N/2)
-                    m = df[Q][1]
-                    id = di[Q]
-                    for i ∈ 1:N
-                        i≠m && addblade!(out,a.v[id[i]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q]),one(Bits)<<(i-1),Dimension{N}())
+                    @inbounds m = df[Q][1]
+                    @inbounds val = df[Q][2] ? -(b.v[Q]) : b.v[Q]
+                    val≠0 && for i ∈ 1:N
+                        @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
                 return $Blade{t,V,1}(out)

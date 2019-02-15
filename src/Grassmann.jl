@@ -5,20 +5,28 @@ module Grassmann
 
 using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
-using DirectSum #, AbstractTensors
+using DirectSum, AbstractTensors
 
 export VectorSpace, vectorspace, ⊕, ℝ, @V_str
 import DirectSum: hasdual, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
-include("direct_sum.jl")
-
-abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
 include("utilities.jl")
 include("multivectors.jl")
 include("algebra.jl")
 include("forms.jl")
-### + extra dispatch
 include("symbolic.jl")
+include("generators.jl")
+
+abstract type SubAlgebra{V} <: TensorAlgebra{V} end
+
+adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
+dual(G::A) where A<: SubAlgebra = G'
+Base.firstindex(a::T) where T<:SubAlgebra = 1
+Base.lastindex(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
+Base.length(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
+
+⊕(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
++(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 
 ## Algebra{N}
 
@@ -30,40 +38,6 @@ end
 @pure getindex(a::Algebra,i::Int) = getfield(a,:b)[i]
 @pure getindex(a::Algebra,i::Colon) = getfield(a,:b)
 @pure getindex(a::Algebra,i::UnitRange{Int}) = [getindex(a,j) for j ∈ i]
-Base.firstindex(a::T) where T<:TensorAlgebra = 1
-Base.lastindex(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
-Base.length(a::T) where T<:TensorAlgebra{V} where V = 1<<ndims(V)
-
-@pure @noinline function lookup_basis(V::VectorSpace,v::Symbol)::Union{SValue,Basis}
-    vs = string(v)
-    vt = vs[1:1]≠pre[1]
-    Z=match(Regex("([$(pre[1])]([0-9a-vx-zA-VX-Z]+))?([$(pre[2])]([0-9a-zA-Z]+))?"),vs)
-    ef = String[]
-    for k ∈ (2,4)
-        Z[k] ≠ nothing && push!(ef,Z[k])
-    end
-    length(ef) == 0 && (return zero(V))
-    let W = V,fs=false
-        C = dualtype(V)
-        X = C≥0 && ndims(V)<4sizeof(Bits)+1
-        X && (W = C>0 ? V'⊕V : V⊕V')
-        V2 = (vt ⊻ (vt ? C≠0 : C>0)) ? V' : V
-        L = length(ef) > 1
-        M = X ? Int(ndims(W)/2) : ndims(W)
-        m = ((!L) && vt && (C<0)) ? M : 0
-        chars = (L || (Z[2] ≠ nothing)) ? alphanumv : alphanumw
-        (es,e,et) = indexjoin([findfirst(isequal(ef[1][k]),chars) for k∈1:length(ef[1])].+m,C<0 ? V : V2)
-        et && (return zero(V))
-        d = if L
-            (fs,f,ft) = indexjoin([findfirst(isequal(ef[2][k]),alphanumw) for k∈1:length(ef[2])].+M,W)
-            ft && (return zero(V))
-            Basis{W}([e;f])
-        else
-            Basis{V2}(e)
-        end
-        return (es⊻fs) ? SValue(-1,d) : d
-    end
-end
 
 @pure function Base.getproperty(a::Algebra{V},v::Symbol) where V
     return if v ∈ (:b,:g)
@@ -77,7 +51,7 @@ end
 
 @pure function Base.collect(s::VectorSpace)
     sym = labels(s)
-    Algebra{s}(generate(s),Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
+    @inbounds Algebra{s}(generate(s),Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
 end
 
 Algebra(s::VectorSpace) = getalgebra(s)
@@ -93,9 +67,6 @@ function show(io::IO,a::Algebra{V}) where V
     end
     print(io,a[end],")")
 end
-
-adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
-dual(G::A) where A<: SubAlgebra = G'
 
 export Λ, @Λ_str, getalgebra, getbasis, TensorAlgebra, SubAlgebra
 
@@ -133,17 +104,17 @@ const algebra_cache = Vector{Dict{Bits,Λ}}[]
     for N ∈ length(algebra_cache)+1:n
         push!(algebra_cache,[Dict{Int,Λ}() for k∈1:12])
     end
-    if !haskey(algebra_cache[n][m+1],s)
-        push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,m,s}()))
+    @inbounds if !haskey(algebra_cache[n][m+1],s)
+        @inbounds push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,m,s}()))
     end
-    algebra_cache[n][m+1][s]
+    @inbounds algebra_cache[n][m+1][s]
 end
 
 @pure getbasis(V::VectorSpace,v::Symbol) = getproperty(getalgebra(V),v)
 @pure function getbasis(V::VectorSpace{N},b) where N
     B = Bits(b)
     if N ≤ algebra_limit
-        getalgebra(V).b[basisindex(ndims(V),B)]
+        @inbounds getalgebra(V).b[basisindex(ndims(V),B)]
     else
         Basis{V,count_ones(B),B}()
     end
@@ -168,7 +139,7 @@ end
     else
         F = findfirst(x->1+binomsum(N,x)-i>0,0:N)
         G = F ≠ nothing ? F-2 : N
-        B = indexbasis(N,G)[i-binomsum(N,G)]
+        @inbounds B = indexbasis(N,G)[i-binomsum(N,G)]
         Basis{V,count_ones(B),B}()
     end
 end
@@ -177,7 +148,7 @@ end
     return if v ∈ (:b,:g)
         getfield(a,v)
     elseif haskey(a.g,v)
-        a[getfield(a,:g)[v]]
+        @inbounds a[getfield(a,:g)[v]]
     else
         lookup_basis(V,v)
     end
@@ -201,13 +172,13 @@ const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
     for N ∈ length(sparse_cache)+1:n
         push!(sparse_cache,[Dict{Int,SparseAlgebra}() for k∈1:12])
     end
-    if !haskey(sparse_cache[n][m+1],s)
-        push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,m,s}()))
+    @inbounds if !haskey(sparse_cache[n][m+1],s)
+        @inbounds push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,m,s}()))
     end
-    sparse_cache[n][m+1][s]
+    @inbounds sparse_cache[n][m+1][s]
 end
 
-## ExtendexAlgebra{V}
+## ExtendedAlgebra{V}
 
 struct ExtendedAlgebra{V} <: SubAlgebra{V} end
 
@@ -240,18 +211,13 @@ const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
     for N ∈ length(extended_cache)+1:n
         push!(extended_cache,[Dict{Bits,ExtendedAlgebra}() for k∈1:12])
     end
-    if !haskey(extended_cache[n][m+1],s)
-        push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,m,s}()))
+    @inbounds if !haskey(extended_cache[n][m+1],s)
+        @inbounds push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,m,s}()))
     end
-    extended_cache[n][m+1][s]
+    @inbounds extended_cache[n][m+1][s]
 end
 
 # ParaAlgebra
-
-## sums
-
-⊕(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
-+(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 
 __init__() = @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" import Reduce
 

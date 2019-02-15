@@ -9,7 +9,7 @@ abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 # print tools
 
-import DirectSum: indexbits, indices, shift_indices, printindex, printindices, VTI
+import DirectSum: indices, shift_indices, printindex, printindices, VTI
 
 ## MultiBasis{N}
 
@@ -62,125 +62,6 @@ end
 
 @inline show(io::IO, e::Basis{V}) where V = printindices(io,V,bits(e))
 
-@pure function labels(V::VectorSpace{N},label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2])) where N
-    lab = string(label)
-    io = IOBuffer()
-    els = Array{Symbol,1}(undef,1<<N)
-    els[1] = label
-    icr = 1
-    C = dualtype(V)
-    C < 0 && (M = Int(N/2))
-    for i ∈ 1:N
-        set = combo(N,i)
-        for k ∈ 1:length(set)
-            sk = copy(set[k])
-            if C < 0
-                a = Int[]
-                b = Int[]
-                for j ∈ sk
-                    push!(j ≤ M ? a : b, j)
-                end
-                b .-= M
-                e = shift_indices(V,a)
-                f = shift_indices(V,b)
-                F = !isempty(f)
-                if !(F && isempty(e))
-                    print(io,lab,a[1:min(9,end)]...)
-                    for j ∈ 10:length(a)
-                        print(io,subs[j])
-                    end
-                end
-                if F
-                    print(io,string(dual),b[1:min(9,end)]...)
-                    for j ∈ 10:length(b)
-                        print(io,sups[j])
-                    end
-                end
-            else
-                print(io,C>0 ? string(dual) : lab)
-                for j ∈ shift_indices(V,sk)
-                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? sups[j] : subs[j]) : j) : 'ϵ') : 'o')
-                end
-            end
-            icr += 1
-            els[icr] = Symbol(String(take!(io)))
-        end
-    end
-    return els
-end
-
-@pure function generate(V::VectorSpace{N}) where N
-    exp = Basis{V}[Basis{V,0,zero(Bits)}()]
-    for i ∈ 1:N
-        set = combo(N,i)
-        for k ∈ 1:length(set)
-            push!(exp,Basis{V,i,bit2int(indexbits(N,set[k]))}())
-        end
-    end
-    return exp
-end
-
-export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
-
-function basis(V::VectorSpace,sig::Symbol=vsn[1],label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2]))
-    N = ndims(V)
-    if N > algebra_limit
-        Λ(V)
-        basis = generate(V)
-        sym = labels(V,label,dual)
-    else
-        basis = Λ(V).b
-        sym = labels(V,label,dual)
-    end
-    exp = Expr[Expr(:(=),esc(sig),V),
-        Expr(:(=),esc(label),basis[1])]
-    for i ∈ 2:1<<N
-        push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
-    end
-    return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
-end
-
-macro basis(q,sig=vsn[1],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q),sig,label,dual)
-end
-
-macro basis_str(str)
-    basis(VectorSpace(str))
-end
-
-const indexbasis_cache = Vector{Vector{Bits}}[]
-@pure function indexbasis(n::Int,g::Int)
-    n>sparse_limit && (return [bit2int(indexbits(n,combo(n,g)[q])) for q ∈ 1:binomial(n,g)])
-    for k ∈ length(indexbasis_cache)+1:n
-        push!(indexbasis_cache,[[bit2int(indexbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
-    end
-    g>0 ? indexbasis_cache[n][g] : [zero(Bits)]
-end
-
-indexbasis(Int((sparse_limit+cache_limit)/2),1)
-
-@pure indexbasis_set(N) = SVector(Vector{Bits}[indexbasis(N,g) for g ∈ 0:N]...)
-
-macro dualbasis(q,sig=vsn[2],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q))',sig,label,dual)
-end
-
-macro dualbasis_str(str)
-    basis(VectorSpace(str)',vsn[2])
-end
-
-macro mixedbasis(q,sig=vsn[3],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q)
-    bases = basis(V⊕V',sig,label,dual)
-    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
-end
-
-macro mixedbasis_str(str)
-    V = VectorSpace(str)
-    bases = basis(V⊕V',vsn[3])
-    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
-end
-
 ## S/MValue{N}
 
 const MSV = (:MValue,:SValue)
@@ -208,18 +89,6 @@ end
 
 ==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) && value(a) == value(b)
 ==(a::TensorTerm,b::TensorTerm) = false
-
-## Grade{G}
-
-struct Grade{G}
-    @pure Grade{G}() where G = new{G}()
-end
-
-## Dimension{N}
-
-struct Dimension{N}
-    @pure Dimension{N}() where N = new{N}()
-end
 
 ## S/MBlade{T,N}
 
@@ -255,19 +124,19 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
 
         function show(io::IO, m::$Blade{T,V,G}) where {T,V,G}
             ib = indexbasis(ndims(V),G)
-            if T == Any && typeof(m.v[1]) ∈ (Expr,Symbol)
-                typeof(m.v[1])≠Expr ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
+            @inbounds if T == Any && typeof(m.v[1]) ∈ (Expr,Symbol)
+                @inbounds typeof(m.v[1])≠Expr ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
             else
-                print(io,m.v[1])
+                @inbounds print(io,m.v[1])
             end
-            printindices(io,V,ib[1])
+            @inbounds printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
                 if T == Any && typeof(m.v[k]) ∈ (Expr,Symbol)
-                    typeof(m.v[k])≠Expr ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
+                    @inbounds typeof(m.v[k])≠Expr ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
                 else
-                    print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
+                    @inbounds print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
                 end
-                printindices(io,V,ib[k])
+                @inbounds printindices(io,V,ib[k])
             end
         end
     end
@@ -369,7 +238,7 @@ for var ∈ ((:T,:V),(:T,),())
                 N = ndims(V)
                 out = zeros(mvec(N,T))
                 r = binomsum(N,G)
-                out.v[r+1:r+binomial(N,G)] = v.v
+                @inbounds out.v[r+1:r+binomial(N,G)] = v.v
                 return MultiVector{T,V}(out)
             end
         end
@@ -383,14 +252,14 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
     for i ∈ 2:N+1
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
-            s = k+bs[i]
-            if m.v[s] ≠ 0
-                if T == Any && typeof(m.v[s]) ∈ (Expr,Symbol)
-                    typeof(m.v[s])≠Expr ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
+            @inbounds s = k+bs[i]
+            @inbounds if m.v[s] ≠ 0
+                @inbounds if T == Any && typeof(m.v[s]) ∈ (Expr,Symbol)
+                    @inbounds typeof(m.v[s])≠Expr ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
                 else
-                    print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
+                    @inbounds print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
-                printindices(io,V,ib[k])
+                @inbounds printindices(io,V,ib[k])
             end
         end
     end
@@ -469,7 +338,7 @@ function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
     g = grade.(v.v)
     out = zeros(mvec(N,T))
     for k ∈ 1:length(v.v)
-        (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
+        @inbounds (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
         setmulti!(out,convert(T,val),bits(b),Dimension{N}())
     end
     return MultiVector{T,V}(out)
@@ -532,8 +401,8 @@ for Blade ∈ MSB
                 out = zeros(mvec(M,G,T))
                 ib = indexbasis(N,G)
                 for k ∈ 1:length(ib)
-                    if b[k] ≠ 0
-                        setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                    @inbounds if b[k] ≠ 0
+                        @inbounds setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
                     end
                 end
                 return $Blade{T,W,G}(out)
@@ -558,9 +427,9 @@ function (W::VectorSpace)(m::MultiVector{T,V}) where {T,V}
         for i ∈ 1:N+1
             ib = indexbasis(N,i-1)
             for k ∈ 1:length(ib[i])
-                s = k+bs[i]
-                if m.v[s] ≠ 0
-                    setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                @inbounds s = k+bs[i]
+                @inbounds if m.v[s] ≠ 0
+                    @inbounds setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
                 end
             end
         end

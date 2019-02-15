@@ -4,5 +4,6 @@ StaticArrays
 ComputedFieldTypes
 Requires
 DirectSum
+AbstractTensors
 AbstractLattices
 Reduce
