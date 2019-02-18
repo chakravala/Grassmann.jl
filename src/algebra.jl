@@ -151,25 +151,50 @@ end
 #∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
-## inner product
+## complement
 
-export ⋅
+complement(N::Int,B::UInt) = (~B)&(one(Bits)<<N-1)
 
-⋅(a::A,b::B) where {A<:TensorTerm{V,1},B<:TensorTerm{V,1}} where V = (a*b+b*a)/(2*Basis{V}())
-⋅(a::A,b::B) where {A<:TensorTerm{V,1},B<:TensorTerm{W,1}} where {V,W} = interop(⋅,a,b)
-for Blade ∈ MSB
-    for Other ∈ MSB
-        @eval begin
-            ⋅(a::$Blade{T,V,1},b::$Other{S,V,1}) where {T,V,S} = (a*b+b*a)/(2*Basis{V}())
+@pure parityright(V::Int,B,G,N=nothing) = isodd(V+B+Int((G+1)*G/2))
+@pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
+
+for side ∈ (:left,:right)
+    c = Symbol(:complement,side)
+    p = Symbol(:parity,side)
+    @eval begin
+        @inline $p(V::VectorSpace,B,G=count_ones(B))=(b=indices(B);$p(sum(V[:][b]),sum(b),G,ndims(V)))
+        @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
+        function $c(b::Basis{V,G,B}) where {V,G,B}
+            d = getbasis(V,complement(ndims(V),B))
+            $p(b) ? SValue{V}(-value(d),d) : d
         end
     end
-    @eval begin
-        ⋅(a::$Blade{T,V,1},b::TensorTerm{V,1}) where {T,V,S} = (a*b+b*a)/(2*Basis{V}())
-        ⋅(a::TensorTerm{V,1},b::$Blade{T,V,1}) where {T,V} = (a*b+b*a)/(2*Basis{V}())
+    for Value ∈ MSV
+        @eval begin
+            $c(b::$Value) = value(b) * $c(basis(b))
+        end
     end
 end
 
+export ⋆
+const ⋆ = complementright
+
+## inner product
+
+import LinearAlgebra: dot, ⋅
+export ⋅
+
+dot(a::A,b::B) where {A<:TensorTerm,B<:TensorTerm} = ⋆(complementleft(a)∧b)
+dot(a::A,b::B) where {A<:TensorMixed,B<:TensorMixed} = ⋆(complementleft(a)∧b)
+dot(a::A,b::B) where {A<:TensorTerm,B<:TensorMixed} = ⋆(complementleft(a)∧b)
+dot(a::A,b::B) where {A<:TensorMixed,B<:TensorTerm} = ⋆(complementleft(a)∧b)
+
 ## regressive product
+
+∨(a::A,b::B) where {A<:TensorTerm,B<:TensorTerm} = ⋆(complementleft(a)∧complementleft(b))
+∨(a::A,b::B) where {A<:TensorMixed,B<:TensorMixed} = ⋆(complementleft(a)∧complementleft(b))
+∨(a::A,b::B) where {A<:TensorTerm,B<:TensorMixed} = ⋆(complementleft(a)∧complementleft(b))
+∨(a::A,b::B) where {A<:TensorMixed,B<:TensorTerm} = ⋆(complementleft(a)∧complementleft(b))
 
 ### Product Algebra Constructor
 
@@ -260,6 +285,40 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             ∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
         end
     end=#
+    for side ∈ (:left,:right)
+        c = Symbol(:complement,side)
+        p = Symbol(:parity,side)
+        for Blade ∈ MSB
+            @eval begin
+                function $c(b::$Blade{T,V,G}) where {T<:$Field,V,G}
+                    N = ndims(V)
+                    ib = indexbasis(N,G)
+                    out = zeros(mvec(N,G,T))
+                    for k ∈ 1:binomial(N,G)
+                        @inbounds val = b.v[k]
+                        @inbounds val≠0 && setblade!(out,$p(V,ib[k]) ? $SUB(val) : val,complement(N,ib[k]),Dimension{N}())
+                    end
+                    return $Blade{T,V,N-G}(out)
+                end
+            end
+        end
+        @eval begin
+            function $c(m::MultiVector{T,V}) where {T<:$Field,V}
+                N = ndims(V)
+                out = zeros(mvec(N,T))
+                bng = binomial_set(N)
+                bs = binomsum_set(N)
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bng[g]
+                        @inbounds val = m.v[bs[g]+i]
+                        @inbounds val≠0 && setmulti!(out,$p(V,ib[i]) ? $SUB(val) : val,complement(N,ib[i]),Dimension{N}())
+                    end
+                end
+                return MultiVector{T,V}(out)
+            end
+        end
+    end
     for (op,product!) ∈ ((:*,:geometric_product!),(:∧,:exterior_product!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
@@ -395,6 +454,18 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     end
                     return MultiVector{t,V}(out)
                 end
+                #=function $op(a::$A{T,V,1},b::$B{S,W,1}) where {T<:$Field,V,S<:$Field,W}
+                    !(V == dual(W) && V ≠ W) && throw(error())
+                    $(insert_expr((:N,:t,:bnl,:ib),VEC)...)
+                    out = zeros($VEC(N,2,t))
+                    B = indexbasis(N,L)
+                    for i ∈ 1:binomial(N,G)
+                        for j ∈ 1:bnl
+                            @inbounds $product!(V,out,ib[i],B[j],$MUL(a[i],b[j]))
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end=#
             end
         end
         @eval begin

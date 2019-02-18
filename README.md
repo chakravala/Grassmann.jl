@@ -4,7 +4,7 @@
 
 # Grassmann.jl
 
-*Static dual multivector types with graded-blade indexing, product algebra, and optional origin*
+*Conformal geometric product algebra based on static dual multivectors with graded-blade indexing*
 
 [![Build Status](https://travis-ci.org/chakravala/Grassmann.jl.svg?branch=master)](https://travis-ci.org/chakravala/Grassmann.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/c36u0rgtm2rjcquk?svg=true)](https://ci.appveyor.com/project/chakravala/grassmann-jl)

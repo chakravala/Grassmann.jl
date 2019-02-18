@@ -165,7 +165,7 @@ for Blade ∈ MSB
             for i ∈ 1:N
                 if i≠m
                     F = bladeindex(N,bit2int(indexbits(N,[i,m])))
-                    @inbounds setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],0x0001<<(i-1),Dimension{N}())
+                    @inbounds setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],ones(Bits)<<(i-1),Dimension{N}())
                 end
             end
             return $Blade{T,V,1}(out)
