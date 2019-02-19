@@ -4,7 +4,6 @@
 
 const Sym = :(Reduce.Algebra)
 const SymField = Any
-const ExprField = Union{Expr,Symbol}
 
 set_val(set,expr) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:+),expr,:val) : :val)
 

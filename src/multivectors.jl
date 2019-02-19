@@ -60,6 +60,9 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
 
+==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 && a == value(b)
+==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 && value(a) == b
+
 @inline show(io::IO, e::Basis{V}) where V = printindices(io,V,bits(e))
 
 ## S/MValue{N}
