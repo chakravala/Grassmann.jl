@@ -15,6 +15,15 @@ This package is a work in progress providing the necessary tools to work with ar
 
 It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
 
+Products available for high-performance and sparse computation include `∧,∨,⋅,*` (which are exterior, regressive, interior, and geometric).
+
+#### Design, code generation
+
+Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
+Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, while the standard lower dimensional algebras already are highly performant and optimized.
+Thanks to the design of the product algebra code generation, any additional optimizations to the type stability will automatically enhance all the different products simultaneously.
+Likewise, any new product formulas will be able to quickly gain from the setup of all of the existing optimizations.
+
 ### Requirements
 
 Availability of this package and its subpackages can be automatically handled with the Julia package manager; however, when the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
@@ -82,6 +91,14 @@ julia> v13∧v2 # exterior tensor product
 
 julia> ans^2 # applies geometric product
 1v
+
+julia> @btime h = 2v1+v3 # vector element
+  37.794 ns (3 allocations: 80 bytes)
+2v₁ + 0v₂ + 1v₃ + 0v₄
+
+julia> @btime $h⋅$h # inner product
+  105.948 ns (2 allocations: 160 bytes)
+-3
 ```
 It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to `S` instead of `V` and basis elements to `b` instead of `v`, so that their local names do not interfere:
 ```Julia
@@ -257,10 +274,13 @@ julia> basis"2"
 julia> (:a*v1 + :b*v2) ∧ (:c*v1 + :d*v2)
 0.0 + (a * d - b * c)v₁₂
 
+julia> (:a*v1 + :b*v2) ⋅ (:c*v1 + :d*v2)
+a * c + b * d
+
 julia> (:a*v1 + :b*v2) * (:c*v1 + :d*v2)
 a * c + b * d + (a * d - b * c)v₁₂
 ```
-If these compatiblity steps are followed, then `Grassmann` will automatically declare the product algebra to use the `Reduce.Algebra` symbolic field operation scope.
+If these compatibility steps are followed, then `Grassmann` will automatically declare the product algebra to use the `Reduce.Algebra` symbolic field operation scope.
 
 It should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
 

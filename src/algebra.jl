@@ -32,11 +32,35 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
             return out
         end
         @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::Bits,B::Bits) where {N,D,T<:Field,M}
-            !(hasdual(V) && isodd(A) && isodd(B)) && $sm(m,parity(A,B,V) ? -(v) : v,A .⊻ B,Dimension{N}())
+            if !(hasdual(V) && isodd(A) && isodd(B))
+                $sm(m,parity(A,B,V) ? -(v) : v,A ⊻ B,Dimension{N}())
+            end
             return m
         end
         @inline function $(Symbol(:join,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-            !(hasdual(V) && hasdual(A) && hasdual(B)) && $sm(m,parity(A,B) ? -(v) : v,bits(A) .⊻ bits(B),Dimension{ndims(V)}())
+            if !(hasdual(V) && hasdual(A) && hasdual(B))
+                $sm(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::Bits,B::Bits) where {N,D,T<:Field,M}
+            p,C,t = regressive(N,value(V),A,B)
+            t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            return m
+        end
+        @inline function $(Symbol(:meet,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
+            p,C,t = regressive(N,value(V),bits(A),bits(B))
+            t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            return m
+        end
+        @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},v::T,A::Bits,B::Bits) where {N,D,T<:Field,M}
+            p,C,t = interior(N,value(V),A,B)
+            t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            return m
+        end
+        @inline function $(Symbol(:skew,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
+            p,C,t = interior(N,value(V),bits(A),bits(B))
+            t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             return m
         end
         @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::Basis) where {M,T<:Field}
@@ -82,31 +106,6 @@ end
     isodd(sum(digits(a,base=2,pad=N+1) .* cumsum!(B,B))+count_ones((a .& b) .& S))
 end
 
-const parity_cache = Vector{Vector{Vector{Bool}}}[]
-@pure function parity(n,s,a,b)::Bool
-    s1,a1,b1 = s+1,a+1,b+1
-    N = length(parity_cache)
-    for k ∈ N+1:n
-        push!(parity_cache,Vector{Vector{Bool}}[])
-    end
-    @inbounds L = length(parity_cache[n])
-    for k ∈ L+1:s1
-        @inbounds push!(parity_cache[n],Vector{Bool}[])
-    end
-    @inbounds L = length(parity_cache[n][s1])
-    for k ∈ L+1:a1
-        @inbounds push!(parity_cache[n][s1],Bool[])
-    end
-    @inbounds L = length(parity_cache[n][s1][a1])
-    for k ∈ L+1:b1
-        @inbounds push!(parity_cache[n][s1][a1],parity_calc(n,s,a,k-1))
-    end
-    @inbounds parity_cache[n][s1][a1][b1]
-end
-
-Base.@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(ndims(v),value(v),a,b)
-Base.@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(ndims(V),value(V),bits(a),bits(b))
-
 for Value ∈ MSV
     @eval begin
         *(a::$Value{V},b::Basis{V}) where V = SValue{V}(a.v,basis(a)*b)
@@ -122,7 +121,7 @@ end
 
 ## exterior product
 
-export ∧
+export ∧, ∨
 
 function ∧(a::Basis{V},b::Basis{V}) where V
     A = bits(a)
@@ -154,8 +153,11 @@ end
 
 ## complement
 
+export complementleft, complementright
+
 complement(N::Int,B::UInt) = (~B)&(one(Bits)<<N-1)
 
+@pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
 @pure parityright(V::Int,B,G,N=nothing) = isodd(V+B+Int((G+1)*G/2))
 @pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
 
@@ -163,7 +165,7 @@ for side ∈ (:left,:right)
     c = Symbol(:complement,side)
     p = Symbol(:parity,side)
     @eval begin
-        @inline $p(V::VectorSpace,B,G=count_ones(B))=(b=indices(B);$p(sum(V[:][b]),sum(b),G,ndims(V)))
+        @inline $p(V::VectorSpace,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
         @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
         function $c(b::Basis{V,G,B}) where {V,G,B}
             d = getbasis(V,complement(ndims(V),B))
@@ -172,7 +174,7 @@ for side ∈ (:left,:right)
     end
     for Value ∈ MSV
         @eval begin
-            $c(b::$Value) = value(b) * $c(basis(b))
+            $c(b::$Value) = value(b) ≠ 0 ? value(b) * $c(basis(b)) : zero(vectorspace(b))
         end
     end
 end
@@ -180,33 +182,95 @@ end
 export ⋆
 const ⋆ = complementright
 
-## inner product
+## inner product: a ∨ ⋆(b)
 
 import LinearAlgebra: dot, ⋅
 export ⋅
 
-dot(a::A,b::B) where {A<:TensorTerm,B<:TensorTerm} = a∨⋆(b)
-dot(a::A,b::B) where {A<:TensorMixed,B<:TensorMixed} = a∨⋆(b)
-dot(a::A,b::B) where {A<:TensorTerm,B<:TensorMixed} = a∨⋆(b)
-dot(a::A,b::B) where {A<:TensorMixed,B<:TensorTerm} = a∨⋆(b)
+function dot(a::Basis{V},b::Basis{V}) where V
+    p,C,t = interior(bits(a),bits(b),V)
+    !t && (return zero(V))
+    d = Basis{V}(C)
+    return p ? SValue{V}(-1,d) : d
+end
 
-## regressive product
+function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+    p,C,t = interior(bits(basis(a)),bits(basis(b)),V)
+    !t && (return zero(V))
+    v = value(a)*value(b)
+    return SValue{V}(p ? -v : v,Basis{V}(C))
+end
 
-function ∨(a::A,b::B) where {A<:TensorTerm{V},B<:TensorTerm{V}} where V
-    L = grade(a) + grade(b)
-    (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b))
+dot(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(dot,a,b)
+
+function interior_calc(N,S,A,B)
+    γ = complement(N,B)
+    p,C,t = regressive(N,S,A,γ)
+    return t ? (p⊻parityright(S,γ), C, t) : (p,C,t)
 end
-function ∨(a::A,b::B) where {A<:TensorMixed{V},B<:TensorMixed{V}} where V
-    L = grade(a) + grade(b)
-    (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b))
+
+@inline interior_product!(V::VectorSpace,out,α,β,γ) = (γ≠0) && skewaddmulti!(V,out,γ,α,β)
+
+## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
+
+function ∨(a::Basis{V},b::Basis{V}) where V
+    p,C,t = regressive(bits(a),bits(b),V)
+    !t && (return zero(V))
+    d = Basis{V}(C)
+    return p ? SValue{V}(-1,d) : d
 end
-function ∨(a::A,b::B) where {A<:TensorTerm{V},B<:TensorMixed{V}} where V
-    L = grade(a) + grade(b)
-    (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b))
+
+function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+    p,C,t = regressive(bits(basis(a)),bits(basis(b)),V)
+    !t && (return zero(V))
+    v = value(a)*value(b)
+    return SValue{V}(p ? -v : v,Basis{V}(C))
 end
-function ∨(a::A,b::B) where {A<:TensorMixed{V},B<:TensorTerm{V}} where V
-    L = grade(a) + grade(b)
-    (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b))
+
+function regressive_calc(N,S,A,B)
+    α,β = complement(N,A),complement(N,B)
+    if !(S ∈ (1,3,5,7,9,11) && isodd(α) && isodd(β)) && (count_ones(α&β)==0) && (α+β≠0)
+        C = complement(N,α ⊻ β)
+        L = count_ones(A)+count_ones(B)
+        pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
+        return !isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, C, true
+    else
+        return false, zero(Bits), false
+    end
+end
+
+@inline regressive_product!(V::VectorSpace,out,α,β,γ) = γ≠0 && meetaddmulti!(V,out,γ,α,β)
+
+### parity cache
+
+for (parity,T) ∈ ((:parity,Bool),(:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
+    cache = Symbol(parity,:_cache)
+    calc = Symbol(parity,:_calc)
+    @eval begin
+        const $cache = Vector{Vector{Vector{$T}}}[]
+        @pure function $parity(n,s,a,b)::$T
+            s1,a1,b1 = s+1,a+1,b+1
+            N = length($cache)
+            for k ∈ N+1:n
+                push!($cache,Vector{Vector{$T}}[])
+            end
+            @inbounds L = length($cache[n])
+            for k ∈ L+1:s1
+                @inbounds push!($cache[n],Vector{$T}[])
+            end
+            @inbounds L = length($cache[n][s1])
+            for k ∈ L+1:a1
+                @inbounds push!($cache[n][s1],$T[])
+            end
+            @inbounds L = length($cache[n][s1][a1])
+            for k ∈ L+1:b1
+                @inbounds push!($cache[n][s1][a1],$calc(n,s,a,k-1))
+            end
+            @inbounds $cache[n][s1][a1][b1]
+        end
+        Base.@pure $parity(a::Bits,b::Bits,v::VectorSpace) = $parity(ndims(v),value(v),a,b)
+        Base.@pure $parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $parity(ndims(V),value(V),bits(a),bits(b))
+    end
 end
 
 ### Product Algebra Constructor
@@ -325,7 +389,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             end
         end
     end
-    for (op,product!) ∈ ((:*,:geometric_product!),(:∧,:exterior_product!))
+    for (op,product!) ∈ ((:∧,:exterior_product!),(:*,:geometric_product!),
+                         (:∨,:regressive_product!),(:dot,:interior_product!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
