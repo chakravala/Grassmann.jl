@@ -108,12 +108,15 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
 @pure function insert_expr(e,vec=:mvec,T=:(valuetype(a)),S=:(valuetype(b)),L=:(2^N))
     x = Any[] # Any[:(sigcheck(sig(a),sig(b)))]
     assign_expr!(e,x,:N,:(ndims(V)))
+    assign_expr!(e,x,:M,:(Int(N/2)))
     assign_expr!(e,x,:t,vec≠:mvec ? :Any : :(promote_type($T,$S)))
     assign_expr!(e,x,:out,:(zeros($vec(N,t))))
     assign_expr!(e,x,:r,:(binomsum(N,G)))
     assign_expr!(e,x,:bng,:(binomial(N,G)))
     assign_expr!(e,x,:bnl,:(binomial(N,L)))
     assign_expr!(e,x,:ib,:(indexbasis(N,G)))
+    assign_expr!(e,x,:bs,:(binomsum_set(N)))
+    assign_expr!(e,x,:bn,:(binomial_set(N)))
     return x
 end
 
