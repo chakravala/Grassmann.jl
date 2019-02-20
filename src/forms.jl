@@ -165,7 +165,7 @@ for Blade ∈ MSB
             for i ∈ 1:N
                 if i≠m
                     F = bladeindex(N,bit2int(indexbits(N,[i,m])))
-                    @inbounds setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],ones(Bits)<<(i-1),Dimension{N}())
+                    @inbounds setblade!(out,V[intlog(x)+1] ? -(a.v[F]) : a.v[F],one(Bits)<<(i-1),Dimension{N}())
                 end
             end
             return $Blade{T,V,1}(out)
@@ -254,3 +254,22 @@ for Blade ∈ MSB
     end
 end
 
+
+for Blade ∈ MSB
+    @eval begin
+        function $Blade{T,V}(b::Matrix{T}) where {T,V}
+            dualtype(V)≥0 && throw(error("$V does not support this conversion"))
+            N = ndims(V)
+            M = Int(N/2)
+            size(b) ≠ (M,M) && throw(error("dimension mismatch"))
+            out = zeros(mvec(N,2,T))
+            for i ∈ 1:M
+                x = one(Bits)<<(i-1)
+                for j ∈ 1:M
+                    @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
+                end
+            end
+            return $Blade{T,V,2}(out)
+        end
+    end
+end

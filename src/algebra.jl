@@ -201,8 +201,6 @@ function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-dot(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(dot,a,b)
-
 function interior_calc(N,S,A,B)
     γ = complement(N,B)
     p,C,t = regressive(N,S,A,γ)
@@ -226,6 +224,8 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
+
+∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
 
 function regressive_calc(N,S,A,B)
     α,β = complement(N,A),complement(N,B)
