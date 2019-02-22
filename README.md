@@ -98,7 +98,7 @@ julia> @btime h = 2v1+v3 # vector element
 
 julia> @btime $h⋅$h # inner product
   105.948 ns (2 allocations: 160 bytes)
--3
+-3v
 ```
 It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to `S` instead of `V` and basis elements to `b` instead of `v`, so that their local names do not interfere:
 ```Julia
@@ -127,13 +127,29 @@ Grassmann.Algebra{⟨+++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v
 julia> G3.v13 * G3.v12
 v₂₃
 ```
-Another way is `Λ.V3`, then it is possible to assign the **quaternion** generators `i,j,k` with
+Effort of computation depends on the sparsity. Then it is possible to assign the **quaternion** generators `i,j,k` with
 ```Julia
-julia> i,j,k = Λ.V3.v32, Λ.V3.v13, Λ.V3.v21
-(-1v₂₃, v₁₃, -1v₁₂)
+julia> i,j,k = complementright.((-Λ(3).v1,-Λ(3).v2,-Λ(3).v3))
+(-1v₂₃, 1v₁₃, -1v₁₂)
 
 julia> @btime i^2, j^2, k^2, i*j*k
   158.925 ns (5 allocations: 112 bytes)
+(-1v, -1v, -1v, -1v)
+
+julia> @btime -(j+k) * (j+k)
+  176.233 ns (8 allocations: 240 bytes)
+2
+
+julia> @btime -(j+k) * i
+  111.394 ns (6 allocations: 192 bytes)
+0 - 1v₁₂ - 1v₁₃
+```
+Alternatively, another representation of the quaternions is
+```Julia
+julia> basis"--"
+(⟨--⟩, v, v₁, v₂, v₁₂)
+
+julia> v1^2, v2^2, v12^2, v1*v2*v12
 (-1v, -1v, -1v, -1v)
 ```
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
@@ -338,12 +354,30 @@ julia> (:a*v1 + :b*v2) ∧ (:c*v1 + :d*v2)
 0.0 + (a * d - b * c)v₁₂
 
 julia> (:a*v1 + :b*v2) ⋅ (:c*v1 + :d*v2)
-a * c + b * d
+(a * c + b * d)v
 
 julia> (:a*v1 + :b*v2) * (:c*v1 + :d*v2)
 a * c + b * d + (a * d - b * c)v₁₂
 ```
 If these compatibility steps are followed, then `Grassmann` will automatically declare the product algebra to use the `Reduce.Algebra` symbolic field operation scope.
+
+```Julia
+julia> using Reduce,Grassmann; basis"4"
+Reduce (Free CSL version, revision 4590), 11-May-18 ...
+(⟨++++⟩, v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
+
+julia> P,Q = :px*v1 + :py*v2 + :pz* v3 + v4, :qx*v 1+ :qy*v2 + :qz*v3 + v4
+(pxv₁ + pyv₂ + pzv₃ + 1.0v₄, qxv₁ + qyv₂ + qzv₃ + 1.0v₄)
+
+julia> P∧Q
+0.0 + (px * qy - py * qx)v₁₂ + (px * qz - pz * qx)v₁₃ + (px - qx)v₁₄ + (py * qz - pz * qy)v₂₃ + (py - qy)v₂₄ + (pz - qz)v₃₄
+
+julia> R = :rx*v1 + :ry*v2 + :rz*v3 + v4
+rxv₁ + ryv₂ + rzv₃ + 1.0v₄
+
+julia> P∧Q∧R
+0.0 + ((px * qy - py * qx) * rz - ((px * qz - pz * qx) * ry - (py * qz - pz * qy) * rx))v₁₂₃ + (((px * qy - py * qx) + (py - qy) * rx) - (px - qx) * ry)v₁₂₄ + (((px * qz - pz * qx) + (pz - qz) * rx) - (px - qx) * rz)v₁₃₄ + (((py * qz - pz * qy) + (pz - qz) * ry) - (py - qy) * rz)v₂₃₄
+```
 
 It should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
 
