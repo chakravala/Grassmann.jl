@@ -17,6 +17,8 @@ It is currently possible to do both high-performance numerical computations with
 
 Products available for high-performance and sparse computation include `∧,∨,⋅,*` (exterior, regressive, interior, geometric).
 
+Some unary operations include `complementleft`,`complementright`,`reverse,`,`involve`,`conj`, and `adjoint`.
+
 #### Design, code generation
 
 Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
