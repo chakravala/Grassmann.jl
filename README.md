@@ -15,7 +15,7 @@ This package is a work in progress providing the necessary tools to work with ar
 
 It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
 
-Products available for high-performance and sparse computation include `∧,∨,⋅,*` (e.g. exterior, regressive, interior, and geometric).
+Products available for high-performance and sparse computation include `∧,∨,⋅,*` (exterior, regressive, interior, geometric).
 
 #### Design, code generation
 
@@ -308,6 +308,15 @@ Then a `TensorAlgebra` evaluation of `Leech` at an `Integer` linear combination 
 ```Julia
 julia> Leech(E24.v1 + 2*E24.v2)
 5.65685424949238v₁ + 2.82842712474619v₂ + 0.0v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 0.0va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.0w² + 0.0w³ + 0.0w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
+
+julia> ans⋅ans
+39.99999999999999v
+
+julia> Leech(E24.v2 + E24.v5)
+2.82842712474619v₁ + 1.414213562373095v₂ + 0.0v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 1.414213562373095va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.7071067811865475w² + 1.414213562373095w³ + 1.414213562373095w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
+
+julia> ans⋅ans
+7.499999999999998v
 ```
 The `Grassmann` package is designed to smoothly handle high-dimensional bivector algebras with headroom to spare. Although some of these calculations may have an initial delay, repeated calls are fast due to built-in caching and pre-compilation.
 
@@ -350,11 +359,11 @@ Additionally, due to the interoperability of the `AbstractTensors` package, the 
 julia> basis"2"
 (⟨++⟩, v, v₁, v₂, v₁₂)
 
-julia> (:a*v1 + :b*v2) ∧ (:c*v1 + :d*v2)
-0.0 + (a * d - b * c)v₁₂
-
 julia> (:a*v1 + :b*v2) ⋅ (:c*v1 + :d*v2)
 (a * c + b * d)v
+
+julia> (:a*v1 + :b*v2) ∧ (:c*v1 + :d*v2)
+0.0 + (a * d - b * c)v₁₂
 
 julia> (:a*v1 + :b*v2) * (:c*v1 + :d*v2)
 a * c + b * d + (a * d - b * c)v₁₂

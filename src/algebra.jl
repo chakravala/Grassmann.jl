@@ -126,7 +126,7 @@ export ∧, ∨
 @pure function ∧(a::Basis{V},b::Basis{V}) where V
     A = bits(a)
     B = bits(b)
-    (count_ones(A&B)>0 || A+B==0) && (return zero(V))
+    (count_ones(A&B)>0) && (return zero(V))
     d = Basis{V}(A⊻B)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
@@ -136,7 +136,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     y = basis(b)
     A = bits(x)
     B = bits(y)
-    (count_ones(A&B)>0 || A+B==0) && (return zero(V))
+    (count_ones(A&B)>0) && (return zero(V))
     v = value(a)*value(b)
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
@@ -144,7 +144,7 @@ end
 ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 
 @inline function exterior_product!(V::VectorSpace,out,α,β,γ)
-    (γ≠0) && (count_ones(α&β)==0) && (α+β≠0) && joinaddmulti!(V,out,γ,α,β)
+    (γ≠0) && (count_ones(α&β)==0) && joinaddmulti!(V,out,γ,α,β)
 end
 
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
@@ -244,29 +244,36 @@ end
 ### parity cache
 
 for (parity,T) ∈ ((:parity,Bool),(:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
+    extra = Symbol(parity,:_extra)
     cache = Symbol(parity,:_cache)
     calc = Symbol(parity,:_calc)
     @eval begin
-        const $cache = Vector{Vector{Vector{$T}}}[]
+        const $cache = Dict{Bits,Vector{Vector{$T}}}[]
+        const $extra = Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[]
         @pure function $parity(n,s,a,b)::$T
-            s1,a1,b1 = s+1,a+1,b+1
-            N = length($cache)
-            for k ∈ N+1:n
-                push!($cache,Vector{Vector{$T}}[])
+            if n > sparse_limit
+                N = n-sparse_limit
+                for k ∈ length($extra)+1:N
+                    push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
+                end
+                @inbounds !haskey($extra[N],s) && push!($extra[N],s=>Dict{Bits,Dict{Bits,$T}}())
+                @inbounds !haskey($extra[N][s],a) && push!($extra[N][s],a=>Dict{Bits,$T}())
+                @inbounds !haskey($extra[N][s][a],b) && push!($extra[N][s][a],b=>$calc(n,s,a,b))
+                @inbounds $extra[N][s][a][b]
+            else
+                a1 = a+1
+                for k ∈ length($cache)+1:n
+                    push!($cache,Dict{Bits,Vector{$T}}())
+                end
+                @inbounds !haskey($cache[n],s) && push!($cache[n],s=>Vector{$T}[])
+                @inbounds for k ∈ length($cache[n][s]):a
+                    @inbounds push!($cache[n][s],$T[])
+                end
+                @inbounds for k ∈ length($cache[n][s][a1]):b
+                    @inbounds push!($cache[n][s][a1],$calc(n,s,a,k))
+                end
+                @inbounds $cache[n][s][a1][b+1]
             end
-            @inbounds L = length($cache[n])
-            for k ∈ L+1:s1
-                @inbounds push!($cache[n],Vector{$T}[])
-            end
-            @inbounds L = length($cache[n][s1])
-            for k ∈ L+1:a1
-                @inbounds push!($cache[n][s1],$T[])
-            end
-            @inbounds L = length($cache[n][s1][a1])
-            for k ∈ L+1:b1
-                @inbounds push!($cache[n][s1][a1],$calc(n,s,a,k-1))
-            end
-            @inbounds $cache[n][s1][a1][b1]
         end
         @pure $parity(a::Bits,b::Bits,v::VectorSpace) = $parity(ndims(v),value(v),a,b)
         @pure $parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $parity(ndims(V),value(V),bits(a),bits(b))
@@ -300,6 +307,13 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         end
     end
     @eval begin
+        @inline function inner_product(V::VectorSpace,out::T,α,β,γ::T) where T<:$Field
+            if γ≠0
+                p,C,f = interior(ndims(V),value(V),α,β)
+                f && (return p ? $SUB(out,γ) : $ADD(out,γ))
+            end
+            return out
+        end
         function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
             if dualtype(V)<0
                 $(insert_expr((:N,:M,:bs,:bn),VEC)...)
@@ -343,8 +357,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
         *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
         #∧(::$Field,::$Field) = 0
-        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = G≠0 ? SValue{V,G}(a,b) : zero(V)
-        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = G≠0 ? SValue{V,G}(b,a) : zero(V)
+        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(a,b)
+        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(b,a)
         #=
         ∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
@@ -358,6 +372,48 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             ∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
         end
     end=#
+    for Blade ∈ MSB
+        @eval begin
+            function dot(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,:t,:ib),VEC)...)
+                out::t = zero(t)
+                for i ∈ 1:binomial(N,G)
+                    @inbounds a[i]≠0 && (out = inner_product(V,out,ib[i],bits(b),a[i]))
+                end
+                return SValue{V,0,getbasis(V,0),t}(out)
+            end
+            function dot(a::Basis{V,G},b::$Blade{T,V,G}) where {V,T<:$Field,G}
+                $(insert_expr((:N,:t,:ib),VEC)...)
+                out::t = zero(t)
+                for i ∈ 1:binomial(N,G)
+                    @inbounds b[i]≠0 && (out = inner_product(V,out,bits(a),ib[i],b[i]))
+                end
+                return SValue{V,0,getbasis(V,0),t}(out)
+            end
+        end
+        for Value ∈ MSV
+            @eval begin
+                function dot(a::$Blade{T,V,G},b::$Value{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
+                    $(insert_expr((:N,:t,:ib),VEC)...)
+                    out::t = zero(t)
+                    for i ∈ 1:binomial(N,G)
+                        v = $MUL(a[i],b.v)
+                        @inbounds v≠0 && (out = inner_product(V,out,ib[i],bits(basis(b)),v))
+                    end
+                    return SValue{V,0,getbasis(V,0),t}(out)
+                end
+                function dot(a::$Value{V,G,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
+                    $(insert_expr((:N,:t,:ib),VEC)...)
+                    out::t = zero(t)
+                    for i ∈ 1:binomial(N,G)
+                        v = $MUL(a.v,b[i])
+                        @inbounds v≠0 && (out = inner_product(V,out,bits(basis(a)),ib[i],v))
+                    end
+                    return SValue{V,0,getbasis(V,0),t}(out)
+                end
+            end
+        end
+    end
     for Blade ∈ MSB, Other ∈ MSB
         @eval begin
             function dot(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T<:$Field,V,G,S<:$Field}
@@ -366,14 +422,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 for i ∈ 1:bng
                     @inbounds v,ibi = a[i],ib[i]
                     v≠0 && for j ∈ 1:bng
-                        @inbounds p,C,f = interior(N,value(V),ibi,ib[j])
-                        if f
-                            if p
-                                out = $SUB(out,$MUL(v,b[j]))
-                            else
-                                out = $ADD(out,$MUL(v,b[j]))
-                            end
-                        end
+                        w = $MUL(v,b[j])
+                        @inbounds w≠0 && (out = inner_product(V,out,ibi,ib[j],w))
                     end
                 end
                 return SValue{V,0,getbasis(V,0),t}(out)
@@ -390,7 +440,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                         end
                     end
                     return MultiVector{t,V}(out)
-                else
+                elseif
                     $(insert_expr((:N,:t,:bng,:ib),VEC)...)
                     out = zero(t)
                     for i ∈ 1:bng
@@ -401,6 +451,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                         end
                     end
                     return SValue{V,0}(out,Basis{V}())
+                else
+                    return interop(∧,a,b)
                 end
             end=#
         end

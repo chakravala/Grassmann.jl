@@ -205,7 +205,7 @@ end
 const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
 @pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,doc2m(d,o,c),s)
 @pure getextended(n::Int,m::Int,s) = getextended(n,m,Bits(s))
-@pure getextended(V::VectorSpace) = getextended(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
+@pure getextended(V::VectorSpace) = getextended(ndims(V),doc2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
 @pure function getextended(n::Int,m::Int,s::Bits)
     n==0 && (return ExtendedAlgebra(V0))
     for N ∈ length(extended_cache)+1:n

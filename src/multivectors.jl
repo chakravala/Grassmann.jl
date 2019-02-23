@@ -84,6 +84,8 @@ for Value ∈ MSV
         $Value{V}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
         $Value{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
+        $Value{V,G}(v,b::SValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
+        $Value{V,G}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
         show(io::IO,m::$Value) = print(io,(valuetype(m)∉(Expr,Any) ? [m.v] : ['(',m.v,')'])...,basis(m))
@@ -105,6 +107,7 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
 
         export $Blade
         getindex(m::$Blade,i::Int) = m.v[i]
+        getindex(m::$Blade,i::UnitRange{Int}) = m.v[i]
         setindex!(m::$Blade{T},k::T,i::Int) where T = (m.v[i] = k)
         Base.firstindex(m::$Blade) = 1
         Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
@@ -142,6 +145,12 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
                 @inbounds printindices(io,V,ib[k])
             end
         end
+        function ==(a::$Blade{S,V,G} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
+            i = bladeindex(ndims(V),bits(basis(b)))
+            a[i] == value(b) && sum(a[1:i-1] .≠ 0)+sum(a[i+1:end] .≠ 0) == 0
+        end
+        ==(a::T,b::$Blade{S,V} where S) where T<:TensorTerm{V} where V = b==a
+        ==(a::$Blade{S,V} where S,b::T) where T<:TensorTerm{V} where V = false
     end
     for var ∈ ((:T,:V,:G),(:T,:V),(:T,))
         @eval begin
@@ -169,9 +178,8 @@ for (Blade,Vec1,Vec2) ∈ ((MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector)
 end
 for Blade ∈ MSB, Other ∈ MSB
     @eval begin
-        ==(a::$Blade{T,V,G},b::$Other{T,V,G}) where {T,V,G} = a.v == b.v
+        ==(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T,V,G,S} = sum(a.v .≠ b.v) == 0
         ==(a::$Blade{T,V} where T,b::$Other{S,V} where S) where V = false
-        ==(a::$Blade{T,V} where T,b::$Other{S,W} where S) where {V,W,G} = throw(error("not implemented yet"))
     end
 end
 
@@ -268,9 +276,7 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
     end
 end
 
-==(a::MultiVector{T,V},b::MultiVector{T,V}) where {T,V} = a.v == b.v
-==(a::MultiVector{T,V} where T,b::MultiVector{S,V} where S) where V = false
-==(a::MultiVector{T,V} where T,b::MultiVector{S,W} where S) where {V,W,G} = throw(error("not implemented yet"))
+==(a::MultiVector{T,V},b::MultiVector{S,V}) where {T,V,S} = sum(a.v .≠ b.v) == 0
 
 ## Generic
 
