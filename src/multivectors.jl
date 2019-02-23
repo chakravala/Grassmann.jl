@@ -111,7 +111,7 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
         setindex!(m::$Blade{T},k::T,i::Int) where T = (m.v[i] = k)
         Base.firstindex(m::$Blade) = 1
         Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
-        Base.length(s::$Blade{T,N,G}) where {T,N,G} = length(m.v)
+        Base.length(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
     end
     @eval begin
         function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
@@ -383,7 +383,7 @@ end
 ## conversions
 
 @pure function (W::VectorSpace)(b::Basis{V}) where V
-    V==W && (return B)
+    V==W && (return b)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
     WC,VC = dualtype(W),dualtype(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
@@ -435,7 +435,7 @@ function (W::VectorSpace)(m::MultiVector{T,V}) where {T,V}
         bs = binomsum_set(N)
         for i ∈ 1:N+1
             ib = indexbasis(N,i-1)
-            for k ∈ 1:length(ib[i])
+            for k ∈ 1:length(ib)
                 @inbounds s = k+bs[i]
                 @inbounds if m.v[s] ≠ 0
                     @inbounds setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())

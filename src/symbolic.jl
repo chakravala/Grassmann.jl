@@ -19,35 +19,56 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
             @inbounds $(set_val(set,:(out[basisindex(N,i)])))
             return out
         end
-        @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},v::T,A::Bits,B::Bits) where {N,D,T<:SymField,M}
-            if !(Bool(D) && isodd(A) && isodd(B))
+        @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
+            if  v ≠ 0 && !(Bool(D) && isodd(A) && isodd(B))
                 $sm(m,parity(A,B,V) ? $Sym.:-(v) : v,A ⊻ B,Dimension{N}())
             end
             return m
         end
-        @inline function $(Symbol(:join,sm))(m::SizedArray{Tuple{M},T,1,1},v::T,A::Basis{V},B::Basis{V}) where {V,T<:SymField,M}
-            if !(hasdual(V) && hasdual(A) && hasdual(B))
+        @inline function $(Symbol(:join,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
                 $sm(m,parity(A,B) ? $Sym.:-(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
             end
             return m
         end
-        @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},v::T,A::Bits,B::Bits) where {N,D,T<:SymField,M}
-            p,C,t = regressive(N,value(V),A,B)
-            t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
-        end
-        @inline function $(Symbol(:meet,sm))(m::SizedArray{Tuple{M},T,1,1},v::T,A::Basis{V},B::Basis{V}) where {V,T<:SymField,M}
-            p,C,t = regressive(N,value(V),bits(A),bits(B))
-            t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+        @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
+            if v ≠ 0
+                p,C,t = regressive(N,value(V),A,B)
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
             return m
         end
-        @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},v::T,A::Bits,B::Bits) where {N,D,T<:SymField,M}
-            p,C,t = interior(N,value(V),A,B)
-            t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+        @inline function $(Symbol(:meet,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
+            if v ≠ 0
+                p,C,t = regressive(N,value(V),bits(A),bits(B))
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
             return m
         end
-        @inline function $(Symbol(:skew,sm))(m::SizedArray{Tuple{M},T,1,1},v::T,A::Basis{V},B::Basis{V}) where {V,T<:SymField,M}
-            p,C,t = interior(N,value(V),bits(A),bits(B))
-            t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+        @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
+            if v ≠ 0
+                p,C,t = interior(N,value(V),A,B)
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:skew,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
+            if v ≠ 0
+                p,C,t = interior(N,value(V),bits(A),bits(B))
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:join,sb))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
+            if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
+                $sb(m,parity(A,B,V) ? $Sym.:-(v) : v,A ⊻ B,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:join,sb))(m::SizedArray{Tuple{M},T,1,1},v::T,A::Basis{V},B::Basis{V}) where {V,T<:SymField,M}
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                $sb(m,parity(A,B) ? $Sym.:-(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
+            end
             return m
         end
         @inline function $sb(out::SizedArray{Tuple{M},T,1,1},val::T,i::Basis) where {M,T<:SymField}

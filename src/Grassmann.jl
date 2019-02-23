@@ -91,7 +91,7 @@ end
     C = V[1]∉('D','C') ? 0 : 1
     length(V) < 5 && (V *= join(zeros(Int,5-length(V))))
     S = Bits(parse(Int,V[5:end]))
-    getalgebra(N,doc2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? flip_sig(N,S) : S)
+    getalgebra(N,doc2m(parse(Int,V[3]),parse(Int,V[4]),C),C>0 ? DirectSum.flip_sig(N,S) : S)
 end
 
 # Allocating thread-safe $(2^n)×Basis{VectorSpace}

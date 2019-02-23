@@ -235,7 +235,7 @@ julia> ans(v1+v2)
 The sum `w1+2w2` is interpreted as a covector element of the dual vector space, which can be evaluated as a linear functional when a vector argument is input.
 Using these in the workspace, it is possible to use the Grassmann exterior `∧`-tensor product operation to construct elements `ℒ` of the (1,1)-bivector subspace of linear transformations from the `Grade{2}` algebra.
 ```Julia
-julia> ℒ = ((v1+2v2)∧(3w1+4w2))(2)
+julia> ℒ = (v1+2v2)∧(3w1+4w2)
 0v₁₂ + 3v₁w¹ + 4v₁w² + 6v₂w¹ + 8v₂w² + 0w¹²
 ```
 The element `ℒ` is a linear form which can take `Grade{1}` vectors as input,
@@ -283,9 +283,9 @@ julia> generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
        0 0 0 0 0 0 0 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0;
        -3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
 
-julia> const E24,W = Λ(24), ℝ^24+(ℝ^24)';
+julia> const E24,W24 = Λ(24), ℝ^24+(ℝ^24)';
 
-julia> const Leech = SBlade{Float64,W}(generator./sqrt(8));
+julia> const Leech = SBlade{Float64,W24}(generator./sqrt(8));
 
 julia> typeof(Leech)
 SBlade{Float64,⟨++++++++++++++++++++++++------------------------⟩*,2,1128}
@@ -377,7 +377,7 @@ julia> using Reduce,Grassmann; basis"4"
 Reduce (Free CSL version, revision 4590), 11-May-18 ...
 (⟨++++⟩, v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
 
-julia> P,Q = :px*v1 + :py*v2 + :pz* v3 + v4, :qx*v 1+ :qy*v2 + :qz*v3 + v4
+julia> P,Q = :px*v1 + :py*v2 + :pz* v3 + v4, :qx*v1 + :qy*v2 + :qz*v3 + v4
 (pxv₁ + pyv₂ + pzv₃ + 1.0v₄, qxv₁ + qyv₂ + qzv₃ + 1.0v₄)
 
 julia> P∧Q
