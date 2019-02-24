@@ -45,28 +45,28 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         end
         @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
             if v ≠ 0
-                p,C,t = regressive(N,value(V),A,B)
+                p,C,t = regressive(A,B,V)
                 t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:meet,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
             if v ≠ 0
-                p,C,t = regressive(N,value(V),bits(A),bits(B))
+                p,C,t = regressive(bits(A),bits(B),V)
                 t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
             if v ≠ 0
-                p,C,t = interior(N,value(V),A,B)
+                p,C,t = interior(A,B,V)
                 t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:skew,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
             if v ≠ 0
-                p,C,t = interior(N,value(V),bits(A),bits(B))
+                p,C,t = interior(bits(A),bits(B),V)
                 t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             end
             return m
@@ -221,7 +221,7 @@ import LinearAlgebra: dot, ⋅
 export ⋅
 
 @pure function dot(a::Basis{V},b::Basis{V}) where V
-    p,C,t = interior(bits(a),bits(b),V)
+    p,C,t = interior(a,b)
     !t && (return zero(V))
     d = Basis{V}(C)
     return p ? SValue{V}(-1,d) : d
@@ -234,16 +234,16 @@ function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-@pure function interior_calc(N,S,A,B)
+@pure function interior_calc(N,M,S,A,B)
     γ = complement(N,B)
-    p,C,t = regressive(N,S,A,γ)
-    return t ? (p⊻parityright(S,γ), C, t) : (p,C,t)
+    p,C,t = regressive_calc(N,M,S,A,γ)
+    return t ? p⊻parityright(S,B) : p, C, t
 end
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
 @pure function ∨(a::Basis{V},b::Basis{V}) where V
-    p,C,t = regressive(bits(a),bits(b),V)
+    p,C,t = regressive(a,b)
     !t && (return zero(V))
     d = Basis{V}(C)
     return p ? SValue{V}(-1,d) : d
@@ -258,13 +258,13 @@ end
 
 ∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
 
-@pure function regressive_calc(N,S,A,B)
+@pure function regressive_calc(N,M,S,A,B)
     α,β = complement(N,A),complement(N,B)
-    if !(S ∈ (1,3,5,7,9,11) && isodd(α) && isodd(β)) && (count_ones(α&β)==0) && (α+β≠0)
-        C = complement(N,α ⊻ β)
+    if (count_ones(α&β)==0) && !(M ∈ (1,3,5,7,9,11) && isodd(α) && isodd(β))
+        C = α ⊻ β
         L = count_ones(A)+count_ones(B)
         pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
-        return !isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, C, true
+        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, complement(N,C), true
     else
         return false, zero(Bits), false
     end
@@ -272,40 +272,81 @@ end
 
 ### parity cache
 
-for (parity,T) ∈ ((:parity,Bool),(:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
+@eval begin
+    const parity_cache = Dict{Bits,Vector{Vector{Bool}}}[]
+    const parity_extra = Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}[]
+    @pure function parity(n,s,a,b)::Bool
+        if n > sparse_limit
+            N = n-sparse_limit
+            for k ∈ length(parity_extra)+1:N
+                push!(parity_extra,Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}())
+            end
+            @inbounds !haskey(parity_extra[N],s) && push!(parity_extra[N],s=>Dict{Bits,Dict{Bits,Bool}}())
+            @inbounds !haskey(parity_extra[N][s],a) && push!(parity_extra[N][s],a=>Dict{Bits,Bool}())
+            @inbounds !haskey(parity_extra[N][s][a],b) && push!(parity_extra[N][s][a],b=>parity_calc(n,s,a,b))
+            @inbounds parity_extra[N][s][a][b]
+        else
+            a1 = a+1
+            for k ∈ length(parity_cache)+1:n
+                push!(parity_cache,Dict{Bits,Vector{Bool}}())
+            end
+            @inbounds !haskey(parity_cache[n],s) && push!(parity_cache[n],s=>Vector{Bool}[])
+            @inbounds for k ∈ length(parity_cache[n][s]):a
+                @inbounds push!(parity_cache[n][s],Bool[])
+            end
+            @inbounds for k ∈ length(parity_cache[n][s][a1]):b
+                @inbounds push!(parity_cache[n][s][a1],parity_calc(n,s,a,k))
+            end
+            @inbounds parity_cache[n][s][a1][b+1]
+        end
+    end
+    @pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(ndims(v),value(v),a,b)
+    @pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(ndims(V),value(V),bits(a),bits(b))
+end
+
+### parity cache 2
+
+for (parity,T) ∈ ((:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
     extra = Symbol(parity,:_extra)
     cache = Symbol(parity,:_cache)
     calc = Symbol(parity,:_calc)
     @eval begin
-        const $cache = Dict{Bits,Vector{Vector{$T}}}[]
-        const $extra = Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[]
-        @pure function $parity(n,s,a,b)::$T
+        const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
+        const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
+        @pure function $parity(n,m,s,a,b)::$T
+            m1 = m+1
             if n > sparse_limit
                 N = n-sparse_limit
                 for k ∈ length($extra)+1:N
-                    push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
+                    push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[])
                 end
-                @inbounds !haskey($extra[N],s) && push!($extra[N],s=>Dict{Bits,Dict{Bits,$T}}())
-                @inbounds !haskey($extra[N][s],a) && push!($extra[N][s],a=>Dict{Bits,$T}())
-                @inbounds !haskey($extra[N][s][a],b) && push!($extra[N][s][a],b=>$calc(n,s,a,b))
-                @inbounds $extra[N][s][a][b]
+                for k ∈ length($extra[N])+1:m1
+                    push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
+                end
+                @inbounds !haskey($extra[N][m1],s) && push!($extra[N][m1],s=>Dict{Bits,Dict{Bits,$T}}())
+                @inbounds !haskey($extra[N][m1][s],a) && push!($extra[N][m1][s],a=>Dict{Bits,$T}())
+                @inbounds !haskey($extra[N][m1][s][a],b) && push!($extra[N][m1][s][a],b=>$calc(n,m,s,a,b))
+                @inbounds $extra[N][m1][s][a][b]
             else
                 a1 = a+1
                 for k ∈ length($cache)+1:n
-                    push!($cache,Dict{Bits,Vector{$T}}())
+                    push!($cache,Dict{Bits,Vector{Vector{$T}}}[])
                 end
-                @inbounds !haskey($cache[n],s) && push!($cache[n],s=>Vector{$T}[])
-                @inbounds for k ∈ length($cache[n][s]):a
-                    @inbounds push!($cache[n][s],$T[])
+                for k ∈ length($cache[n])+1:m1
+                    push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
                 end
-                @inbounds for k ∈ length($cache[n][s][a1]):b
-                    @inbounds push!($cache[n][s][a1],$calc(n,s,a,k))
+                @inbounds !haskey($cache[n][m1],s) && push!($cache[n][m1],s=>Vector{$T}[])
+                @inbounds for k ∈ length($cache[n][m1][s]):a
+                    @inbounds push!($cache[n][m1][s],$T[])
                 end
-                @inbounds $cache[n][s][a1][b+1]
+                @inbounds for k ∈ length($cache[n][m1][s][a1]):b
+                    @inbounds push!($cache[n][m1][s][a1],$calc(n,m,s,a,k))
+                end
+                @inbounds $cache[n][m1][s][a1][b+1]
             end
         end
-        @pure $parity(a::Bits,b::Bits,v::VectorSpace) = $parity(ndims(v),value(v),a,b)
-        @pure $parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $parity(ndims(V),value(V),bits(a),bits(b))
+        @pure $parity(a::Bits,b::Bits,v::VectorSpace) = $parity(ndims(v),DirectSum.options(v),value(v),a,b)
+        @pure $parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $parity(ndims(V),DirectSum.options(V),value(V),bits(a),bits(b))
     end
 end
 
@@ -338,7 +379,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     @eval begin
         @inline function inner_product!(mv::MValue{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
-                p,C,f = interior(ndims(V),value(V),α,β)
+                p,C,f = interior(α,β,V)
                 f && (mv.v = p ? $SUB(mv.v,γ) : $ADD(mv.v,γ))
             end
             return mv
