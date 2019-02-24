@@ -25,6 +25,8 @@ Base.firstindex(a::T) where T<:SubAlgebra = 1
 Base.lastindex(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
 Base.length(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
 
+==(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = V == W
+
 ⊕(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 +(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 

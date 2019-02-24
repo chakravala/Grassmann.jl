@@ -306,14 +306,14 @@ end
 
 ### parity cache 2
 
-for (parity,T) ∈ ((:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
-    extra = Symbol(parity,:_extra)
-    cache = Symbol(parity,:_cache)
-    calc = Symbol(parity,:_calc)
+for (par,T) ∈ ((:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
+    extra = Symbol(par,:_extra)
+    cache = Symbol(par,:_cache)
+    calc = Symbol(par,:_calc)
     @eval begin
         const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
         const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
-        @pure function $parity(n,m,s,a,b)::$T
+        @pure function $par(n,m,s,a,b)::$T
             m1 = m+1
             if n > sparse_limit
                 N = n-sparse_limit
@@ -345,8 +345,8 @@ for (parity,T) ∈ ((:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bi
                 @inbounds $cache[n][m1][s][a1][b+1]
             end
         end
-        @pure $parity(a::Bits,b::Bits,v::VectorSpace) = $parity(ndims(v),DirectSum.options(v),value(v),a,b)
-        @pure $parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $parity(ndims(V),DirectSum.options(V),value(V),bits(a),bits(b))
+        @pure $par(a::Bits,b::Bits,v::VectorSpace) = $par(ndims(v),DirectSum.options(v),value(v),a,b)
+        @pure $par(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $par(ndims(V),DirectSum.options(V),value(V),bits(a),bits(b))
     end
 end
 
