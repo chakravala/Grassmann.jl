@@ -131,8 +131,11 @@ v₂₃
 ```
 Effort of computation depends on the sparsity. Then it is possible to assign the **quaternion** generators `i,j,k` with
 ```Julia
-julia> i,j,k = complementright.((-Λ(3).v1,-Λ(3).v2,-Λ(3).v3))
-(-1v₂₃, 1v₁₃, -1v₁₂)
+julia> i,j,k = hyperplanes(ℝ^3)
+3-element Array{SValue{⟨+++⟩,2,B,Int64} where B,1}:
+ -1v₂₃
+ 1v₁₃
+ -1v₁₂
 
 julia> @btime i^2, j^2, k^2, i*j*k
   158.925 ns (5 allocations: 112 bytes)

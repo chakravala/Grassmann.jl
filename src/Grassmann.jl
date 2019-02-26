@@ -17,6 +17,12 @@ include("forms.jl")
 include("symbolic.jl")
 include("generators.jl")
 
+## fundamentals
+
+export hyperplanes
+
+hyperplanes(V::VectorSpace{N}) where N = map(n->I*getbasis(V,1<<n),0:N-1)
+
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
 adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))

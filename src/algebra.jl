@@ -137,6 +137,19 @@ end
 #*(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #*(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
+for Value ∈ MSV
+    @eval begin
+        *(a::UniformScaling,b::$Value{V}) where V = V(a)*b
+        *(a::$Value{V},b::UniformScaling) where V = a*V(b)
+    end
+end
+for Blade ∈ MSB
+    @eval begin
+        *(a::UniformScaling,b::$Blade{T,V} where T) where V = V(a)*b
+        *(a::$Blade{T,V} where T,b::UniformScaling) where V = a*V(b)
+    end
+end
+
 ## exterior product
 
 export ∧, ∨
@@ -159,7 +172,10 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
 
-∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
+@inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
+@inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
+@inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
+
 
 @inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
 
@@ -215,6 +231,9 @@ for r ∈ (:reverse,:involve,:conj)
     end
 end
 
+reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
+reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
+
 ## inner product: a ∨ ⋆(b)
 
 import LinearAlgebra: dot, ⋅
@@ -256,7 +275,10 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
+@inline ∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
+@inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
+@inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
+
 
 @pure function regressive_calc(N,M,S,A,B)
     α,β = complement(N,A),complement(N,B)
@@ -269,6 +291,13 @@ end
         return false, zero(Bits), false
     end
 end
+
+## cross product
+
+import LinearAlgebra: cross
+export ×
+
+cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = I*(a∧b)
 
 ### parity cache
 

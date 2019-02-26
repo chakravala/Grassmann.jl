@@ -11,6 +11,12 @@ abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 import DirectSum: shift_indices, printindex, printindices, VTI
 
+## pseudoscalar
+
+using LinearAlgebra
+import LinearAlgebra: I
+export UniformScaling, I
+
 ## MultiBasis{N}
 
 struct Basis{V,G,B} <: TensorTerm{V,G}
@@ -381,6 +387,8 @@ function adjoint(b::Basis{V,G,B}) where {V,G,B}
 end
 
 ## conversions
+
+@inline (V::VectorSpace)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? -(one(T)) : one(T)) : s.λ,getbasis(V,(one(Bits)<<ndims(V))-1))
 
 @pure function (W::VectorSpace)(b::Basis{V}) where V
     V==W && (return b)
