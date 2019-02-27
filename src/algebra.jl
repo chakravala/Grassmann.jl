@@ -595,7 +595,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                         @inbounds val = b.v[k]
                         @inbounds val≠0 && setblade!(out,$SUB(val),ib[k],Dimension{N}())
                     end
-                    return $Blade{T,V,N-G}(out)
+                    return $Blade{T,V,G}(out)
                 end
             end
         end
