@@ -32,33 +32,48 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
             return m
         end
         @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
-            if v ≠ 0
-                p,C,t = regressive(N,value(V),A,B)
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = regressive(A,B,V)
                 t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:meet,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
-            if v ≠ 0
-                p,C,t = regressive(N,value(V),bits(A),bits(B))
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = regressive(bits(A),bits(B),V)
                 t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
-            if v ≠ 0
-                p,C,t = interior(N,value(V),A,B)
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = interior(A,B,V)
                 t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
             end
             return m
         end
         @inline function $(Symbol(:skew,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
-            if v ≠ 0
-                p,C,t = interior(N,value(V),bits(A),bits(B))
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = interior(bits(A),bits(B),V)
                 t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
             end
             return m
         end
+        @inline function $(Symbol(:cross,sm))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = crossprod(A,B,V)
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:cross,sm))(m::SizedArray{Tuple{M},T,1,1},A::Basis{V},B::Basis{V},v::T) where {V,T<:SymField,M}
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                p,C,t = crossprod(bits(A),bits(B),V)
+                t && $sm(m,p ? $Sym.:-(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+
         @inline function $(Symbol(:join,sb))(V::VectorSpace{N,D},m::SizedArray{Tuple{M},T,1,1},A::Bits,B::Bits,v::T) where {N,D,T<:SymField,M}
             if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
                 $sb(m,parity(A,B,V) ? $Sym.:-(v) : v,A ⊻ B,Dimension{N}())

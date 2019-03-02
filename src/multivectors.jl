@@ -388,7 +388,7 @@ end
 
 ## conversions
 
-@inline (V::VectorSpace)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? -(one(T)) : one(T)) : s.λ,getbasis(V,(one(Bits)<<ndims(V))-1))
+@inline (V::VectorSpace)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<ndims(V))-1))
 
 @pure function (W::VectorSpace)(b::Basis{V}) where V
     V==W && (return b)

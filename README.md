@@ -15,9 +15,9 @@ This package is a work in progress providing the necessary tools to work with ar
 
 It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
 
-Products available for high-performance and sparse computation include `∧,∨,⋅,*` (exterior, regressive, interior, geometric).
+Products available for sparse & high-performance ops include `∧,∨,⋅,*,×` (exterior, regressive, interior, geometric, cross).
 
-Some unary operations include `complementleft`,`complementright`,`reverse,`,`involve`,`conj`, and `adjoint`.
+Some unary operations include `complementleft`,`complementright`,`reverse`,`involute`,`conj`, and `adjoint`.
 
 #### Design, code generation
 

@@ -38,7 +38,7 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
             return m
         end
         @inline function $(Symbol(:join,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-            if v ≠ 0 !(hasdual(V) && hasdual(A) && hasdual(B))
+            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
                 $sm(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
             end
             return m
@@ -67,6 +67,20 @@ for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         @inline function $(Symbol(:skew,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
             if v ≠ 0
                 p,C,t = interior(bits(A),bits(B),V)
+                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:cross,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
+            if v ≠ 0
+                p,C,t = crossprod(A,B,V)
+                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            end
+            return m
+        end
+        @inline function $(Symbol(:cross,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
+            if v ≠ 0
+                p,C,t = crossprod(bits(A),bits(B),V)
                 t && $sm(m,p ? -(v) : v,C,Dimension{N}())
             end
             return m
@@ -187,15 +201,17 @@ end
 
 ## complement
 
-export complementleft, complementright
+export complementleft, complementright, complementhodge
 
 @pure complement(N::Int,B::UInt) = (~B)&(one(Bits)<<N-1)
 
-@pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
-@pure parityright(V::Int,B,G,N=nothing) = isodd(V+B+Int((G+1)*G/2))
-@pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
+@pure parityhodge(V::Bits,B::Bits) = parityhodge(count_ones(V&B),sum(indices(B)),count_ones(B))
 
-for side ∈ (:left,:right)
+@pure parityright(V::Int,B,G,N=nothing) = isodd(B+Int((G+1)*G/2))
+@pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
+@pure parityhodge(V::Int,B,G,N=nothing) = isodd(V)⊻parityright(V,B,G)
+
+for side ∈ (:left,:right,:hodge)
     c = Symbol(:complement,side)
     p = Symbol(:parity,side)
     @eval begin
@@ -212,18 +228,18 @@ for side ∈ (:left,:right)
 end
 
 export ⋆
-const ⋆ = complementright
+const ⋆ = complementhodge
 
 ## reverse
 
 import Base: reverse, conj
-export involve
+export involute
 
 @pure parityreverse(G) = isodd(Int((G-1)*G/2))
-@pure parityinvolve(G) = isodd(G)
-@pure parityconj(G) = parityreverse(G)⊻parityinvolve(G)
+@pure parityinvolute(G) = isodd(G)
+@pure parityconj(G) = parityreverse(G)⊻parityinvolute(G)
 
-for r ∈ (:reverse,:involve,:conj)
+for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
     @eval @pure $r(b::Basis{V,G,B}) where {V,G,B} =$p(G) ? SValue{V}(-value(b),b) : b
     for Value ∈ MSV
@@ -256,7 +272,7 @@ end
 @pure function interior_calc(N,M,S,A,B)
     γ = complement(N,B)
     p,C,t = regressive_calc(N,M,S,A,γ)
-    return t ? p⊻parityright(S,B) : p, C, t
+    return t ? p⊻parityhodge(S,B) : p, C, t
 end
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
@@ -279,13 +295,12 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-
 @pure function regressive_calc(N,M,S,A,B)
     α,β = complement(N,A),complement(N,B)
     if (count_ones(α&β)==0) && !(M ∈ (1,3,5,7,9,11) && isodd(α) && isodd(β))
         C = α ⊻ β
         L = count_ones(A)+count_ones(B)
-        pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
+        pa,pb,pc = parityhodge(S,A),parityhodge(S,B),parityhodge(S,C)
         return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, complement(N,C), true
     else
         return false, zero(Bits), false
@@ -297,7 +312,30 @@ end
 import LinearAlgebra: cross
 export ×
 
-cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = I*(a∧b)
+cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
+
+@pure function cross(a::Basis{V},b::Basis{V}) where V
+    p,C,t = crossprod(a,b)
+    !t && (return zero(V))
+    d = Basis{V}(C)
+    return p ? SValue{V}(-1,d) : d
+end
+
+function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+    p,C,t = crossprod(bits(basis(a)),bits(basis(b)),V)
+    !t && (return zero(V))
+    v = value(a)*value(b)
+    return SValue{V}(p ? -v : v,Basis{V}(C))
+end
+
+@pure function crossprod_calc(N,M,S,A,B)
+    if (count_ones(A&B)==0) && !(M ∈ (1,3,5,7,9,11) && isodd(A) && isodd(B))
+        C = A ⊻ B
+        return parity(N,S,A,B)⊻parityhodge(S,C), complement(N,C), true
+    else
+        return false, zero(Bits), false
+    end
+end
 
 ### parity cache
 
@@ -335,7 +373,8 @@ end
 
 ### parity cache 2
 
-for (par,T) ∈ ((:interior,Tuple{Bool,Bits,Bool}),(:regressive,Tuple{Bool,Bits,Bool}))
+for par ∈ (:interior,:regressive,:crossprod)
+    T = Tuple{Bool,Bits,Bool}
     extra = Symbol(par,:_extra)
     cache = Symbol(par,:_cache)
     calc = Symbol(par,:_calc)
@@ -581,7 +620,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             end
         end
     end
-    for side ∈ (:left,:right)
+    for side ∈ (:left,:right,:hodge)
         c = Symbol(:complement,side)
         p = Symbol(:parity,side)
         for Blade ∈ MSB
@@ -612,7 +651,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             end
         end
     end
-    for reverse ∈ (:reverse,:involve,:conj)
+    for reverse ∈ (:reverse,:involute,:conj)
         p = Symbol(:parity,reverse)
         for Blade ∈ MSB
             @eval begin
@@ -646,7 +685,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     end
 
     for (op,product!) ∈ ((:∧,:exterior_product!),(:*,:joinaddmulti!),
-                         (:∨,:meetaddmulti!),(:dot,:skewaddmulti!))
+                         (:∨,:meetaddmulti!),(:dot,:skewaddmulti!),
+                         (:cross,:crossaddmulti!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
