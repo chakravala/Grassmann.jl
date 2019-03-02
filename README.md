@@ -15,9 +15,9 @@ This package is a work in progress providing the necessary tools to work with ar
 
 It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
 
-Products available for high-performance and sparse computation include `∧,∨,⋅,*` (exterior, regressive, interior, geometric).
+Products available for sparse & high-performance ops include `∧,∨,⋅,*,×` (exterior, regressive, interior, geometric, cross).
 
-Some unary operations include `complementleft`,`complementright`,`reverse,`,`involve`,`conj`, and `adjoint`.
+Some unary operations include `complementleft`,`complementright`,`reverse`,`involute`,`conj`, and `adjoint`.
 
 #### Design, code generation
 
@@ -131,8 +131,11 @@ v₂₃
 ```
 Effort of computation depends on the sparsity. Then it is possible to assign the **quaternion** generators `i,j,k` with
 ```Julia
-julia> i,j,k = complementright.((-Λ(3).v1,-Λ(3).v2,-Λ(3).v3))
-(-1v₂₃, 1v₁₃, -1v₁₂)
+julia> i,j,k = hyperplanes(ℝ^3)
+3-element Array{SValue{⟨+++⟩,2,B,Int64} where B,1}:
+ -1v₂₃
+ 1v₁₃
+ -1v₁₂
 
 julia> @btime i^2, j^2, k^2, i*j*k
   158.925 ns (5 allocations: 112 bytes)
