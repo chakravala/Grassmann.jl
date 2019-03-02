@@ -22,96 +22,52 @@ end
 for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
     sm = Symbol(op,:multi!)
     sb = Symbol(op,:blade!)
-    @eval begin
-        @inline function $sm(out::MArray{Tuple{M},T,1,M},val::T,i::Bits) where {M,T<:Field}
-            @inbounds $(Expr(set,:(out[basisindex(intlog(M),i)]),:val))
-            return out
-        end
-        @inline function $sm(out::Q,val::T,i::Bits,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            @inbounds $(Expr(set,:(out[basisindex(N,i)]),:val))
-            return out
-        end
-        @inline function $(Symbol(:join,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-            if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
-                $sm(m,parity(A,B,V) ? -(v) : v,A ⊻ B,Dimension{N}())
+    for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
+        for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
+            @eval begin
+                @inline function $s(out::MArray{Tuple{M},T,1,M},val::T,i::$B) where {M,T<:Field}
+                    @inbounds $(Expr(set,:(out[$index(intlog(M),$i)]),:val))
+                    return out
+                end
+                @inline function $s(out::Q,val::T,i::$B,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
+                    @inbounds $(Expr(set,:(out[$index(N,$i)]),:val))
+                    return out
+                end
             end
-            return m
         end
-        @inline function $(Symbol(:join,sm))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
-                $sm(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
+    end
+    for s ∈ (sm,sb)
+        @eval begin
+            @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
+                if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
+                    $s(m,parity(A,B,V) ? -(v) : v,A ⊻ B,Dimension{N}())
+                end
+                return m
             end
-            return m
-        end
-        @inline function $(Symbol(:meet,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-            if v ≠ 0
-                p,C,t = regressive(A,B,V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+            @inline function $(Symbol(:join,s))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
+                if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                    $s(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
+                end
+                return m
             end
-            return m
         end
-        @inline function $(Symbol(:meet,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
-            if v ≠ 0
-                p,C,t = regressive(bits(A),bits(B),V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
+        for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
+            @eval begin
+                @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
+                    if v ≠ 0
+                        p,C,t = $uct(A,B,V)
+                        t && $s(m,p ? -(v) : v,C,Dimension{N}())
+                    end
+                    return m
+                end
+                @inline function $(Symbol(prod,s))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
+                    if v ≠ 0
+                        p,C,t = $uct(bits(A),bits(B),V)
+                        t && $s(m,p ? -(v) : v,C,Dimension{N}())
+                    end
+                    return m
+                end
             end
-            return m
-        end
-        @inline function $(Symbol(:skew,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-            if v ≠ 0
-                p,C,t = interior(A,B,V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
-            end
-            return m
-        end
-        @inline function $(Symbol(:skew,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
-            if v ≠ 0
-                p,C,t = interior(bits(A),bits(B),V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
-            end
-            return m
-        end
-        @inline function $(Symbol(:cross,sm))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-            if v ≠ 0
-                p,C,t = crossprod(A,B,V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
-            end
-            return m
-        end
-        @inline function $(Symbol(:cross,sm))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
-            if v ≠ 0
-                p,C,t = crossprod(bits(A),bits(B),V)
-                t && $sm(m,p ? -(v) : v,C,Dimension{N}())
-            end
-            return m
-        end
-        @inline function $(Symbol(:join,sb))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-            if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
-                $sb(m,parity(A,B,V) ? -(v) : v,A ⊻ B,Dimension{N}())
-            end
-            return m
-        end
-        @inline function $(Symbol(:join,sb))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-            if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
-                $sb(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
-            end
-            return m
-        end
-        @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::Basis) where {M,T<:Field}
-            @inbounds $(Expr(set,:(out[bladeindex(intlog(M),bits(i))]),:val))
-            return out
-        end
-        @inline function $sb(out::Q,val::T,i::Basis,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            @inbounds $(Expr(set,:(out[bladeindex(N,bits(i))]),:val))
-            return out
-        end
-        @inline function $sb(out::MArray{Tuple{M},T,1,M},val::T,i::UInt16) where {M,T<:Field}
-            @inbounds $(Expr(set,:(out[bladeindex(intlog(M),i)]),:val))
-            return out
-        end
-        @inline function $sb(out::Q,val::T,i::Bits,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-            @inbounds $(Expr(set,:(out[bladeindex(N,i)]),:val))
-            return out
         end
     end
 end
@@ -271,7 +227,7 @@ end
 
 @pure function interior_calc(N,M,S,A,B)
     γ = complement(N,B)
-    p,C,t = regressive_calc(N,M,S,A,γ)
+    p,C,t = regressive(N,M,S,A,γ)
     return t ? p⊻parityhodge(S,B) : p, C, t
 end
 
