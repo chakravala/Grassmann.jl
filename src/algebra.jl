@@ -19,53 +19,60 @@ function add!(out::MultiVector{T,V},val::T,A::Vector{Int},B::Vector{Int}) where 
     return out
 end
 
-for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-    sm = Symbol(op,:multi!)
-    sb = Symbol(op,:blade!)
-    for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
-        for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
-            @eval begin
-                @inline function $s(out::MArray{Tuple{M},T,1,M},val::T,i::$B) where {M,T<:Field}
-                    @inbounds $(Expr(set,:(out[$index(intlog(M),$i)]),:val))
-                    return out
-                end
-                @inline function $s(out::Q,val::T,i::$B,::Dimension{N}) where Q<:MArray{Tuple{M},T,1,M} where {M,T<:Field,N}
-                    @inbounds $(Expr(set,:(out[$index(N,$i)]),:val))
-                    return out
+const Sym = :(Reduce.Algebra)
+const SymField = Any
+
+set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:+),expr,val) : val)
+
+function declare_mutating_operations(M,neg,F,set_val)
+    for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
+        sm = Symbol(op,:multi!)
+        sb = Symbol(op,:blade!)
+        for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
+            for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
+                @eval begin
+                    @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
+                        @inbounds $(set_val(set,:(out[$index(intlog(M),$i)]),:val))
+                        return out
+                    end
+                    @inline function $s(out::Q,val::S,i::$B,::Dimension{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
+                        @inbounds $(set_val(set,:(out[$index(N,$i)]),:val))
+                        return out
+                    end
                 end
             end
         end
-    end
-    for s ∈ (sm,sb)
-        @eval begin
-            @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-                if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
-                    $s(m,parity(A,B,V) ? -(v) : v,A ⊻ B,Dimension{N}())
-                end
-                return m
-            end
-            @inline function $(Symbol(:join,s))(m::MArray{Tuple{M},T,1,M},v::T,A::Basis{V},B::Basis{V}) where {V,T<:Field,M}
-                if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
-                    $s(m,parity(A,B) ? -(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
-                end
-                return m
-            end
-        end
-        for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
+        for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::MArray{Tuple{M},T,1,M},A::Bits,B::Bits,v::T) where {N,D,T<:Field,M}
-                    if v ≠ 0
-                        p,C,t = $uct(A,B,V)
-                        t && $s(m,p ? -(v) : v,C,Dimension{N}())
+                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
+                        $s(m,parity(A,B,V) ? $neg(v) : v,A ⊻ B,Dimension{N}())
                     end
                     return m
                 end
-                @inline function $(Symbol(prod,s))(m::MArray{Tuple{M},T,1,M},A::Basis{V},B::Basis{V},v::T) where {V,T<:Field,M}
-                    if v ≠ 0
-                        p,C,t = $uct(bits(A),bits(B),V)
-                        t && $s(m,p ? -(v) : v,C,Dimension{N}())
+                @inline function $(Symbol(:join,s))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
+                        $s(m,parity(A,B) ? $neg(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
                     end
                     return m
+                end
+            end
+            for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
+                @eval begin
+                    @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::T) where {N,D,T,M}
+                        if v ≠ 0
+                            p,C,t = $uct(A,B,V)
+                            t && $s(m,p ? $neg(v) : v,C,Dimension{N}())
+                        end
+                        return m
+                    end
+                    @inline function $(Symbol(prod,s))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
+                        if v ≠ 0
+                            p,C,t = $uct(bits(A),bits(B),V)
+                            t && $s(m,p ? $neg(v) : v,C,Dimension{N}())
+                        end
+                        return m
+                    end
                 end
             end
         end
@@ -377,6 +384,14 @@ end
 ### Product Algebra Constructor
 
 function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CONJ=:conj)
+    if Field == Grassmann.Field
+        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),:-,Field,Expr)
+    elseif Field ∈ (SymField,:(SymPy.Sym))
+        declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),SUB,Field,set_val)
+    end
+    Field == :(SymPy.Sym) && for par ∈ (:parany,:parval,:parsym)
+        @eval $par = ($par...,$Field)
+    end
     TF = Field ≠ Number ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     for Value ∈ MSV
@@ -997,6 +1012,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
 end
 
 generate_product_algebra()
+generate_product_algebra(SymField,:($Sym.:*),:($Sym.:+),:($Sym.:-),:svec,:($Sym.conj))
 
 const NSE = Union{Symbol,Expr,<:Number}
 

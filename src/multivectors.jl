@@ -11,6 +11,10 @@ abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 import DirectSum: shift_indices, printindex, printindices, VTI
 
+parany = (Expr,Any)
+parsym = (Expr,Symbol)
+parval = (Expr,)
+
 ## pseudoscalar
 
 using LinearAlgebra
@@ -94,7 +98,7 @@ for Value ∈ MSV
         $Value{V,G}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
         $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
-        show(io::IO,m::$Value) = print(io,(valuetype(m)∉(Expr,Any) ? [m.v] : ['(',m.v,')'])...,basis(m))
+        show(io::IO,m::$Value) = print(io,(valuetype(m)∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
 
@@ -136,15 +140,15 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
 
         function show(io::IO, m::$Blade{T,V,G}) where {T,V,G}
             ib = indexbasis(ndims(V),G)
-            @inbounds if T == Any && typeof(m.v[1]) ∈ (Expr,Symbol)
-                @inbounds typeof(m.v[1])≠Expr ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
+            @inbounds if T == Any && typeof(m.v[1]) ∈ parsym
+                @inbounds typeof(m.v[1])∉parval ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
             else
                 @inbounds print(io,m.v[1])
             end
             @inbounds printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
-                if T == Any && typeof(m.v[k]) ∈ (Expr,Symbol)
-                    @inbounds typeof(m.v[k])≠Expr ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
+                if T == Any && typeof(m.v[k]) ∈ parsym
+                    @inbounds typeof(m.v[k])∉parval ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
                 else
                     @inbounds print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
                 end
@@ -271,8 +275,8 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
         for k ∈ 1:length(ib)
             @inbounds s = k+bs[i]
             @inbounds if m.v[s] ≠ 0
-                @inbounds if T == Any && typeof(m.v[s]) ∈ (Expr,Symbol)
-                    @inbounds typeof(m.v[s])≠Expr ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
+                @inbounds if T == Any && typeof(m.v[s]) ∈ parsym
+                    @inbounds typeof(m.v[s])∉parval ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
                 else
                     @inbounds print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
@@ -295,7 +299,7 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure valuetype(::Union{MValue{V,G,B,T},SValue{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
-@inline value(m::VBV,T::DataType=valuetype(m)) = T≠valuetype(m) ? convert(T,m.v) : m.v
+@inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline sig(::TensorAlgebra{V}) where V = V
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B

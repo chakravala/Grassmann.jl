@@ -14,7 +14,6 @@ include("utilities.jl")
 include("multivectors.jl")
 include("algebra.jl")
 include("forms.jl")
-include("symbolic.jl")
 include("generators.jl")
 
 ## fundamentals
@@ -227,6 +226,9 @@ end
 
 # ParaAlgebra
 
-__init__() = @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" import Reduce
+function __init__()
+    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:svec,:(SymPy.conj))
+end
 
 end # module
