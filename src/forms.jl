@@ -5,7 +5,7 @@
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
 const dualformC_cache = Vector{Tuple{Int,Bool}}[]
-function dualform(V::VectorSpace{N}) where {N}
+@pure function dualform(V::VectorSpace{N}) where {N}
     C = dualtype(V)<0
     for n ∈ 2length(C ? dualformC_cache : dualform_cache)+2:2:N
         push!(C ? dualformC_cache : dualform_cache,Tuple{Int,Bool}[])
@@ -27,7 +27,7 @@ end
 
 const dualindex_cache = Vector{Vector{Int}}[]
 const dualindexC_cache = Vector{Vector{Int}}[]
-function dualindex(V::VectorSpace{N}) where N
+@pure function dualindex(V::VectorSpace{N}) where N
     C = dualtype(V)<0
     for n ∈ 2length(C ? dualindexC_cache : dualindex_cache)+2:2:N
         push!(C ? dualindexC_cache : dualindex_cache,Vector{Int}[])

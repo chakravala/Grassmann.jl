@@ -32,16 +32,16 @@ end
 @pure Base.zero(V::VectorSpace) = 0*one(V)
 @pure Base.one(V::VectorSpace) = Basis{V}()
 
-function getindex(b::Basis,i::Int)
+@pure function getindex(b::Basis,i::Int)
     d = one(Bits) << (i-1)
     return (d & bits(b)) == d
 end
 
 getindex(b::Basis,i::UnitRange{Int}) = [getindex(b,j) for j ∈ i]
-getindex(b::Basis{V},i::Colon) where V = [getindex(b,j) for j ∈ 1:ndims(V)]
+@pure getindex(b::Basis{V},i::Colon) where V = [getindex(b,j) for j ∈ 1:ndims(V)]
 Base.firstindex(m::Basis) = 1
-Base.lastindex(m::Basis{V}) where V = ndims(V)
-Base.length(b::Basis{V}) where V = ndims(V)
+@pure Base.lastindex(m::Basis{V}) where V = ndims(V)
+@pure Base.length(b::Basis{V}) where V = ndims(V)
 
 function Base.iterate(r::Basis, i::Int=1)
     Base.@_inline_meta
@@ -52,7 +52,7 @@ end
 @inline indices(b::Basis) = indices(bits(b))
 @inline shift_indices(b::Basis{V}) where V = shift_indices(V,indices(b))
 
-Basis{V}(i::Bits) where V = getbasis(V,i)
+@pure Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
 for t ∈ ((:V,),(:V,:G))
@@ -66,12 +66,12 @@ for t ∈ ((:V,),(:V,:G))
     end
 end
 
-==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = bits(a) == bits(b)
-==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
-==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = throw(error("not implemented yet"))
+@pure ==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = bits(a) == bits(b)
+@pure ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
+@pure ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = interop(==,a,b)
 
-==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 && a == value(b)
-==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 && value(a) == b
+==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 ? a==value(b) : 0==a==value(b)
+==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 ? value(a)==b : 0==value(a)==b
 
 @inline show(io::IO, e::Basis{V}) where V = printindices(io,V,bits(e))
 
@@ -87,9 +87,9 @@ end
 for Value ∈ MSV
     @eval begin
         export $Value
-        $Value(b::Basis{V,G}) where {V,G} = $Value{V}(b)
+        @pure $Value(b::Basis{V,G}) where {V,G} = $Value{V}(b)
+        @pure $Value{V}(b::Basis{V,G}) where {V,G} = $Value{V,G,b,Int}(1)
         $Value(v,b::TensorTerm{V}) where V = $Value{V}(v,b)
-        $Value{V}(b::Basis{V,G}) where {V,G} = $Value{V,G,b,Int}(1)
         $Value{V}(v,b::SValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
         $Value{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
@@ -102,8 +102,8 @@ for Value ∈ MSV
     end
 end
 
-==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) && value(a) == value(b)
-==(a::TensorTerm,b::TensorTerm) = false
+==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) ? value(a) == value(b) : 0 == value(a) == value(b)
+==(a::TensorTerm,b::TensorTerm) = 0 == value(a) == value(b)
 
 ## S/MBlade{T,N}
 
@@ -120,8 +120,8 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
         getindex(m::$Blade,i::UnitRange{Int}) = m.v[i]
         setindex!(m::$Blade{T},k::T,i::Int) where T = (m.v[i] = k)
         Base.firstindex(m::$Blade) = 1
-        Base.lastindex(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
-        Base.length(m::$Blade{T,N,G}) where {T,N,G} = length(m.v)
+        @pure Base.lastindex(m::$Blade{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
+        @pure Base.length(m::$Blade{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
     end
     @eval begin
         function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
@@ -157,10 +157,12 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
         end
         function ==(a::$Blade{S,V,G} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
             i = bladeindex(ndims(V),bits(basis(b)))
-            a[i] == value(b) && sum(a[1:i-1] .≠ 0)+sum(a[i+1:end] .≠ 0) == 0
+            @inbounds a[i] == value(b) && prod(a[1:i-1] .== 0) && prod(a[i+1:end] .== 0)
         end
         ==(a::T,b::$Blade{S,V} where S) where T<:TensorTerm{V} where V = b==a
-        ==(a::$Blade{S,V} where S,b::T) where T<:TensorTerm{V} where V = false
+        ==(a::$Blade{S,V} where S,b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
+        ==(a::Number,b::$Blade{S,V,G} where {S,V}) where G = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
+        ==(a::$Blade{S,V,G} where {S,V},b::Number) where G = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
     end
     for var ∈ ((:T,:V,:G),(:T,:V),(:T,))
         @eval begin
@@ -188,8 +190,8 @@ for (Blade,Vec1,Vec2) ∈ ((MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector)
 end
 for Blade ∈ MSB, Other ∈ MSB
     @eval begin
-        ==(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T,V,G,S} = sum(a.v .≠ b.v) == 0
-        ==(a::$Blade{T,V} where T,b::$Other{S,V} where S) where V = false
+        ==(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T,V,G,S} = prod(a.v .== b.v)
+        ==(a::$Blade{T,V} where T,b::$Other{S,V} where S) where V = prod(0 .==value(a)) && prod(0 .== value(b))
     end
 end
 
@@ -210,7 +212,7 @@ end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
 setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
-Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
+@pure Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 
 function (m::MultiVector{T,V})(g::Int,::Type{B}=SBlade) where {T,V,B}
     B ≠ SBlade ? MBlade{T,V,g}(m[g]) : SBlade{T,V,g}(m[g])
@@ -286,7 +288,26 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
     end
 end
 
-==(a::MultiVector{T,V},b::MultiVector{S,V}) where {T,V,S} = sum(a.v .≠ b.v) == 0
+==(a::MultiVector{T,V},b::MultiVector{S,V}) where {T,V,S} = prod(a.v .== b.v)
+
+for Blade ∈ MSB
+    @eval begin
+        function ==(a::MultiVector{T,V},b::$Blade{S,V,G}) where {T,V,S,G}
+            N = ndims(V)
+            r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 2^N+1
+            prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
+        end
+        ==(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T,V,S,G} = b == a
+    end
+end
+
+function ==(a::MultiVector{S,V} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
+    i = basisindex(ndims(V),bits(basis(b)))
+    @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
+end
+==(a::T,b::MultiVector{S,V} where S) where T<:TensorTerm{V} where V = b==a
+==(a::Number,b::MultiVector{S,V,G} where {S,V}) where G = prod(0 == a .== value(b))
+==(a::MultiVector{S,V,G} where {S,V},b::Number) where G = prod(0 == b .== value(a))
 
 ## Generic
 
@@ -300,20 +321,19 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
-@inline sig(::TensorAlgebra{V}) where V = V
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B
-@inline grade(m::TensorTerm{V,G} where V) where G = G
-@inline grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
-@inline grade(m::Number) = 0
+@pure grade(m::TensorTerm{V,G} where V) where G = G
+@pure grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
+@pure grade(m::Number) = 0
 
-isdual(e::Basis{V}) where V = hasdual(e) && count_ones(bits(e)) == 1
-hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
+@pure isdual(e::Basis{V}) where V = hasdual(e) && count_ones(bits(e)) == 1
+@pure hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
 
-isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasdual(V)+1]
-hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(bits(e)))
-hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
-hasorigin(m::TensorAlgebra) = hasorigin(sig(m))
+@pure isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasdual(V)+1]
+@pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(bits(e)))
+@pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
+@pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
 ## MultiGrade{N}
 
@@ -386,7 +406,7 @@ end
 
 import Base: adjoint # conj
 
-function adjoint(b::Basis{V,G,B}) where {V,G,B}
+@pure function adjoint(b::Basis{V,G,B}) where {V,G,B}
     Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
 end
 

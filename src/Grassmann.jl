@@ -20,12 +20,12 @@ include("generators.jl")
 
 export hyperplanes
 
-hyperplanes(V::VectorSpace{N}) where N = map(n->I*getbasis(V,1<<n),0:N-1)
+@pure hyperplanes(V::VectorSpace{N}) where N = map(n->I*getbasis(V,1<<n),0:N-1)
 
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
-adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
-dual(G::A) where A<: SubAlgebra = G'
+@pure adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
+@pure dual(G::A) where A<: SubAlgebra = G'
 Base.firstindex(a::T) where T<:SubAlgebra = 1
 Base.lastindex(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
 Base.length(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
@@ -61,8 +61,8 @@ end
     @inbounds Algebra{s}(generate(s),Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
 end
 
-Algebra(s::VectorSpace) = getalgebra(s)
-Algebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getalgebra(n,d,o,s)
+@pure Algebra(s::VectorSpace) = getalgebra(s)
+@pure Algebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getalgebra(n,d,o,s)
 Algebra(s::String) = getalgebra(VectorSpace(s))
 Algebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
 
@@ -161,7 +161,7 @@ end
     end
 end
 
-SparseAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getsparse(n,d,o,s)
+@pure SparseAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getsparse(n,d,o,s)
 SparseAlgebra(s::String) = getsparse(VectorSpace(s))
 SparseAlgebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
 
@@ -199,7 +199,7 @@ struct ExtendedAlgebra{V} <: SubAlgebra{V} end
     end
 end
 
-ExtendedAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getextended(n,d,o,s)
+@pure ExtendedAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getextended(n,d,o,s)
 ExtendedAlgebra(s::String) = getextended(VectorSpace(s))
 ExtendedAlgebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
 
