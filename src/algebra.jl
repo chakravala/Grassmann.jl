@@ -24,7 +24,7 @@ const SymField = Any
 
 set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:+),expr,val) : val)
 
-function declare_mutating_operations(M,neg,F,set_val,mul)
+function declare_mutating_operations(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
         sb = Symbol(op,:blade!)
@@ -46,7 +46,7 @@ function declare_mutating_operations(M,neg,F,set_val,mul)
             @eval begin
                 @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
                     if v ≠ 0 && !(hasinf(V) && isodd(A) && isodd(B))
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $neg(v) : v) : parity_interior(A,B,V)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),v)
                         $s(m,val,A ⊻ B,Dimension{N}())
                     end
                     return m
@@ -60,7 +60,7 @@ function declare_mutating_operations(M,neg,F,set_val,mul)
                     @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::T) where {N,D,T,M}
                         if v ≠ 0
                             g,C,t = $uct(A,B,V)
-                            t && $s(m,typeof(V) <: Signature ? g ? $neg(v) : v : $mul(g,v),C,Dimension{N}())
+                            t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
                         end
                         return m
                     end
@@ -415,9 +415,9 @@ end
 
 function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CONJ=:conj)
     if Field == Grassmann.Field
-        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),:-,Field,Expr,:*)
+        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Field,Expr,:-,:*)
     elseif Field ∈ (SymField,:(SymPy.Sym))
-        declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),SUB,Field,set_val,MUL)
+        declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
     Field == :(SymPy.Sym) && for par ∈ (:parany,:parval,:parsym)
         @eval $par = ($par...,$Field)
