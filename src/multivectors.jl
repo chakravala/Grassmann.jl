@@ -28,20 +28,20 @@ struct Basis{V,G,B} <: TensorTerm{V,G}
 end
 
 @pure bits(b::Basis{V,G,B} where {V,G}) where B = B
-@pure Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-@pure Base.zero(V::VectorSpace) = 0*one(V)
-@pure Base.one(V::VectorSpace) = Basis{V}()
+Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
+Base.zero(V::VectorSpace) = 0*one(V)
+Base.one(V::VectorSpace) = Basis{V}()
 
-@pure function getindex(b::Basis,i::Int)
+function getindex(b::Basis,i::Int)
     d = one(Bits) << (i-1)
     return (d & bits(b)) == d
 end
 
 getindex(b::Basis,i::UnitRange{Int}) = [getindex(b,j) for j ∈ i]
-@pure getindex(b::Basis{V},i::Colon) where V = [getindex(b,j) for j ∈ 1:ndims(V)]
+getindex(b::Basis{V},i::Colon) where V = [getindex(b,j) for j ∈ 1:ndims(V)]
 Base.firstindex(m::Basis) = 1
-@pure Base.lastindex(m::Basis{V}) where V = ndims(V)
-@pure Base.length(b::Basis{V}) where V = ndims(V)
+Base.lastindex(m::Basis{V}) where V = ndims(V)
+Base.length(b::Basis{V}) where V = ndims(V)
 
 function Base.iterate(r::Basis, i::Int=1)
     Base.@_inline_meta
@@ -66,9 +66,9 @@ for t ∈ ((:V,),(:V,:G))
     end
 end
 
-@pure ==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = bits(a) == bits(b)
-@pure ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
-@pure ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = interop(==,a,b)
+==(a::Basis{V,G},b::Basis{V,G}) where {V,G} = bits(a) == bits(b)
+==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
+==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = interop(==,a,b)
 
 ==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 ? a==value(b) : 0==a==value(b)
 ==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 ? value(a)==b : 0==value(a)==b
@@ -212,7 +212,7 @@ end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
 setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
-@pure Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
+Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 
 function (m::MultiVector{T,V})(g::Int,::Type{B}=SBlade) where {T,V,B}
     B ≠ SBlade ? MBlade{T,V,g}(m[g]) : SBlade{T,V,g}(m[g])
@@ -270,6 +270,7 @@ end
 
 function show(io::IO, m::MultiVector{T,V}) where {T,V}
     N = ndims(V)
+    basis_count = true
     print(io,m[0][1])
     bs = binomsum_set(N)
     for i ∈ 2:N+1
@@ -283,9 +284,11 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
                     @inbounds print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
                 @inbounds printindices(io,V,ib[k])
+                basis_count = false
             end
         end
     end
+    basis_count && print(io,pre[1]*'⃖')
 end
 
 ==(a::MultiVector{T,V},b::MultiVector{S,V}) where {T,V,S} = prod(a.v .== b.v)
@@ -311,7 +314,8 @@ end
 
 ## Generic
 
-export basis, grade, hasdual, hasorigin, isdual, isorigin
+import Base: isinf
+export basis, grade, hasinf, hasorigin, isorigin
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
@@ -327,11 +331,11 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
 @pure grade(m::Number) = 0
 
-@pure isdual(e::Basis{V}) where V = hasdual(e) && count_ones(bits(e)) == 1
-@pure hasdual(e::Basis{V}) where V = hasdual(V) && isodd(bits(e))
+@pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
+@pure hasinf(e::Basis{V}) where V = hasinf(V) && isodd(bits(e))
 
-@pure isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasdual(V)+1]
-@pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasdual(V) ? e[2] : isodd(bits(e)))
+@pure isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasinf(V)+1]
+@pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasinf(V) ? e[2] : isodd(bits(e)))
 @pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
@@ -406,15 +410,15 @@ end
 
 import Base: adjoint # conj
 
-@pure function adjoint(b::Basis{V,G,B}) where {V,G,B}
+function adjoint(b::Basis{V,G,B}) where {V,G,B}
     Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
 end
 
 ## conversions
 
-@inline (V::VectorSpace)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<ndims(V))-1))
+@inline (V::Signature)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<ndims(V))-1))
 
-@pure function (W::VectorSpace)(b::Basis{V}) where V
+@pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
     WC,VC = dualtype(W),dualtype(V)
@@ -426,12 +430,12 @@ end
         throw(error("arbitrary VectorSpace intersection not yet implemented."))
     end
 end
-@pure (W::VectorSpace)(b::SValue) = SValue{W}(value(b),W(basis(b)))
-(W::VectorSpace)(b::MValue) = MValue{W}(value(b),W(basis(b)))
+(W::Signature)(b::SValue) = SValue{W}(value(b),W(basis(b)))
+(W::Signature)(b::MValue) = MValue{W}(value(b),W(basis(b)))
 
 for Blade ∈ MSB
     @eval begin
-        function (W::VectorSpace)(b::$Blade{T,V,G}) where {T,V,G}
+        function (W::Signature)(b::$Blade{T,V,G}) where {T,V,G}
             V==W && (return b)
             !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
             WC,VC = dualtype(W),dualtype(V)
@@ -455,7 +459,7 @@ for Blade ∈ MSB
     end
 end
 
-function (W::VectorSpace)(m::MultiVector{T,V}) where {T,V}
+function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     V==W && (return m)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
     WC,VC = dualtype(W),dualtype(V)

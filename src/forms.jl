@@ -5,7 +5,7 @@
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
 const dualformC_cache = Vector{Tuple{Int,Bool}}[]
-@pure function dualform(V::VectorSpace{N}) where {N}
+@pure function dualform(V::Signature{N}) where {N}
     C = dualtype(V)<0
     for n ∈ 2length(C ? dualformC_cache : dualform_cache)+2:2:N
         push!(C ? dualformC_cache : dualform_cache,Tuple{Int,Bool}[])

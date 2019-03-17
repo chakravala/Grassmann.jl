@@ -77,33 +77,34 @@ function basis(V::VectorSpace,sig::Symbol=vsn[1],label::Symbol=Symbol(pre[1]),du
     for i ∈ 2:1<<N
         @inbounds push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
+    push!(exp,Expr(:(=),esc(Symbol(label,'⃖')) ,MultiVector(basis[1])))
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
 end
 
 macro basis(q,sig=vsn[1],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q),sig,label,dual)
+    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q),sig,label,dual)
 end
 
 macro basis_str(str)
-    basis(VectorSpace(str))
+    basis(vectorspace(str))
 end
 
 macro dualbasis(q,sig=vsn[2],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q))',sig,label,dual)
+    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q))',sig,label,dual)
 end
 
 macro dualbasis_str(str)
-    basis(VectorSpace(str)',vsn[2])
+    basis(vectorspace(str)',vsn[2])
 end
 
 macro mixedbasis(q,sig=vsn[3],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : VectorSpace(q)
+    V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q)
     bases = basis(V⊕V',sig,label,dual)
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
 macro mixedbasis_str(str)
-    V = VectorSpace(str)
+    V = vectorspace(str)
     bases = basis(V⊕V',vsn[3])
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
