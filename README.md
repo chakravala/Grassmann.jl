@@ -10,6 +10,8 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/c36u0rgtm2rjcquk?svg=true)](https://ci.appveyor.com/project/chakravala/grassmann-jl)
 [![Coverage Status](https://coveralls.io/repos/chakravala/Grassmann.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/chakravala/Grassmann.jl?branch=master)
 [![codecov.io](http://codecov.io/github/chakravala/Grassmann.jl/coverage.svg?branch=master)](http://codecov.io/github/chakravala/Grassmann.jl?branch=master)
+[![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 
 This package is a work in progress providing the necessary tools to work with arbitrary dual `MultiVector` elements with optional origin. Due to the parametric type system for the generating `VectorSpace`, the Julia compiler can fully preallocate and often cache values efficiently. Both static and mutable vector types are supported.
 
@@ -40,7 +42,7 @@ Let `N` be the dimension of a `VectorSpace{N}`.
 The metric signature of the `Basis{V,1}` elements of a vector space `V` can be specified with the `V"..."` constructor by using `+` and `-` to specify whether the `Basis{V,1}` element of the corresponding index squares to `+1` or `-1`.
 For example, `V"+++"` constructs a positive definite 3-dimensional `VectorSpace`.
 ```Julia
-julia> ℝ^3 == V"+++" == VectorSpace(3)
+julia> ℝ^3 == V"+++" == vectorspace(3)
 true
 ```
 The direct sum operator `⊕` can be used to join spaces (alternatively `+`), and `'` is an involution which toggles a dual vector space with inverted signature.
