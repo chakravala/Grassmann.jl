@@ -7,8 +7,8 @@ using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
 using DirectSum, AbstractTensors
 
-export VectorSpace, vectorspace, ⊕, ℝ, @V_str
-import DirectSum: hasdual, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
+export vectorspace, ⊕, ℝ, @V_str, @D_str, Signature, DiagonalForm, value
+import DirectSum: hasinf, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
 
 include("utilities.jl")
 include("multivectors.jl")
@@ -24,7 +24,7 @@ export hyperplanes
 
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
-@pure adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
+adjoint(G::A) where A<:SubAlgebra{V} where V = Λ(dual(V))
 @pure dual(G::A) where A<: SubAlgebra = G'
 Base.firstindex(a::T) where T<:SubAlgebra = 1
 Base.lastindex(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
@@ -42,9 +42,9 @@ Base.length(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
     g::Dict{Symbol,Int}
 end
 
-@pure getindex(a::Algebra,i::Int) = getfield(a,:b)[i]
-@pure getindex(a::Algebra,i::Colon) = getfield(a,:b)
-@pure getindex(a::Algebra,i::UnitRange{Int}) = [getindex(a,j) for j ∈ i]
+getindex(a::Algebra,i::Int) = getfield(a,:b)[i]
+getindex(a::Algebra,i::Colon) = getfield(a,:b)
+getindex(a::Algebra,i::UnitRange{Int}) = [getindex(a,j) for j ∈ i]
 
 @pure function Base.getproperty(a::Algebra{V},v::Symbol) where V
     return if v ∈ (:b,:g)
@@ -56,15 +56,15 @@ end
     end
 end
 
-@pure function Base.collect(s::VectorSpace)
+function Base.collect(s::VectorSpace)
     sym = labels(s)
     @inbounds Algebra{s}(generate(s),Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
 end
 
 @pure Algebra(s::VectorSpace) = getalgebra(s)
 @pure Algebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getalgebra(n,d,o,s)
-Algebra(s::String) = getalgebra(VectorSpace(s))
-Algebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
+Algebra(s::String) = getalgebra(vectorspace(s))
+Algebra(s::String,v::Symbol) = getbasis(vectorspace(s),v)
 
 function show(io::IO,a::Algebra{V}) where V
     N = ndims(V)
@@ -83,14 +83,6 @@ macro Λ_str(str)
     Algebra(str)
 end
 
-@pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra(n,doc2m(d,o,c),s)
-@pure getalgebra(n::Int,m::Int,s) = getalgebra(n,m,Bits(s))
-@pure function getalgebra(V::VectorSpace)
-    N,C = ndims(V),dualtype(V)
-    C<0 && N>2algebra_limit && (return getextended(V))
-    getalgebra(N,doc2m(Int(hasdual(V)),Int(hasorigin(V)),C),value(V))
-end
-
 @pure function Base.getproperty(λ::typeof(Λ),v::Symbol)
     v ∈ (:body,:var) && (return getfield(λ,v))
     V = string(v)
@@ -103,19 +95,33 @@ end
 
 # Allocating thread-safe $(2^n)×Basis{VectorSpace}
 const Λ0 = Λ{V0}(SVector{1,Basis{V0}}(Basis{V0,0,zero(Bits)}()),Dict(:e=>1))
-const algebra_cache = Vector{Dict{Bits,Λ}}[]
-@pure function getalgebra(n::Int,m::Int,s::Bits)
-    n==0 && (return Λ0)
-    n > sparse_limit && (return getextended(n,m,s))
-    n > algebra_limit && (return getsparse(n,m,s))
-    for N ∈ length(algebra_cache)+1:n
-        push!(algebra_cache,[Dict{Int,Λ}() for k∈1:12])
+
+for (vs,dat) ∈ ((:Signature,Bits),(:DiagonalForm,Int))
+    algebra_cache = Symbol(:algebra_cache_,vs)
+    getalg = Symbol(:getalgebra_,vs)
+    @eval begin
+        const $algebra_cache = Vector{Dict{$dat,Λ}}[]
+        @pure function $getalg(n::Int,m::Int,s::$dat)
+            n==0 && (return Λ0)
+            n > sparse_limit && (return $(Symbol(:getextended_,vs))(n,m,s))
+            n > algebra_limit && (return $(Symbol(:getsparse_,vs))(n,m,s))
+            for N ∈ length($algebra_cache)+1:n
+                push!($algebra_cache,[Dict{$dat,Λ}() for k∈1:12])
+            end
+            @inbounds if !haskey($algebra_cache[n][m+1],s)
+                @inbounds push!($algebra_cache[n][m+1],s=>collect($vs{n,m,s}()))
+            end
+            @inbounds $algebra_cache[n][m+1][s]
+        end
+        @pure function getalgebra(V::$vs{N,M,S}) where {N,M,S}
+            dualtype(V)<0 && N>2algebra_limit && (return getextended(V))
+            $(Symbol(:getalgebra_,vs))(N,M,S)
+        end
     end
-    @inbounds if !haskey(algebra_cache[n][m+1],s)
-        @inbounds push!(algebra_cache[n][m+1],s=>collect(VectorSpace{n,m,s}()))
-    end
-    @inbounds algebra_cache[n][m+1][s]
 end
+
+@pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra_Signature(n,doc2m(d,o,c),s)
+@pure getalgebra(n::Int,m::Int,s) = getalgebra_Signature(n,m,Bits(s))
 
 @pure getbasis(V::VectorSpace,v::Symbol) = getproperty(getalgebra(V),v)
 @pure function getbasis(V::VectorSpace{N},b) where N
@@ -162,27 +168,11 @@ end
 end
 
 @pure SparseAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getsparse(n,d,o,s)
-SparseAlgebra(s::String) = getsparse(VectorSpace(s))
-SparseAlgebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
+SparseAlgebra(s::String) = getsparse(vectorspace(s))
+SparseAlgebra(s::String,v::Symbol) = getbasis(vectorspace(s),v)
 
 function show(io::IO,a::SparseAlgebra{V}) where V
     print(io,"Grassmann.SparseAlgebra{$V,$(1<<ndims(V))}($(a[1]), ..., $(a[end]))")
-end
-
-# Declaring thread-safe $(1<<n)×Basis{VectorSpace}
-const sparse_cache = Vector{Dict{Bits,SparseAlgebra}}[]
-@pure getsparse(n::Int,d::Int,o::Int,s,c::Int=0) = getsparse(n,doc2m(d,o,c),s)
-@pure getsparse(n::Int,m::Int,s) = getsparse(n,m,Bits(s))
-@pure getsparse(V::VectorSpace) = getsparse(ndims(V),do2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
-@pure function getsparse(n::Int,m::Int,s::Bits)
-    n==0 && (return SparseAlgebra(V0))
-    for N ∈ length(sparse_cache)+1:n
-        push!(sparse_cache,[Dict{Int,SparseAlgebra}() for k∈1:12])
-    end
-    @inbounds if !haskey(sparse_cache[n][m+1],s)
-        @inbounds push!(sparse_cache[n][m+1],s=>SparseAlgebra(VectorSpace{n,m,s}()))
-    end
-    @inbounds sparse_cache[n][m+1][s]
 end
 
 ## ExtendedAlgebra{V}
@@ -200,28 +190,41 @@ struct ExtendedAlgebra{V} <: SubAlgebra{V} end
 end
 
 @pure ExtendedAlgebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getextended(n,d,o,s)
-ExtendedAlgebra(s::String) = getextended(VectorSpace(s))
-ExtendedAlgebra(s::String,v::Symbol) = getbasis(VectorSpace(s),v)
+ExtendedAlgebra(s::String) = getextended(vectorspace(s))
+ExtendedAlgebra(s::String,v::Symbol) = getbasis(vectorspace(s),v)
 
 function show(io::IO,a::ExtendedAlgebra{V}) where V
     N = 1<<ndims(V)
     print(io,"Grassmann.ExtendedAlgebra{$V,$N}($(getbasis(V,0)), ..., $(getbasis(V,N-1)))")
 end
 
-# Extending thread-safe $(2^n)×Basis{VectorSpace}
-const extended_cache = Vector{Dict{Bits,ExtendedAlgebra}}[]
-@pure getextended(n::Int,d::Int,o::Int,s,c::Int=0) = getextended(n,doc2m(d,o,c),s)
-@pure getextended(n::Int,m::Int,s) = getextended(n,m,Bits(s))
-@pure getextended(V::VectorSpace) = getextended(ndims(V),doc2m(Int(hasdual(V)),Int(hasorigin(V)),dualtype(V)),value(V))
-@pure function getextended(n::Int,m::Int,s::Bits)
-    n==0 && (return ExtendedAlgebra(V0))
-    for N ∈ length(extended_cache)+1:n
-        push!(extended_cache,[Dict{Bits,ExtendedAlgebra}() for k∈1:12])
+# Extending (2^n)×Basis{VectorSpace}
+
+for (ExtraAlgebra,extra) ∈ ((SparseAlgebra,:sparse),(ExtendedAlgebra,:extended))
+    getextra = Symbol(:get,extra)
+    gets = Symbol(getextra,:_Signature)
+    for (vs,dat) ∈ ((:Signature,Bits),(:DiagonalForm,Int))
+        extra_cache = Symbol(extra,:_cache_,vs)
+        getalg = Symbol(:get,extra,:_,vs)
+        @eval begin
+            const $extra_cache = Vector{Dict{$dat,$ExtraAlgebra}}[]
+            @pure function $getalg(n::Int,m::Int,s::$dat)
+                n==0 && (return $ExtraAlgebra(V0))
+                for N ∈ length($extra_cache)+1:n
+                    push!($extra_cache,[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
+                end
+                @inbounds if !haskey($extra_cache[n][m+1],s)
+                    @inbounds push!($extra_cache[n][m+1],s=>$ExtraAlgebra($vs{n,m,s}()))
+                end
+                @inbounds $extra_cache[n][m+1][s]
+            end
+            @pure $getextra(V::$vs{N,M,S}) where {N,M,S} = $getalg(N,M,S)
+        end
     end
-    @inbounds if !haskey(extended_cache[n][m+1],s)
-        @inbounds push!(extended_cache[n][m+1],s=>ExtendedAlgebra(VectorSpace{n,m,s}()))
+    @eval begin
+        @pure $getextra(n::Int,d::Int,o::Int,s,c::Int=0) = $gets(n,doc2m(d,o,c),s)
+        @pure $getextra(n::Int,m::Int,s) = $gets(n,m,Bits(s))
     end
-    @inbounds extended_cache[n][m+1][s]
 end
 
 # ParaAlgebra

@@ -24,7 +24,7 @@ const SymField = Any
 
 set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:+),expr,val) : val)
 
-function declare_mutating_operations(M,neg,F,set_val)
+function declare_mutating_operations(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
         sb = Symbol(op,:blade!)
@@ -45,33 +45,27 @@ function declare_mutating_operations(M,neg,F,set_val)
         for s ∈ (sm,sb)
             @eval begin
                 @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !(hasdual(V) && isodd(A) && isodd(B))
-                        $s(m,parity(A,B,V) ? $neg(v) : v,A ⊻ B,Dimension{N}())
+                    if v ≠ 0 && !(hasinf(V) && isodd(A) && isodd(B))
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),v)
+                        $s(m,val,A ⊻ B,Dimension{N}())
                     end
                     return m
                 end
                 @inline function $(Symbol(:join,s))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !(hasdual(V) && hasdual(A) && hasdual(B))
-                        $s(m,parity(A,B) ? $neg(v) : v,bits(A) ⊻ bits(B),Dimension{ndims(V)}())
-                    end
-                    return m
+                    $(Symbol(:join,s))(V,m,bits(A),bits(B),v)
                 end
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
                 @eval begin
                     @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::T) where {N,D,T,M}
                         if v ≠ 0
-                            p,C,t = $uct(A,B,V)
-                            t && $s(m,p ? $neg(v) : v,C,Dimension{N}())
+                            g,C,t = $uct(A,B,V)
+                            t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
                         end
                         return m
                     end
                     @inline function $(Symbol(prod,s))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
-                        if v ≠ 0
-                            p,C,t = $uct(bits(A),bits(B),V)
-                            t && $s(m,p ? $neg(v) : v,C,Dimension{N}())
-                        end
-                        return m
+                        $(Symbol(prod,s))(V,m,bits(A),bits(B),v)
                     end
                 end
             end
@@ -85,17 +79,18 @@ end
     add!(out,val,Basis{V,count_ones(ua),ua},Basis{V,count_ones(ub),ub})
 end
 @inline function add!(m::MultiVector{T,V},v::T,A::Basis{V},B::Basis{V}) where {T<:Field,V}
-    !(hasdual(V) && isodd(A) && isodd(B)) && addmulti!(m.v,parity(A,B) ? -(v) : v,bits(A).⊻bits(B))
+    !(hasinf(V) && isodd(A) && isodd(B)) && addmulti!(m.v,parity(A,B) ? -(v) : v,bits(A).⊻bits(B))
     return out
 end
 
 ## geometric product
 
 @pure function *(a::Basis{V},b::Basis{V}) where V
-    hasdual(V) && hasdual(a) && hasdual(b) && (return zero(V))
-    c = bits(a) ⊻ bits(b)
-    d = Basis{V}(c)
-    return parity(a,b) ? SValue{V}(-1,d) : d
+    hasinf(V) && hasinf(a) && hasinf(b) && (return zero(V))
+    A,B = bits(a), bits(b)
+    C = A ⊻ B
+    d = Basis{V}(C)
+    return (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b) ? SValue{V}(-1,d) : d) : SValue{V}(parity_interior(A,B,V),d)
 end
 
 @pure function parity_calc(N,S,a,b)
@@ -164,25 +159,29 @@ end
 
 ## complement
 
-export complementleft, complementright, complementhodge
+export complementleft, complementright
 
 @pure complement(N::Int,B::UInt) = (~B)&(one(Bits)<<N-1)
 
-@pure parityhodge(V::Bits,B::Bits) = parityhodge(count_ones(V&B),sum(indices(B)),count_ones(B))
+@pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
 
-@pure parityright(V::Int,B,G,N=nothing) = isodd(B+Int((G+1)*G/2))
+@pure parityright(V::Int,B,G,N=nothing) = isodd(V)⊻isodd(B+Int((G+1)*G/2))
 @pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
-@pure parityhodge(V::Int,B,G,N=nothing) = isodd(V)⊻parityright(V,B,G)
 
-for side ∈ (:left,:right,:hodge)
+for side ∈ (:left,:right)
     c = Symbol(:complement,side)
     p = Symbol(:parity,side)
     @eval begin
-        @inline $p(V::VectorSpace,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
+        @inline $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
+        @inline function $p(V::DiagonalForm,B,G=count_ones(B))
+            ind = indices(B)
+            g = prod(V[ind])
+            $p(0,sum(ind),G,ndims(V)) ? -(g) : g
+        end
         @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
         @pure function $c(b::Basis{V,G,B}) where {V,G,B}
             d = getbasis(V,complement(ndims(V),B))
-            $p(b) ? SValue{V}(-value(d),d) : d
+            typeof(V)<:Signature ? ($p(b) ? SValue{V}(-value(d),d) : d) : SValue{V}($p(b)*value(d),d)
         end
     end
     for Value ∈ MSV
@@ -191,11 +190,11 @@ for side ∈ (:left,:right,:hodge)
 end
 
 export ⋆
-const ⋆ = complementhodge
+const ⋆ = complementright
 
 ## reverse
 
-import Base: reverse, conj
+import Base: reverse, conj, ~
 export involute
 
 @pure parityreverse(G) = isodd(Int((G-1)*G/2))
@@ -213,29 +212,40 @@ end
 reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
 reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
 
+@inline ~(b::TensorAlgebra) = reverse(b)
+@inline ~(b::UniformScaling) = reverse(b)
+
 ## inner product: a ∨ ⋆(b)
 
 import LinearAlgebra: dot, ⋅
 export ⋅
 
 @pure function dot(a::Basis{V},b::Basis{V}) where V
-    p,C,t = interior(a,b)
+    g,C,t = interior(a,b)
     !t && (return zero(V))
     d = Basis{V}(C)
-    return p ? SValue{V}(-1,d) : d
+    return typeof(V) <: Signature ? (g ? SValue{V}(-1,d) : d) : SValue{V}(g,d)
 end
 
 function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    p,C,t = interior(bits(basis(a)),bits(basis(b)),V)
+    g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
     !t && (return zero(V))
     v = value(a)*value(b)
-    return SValue{V}(p ? -v : v,Basis{V}(C))
+    return SValue{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
 end
 
-@pure function interior_calc(N,M,S,A,B)
+@pure function interior_calc(V::Signature{N,M,S},A,B) where {N,M,S}
     γ = complement(N,B)
-    p,C,t = regressive(N,M,S,A,γ)
-    return t ? p⊻parityhodge(S,B) : p, C, t
+    p,C,t = regressive(A,γ,V)
+    return t ? p⊻parityright(S,B) : p, C, t
+end
+
+@pure function interior_calc(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
+    γ = complement(N,B)
+    p,C,t = regressive(A,γ,Signature(V))
+    ind = indices(B)
+    g = prod(V[ind])
+    return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C, t
 end
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
@@ -258,16 +268,21 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-@pure function regressive_calc(N,M,S,A,B)
+@pure function regressive_calc(::Signature{N,M,S},A,B) where {N,M,S}
     α,β = complement(N,A),complement(N,B)
-    if (count_ones(α&β)==0) && !(M ∈ (1,3,5,7,9,11) && isodd(α) && isodd(β))
+    if (count_ones(α&β)==0) && !(hasinf(M) && isodd(α) && isodd(β))
         C = α ⊻ β
         L = count_ones(A)+count_ones(B)
-        pa,pb,pc = parityhodge(S,A),parityhodge(S,B),parityhodge(S,C)
+        pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
         return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, complement(N,C), true
     else
         return false, zero(Bits), false
     end
+end
+
+@pure function regressive_calc(V::DiagonalForm,A,B)
+    p,C,t = regressive(A,B,Signature(V))
+    return p ? -1 : 1, C, t
 end
 
 ## cross product
@@ -291,103 +306,118 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-@pure function crossprod_calc(N,M,S,A,B)
-    if (count_ones(A&B)==0) && !(M ∈ (1,3,5,7,9,11) && isodd(A) && isodd(B))
+@pure function crossprod_calc(::Signature{N,M,S},A,B) where {N,M,S}
+    if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
         C = A ⊻ B
-        return parity(N,S,A,B)⊻parityhodge(S,C), complement(N,C), true
+        return parity(N,S,A,B)⊻parityright(S,C), complement(N,C), true
     else
         return false, zero(Bits), false
     end
 end
 
+@pure function crodprod_calc(V::DiagonalForm{N,M,S}) where {N,M,S}
+    if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
+        C = A ⊻ B
+        g = parityright(V,C)
+        return parity(A,B,V) ? -(g) : g, complement(N,C), true
+    else
+        return 1, zero(Bits), false
+    end
+end
+
 ### parity cache
 
-@eval begin
-    const parity_cache = Dict{Bits,Vector{Vector{Bool}}}[]
-    const parity_extra = Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}[]
-    @pure function parity(n,s,a,b)::Bool
-        if n > sparse_limit
-            N = n-sparse_limit
-            for k ∈ length(parity_extra)+1:N
-                push!(parity_extra,Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}())
-            end
-            @inbounds !haskey(parity_extra[N],s) && push!(parity_extra[N],s=>Dict{Bits,Dict{Bits,Bool}}())
-            @inbounds !haskey(parity_extra[N][s],a) && push!(parity_extra[N][s],a=>Dict{Bits,Bool}())
-            @inbounds !haskey(parity_extra[N][s][a],b) && push!(parity_extra[N][s][a],b=>parity_calc(n,s,a,b))
-            @inbounds parity_extra[N][s][a][b]
-        else
-            a1 = a+1
-            for k ∈ length(parity_cache)+1:n
-                push!(parity_cache,Dict{Bits,Vector{Bool}}())
-            end
-            @inbounds !haskey(parity_cache[n],s) && push!(parity_cache[n],s=>Vector{Bool}[])
-            @inbounds for k ∈ length(parity_cache[n][s]):a
-                @inbounds push!(parity_cache[n][s],Bool[])
-            end
-            @inbounds for k ∈ length(parity_cache[n][s][a1]):b
-                @inbounds push!(parity_cache[n][s][a1],parity_calc(n,s,a,k))
-            end
-            @inbounds parity_cache[n][s][a1][b+1]
+const parity_cache = Dict{Bits,Vector{Vector{Bool}}}[]
+const parity_extra = Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}[]
+@pure function parity(n,s,a,b)::Bool
+    if n > sparse_limit
+        N = n-sparse_limit
+        for k ∈ length(parity_extra)+1:N
+            push!(parity_extra,Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}())
         end
+        @inbounds !haskey(parity_extra[N],s) && push!(parity_extra[N],s=>Dict{Bits,Dict{Bits,Bool}}())
+        @inbounds !haskey(parity_extra[N][s],a) && push!(parity_extra[N][s],a=>Dict{Bits,Bool}())
+        @inbounds !haskey(parity_extra[N][s][a],b) && push!(parity_extra[N][s][a],b=>parity_calc(n,s,a,b))
+        @inbounds parity_extra[N][s][a][b]
+    else
+        a1 = a+1
+        for k ∈ length(parity_cache)+1:n
+            push!(parity_cache,Dict{Bits,Vector{Bool}}())
+        end
+        @inbounds !haskey(parity_cache[n],s) && push!(parity_cache[n],s=>Vector{Bool}[])
+        @inbounds for k ∈ length(parity_cache[n][s]):a
+            @inbounds push!(parity_cache[n][s],Bool[])
+        end
+        @inbounds for k ∈ length(parity_cache[n][s][a1]):b
+            @inbounds push!(parity_cache[n][s][a1],parity_calc(n,s,a,k))
+        end
+        @inbounds parity_cache[n][s][a1][b+1]
     end
-    @pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(ndims(v),value(v),a,b)
-    @pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(ndims(V),value(V),bits(a),bits(b))
+end
+@pure parity(a::Bits,b::Bits,v::Signature) = parity(ndims(v),value(v),a,b)
+@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(a,b,Signature(v))
+@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(bits(a),bits(b),V)
+
+@pure function parity_interior(a::Bits,b::Bits,V::DiagonalForm)
+    g = abs(prod(V[indices(a&b)]))
+    parity(a,b,Signature(V)) ? -(g) : g
 end
 
 ### parity cache 2
 
 for par ∈ (:interior,:regressive,:crossprod)
-    T = Tuple{Bool,Bits,Bool}
-    extra = Symbol(par,:_extra)
-    cache = Symbol(par,:_cache)
     calc = Symbol(par,:_calc)
-    @eval begin
-        const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
-        const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
-        @pure function $par(n,m,s,a,b)::$T
-            m1 = m+1
-            if n > sparse_limit
-                N = n-sparse_limit
-                for k ∈ length($extra)+1:N
-                    push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[])
+    for (vs,space,dat) ∈ ((:_sig,Signature,Bool),(:_diag,DiagonalForm,Any))
+        T = Tuple{dat,Bits,Bool}
+        extra = Symbol(par,vs,:_extra)
+        cache = Symbol(par,vs,:_cache)
+        @eval begin
+            const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
+            const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
+            @pure function ($par(a,b,V::$space{n,m,s})::$T) where {n,m,s}
+                m1 = m+1
+                if n > sparse_limit
+                    N = n-sparse_limit
+                    for k ∈ length($extra)+1:N
+                        push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[])
+                    end
+                    for k ∈ length($extra[N])+1:m1
+                        push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
+                    end
+                    @inbounds !haskey($extra[N][m1],s) && push!($extra[N][m1],s=>Dict{Bits,Dict{Bits,$T}}())
+                    @inbounds !haskey($extra[N][m1][s],a) && push!($extra[N][m1][s],a=>Dict{Bits,$T}())
+                    @inbounds !haskey($extra[N][m1][s][a],b) && push!($extra[N][m1][s][a],b=>$calc(V,a,b))
+                    @inbounds $extra[N][m1][s][a][b]
+                else
+                    a1 = a+1
+                    for k ∈ length($cache)+1:n
+                        push!($cache,Dict{Bits,Vector{Vector{$T}}}[])
+                    end
+                    for k ∈ length($cache[n])+1:m1
+                        push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
+                    end
+                    @inbounds !haskey($cache[n][m1],s) && push!($cache[n][m1],s=>Vector{$T}[])
+                    @inbounds for k ∈ length($cache[n][m1][s]):a
+                        @inbounds push!($cache[n][m1][s],$T[])
+                    end
+                    @inbounds for k ∈ length($cache[n][m1][s][a1]):b
+                        @inbounds push!($cache[n][m1][s][a1],$calc(V,a,k))
+                    end
+                    @inbounds $cache[n][m1][s][a1][b+1]
                 end
-                for k ∈ length($extra[N])+1:m1
-                    push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
-                end
-                @inbounds !haskey($extra[N][m1],s) && push!($extra[N][m1],s=>Dict{Bits,Dict{Bits,$T}}())
-                @inbounds !haskey($extra[N][m1][s],a) && push!($extra[N][m1][s],a=>Dict{Bits,$T}())
-                @inbounds !haskey($extra[N][m1][s][a],b) && push!($extra[N][m1][s][a],b=>$calc(n,m,s,a,b))
-                @inbounds $extra[N][m1][s][a][b]
-            else
-                a1 = a+1
-                for k ∈ length($cache)+1:n
-                    push!($cache,Dict{Bits,Vector{Vector{$T}}}[])
-                end
-                for k ∈ length($cache[n])+1:m1
-                    push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
-                end
-                @inbounds !haskey($cache[n][m1],s) && push!($cache[n][m1],s=>Vector{$T}[])
-                @inbounds for k ∈ length($cache[n][m1][s]):a
-                    @inbounds push!($cache[n][m1][s],$T[])
-                end
-                @inbounds for k ∈ length($cache[n][m1][s][a1]):b
-                    @inbounds push!($cache[n][m1][s][a1],$calc(n,m,s,a,k))
-                end
-                @inbounds $cache[n][m1][s][a1][b+1]
             end
         end
-        @pure $par(a::Bits,b::Bits,v::VectorSpace) = $par(ndims(v),DirectSum.options(v),value(v),a,b)
-        @pure $par(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $par(ndims(V),DirectSum.options(V),value(V),bits(a),bits(b))
     end
+    @eval @pure $par(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $par(bits(a),bits(b),V)
 end
 
 ### Product Algebra Constructor
 
 function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CONJ=:conj)
     if Field == Grassmann.Field
-        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),:-,Field,Expr)
+        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Field,Expr,:-,:*)
     elseif Field ∈ (SymField,:(SymPy.Sym))
-        declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),SUB,Field,set_val)
+        declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
     Field == :(SymPy.Sym) && for par ∈ (:parany,:parval,:parsym)
         @eval $par = ($par...,$Field)
@@ -418,8 +448,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     @eval begin
         @inline function inner_product!(mv::MValue{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
-                p,C,f = interior(α,β,V)
-                f && (mv.v = p ? $SUB(mv.v,γ) : $ADD(mv.v,γ))
+                g,C,f = interior(α,β,V)
+                f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,γ) : $ADD(mv.v,γ)) : $ADD(mv.v,$MUL(g,γ)))
             end
             return mv
         end
@@ -591,7 +621,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             end
         end
     end
-    for side ∈ (:left,:right,:hodge)
+    for side ∈ (:left,:right)
         c = Symbol(:complement,side)
         p = Symbol(:parity,side)
         for Blade ∈ MSB
@@ -601,7 +631,10 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     out = zeros($VEC(N,G,T))
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
-                        @inbounds val≠0 && setblade!(out,$p(V,ib[k]) ? $SUB(val) : val,complement(N,ib[k]),Dimension{N}())
+                        if val≠0
+                            v = typeof(V)<:Signature ? ($p(V,ib[k]) ? $SUB(val) : val) : $p(V,ib[k])
+                            @inbounds setblade!(out,v,complement(N,ib[k]),Dimension{N}())
+                        end
                     end
                     return $Blade{T,V,N-G}(out)
                 end
@@ -615,7 +648,10 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds val = m.v[bs[g]+i]
-                        @inbounds val≠0 && setmulti!(out,$p(V,ib[i]) ? $SUB(val) : val,complement(N,ib[i]),Dimension{N}())
+                        if val≠0
+                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])
+                            @inbounds setmulti!(out,v,complement(N,ib[i]),Dimension{N}())
+                        end
                     end
                 end
                 return MultiVector{T,V}(out)
