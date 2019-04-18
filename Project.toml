@@ -1,0 +1,24 @@
+name = "Grassmann"
+uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
+authors = ["Michael Reed"]
+version = "0.1.1"
+
+[deps]
+AbstractLattices = "398f06c4-4d28-53ec-89ca-5b2656b7603d"
+AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+ComputedFieldTypes = "459fdd68-db75-56b8-8c15-d717a790f88e"
+DirectSum = "22fd7b30-a8c0-5bf2-aabe-97783860d07c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Reduce = "93e0c654-6965-5f22-aba9-9c1ae6b3c259"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[compat]
+DirectSum = "0.2"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

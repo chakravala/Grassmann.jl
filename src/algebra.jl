@@ -235,14 +235,15 @@ function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
 end
 
 @pure function interior_calc(V::Signature{N,M,S},A,B) where {N,M,S}
+    hasinf(M) && isodd(A) && isodd(B) && (return false,zero(Bits),false)
     γ = complement(N,B)
-    p,C,t = regressive(A,γ,V)
+    p,C,t = regressive_calc(V,A,γ,true)
     return t ? p⊻parityright(S,B) : p, C, t
 end
 
 @pure function interior_calc(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
     γ = complement(N,B)
-    p,C,t = regressive(A,γ,Signature(V))
+    p,C,t = regressive_calc(Signature(V),A,γ,true)
     ind = indices(B)
     g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C, t
@@ -268,13 +269,14 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-@pure function regressive_calc(::Signature{N,M,S},A,B) where {N,M,S}
+@pure function regressive_calc(::Signature{N,M,S},A,B,opt=false) where {N,M,S}
     α,β = complement(N,A),complement(N,B)
-    if (count_ones(α&β)==0) && !(hasinf(M) && isodd(α) && isodd(β))
+    if (count_ones(α&β)==0 ? true : A+B==0) && !(hasinf(M) && isodd(α) && isodd(β) && (A+B≠0))
         C = α ⊻ β
         L = count_ones(A)+count_ones(B)
         pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
-        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, complement(N,C), true
+        bas = opt ? complement(N,C) : A+B≠0 ? complement(N,C) : zero(Bits)
+        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, bas, true
     else
         return false, zero(Bits), false
     end
@@ -315,7 +317,7 @@ end
     end
 end
 
-@pure function crodprod_calc(V::DiagonalForm{N,M,S}) where {N,M,S}
+@pure function crossprod_calc(V::DiagonalForm{N,M,S}) where {N,M,S}
     if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
         C = A ⊻ B
         g = parityright(V,C)
@@ -632,7 +634,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
-                            v = typeof(V)<:Signature ? ($p(V,ib[k]) ? $SUB(val) : val) : $p(V,ib[k])
+                            v = typeof(V)<:Signature ? ($p(V,ib[k]) ? $SUB(val) : val) : $p(V,ib[k])*val
                             @inbounds setblade!(out,v,complement(N,ib[k]),Dimension{N}())
                         end
                     end
@@ -649,7 +651,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds val = m.v[bs[g]+i]
                         if val≠0
-                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])
+                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])*val
                             @inbounds setmulti!(out,v,complement(N,ib[i]),Dimension{N}())
                         end
                     end
@@ -733,7 +735,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds $product!(V,out,bits(basis(s)),ib[i],$MUL(a.v,b.v[bs[g]+i]))
+                            @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b.v[bs[g]+i]))
                         end
                     end
                     return MultiVector{t,V,2^N}(out)

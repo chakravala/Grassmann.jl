@@ -39,7 +39,7 @@
             else
                 print(io,C>0 ? string(dual) : lab)
                 for j ∈ shift_indices(V,sk)
-                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? sups[j] : subs[j]) : j) : 'ϵ') : 'o')
+                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? sups[j] : subs[j]) : j) : vio[1]) : vio[2])
                 end
             end
             icr += 1
