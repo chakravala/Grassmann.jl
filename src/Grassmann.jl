@@ -100,22 +100,25 @@ for (vs,dat) ∈ ((:Signature,Bits),(:DiagonalForm,Int))
     algebra_cache = Symbol(:algebra_cache_,vs)
     getalg = Symbol(:getalgebra_,vs)
     @eval begin
-        const $algebra_cache = Vector{Dict{$dat,Λ}}[]
-        @pure function $getalg(n::Int,m::Int,s::$dat)
+        const $algebra_cache = Vector{Vector{Dict{$dat,Λ}}}[]
+        @pure function $getalg(n::Int,m::Int,s::$dat,d::Int=0)
             n==0 && (return Λ0)
             n > sparse_limit && (return $(Symbol(:getextended_,vs))(n,m,s))
             n > algebra_limit && (return $(Symbol(:getsparse_,vs))(n,m,s))
-            for N ∈ length($algebra_cache)+1:n
-                push!($algebra_cache,[Dict{$dat,Λ}() for k∈1:12])
+            for D ∈ length($algebra_cache)+1:d+1
+                push!($algebra_cache,Vector{Dict{$dat,Λ}}[])
             end
-            @inbounds if !haskey($algebra_cache[n][m+1],s)
-                @inbounds push!($algebra_cache[n][m+1],s=>collect($vs{n,m,s}()))
+            for N ∈ length($algebra_cache[d+1])+1:n
+                push!($algebra_cache[d+1],[Dict{$dat,Λ}() for k∈1:12])
             end
-            @inbounds $algebra_cache[n][m+1][s]
+            @inbounds if !haskey($algebra_cache[d+1][n][m+1],s)
+                @inbounds push!($algebra_cache[d+1][n][m+1],s=>collect($vs{n,m,s,d}()))
+            end
+            @inbounds $algebra_cache[d+1][n][m+1][s]
         end
-        @pure function getalgebra(V::$vs{N,M,S}) where {N,M,S}
+        @pure function getalgebra(V::$vs{N,M,S,D}) where {N,M,S,D}
             dualtype(V)<0 && N>2algebra_limit && (return getextended(V))
-            $(Symbol(:getalgebra_,vs))(N,M,S)
+            $(Symbol(:getalgebra_,vs))(N,M,S,D)
         end
     end
 end
@@ -207,18 +210,21 @@ for (ExtraAlgebra,extra) ∈ ((SparseAlgebra,:sparse),(ExtendedAlgebra,:extended
         extra_cache = Symbol(extra,:_cache_,vs)
         getalg = Symbol(:get,extra,:_,vs)
         @eval begin
-            const $extra_cache = Vector{Dict{$dat,$ExtraAlgebra}}[]
-            @pure function $getalg(n::Int,m::Int,s::$dat)
+            const $extra_cache = Vector{Vector{Dict{$dat,$ExtraAlgebra}}}[]
+            @pure function $getalg(n::Int,m::Int,s::$dat,d::Int=0)
                 n==0 && (return $ExtraAlgebra(V0))
-                for N ∈ length($extra_cache)+1:n
-                    push!($extra_cache,[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
+                for D ∈ length($extra_cache)+1:d+1
+                    push!($extra_cache,Vector{Dict{$dat,$ExtraAlgebra}}[])
                 end
-                @inbounds if !haskey($extra_cache[n][m+1],s)
-                    @inbounds push!($extra_cache[n][m+1],s=>$ExtraAlgebra($vs{n,m,s}()))
+                for N ∈ length($extra_cache[d+1])+1:n
+                    push!($extra_cache[d+1],[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
                 end
-                @inbounds $extra_cache[n][m+1][s]
+                @inbounds if !haskey($extra_cache[d+1][n][m+1],s)
+                    @inbounds push!($extra_cache[d+1][n][m+1],s=>$ExtraAlgebra($vs{n,m,s,d}()))
+                end
+                @inbounds $extra_cache[d+1][n][m+1][s]
             end
-            @pure $getextra(V::$vs{N,M,S}) where {N,M,S} = $getalg(N,M,S)
+            @pure $getextra(V::$vs{N,M,S,D}) where {N,M,S,D} = $getalg(N,M,S,D)
         end
     end
     @eval begin

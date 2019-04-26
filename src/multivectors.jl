@@ -9,7 +9,7 @@ abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 # print tools
 
-import DirectSum: shift_indices, printindex, printindices, VTI
+import DirectSum: shift_indices, printindices, VTI
 
 parany = (Expr,Any)
 parsym = (Expr,Symbol)
@@ -73,7 +73,7 @@ end
 ==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 ? a==value(b) : 0==a==value(b)
 ==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 ? value(a)==b : 0==value(a)==b
 
-@inline show(io::IO, e::Basis{V}) where V = printindices(io,V,bits(e))
+@inline show(io::IO, e::Basis) = printindices(io,vectorspace(e),bits(e))
 
 ## S/MValue{N}
 

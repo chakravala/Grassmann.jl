@@ -2,44 +2,34 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-@pure function labels(V::VectorSpace{N},label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2])) where N
+@pure function labels(V::T,label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2]),) where T<:VectorSpace
+    N = ndims(V)
     lab = string(label)
     io = IOBuffer()
     els = Array{Symbol,1}(undef,1<<N)
     els[1] = label
     icr = 1
     C = dualtype(V)
+    db = DirectSum.dualbits(V)
+    D = DirectSum.diffmode(V)
     C < 0 && (M = Int(N/2))
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            @inbounds sk = copy(set[k])
+            e = bit2int(indexbits(N,set[k]))
             if C < 0
-                a = Int[]
-                b = Int[]
-                for j ∈ sk
-                    push!(j ≤ M ? a : b, j)
-                end
-                b .-= M
-                e = shift_indices(V,a)
-                f = shift_indices(V,b)
-                F = !isempty(f)
-                if !(F && isempty(e))
-                    @inbounds print(io,lab,a[1:min(9,end)]...)
-                    for j ∈ 10:length(a)
-                        print(io,subs[j])
-                    end
-                end
-                if F
-                    @inbounds print(io,string(dual),b[1:min(9,end)]...)
-                    for j ∈ 10:length(b)
-                        print(io,sups[j])
-                    end
-                end
+                es = e & (~(db[1]|db[2]))
+                n = Int((N-2D)/2)
+                eps = shift_indices(V,e & db[1]).-(N-2D)
+                par = shift_indices(V,e & db[2]).-(N-D)
+                printindices(io,shift_indices(V,es & Bits(2^n-1)),shift_indices(V,es>>n),eps,par,true,lab,string(dual))
             else
-                print(io,C>0 ? string(dual) : lab)
-                for j ∈ shift_indices(V,sk)
-                    print(io,j≠0 ? (j>0 ? (j>9 ? (C>0 ? sups[j] : subs[j]) : j) : vio[1]) : vio[2])
+                es = e & (~db)
+                eps = shift_indices(V,e & db).-(N-D)
+                if !isempty(eps)
+                    printindices(io,shift_indices(V,es),Int[],C>0 ? Int[] : eps,C>0 ? eps : Int[],true,C>0 ? string(dual) : lab)
+                else
+                    printindices(io,shift_indices(V,es),true,C>0 ? string(dual) : lab)
                 end
             end
             icr += 1

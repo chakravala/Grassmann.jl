@@ -6,6 +6,8 @@ import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert,
 import DirectSum: Bits, bit2int, doc2m, indexbits, indices
 import DirectSum: pre, alphanumv, alphanumw, vsn, vio, subs, sups
 
+bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,arg) : op
+
 @pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
 @pure binomial(N,G) = Base.binomial(N,G)
 @pure mvec(N,G,t) = MVector{binomial(N,G),t}
