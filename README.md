@@ -4,7 +4,7 @@
 
 # Grassmann.jl
 
-*Conformal geometric product algebra based on static dual multivectors with graded-blade indexing*
+*⟨Grassmann-Clifford-Hestenes-Taylor⟩ differential geometric algebra of hyper-dual multivector forms*
 
 [![Build Status](https://travis-ci.org/chakravala/Grassmann.jl.svg?branch=master)](https://travis-ci.org/chakravala/Grassmann.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/c36u0rgtm2rjcquk?svg=true)](https://ci.appveyor.com/project/chakravala/grassmann-jl)
@@ -13,20 +13,43 @@
 [![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 
-This package is a work in progress providing the necessary tools to work with arbitrary dual `MultiVector` elements with optional origin. Due to the parametric type system for the generating `VectorSpace`, the Julia compiler can fully preallocate and often cache values efficiently. Both static and mutable vector types are supported.
+The [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) package provides tools for doing computations based on multi-linear algebra, differential geometry, and spin groups using the extended tensor algebra known as Grassmann-Clifford-Hestenes-Taylor geometric algebra.
+The primary operations are `∧, ∨, ⋅, *, ×, ⋆, ', ~` (which are the outer, regressive, inner, geometric, and cross products along with the Hodge star, adjoint, and multivector reversal operations).
+Any operations are highly extensible with high dimensional support for up to 62 indices and staged caching / precompilation, where the code generation enables the fairly automated task of making more definitions and computational effort depends on the sparsity.
+The [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) multivector parametric type polymorphism is based on tangent bundle vector spaces and conformal projective geometry to make the dispatch highly extensible for many applications.
+Additionally, interoperability between different sub-algebras is enabled by [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl), on which the type system is built.
 
-It is currently possible to do both high-performance numerical computations with `Grassmann` and it is also currently possible to use symbolic scalar coefficients when the `Reduce` package is also loaded (compatibility instructions at bottom).
-
-Products available for sparse & high-performance ops include `∧,∨,⋅,*,×` (exterior, regressive, interior, geometric, cross).
-
-Some unary operations include `complementleft`,`complementright`,`reverse`,`involute`,`conj`, and `adjoint`.
+  * [Design, code generation](#design-code-generation)
+	 * [Requirements](#requirements)
+  * [Direct-sum yields VectorSpace parametric type polymorphism ⨁](#direct-sum-yields-vectorspace-parametric-type-polymorphism-)
+	 * [Tangent bundle](#tangent-bundle)
+	 * [Interoperability for TensorAlgebra{V}](#interoperability-for-tensoralgebrav)
+  * [Generating elements and geometric algebra Λ(V)](#generating-elements-and-geometric-algebra-λv)
+	 * [Approaching ∞ dimensions with SparseAlgebra and ExtendedAlgebra](#approaching--dimensions-with-sparsealgebra-and-extendedalgebra)
+	 * [Differential forms and Taylor's tangent algebra](#differential-forms-and-taylors-tangent-algebra)
+  * [Constructing linear transformations from mixed tensor product ⊗](#constructing-linear-transformations-from-mixed-tensor-product-)
+  * [Importing the generators of the Leech lattice](#importing-the-generators-of-the-leech-lattice)
+  * [Symbolic coefficients by declaring an alternative scalar algebra](#symbolic-coefficients-by-declaring-an-alternative-scalar-algebra)
+  * [References](#references)
 
 #### Design, code generation
+
+The design of [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) is based on the `TensorAlgebra` abstract type system interoperability from [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl) with a `VectorSpace` parameter from [DirectSum.jl](https://github.com/chakravala/DirectSum.jl).
+Abstract tangent vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
+
+The abstract nature of the product algebra code generation enables one to automate the extension of the product operations to any specific number field type (including symbolic coefficients with [Reduce.jl](https://github.com/chakravala/Reduce.jl) or SymPy.jl), by taking advantage of Julia's type system.
+With the type system, it is possible to construct mixed tensor products from the mixed tangent vector basis and its dual basis, such as bivector elements of Lie groups.
+`Grassmann` can be used to study unitary groups used in quantum computing by building efficient computational representations of their algebras.
+Applicability of the Grassmann computational package not only maps to quantum computing, but has the potential of impacting countless other engineering and scientific computing applications.
+It can be used to work with automatic differentiation and differential geometry, algebraic forms and invariant theory, electric circuits and wave scattering, spacetime geometry and relativity, computer graphics and photogrammetry, and much more.
 
 Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
 Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, while the standard lower dimensional algebras already are highly performant and optimized.
 Thanks to the design of the product algebra code generation, any additional optimizations to the type stability will automatically enhance all the different products simultaneously.
 Likewise, any new product formulas will be able to quickly gain from the setup of all of the existing optimizations.
+
+The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
+This enables the usage of many different types of `TensorAlgebra` along with various `VectorSpace` parameters and interoperability for a wide range of scientific and research applications.
 
 ### Requirements
 
@@ -38,9 +61,13 @@ Interoperability of `TensorAlgebra` with other packages is automatically enabled
 
 ## Direct-sum yields `VectorSpace` parametric type polymorphism ⨁
 
+The *DirectSum.jl* package is a work in progress providing the necessary tools to work with arbitrary dual `VectorSpace` elements with optional origin.
+Due to the parametric type system for the generating `VectorSpace`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
+Although intended for use with the *Grassmann.jl* package, `DirectSum` can be used independently.
+
 Let `N` be the dimension of a `VectorSpace{N}`.
 The metric signature of the `Basis{V,1}` elements of a vector space `V` can be specified with the `V"..."` constructor by using `+` and `-` to specify whether the `Basis{V,1}` element of the corresponding index squares to `+1` or `-1`.
-For example, `V"+++"` constructs a positive definite 3-dimensional `VectorSpace`.
+E.g., `V"+++"` constructs a positive definite 3-dimensional `VectorSpace`.
 ```Julia
 julia> ℝ^3 == V"+++" == vectorspace(3)
 true
@@ -67,7 +94,56 @@ Grassmann.Algebra{⟨+---⟩',16}(w, w¹, w², w³, w⁴, w¹², w¹³, w¹⁴, 
 julia> collect(W) # all mixed basis elements
 Grassmann.Algebra{⟨-++++---⟩*,256}(v, v₁, v₂, v₃, v₄, w¹, w², w³, w⁴, v₁₂, v₁₃, v₁₄, v₁w¹, v₁w², ...
 ```
+Compile-time type operations make code optimization easier.
+Additionally to the direct-sum operation, several others operations are supported, such as `∪,∩,⊆,⊇` for set operations.
+```Julia
+julia> ℝ+ℝ' ⊇ vectorspace(1)
+true
+
+julia> ℝ ∩ ℝ' == vectorspace(0)
+true
+
+julia> ℝ ∪ ℝ' == ℝ+ℝ'
+true
+```
+**Note**. Although some of the operations sometimes result in the same value as shown in the above examples, the `∪` and `+` are entirely different operations in general.
+
+It is possible to specify an arbitrary `DiagonalForm` for the metric of the basis elements with `V"1,2,3"` or `V"-1,1,1,1"`, for example.
+Additionally, special projective geometry elements can be specified, such as `∞` at the first index, i.e. `V"∞+++"` or the *origin* by using `∅` subsequently (`V"∅+++"` or `V"∞∅+++"`). The projective geometry elements are still experimental on this release.
+
+### Tangent bundle
+
+The `tangent` map takes `V` to its tangent space and can be applied repeatedly or specified `tangent(V,order)` for higher `order`.
+
+```Julia
+julia> V = tangent(ℝ^3)
+⟨+++₁⟩
+
+julia> V'
+⟨---¹⟩'
+
+julia> V+V'
+⟨+++---₁¹⟩*
+```
+
 More information about `DirectSum` is available  at https://github.com/chakravala/DirectSum.jl
+
+### Interoperability for `TensorAlgebra{V}`
+
+*AbstractTensors.jl* provides the abstract interoperability between tensor algebras having differing `VectorSpace` parameters. The great thing about it is that the `VectorSpace` unions and intersections are handled separately in a different package and the actual tensor implementations are handled separately also. This enables anyone who wishes to be interoperable with `TensorAlgebra` to build their own subtypes in their own separate package with interoperability automatically possible between it all, provided the guidelines are followed.
+
+The key to making the whole interoperability work is that each `TensorAlgebra` subtype shares a `VectorSpace` parameter (with all `isbitstype` parameters), which contains all the info needed at compile time to make decisions about conversions. So other packages need only use the vector space information to decide on how to convert based on the implementation of a type. If external methods are needed, they can be loaded by `Requires` when making a separate package with `TensorAlgebra` interoperability.
+
+Since `VectorSpace` choices are fundamental to `TensorAlgebra` operations, the universal interoperability between `TensorAlgebra{V}` elements with different associated `VectorSpace` choices is naturally realized by applying the `union` morphism to operations.
+Some of the method names like `+,-,\otimes,\times,\cdot,*` for `TensorAlgebra` elements are shared across different packages, with interoperability.
+
+Additionally, a universal unit volume element can be specified in terms of `LinearAlgebra.UniformScaling`, which is independent of `V` and has its interpretation only instantiated by the context of the `TensorAlgebra{V}` element being operated on.
+The universal interoperability of `LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the `VectorSpace` form of any other `TensorAlgebra` element is handled globally.
+This enables the usage of `I` from `LinearAlgebra` as a universal pseudoscalar element.
+
+By importing the `AbstractTensors` module, the *Reduce.jl* package is able to correctly bypass operations on `TensorAlgebra` elements to the correct methods within the scope of the `Reduce.Algebra` module.
+This requires no additional overhead for the `Grassmann` or `Reduce` packages, because the `AbstractTensors` interoperability interface enables separate precompilation of both.
+Additionally, the `VectorSpace` interoperability also enables more arbitrary inputs.
 
 ## Generating elements and geometric algebra Λ(V)
 
@@ -79,7 +155,7 @@ julia> using Grassmann; @basis ℝ'⊕ℝ^3 # equivalent to basis"-+++"
 (⟨-+++⟩, v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
 ```
 As a result of this macro, all of the `Basis{V,G}` elements generated by that `VectorSpace` become available in the local workspace with the specified naming.
-The first argument provides signature specifications, the second argument is the variable name for the `VectorSpace`, and the third and fourth argument are the the prefixes of the `Basis` vector names (and covector basis names). By default, `V` is assigned the `VectorSpace` and `v` is the prefix for the `Basis` elements. Thus,
+The first argument provides signature specifications, the second argument is the variable name for the `VectorSpace`, and the third and fourth argument are the the prefixes of the `Basis` vector names (and covector basis names). By default, `V` is assigned the `VectorSpace` and `v` is the prefix for the `Basis` elements.
 ```Julia
 julia> V # Minkowski spacetime
 ⟨-+++⟩
@@ -131,7 +207,7 @@ Grassmann.Algebra{⟨+++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v
 julia> G3.v13 * G3.v12
 v₂₃
 ```
-Effort of computation depends on the sparsity. Then it is possible to assign the **quaternion** generators `i,j,k` with
+It is possible to assign the **quaternion** generators `i,j,k` with
 ```Julia
 julia> i,j,k = hyperplanes(ℝ^3)
 3-element Array{SValue{⟨+++⟩,2,B,Int64} where B,1}:
@@ -161,7 +237,7 @@ julia> v1^2, v2^2, v12^2, v1*v2*v12
 ```
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 
-### Reaching ∞ dimensions with `SparseAlgebra` and `ExtendedAlgebra`
+### Approaching ∞ dimensions with `SparseAlgebra` and `ExtendedAlgebra`
 
 It is possible to reach `Basis` elements up to `N=62` indices with `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 ```Julia
@@ -187,7 +263,7 @@ Grassmann.SparseAlgebra{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃
 This is the largest `SparseAlgebra` that can be generated with Julia, due to array size limitations.
 
 To reach higher dimensions, for `N>22` the `Grassmann.ExtendedAlgebra` type is used.
-It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 61 standard keyboard characters, this fits nicely. Since 22 is the limit for the largest fully representable `MultiVector` with Julia, having a 64-bit representation still lets you extend to 44 generating `Basis` elements if you suddenly want to decide to have a dual vector space also.
+It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 62 standard keyboard characters, this fits nicely. Since 22 is the limit for the largest fully representable `MultiVector` with Julia, having a 64-bit representation still lets you extend to 44 generating `Basis` elements if you suddenly want to decide to have a dual vector space also.
 ```Julia
 julia> V = ℝ^22
 ⟨++++++++++++++++++++++⟩
@@ -209,21 +285,39 @@ In order to work with a `TensorAlgebra{V}`, it is necessary for some computation
 julia> Λ(7) + Λ(7)'
 Grassmann.SparseAlgebra{⟨+++++++-------⟩*,16384}(v, ..., v₁₂₃₄₅₆₇w¹²³⁴⁵⁶⁷)
 ```
-One way of declaring the cache for all 3 combinations of a `VectorSpace{N}` and its dual is to ask for the sum `Λ(V) + Λ(V)'`, which is equivalent to `Λ(V⊕V')`.
+One way of declaring the cache for all 3 combinations of a `VectorSpace{N}` and its dual is to ask for the sum `Λ(V) + Λ(V)'`, which is equivalent to `Λ(V⊕V')`, but this does not initialize the cache of all 3 combinations unlike the former.
 
 The staging of the precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
+
+### Differential forms and Taylor's tangent algebra
+
+The chain rule is encoded into `Grassmann` algebra when a `tangent` bundle is used, demonstrated here symbolically with `Reduce` by using the dual number definition:
+```Julia
+julia> using Grassmann, Reduce
+Reduce (Free CSL version, revision 4590), 11-May-18 ...
+
+julia> @mixedbasis tangent(ℝ^1)
+(⟨+-₁¹⟩*, v, v₁, w¹, ϵ₁, ∂¹, v₁w¹, v₁ϵ₁, v₁∂¹, w¹ϵ₁, w¹∂¹, ϵ₁∂¹, v₁w¹ϵ₁, v₁w¹∂¹, v₁ϵ₁∂¹, w¹ϵ₁∂¹, v₁w¹ϵ₁∂¹)
+
+julia> a,b = :x*v1 + :dx*ϵ1, :y*v1 + :dy*ϵ1
+(xv₁ + dxϵ₁, yv₁ + dyϵ₁)
+
+julia> a * b
+x * y + (dy * x - dx * y)v₁ϵ₁
+```
+Higher order and multivariable Taylor numbers are also supported, although the implementation in this release is still experimental.
 
 ## Constructing linear transformations from mixed tensor product ⊗
 
 Groups such as SU(n) can be represented with the dual Grassmann’s exterior product algebra, generating a `2^(2n)`-dimensional mother algebra with geometric product from the `n`-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the `n^2`-dimensional bivector subspace of the full `(2n)!/(2(2n−2)!)`-dimensional bivector sub-algebra.
 The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the (1,1)-tensor bivector algebra.
 
-Note that `Λ.V3` gives the vector basis, and `Λ.C3` gives the covector basis:
+Note that `Λ(3)` gives the vector basis, and `Λ(3)'` gives the covector basis:
 ```Julia
-julia> Λ.V3
+julia> Λ(3)
 Grassmann.Algebra{⟨+++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
 
-julia> Λ.C3
+julia> Λ(3)'
 Grassmann.Algebra{⟨---⟩',8}(w, w¹, w², w³, w¹², w¹³, w²³, w¹²³)
 ```
 The following command yields a local 2D vector and covector basis,
@@ -255,7 +349,7 @@ julia> L = [1,2] * [3,4]'; L * [1,1]
 ```
 which is a computation equivalent to a matrix computation.
 
-This package is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
+The `TensorAlgebra` evalution is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
 
 ## Importing the generators of the Leech lattice
 
@@ -331,6 +425,7 @@ In future updates, more emphasis will be placed on increased type-stability with
 
 ## Symbolic coefficients by declaring an alternative scalar algebra
 
+Due to the abstract generality of the code generation of the `Grassmann` product algebra, it is easily possible to extend the entire set of operations to other kinds of scalar coefficient types.
 ```Julia
 julia> using GaloisFields,Grassmann
 
@@ -348,15 +443,13 @@ julia> @btime inv($ans)
   26.636 ns (0 allocations: 0 bytes)
 5v₁
 ```
-
-Due to the abstract generality of the code generation of the `Grassmann` product algebra, it is easily possible to extend the entire set of operations to other kinds of scalar coefficient types.
 By default, the coefficients are required to be `<:Number`. However, if this does not suit your needs, alternative scalar product algebras can be specified with
 ```Julia
 generate_product_algebra(SymField,:(Sym.:*),:(Sym.:+),:(Sym.:-),:svec)
 ```
 where `SymField` is the desired scalar field and `Sym` is the scope which contains the scalar field algebra for `SymField`.
 
-Currently, with the use of `Requires` it is feasible to automatically enable symbolic scalar computation with [Reduce.jl](https://github.com/chakravala/Reduce.jl), e.g.
+With the use of `Requires` it is feasible to automatically enable symbolic scalar computation with [Reduce.jl](https://github.com/chakravala/Reduce.jl), e.g.
 ```Julia
 julia> using Reduce, Grassmann
 Reduce (Free CSL version, revision 4590), 11-May-18 ...
@@ -395,7 +488,7 @@ julia> P∧Q∧R
 0.0 + ((px * qy - py * qx) * rz - ((px * qz - pz * qx) * ry - (py * qz - pz * qy) * rx))v₁₂₃ + (((px * qy - py * qx) + (py - qy) * rx) - (px - qx) * ry)v₁₂₄ + (((px * qz - pz * qx) + (pz - qz) * rx) - (px - qx) * rz)v₁₃₄ + (((py * qz - pz * qy) + (pz - qz) * ry) - (py - qy) * rz)v₂₃₄
 ```
 
-It should be straight-forward to easily substitute any other extended algebraic operations and for extended fields and pull-requests are welcome.
+It should be straight-forward to easily substitute any other extended algebraic operations and fields; issues with questions or pull-requests to that end are welcome.
 
 ## References
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)

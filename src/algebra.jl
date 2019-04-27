@@ -5,7 +5,8 @@
 import Base: +, -, *, ^, /, inv
 import AbstractLattices: ∧, ∨, dist
 import AbstractTensors: ⊗
-import DirectSum: dualcheck
+import DirectSum: dualcheck, tangent
+export tangent
 
 const Field = Number
 const ExprField = Union{Expr,Symbol}
@@ -927,7 +928,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 function $op(a::MultiVector{T,V},b::$Value{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
-                    addmulti!(out,$(bcast(bop,:(value(b,t),))),bits(basis(b)),Dimension{N}())
+                    addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
             end
@@ -1004,11 +1005,11 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
             end
             @eval begin
-                $op(a::$Blade{T,V,G}) where {T<:$Field,V,G} = $Blade{$TF,V,G}($bop.(value(a)))
+                $op(a::$Blade{T,V,G}) where {T<:$Field,V,G} = $Blade{$TF,V,G}($(bcast(bop,:(value(a),))))
                 function $op(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,G,t)))
-                    addblade!(out,$(bcast(bop,:(value(b,t),))),bits(basis(b)),Dimension{N}())
+                    addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MBlade{t,V,G}(out)
                 end
                 function $op(a::Basis{V,G},b::$Blade{T,V,G}) where {T<:$Field,V,G}
@@ -1083,18 +1084,18 @@ end
 
 ## exponentiation
 
-function ^(v::TensorTerm,i::Integer)
-    i == 0 && (return getbasis(sig(v),0))
-    out = v
+function ^(v::T,i::Integer) where T<:TensorTerm
+    i == 0 && (return getbasis(vectorspace(v),0))
+    out = basis(v)
     for k ∈ 1:(i-1)%4
-        out *= v
+        out *= basis(v)
     end
-    return out
+    return typeof(v)<:Basis ? out : out*value(v)^i
 end
 for Term ∈ (MSB...,:MultiVector,:MultiGrade)
     @eval begin
         function ^(v::$Term,i::Integer)
-            i == 0 && (return getbasis(sig(v),0))
+            i == 0 && (return getbasis(vectorspace(v),0))
             out = v
             for k ∈ 1:i-1
                 out *= v
@@ -1117,3 +1118,48 @@ for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
         @pure /(a::$Term,b::Number) = a*inv(b)
     end
 end
+
+## exponential & logarithm function
+
+import Base: exp, log
+
+function exp(t::T) where T<:TensorAlgebra{V} where V
+    terms = TensorAlgebra{V}[t,(t^2)/2]
+    norms = abs.(terms)
+    k = 3
+    while norms[end]<norms[end-1] || norms[end]>1
+        push!(terms,(terms[end]*t)/k)
+        push!(norms,abs(terms[end]))
+        k += 1
+    end
+    return 1+sum(terms[1:end-1])
+end
+
+function log(t::T) where T<:TensorAlgebra{V} where V
+    frob = abs(t)
+    k = 3
+    if frob ≤ 5/4
+        prods = TensorAlgebra{V}[t-1,(t-1)^2]
+        terms = TensorAlgebra{V}[t,prods[2]/2]
+        norms = [frob,abs(terms[2])]
+        while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
+            push!(prods,prods[end]*(t-1))
+            push!(terms,prods[end]/(k*(-1)^(k+1)))
+            push!(norms,abs(terms[end]))
+            k += 1
+        end
+    else
+        s = inv(t*inv(t-1))
+        prods = TensorAlgebra{V}[s,s^2]
+        terms = TensorAlgebra{V}[s,2prods[2]]
+        norms = abs.(terms)
+        while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
+            push!(prods,prods[end]*s)
+            push!(terms,k*prods[end])
+            push!(norms,abs(terms[end]))
+            k += 1
+        end
+    end
+    return sum(terms[1:end-1])
+end
+
