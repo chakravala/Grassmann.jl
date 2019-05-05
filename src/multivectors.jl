@@ -416,7 +416,7 @@ end
 
 ## conversions
 
-@inline (V::Signature)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<ndims(V))-1))
+@inline (V::Signature)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffmode(V)))-1))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
@@ -425,7 +425,16 @@ end
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     if WC<0 && VC≥0
-        return getbasis(W,VC>0 ? bits(b)<<ndims(V) : bits(b))
+        N = ndims(V)
+        dm = diffmode(V)
+        if dm≠0
+            D = DirectSum.dualbits(V)
+            m = (~D)&bits(b)
+            d = (D&bits(b))<<(N-dm+(VC>0 ? dm : 0))
+            return getbasis(W,(VC>0 ? m<<(N-dm) : m)⊻d)
+        else
+            return getbasis(W,VC>0 ? bits(b)<<(N-dm) : bits(b))
+        end
     else
         throw(error("arbitrary VectorSpace intersection not yet implemented."))
     end

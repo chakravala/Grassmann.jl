@@ -20,7 +20,7 @@ include("generators.jl")
 
 export hyperplanes
 
-@pure hyperplanes(V::VectorSpace{N}) where N = map(n->I*getbasis(V,1<<n),0:N-1)
+@pure hyperplanes(V::VectorSpace{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffmode(V))
 
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 

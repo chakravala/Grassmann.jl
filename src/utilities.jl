@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: Bits, bit2int, doc2m, indexbits, indices
+import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode
 import DirectSum: pre, alphanumv, alphanumw, vsn, vio, subs, sups
 
 bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
