@@ -177,6 +177,7 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
     assign_expr!(e,x,:bn,:(binomial_set(N)))
     assign_expr!(e,x,:df,:(dualform(V)))
     assign_expr!(e,x,:di,:(dualindex(V)))
+    assign_expr!(e,x,:D,:(diffmode(V)))
     return x
 end
 

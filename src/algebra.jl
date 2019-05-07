@@ -159,7 +159,7 @@ end
 
 export complementleft, complementright
 
-@pure complement(N::Int,B::UInt) = (~B)&(one(Bits)<<N-1)
+@pure complement(N::Int,B::UInt,D::Int=0) = ((~B)&(one(Bits)<<(N-D)-1))|(B&((one(Bits)<<D-1)<<(N-D)))
 
 @pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
 
@@ -178,7 +178,8 @@ for side ∈ (:left,:right)
         end
         @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
         @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-            d = getbasis(V,complement(ndims(V),B))
+            d = getbasis(V,complement(ndims(V),B,diffmode(V)))
+            dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
             typeof(V)<:Signature ? ($p(b) ? SValue{V}(-value(d),d) : d) : SValue{V}($p(b)*value(d),d)
         end
     end
@@ -324,6 +325,12 @@ end
         return 1, zero(Bits), false
     end
 end
+
+## commutator product
+
+export ⨲
+
+⨲(a,b) = a*b - b*a
 
 ### parity cache
 
@@ -627,13 +634,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         for Blade ∈ MSB
             @eval begin
                 function $c(b::$Blade{T,V,G}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,:ib),VEC)...)
+                    dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    $(insert_expr((:N,:ib,:D),VEC)...)
                     out = zeros($VEC(N,G,T))
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
                             v = typeof(V)<:Signature ? ($p(V,ib[k]) ? $SUB(val) : val) : $p(V,ib[k])*val
-                            @inbounds setblade!(out,v,complement(N,ib[k]),Dimension{N}())
+                            @inbounds setblade!(out,v,complement(N,ib[k],D),Dimension{N}())
                         end
                     end
                     return $Blade{T,V,N-G}(out)
@@ -642,6 +650,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         end
         @eval begin
             function $c(m::MultiVector{T,V}) where {T<:$Field,V}
+                dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                 $(insert_expr((:N,:bs,:bn),VEC)...)
                 out = zeros(mvec(N,T))
                 for g ∈ 1:N+1
@@ -650,7 +659,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                         @inbounds val = m.v[bs[g]+i]
                         if val≠0
                             v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])*val
-                            @inbounds setmulti!(out,v,complement(N,ib[i]),Dimension{N}())
+                            @inbounds setmulti!(out,v,complement(N,ib[i],D),Dimension{N}())
                         end
                     end
                 end
