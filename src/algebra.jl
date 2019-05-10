@@ -1118,8 +1118,13 @@ end
 
 @pure inv_parity(G) = isodd(Int((G*(G-1))/2))
 @pure inv(b::Basis) = inv_parity(grade(b)) ? -1*b : b
-function inv(b::SValue{V,G,B,T}) where {V,G,B,T}
-    SValue{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
+for Value ∈ MSV
+    @eval function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
+        $Value{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
+    end
+end
+for Blade ∈ MSB
+    @eval inv(a::$Blade) = (A=~a; A/(A⋅a))
 end
 for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
