@@ -959,7 +959,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {T<:$Field,V,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
-                $(add_val(eop,:out,:(value(b,mvec(N,t))),bop))
+                $(add_val(eop,:out,:(value(b,$VEC(N,t))),bop))
                 return MultiVector{t,V}(out)
             end
         end
@@ -971,7 +971,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
                     rb = binomsum(N,L)
                     Rb = binomial(N,L)
-                    @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,MVector{Rb,t}),)))
+                    @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
                     return MultiVector{t,V}(out)
                 end
             end
@@ -1001,13 +1001,13 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     end
                     function $op(a::$Blade{T,V,G},b::$Value{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
                         $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                        @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
+                        @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                         addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
                     function $op(a::$Value{V,L,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
                         $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                        @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,MVector{bng,t}),)))
+                        @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
                         addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
@@ -1029,26 +1029,26 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::$Blade{T,V,G},b::Basis{V,L}) where {T<:$Field,V,G,L}
                     $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
+                    @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                     addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::Basis{V,L},b::$Blade{T,V,G}) where {T<:$Field,V,G,L}
                     $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,MVector{bng,t}),)))
+                    @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = $(bcast(bop,:(value(b,$VEC(N,t)),)))
-                    @inbounds out[r+1:r+bng] += value(b,MVector{bng,t})
+                    @inbounds out[r+1:r+bng] += value(a,$VEC(N,G,t))
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::MultiVector{T,V},b::$Blade{S,V,G}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
-                    @inbounds $(Expr(eop,:(out[r+1:r+bng]),:(value(b,MVector{bng,t}))))
+                    @inbounds $(Expr(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t)))))
                     return MultiVector{t,V}(out)
                 end
             end
