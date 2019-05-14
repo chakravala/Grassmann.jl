@@ -11,6 +11,22 @@ export tangent
 const Field = Number
 const ExprField = Union{Expr,Symbol}
 
+## conformal masking >> transfer to DirectSum
+
+@pure conformalmask(V::T) where T<:VectorSpace = UInt(2)^(hasinf(V)+hasorigin(V))-1
+
+@pure function conformal_checker(V,A,B)
+    bt = conformalmask(V)
+    i2o,o2i = hasi2o(V,A,B),haso2i(V,A,B)
+    A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
+end
+
+@pure g_one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
+@pure g_zero(V::VectorSpace) = 0*one(V)
+@pure g_one(V::VectorSpace) = Basis{V}()
+@pure g_one(::Type{T}) where T = one(T)
+@pure g_zero(::Type{T}) where T = zero(T)
+
 ## mutating operations
 
 add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
@@ -48,17 +64,17 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
             @eval begin
                 @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S,::Grade{geo}=Grade{true}()) where {N,D,T<:$F,S<:$F,M,geo}
                     if v ≠ 0 && !dualcheck(V,A,B)
-                        bt = Bits(2)^(hasinf(V)+hasorigin(V))-1
-                        A3,B3 = A&bt,B&bt
-                        hio,i2o,o2i = geo && hasinforigin(V,A,B),geo && hasi2o(V,A,B), geo && haso2i(V,A,B)
+                        C,hio = A ⊻ B, geo && hasinforigin(V,A,B)
                         cc = geo && (hio || hasorigininf(V,A,B))
-                        c = geo && (i2o ⊻ o2i)
-                        pcc = c ⊻ i2o ⊻ (i2o & o2i)
+                        pcc,bas = if geo
+                            A3,B3,i2o,o2i,xor = conformal_checker(V,A,B)
+                            xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
+                        else
+                            false, C
+                        end
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),pcc ? $SUB(v) : v)
-                        C = A ⊻ B
-                        d = c ? (A3|B3)⊻C : C
-                        $s(m,val,d,Dimension{N}())
-                        cc && $s(m,hio ? $SUB(val) : val,bt⊻d,Dimension{N}())
+                        $s(m,val,bas,Dimension{N}())
+                        cc && $s(m,hio ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
                     end
                     return m
                 end
@@ -98,17 +114,14 @@ end
 
 @pure function *(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
-    dualcheck(V,A,B) && (return zero(V))
-    bt = Bits(2)^(hasinf(V)+hasorigin(V))-1
-    A3,B3 = A&bt,B&bt
-    hio,i2o,o2i = hasinforigin(V,A,B),hasi2o(V,A,B),haso2i(V,A,B)
+    dualcheck(V,A,B) && (return g_zero(V))
+    C,hio = A ⊻ B, hasinforigin(V,A,B)
     cc = hio || hasorigininf(V,A,B)
-    c = i2o ⊻ o2i
-    pcc = c ⊻ i2o ⊻ (i2o & o2i)
-    C = A ⊻ B
-    d = Basis{V}(c ? (A3|B3)⊻C : C)
+    A3,B3,i2o,o2i,xor = conformal_checker(V,A,B)
+    pcc = xor ⊻ i2o ⊻ (i2o & o2i)
+    d = Basis{V}(xor ? (A3|B3)⊻C : C)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parity_interior(A,B,V),d)
-    return cc ? (v=value(out);out+SValue{V}(hio ? -(v) : v,Basis{V}(bt⊻bits(d)))) : out
+    return cc ? (v=value(out);out+SValue{V}(hio ? -(v) : v,Basis{V}(conformalmask(V)⊻bits(d)))) : out
 end
 
 @pure function parity_calc(N,S,a,b)
@@ -146,7 +159,7 @@ export ∧, ∨
 
 @pure function ∧(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
-    (count_ones(A&B)>0) && (return zero(V))
+    (count_ones(A&B)>0) && (return g_zero(V))
     d = Basis{V}(A⊻B)
     return parity(a,b) ? SValue{V}(-1,d) : d
 end
@@ -154,7 +167,7 @@ end
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     x,y = basis(a), basis(b)
     A,B = bits(x), bits(y)
-    (count_ones(A&B)>0) && (return zero(V))
+    (count_ones(A&B)>0) && (return g_zero(V))
     v = value(a)*value(b)
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
@@ -176,7 +189,7 @@ end
 
 export complementleft, complementright
 
-@pure complement(N::Int,B::UInt,D::Int=0) = ((~B)&(one(Bits)<<(N-D)-1))|(B&((one(Bits)<<D-1)<<(N-D)))
+@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(Bits)<<(N-D)-1))|(B&((one(Bits)<<D-1)<<(N-D)))
 
 @pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
 
@@ -201,7 +214,7 @@ for side ∈ (:left,:right)
         end
     end
     for Value ∈ MSV
-        @eval $c(b::$Value) = value(b) ≠ 0 ? value(b) * $c(basis(b)) : zero(vectorspace(b))
+        @eval $c(b::$Value) = value(b) ≠ 0 ? value(b) * $c(basis(b)) : g_zero(vectorspace(b))
     end
 end
 
@@ -221,7 +234,7 @@ for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
     @eval @pure $r(b::Basis{V,G,B}) where {V,G,B} =$p(G) ? SValue{V}(-value(b),b) : b
     for Value ∈ MSV
-        @eval $r(b::$Value) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : zero(vectorspace(b))
+        @eval $r(b::$Value) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
     end
 end
 
@@ -238,14 +251,14 @@ export ⋅
 
 @pure function dot(a::Basis{V},b::Basis{V}) where V
     g,C,t = interior(a,b)
-    !t && (return zero(V))
+    !t && (return g_zero(V))
     d = Basis{V}(C)
     return typeof(V) <: Signature ? (g ? SValue{V}(-1,d) : d) : SValue{V}(g,d)
 end
 
 function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
-    !t && (return zero(V))
+    !t && (return g_zero(V))
     v = value(a)*value(b)
     return SValue{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
 end
@@ -253,14 +266,14 @@ end
 @pure function interior_calc(V::Signature{N,M,S},A,B) where {N,M,S}
     dualcheck(V,A,B) && (return false,zero(Bits),false)
     γ = complement(N,B)
-    p,C,t = regressive_calc(V,A,γ,true)
+    p,C,t = regressive_calc(V,A,γ,Grade{true}())
     return t ? p⊻parityright(S,B) : p, C, t
 end
 
 @pure function interior_calc(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
     dualcheck(V,A,B) && (return false,zero(Bits),false)
     γ = complement(N,B)
-    p,C,t = regressive_calc(Signature(V),A,γ,true)
+    p,C,t = regressive_calc(Signature(V),A,γ,Grade{true}())
     ind = indices(B)
     g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C, t
@@ -270,14 +283,14 @@ end
 
 @pure function ∨(a::Basis{V},b::Basis{V}) where V
     p,C,t = regressive(a,b)
-    !t && (return zero(V))
+    !t && (return g_zero(V))
     d = Basis{V}(C)
     return p ? SValue{V}(-1,d) : d
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     p,C,t = regressive(bits(basis(a)),bits(basis(b)),V)
-    !t && (return zero(V))
+    !t && (return g_zero(V))
     v = value(a)*value(b)
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
@@ -286,22 +299,22 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-@pure function regressive_calc(V::Signature{N,M,S},A,B,skew=false) where {N,M,S}
+@pure function regressive_calc(V::Signature{N,M,S},A,B,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
     α,β = complement(N,A),complement(N,B)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
     if ((count_ones(α&β)==0) && !dualcheck(V,α,β)) || cc
-        C = α ⊻ β
-        L = count_ones(A)+count_ones(B)
-        A3,β3 = A&Bits(3),β&Bits(3)
-        i2o,o2i = skew && hasi2o(V,A,β), skew && haso2i(V,A,β)
-        c = i2o ⊻ o2i
-        c3 = cc || c
-        pcc = c3 && parity(A3,β3,V)⊻(i2o || o2i)⊻(c&!i2o)
-        pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
-        bas = skew ? complement(N,C) : A+B≠0 ? complement(N,C) : zero(Bits)
-        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc⊻pcc, c3 ? (A3|β3)⊻bas : bas, true
+        C,L = α ⊻ β, count_ones(A)+count_ones(B)
+        pcc,bas = if skew
+            A3,β3,i2o,o2i,xor = conformal_checker(V,A,β)
+            cx,bas = cc || xor, complement(N,C)
+            cx && parity(A3,β3,V)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
+        else
+            false, A+B≠0 ? complement(N,C) : g_zero(UInt)
+        end
+        par = parityright(S,A)⊻parityright(S,B)⊻parityright(S,C)
+        return (isodd(L*(L-N))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas, true
     else
-        return false, zero(Bits), false
+        return false, g_zero(UInt), false
     end
 end
 
