@@ -5,7 +5,7 @@
 import Base: +, -, *, ^, /, inv
 import AbstractLattices: ∧, ∨, dist
 import AbstractTensors: ⊗
-import DirectSum: dualcheck, tangent
+import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf, hasi2o, haso2i
 export tangent
 
 const Field = Number
@@ -46,10 +46,19 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
         end
         for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S,::Grade{geo}=Grade{true}()) where {N,D,T<:$F,S<:$F,M,geo}
                     if v ≠ 0 && !dualcheck(V,A,B)
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),v)
-                        $s(m,val,A ⊻ B,Dimension{N}())
+                        bt = Bits(2)^(hasinf(V)+hasorigin(V))-1
+                        A3,B3 = A&bt,B&bt
+                        hio,i2o,o2i = geo && hasinforigin(V,A,B),geo && hasi2o(V,A,B), geo && haso2i(V,A,B)
+                        cc = geo && (hio || hasorigininf(V,A,B))
+                        c = geo && (i2o ⊻ o2i)
+                        pcc = c ⊻ i2o ⊻ (i2o & o2i)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),pcc ? $SUB(v) : v)
+                        C = A ⊻ B
+                        d = c ? (A3|B3)⊻C : C
+                        $s(m,val,d,Dimension{N}())
+                        cc && $s(m,hio ? $SUB(val) : val,bt⊻d,Dimension{N}())
                     end
                     return m
                 end
@@ -90,8 +99,16 @@ end
 @pure function *(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
     dualcheck(V,A,B) && (return zero(V))
-    d = Basis{V}(A⊻B)
-    return (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b) ? SValue{V}(-1,d) : d) : SValue{V}(parity_interior(A,B,V),d)
+    bt = Bits(2)^(hasinf(V)+hasorigin(V))-1
+    A3,B3 = A&bt,B&bt
+    hio,i2o,o2i = hasinforigin(V,A,B),hasi2o(V,A,B),haso2i(V,A,B)
+    cc = hio || hasorigininf(V,A,B)
+    c = i2o ⊻ o2i
+    pcc = c ⊻ i2o ⊻ (i2o & o2i)
+    C = A ⊻ B
+    d = Basis{V}(c ? (A3|B3)⊻C : C)
+    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parity_interior(A,B,V),d)
+    return cc ? (v=value(out);out+SValue{V}(hio ? -(v) : v,Basis{V}(bt⊻bits(d)))) : out
 end
 
 @pure function parity_calc(N,S,a,b)
@@ -147,9 +164,9 @@ end
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 
 
-@inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
+@inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ,Grade{false}())
 
-@inline outer_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+@inline outer_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ,Grade{false}())
 
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
 #∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
@@ -241,6 +258,7 @@ end
 end
 
 @pure function interior_calc(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
+    dualcheck(V,A,B) && (return false,zero(Bits),false)
     γ = complement(N,B)
     p,C,t = regressive_calc(Signature(V),A,γ,true)
     ind = indices(B)
@@ -268,14 +286,20 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-@pure function regressive_calc(V::Signature{N,M,S},A,B,opt=false) where {N,M,S}
+@pure function regressive_calc(V::Signature{N,M,S},A,B,skew=false) where {N,M,S}
     α,β = complement(N,A),complement(N,B)
-    if (count_ones(α&β)==0) && !dualcheck(V,α,β)
+    cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
+    if ((count_ones(α&β)==0) && !dualcheck(V,α,β)) || cc
         C = α ⊻ β
         L = count_ones(A)+count_ones(B)
+        A3,β3 = A&Bits(3),β&Bits(3)
+        i2o,o2i = skew && hasi2o(V,A,β), skew && haso2i(V,A,β)
+        c = i2o ⊻ o2i
+        c3 = cc || c
+        pcc = c3 && parity(A3,β3,V)⊻(i2o || o2i)⊻(c&!i2o)
         pa,pb,pc = parityright(S,A),parityright(S,B),parityright(S,C)
-        bas = opt ? complement(N,C) : A+B≠0 ? complement(N,C) : zero(Bits)
-        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc, bas, true
+        bas = skew ? complement(N,C) : A+B≠0 ? complement(N,C) : zero(Bits)
+        return isodd(L*(L-N))⊻pa⊻pb⊻parity(N,S,α,β)⊻pc⊻pcc, c3 ? (A3|β3)⊻bas : bas, true
     else
         return false, zero(Bits), false
     end
@@ -528,7 +552,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 return mv
             end
             function dot(a::Basis{V,G},b::$Blade{T,V,G}) where {V,T<:$Field,G}
-                $(insert_expr((:N,:t,:ib),VEC)...)
+                $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
                     @inbounds inner_product!(mv,bits(a),ib[i],b[i])
                 end
@@ -652,7 +676,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             function $c(m::MultiVector{T,V}) where {T<:$Field,V}
                 dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                 $(insert_expr((:N,:bs,:bn),VEC)...)
-                out = zeros(mvec(N,T))
+                out = zeros($VEC(N,T))
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
@@ -686,7 +710,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         @eval begin
             function $reverse(m::MultiVector{T,V}) where {T<:$Field,V}
                 $(insert_expr((:N,:bs,:bn),VEC)...)
-                out = zeros(mvec(N,T))
+                out = zeros($VEC(N,T))
                 for g ∈ 1:N+1
                     pg = $p(g-1)
                     ib = indexbasis(N,g-1)

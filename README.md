@@ -26,6 +26,7 @@ Additionally, interoperability between different sub-algebras is enabled by [Abs
 	 * [Interoperability for TensorAlgebra{V}](#interoperability-for-tensoralgebrav)
   * [Generating elements and geometric algebra Λ(V)](#generating-elements-and-geometric-algebra-λv)
 	 * [Approaching ∞ dimensions with SparseAlgebra and ExtendedAlgebra](#approaching--dimensions-with-sparsealgebra-and-extendedalgebra)
+	 * [Null-basis of the conformal split](#null-basis-of-the-conformal-split)
 	 * [Differential forms and Taylor's tangent algebra](#differential-forms-and-taylors-tangent-algebra)
   * [Constructing linear transformations from mixed tensor product ⊗](#constructing-linear-transformations-from-mixed-tensor-product-)
   * [Importing the generators of the Leech lattice](#importing-the-generators-of-the-leech-lattice)
@@ -113,7 +114,7 @@ Additionally, special projective geometry elements can be specified, such as `�
 
 ### Tangent bundle
 
-The `tangent` map takes `V` to its tangent space and can be applied repeatedly or specified `tangent(V,order)` for higher `order`.
+The `tangent` map takes `V` to its tangent space and can be applied repeatedly or specified `tangent(V,order)` for higher.
 
 ```Julia
 julia> V = tangent(ℝ^3)
@@ -288,6 +289,33 @@ Grassmann.SparseAlgebra{⟨+++++++-------⟩*,16384}(v, ..., v₁₂₃₄₅₆
 One way of declaring the cache for all 3 combinations of a `VectorSpace{N}` and its dual is to ask for the sum `Λ(V) + Λ(V)'`, which is equivalent to `Λ(V⊕V')`, but this does not initialize the cache of all 3 combinations unlike the former.
 
 The staging of the precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
+
+### Null-basis of the conformal split
+
+Declaring an additional *null-basis* is done by specifying it in the string constructor with `∞` at the first index (i.e. `S"∞+++"`).
+Likewise, an optional *origin* can be declared by `∅` subsequently (i.e. `S"∅+++"` or `S"∞∅+++"`).
+These two basis elements will be interpreted in the type system such that they propagate under transformations when combining a mixed index sets (provided the `Signature` is compatible).
+
+```Julia
+julia> using Grassmann; @basis S"∞∅++"
+(⟨∞∅++⟩, v, v∞, v∅, v₁, v₂, v∞∅, v∞₁, v∞₂, v∅₁, v∅₂, v₁₂, v∞∅₁, v∞∅₂, v∞₁₂, v∅₁₂, v∞∅₁₂)
+
+julia> v∞^2, v∅^2, v1^2, v2^2
+(0v, 0v, v, v)
+
+julia> v∞ ⋅ v∅
+-1v
+
+julia> v∞∅^2
+v
+
+julia> v∞∅ * v∞, v∞∅ * v∅
+(-1v∞, v∅)
+
+julia> v∞ * v∅, v∅ * v∞
+(-1 + 1v∞∅, -1 - 1v∞∅)
+```
+The index number `N` of the `VectorSpace` corresponds to the total number of generator elements. However, even though `S"∞∅+++"` is of type `VectorSpace{5,3}` with `5` generator elements, it can be internally recognized in the direct sum algebra as being an embedding of a 3-index `VectorSpace{3,0}` with additional encoding of the null-basis (origin and point at infinity) in the parameter `M` of the `VectorSpace{N,M}` type.
 
 ### Differential forms and Taylor's tangent algebra
 

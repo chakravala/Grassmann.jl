@@ -2,12 +2,11 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-@pure function labels(V::T,label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2]),) where T<:VectorSpace
+@pure function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],dif::String=pre[4]) where T<:VectorSpace
     N = ndims(V)
-    lab = string(label)
     io = IOBuffer()
     els = Array{Symbol,1}(undef,1<<N)
-    els[1] = label
+    els[1] = Symbol(vec)
     icr = 1
     C = dualtype(V)
     db = DirectSum.dualbits(V)
@@ -22,14 +21,14 @@
                 n = Int((N-2D)/2)
                 eps = shift_indices(V,e & db[1]).-(N-2D)
                 par = shift_indices(V,e & db[2]).-(N-D)
-                printindices(io,shift_indices(V,es & Bits(2^n-1)),shift_indices(V,es>>n),eps,par,true,lab,string(dual))
+                printindices(io,shift_indices(V,es & Bits(2^n-1)),shift_indices(V,es>>n),eps,par,true,vec,cov,duo,dif)
             else
                 es = e & (~db)
                 eps = shift_indices(V,e & db).-(N-D)
                 if !isempty(eps)
-                    printindices(io,shift_indices(V,es),Int[],C>0 ? Int[] : eps,C>0 ? eps : Int[],true,C>0 ? string(dual) : lab)
+                    printindices(io,shift_indices(V,es),Int[],C>0 ? Int[] : eps,C>0 ? eps : Int[],true,C>0 ? cov : vec,cov,C>0 ? dif : duo,dif)
                 else
-                    printindices(io,shift_indices(V,es),true,C>0 ? string(dual) : lab)
+                    printindices(io,shift_indices(V,es),true,C>0 ? string(cov) : vec)
                 end
             end
             icr += 1
@@ -52,44 +51,44 @@ end
 
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
 
-function basis(V::VectorSpace,sig::Symbol=vsn[1],label::Symbol=Symbol(pre[1]),dual::Symbol=Symbol(pre[2]))
+function basis(V::VectorSpace,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
     N = ndims(V)
     if N > algebra_limit
         Λ(V) # fill cache
         basis = generate(V)
-        sym = labels(V,label,dual)
+        sym = labels(V,string.([vec,cov,duo,dif])...)
     else
         basis = Λ(V).b
-        sym = labels(V,label,dual)
+        sym = labels(V,string.([vec,cov,duo,dif])...)
     end
     @inbounds exp = Expr[Expr(:(=),esc(sig),V),
-        Expr(:(=),esc(label),basis[1])]
+        Expr(:(=),esc(Symbol(vec)),basis[1])]
     for i ∈ 2:1<<N
         @inbounds push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
-    push!(exp,Expr(:(=),esc(Symbol(label,'⃖')) ,MultiVector(basis[1])))
+    push!(exp,Expr(:(=),esc(Symbol(vec,'⃖')) ,MultiVector(basis[1])))
     return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
 end
 
-macro basis(q,sig=vsn[1],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q),sig,label,dual)
+macro basis(q,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q),sig,string.([vec,cov,duo,dif])...)
 end
 
 macro basis_str(str)
     basis(vectorspace(str))
 end
 
-macro dualbasis(q,sig=vsn[2],label=Symbol(pre[1]),dual=Symbol(pre[2]))
-    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q))',sig,label,dual)
+macro dualbasis(q,sig=vsn[2],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q))',sig,string.([vec,cov,duo,dif])...)
 end
 
 macro dualbasis_str(str)
     basis(vectorspace(str)',vsn[2])
 end
 
-macro mixedbasis(q,sig=vsn[3],label=Symbol(pre[1]),dual=Symbol(pre[2]))
+macro mixedbasis(q,sig=vsn[3],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
     V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q)
-    bases = basis(V⊕V',sig,label,dual)
+    bases = basis(V⊕V',sig,string.([vec,cov,duo,dif])...)
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 

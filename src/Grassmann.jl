@@ -7,7 +7,7 @@ using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
 using DirectSum, AbstractTensors
 
-export vectorspace, ⊕, ℝ, @V_str, @D_str, Signature, DiagonalForm, value
+export vectorspace, ⊕, ℝ, @V_str, @S_str, @D_str, Signature, DiagonalForm, value
 import DirectSum: hasinf, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
 
 include("utilities.jl")
