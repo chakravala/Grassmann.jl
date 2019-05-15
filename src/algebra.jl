@@ -200,8 +200,8 @@ for side ∈ (:left,:right)
     c = Symbol(:complement,side)
     p = Symbol(:parity,side)
     @eval begin
-        @inline $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
-        @inline function $p(V::DiagonalForm,B,G=count_ones(B))
+        @pure $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
+        @pure function $p(V::DiagonalForm,B,G=count_ones(B))
             ind = indices(B)
             g = prod(V[ind])
             $p(0,sum(ind),G,ndims(V)) ? -(g) : g
@@ -347,7 +347,7 @@ end
 @pure function crossprod_calc(::Signature{N,M,S},A,B) where {N,M,S}
     if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
         C = A ⊻ B
-        return parity(N,S,A,B)⊻parityright(S,C), complement(N,C), true
+        return (parity(N,S,A,B)⊻parityright(S,C)), complement(N,C), true
     else
         return false, zero(Bits), false
     end
@@ -677,7 +677,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
-                            v = typeof(V)<:Signature ? ($p(V,ib[k]) ? $SUB(val) : val) : $p(V,ib[k])*val
+                            p = $p(V,ib[k])
+                            v = typeof(V)<:Signature ? (p ? $SUB(val) : val) : p*val
                             @inbounds setblade!(out,v,complement(N,ib[k],D),Dimension{N}())
                         end
                     end
@@ -1167,6 +1168,7 @@ for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
         @pure /(a::$Term,b::TensorTerm) = a*inv(b)
         @pure /(a::$Term,b::Number) = a*inv(b)
+        @pure /(a::$Term,b::UniformScaling) = a*inv(vectorspace(a)(b))
     end
 end
 
