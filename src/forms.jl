@@ -65,7 +65,7 @@ function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
     N = ndims(V)
     M = Int(N/2)
     T = valuetype(a)
-    bi = indices(a)
+    bi = indices(a,N)
     ib = indexbasis(N,1)
     @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
     t = bits(b)≠v
@@ -95,7 +95,7 @@ for Value ∈ MSV
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
-            bi = indices(basis(a))
+            bi = indices(basis(a),N)
             ib = indexbasis(N,1)
             @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
             t = bits(b)≠v
@@ -105,7 +105,7 @@ for Value ∈ MSV
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
-            bi = indices(a)
+            bi = indices(a,N)
             ib = indexbasis(N,1)
             @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
             t = bits(basis(b))≠v
@@ -126,7 +126,7 @@ for Value ∈ MSV
                 C = dualtype(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:M,:t))...)
-                bi = indices(basis(a))
+                bi = indices(basis(a),N)
                 ib = indexbasis(N,1)
                 @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
                 j = bits(basis(b))≠v
@@ -159,7 +159,7 @@ for Blade ∈ MSB
             C = dualtype(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
-            bi = indices(basis(a))
+            bi = indices(basis(a),N)
             ib = indexbasis(N,1)
             @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
             @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
@@ -199,7 +199,7 @@ for Blade ∈ MSB
                 C = dualtype(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:M,:t))...)
-                bi = indices(basis(a))
+                bi = indices(basis(a),N)
                 ib = indexbasis(N,1)
                 @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
                 @inbounds (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])

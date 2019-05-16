@@ -4,7 +4,6 @@
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
 import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode
-import DirectSum: pre, alphanumv, alphanumw, vsn, vio, subs, sups
 
 bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
@@ -88,8 +87,8 @@ function basisindex(n::Int,i::Array{Int,1})
     g>0 ? basisindex_cache[n][g][s] : 1
 end=#
 
-@inline function bladeindex_calc(d,k)
-    H = indices(UInt(d))
+@pure function bladeindex_calc(d,k)
+    H = indices(UInt(d),k)
     findall(x->x==H,combo(k,length(H)))[1]
 end
 const bladeindex_cache = Vector{Int}[]
@@ -97,7 +96,7 @@ const bladeindex_extra = Vector{Int}[]
 @pure function bladeindex(n::Int,s::Bits)::Int
     if s == 0
         1
-    elseif n>(sparse_limit+algebra_limit)
+    elseif n>(DirectSum.index_limit)
         bladeindex_calc(s,n)
     elseif n>cache_limit
         N = n-cache_limit
@@ -110,11 +109,7 @@ const bladeindex_extra = Vector{Int}[]
     else
         j = length(bladeindex_cache)+1
         for k ∈ j:min(n,cache_limit)
-            y = Array{Int,1}(undef,1<<k-1)
-            for d ∈ 1:1<<k-1
-                y[d] = bladeindex_calc(d,k)
-            end
-            push!(bladeindex_cache,y)
+            push!(bladeindex_cache,[bladeindex_calc(d,k) for d ∈ 1:1<<k-1])
             GC.gc()
         end
         @inbounds bladeindex_cache[n][s]
@@ -127,7 +122,7 @@ const basisindex_extra = Vector{Int}[]
 @pure function basisindex(n::Int,s::Bits)::Int
     if s == 0
         1
-    elseif n>(sparse_limit+algebra_limit)
+    elseif n>(DirectSum.index_limit)
         basisindex_calc(s,n)
     elseif n>cache_limit
         N = n-cache_limit
@@ -140,11 +135,7 @@ const basisindex_extra = Vector{Int}[]
     else
         j = length(basisindex_cache)+1
         for k ∈ j:min(n,cache_limit)
-            y = Array{Int,1}(undef,1<<k-1)
-            for d ∈ 1:1<<k-1
-                y[d] = basisindex_calc(d,k)
-            end
-            push!(basisindex_cache,y)
+            push!(basisindex_cache,[basisindex_calc(d,k) for d ∈ 1:1<<k-1])
             GC.gc()
         end
         @inbounds basisindex_cache[n][s]
@@ -179,25 +170,6 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
     assign_expr!(e,x,:di,:(dualindex(V)))
     assign_expr!(e,x,:D,:(diffmode(V)))
     return x
-end
-
-function indexjoin(ind::Vector{Int},s::VectorSpace{N,M} where N) where M
-    k = 1
-    t = false
-    while k < length(ind)
-        if ind[k] == ind[k+1]
-            ind[k] == 1 && hasinf(s) && (return t, ind, true)
-            s[ind[k]] && (t = !t)
-            deleteat!(ind,[k,k+1])
-        elseif ind[k] > ind[k+1]
-            ind[k:k+1] = ind[k+1:-1:k]
-            t = !t
-            k ≠ 1 && (k -= 1)
-        else
-            k += 1
-        end
-    end
-    return t, ind, false
 end
 
 @eval begin

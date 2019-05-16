@@ -8,13 +8,99 @@ using ComputedFieldTypes, AbstractLattices
 using DirectSum, AbstractTensors
 
 export vectorspace, ⊕, ℝ, @V_str, @S_str, @D_str, Signature, DiagonalForm, value
-import DirectSum: hasinf, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕
+import DirectSum: hasinf, hasorigin, dualtype, dual, value, vectorspace, V0, ⊕, pre, vsn
 
 include("utilities.jl")
 include("multivectors.jl")
+include("parity.jl")
 include("algebra.jl")
 include("forms.jl")
-include("generators.jl")
+
+## generators
+
+function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],dif::String=pre[4]) where T<:VectorSpace
+    N,io,icr = ndims(V),IOBuffer(),1
+    els = Array{Symbol,1}(undef,1<<N)
+    els[1] = Symbol(vec)
+    for i ∈ 1:N
+        set = combo(N,i)
+        for k ∈ 1:length(set)
+            DirectSum.printlabel(io,V,bit2int(indexbits(N,set[k])),true,vec,cov,duo,dif)
+            icr += 1
+            @inbounds els[icr] = Symbol(String(take!(io)))
+        end
+    end
+    return els
+end
+
+#@pure labels(V::T) where T<:VectorSpace = labels(V,pre[1],pre[2],pre[3],pre[4])
+
+@pure function generate(V::VectorSpace{N}) where N
+    exp = Basis{V}[Basis{V,0,g_zero(Bits)}()]
+    for i ∈ 1:N
+        set = combo(N,i)
+        for k ∈ 1:length(set)
+            @inbounds push!(exp,Basis{V,i,bit2int(indexbits(N,set[k]))}())
+        end
+    end
+    return exp
+end
+
+export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
+
+function basis(V::VectorSpace,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    N = ndims(V)
+    if N > algebra_limit
+        Λ(V) # fill cache
+        basis = generate(V)
+        sym = labels(V,string.([vec,cov,duo,dif])...)
+    else
+        basis = Λ(V).b
+        sym = labels(V,string.([vec,cov,duo,dif])...)
+    end
+    @inbounds exp = Expr[Expr(:(=),esc(sig),V),
+        Expr(:(=),esc(Symbol(vec)),basis[1])]
+    for i ∈ 2:1<<N
+        @inbounds push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
+    end
+    push!(exp,Expr(:(=),esc(Symbol(vec,'⃖')) ,MultiVector(basis[1])))
+    return Expr(:block,exp...,Expr(:tuple,esc(sig),esc.(sym)...))
+end
+
+macro basis(q,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    basis(typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q),sig,string.([vec,cov,duo,dif])...)
+end
+
+macro basis_str(str)
+    basis(vectorspace(str))
+end
+
+macro dualbasis(q,sig=vsn[2],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    basis((typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q))',sig,string.([vec,cov,duo,dif])...)
+end
+
+macro dualbasis_str(str)
+    basis(vectorspace(str)',vsn[2])
+end
+
+macro mixedbasis(q,sig=vsn[3],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+    V = typeof(q)∈(Symbol,Expr) ? (@eval(__module__,$q)) : vectorspace(q)
+    bases = basis(V⊕V',sig,string.([vec,cov,duo,dif])...)
+    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
+end
+
+macro mixedbasis_str(str)
+    V = vectorspace(str)
+    bases = basis(V⊕V',vsn[3])
+    Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
+end
+
+@inline function lookup_basis(V::VectorSpace,v::Symbol)::Union{SValue,Basis}
+    p,b,w,z = DirectSum.indexparity(V,v)
+    z && return g_zero(V)
+    d = Basis{w}(b)
+    return p ? SValue(-1,d) : d
+end
 
 ## fundamentals
 

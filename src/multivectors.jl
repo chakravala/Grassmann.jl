@@ -49,8 +49,8 @@ function Base.iterate(r::Basis, i::Int=1)
     Base.unsafe_getindex(r, i), i + 1
 end
 
-@inline indices(b::Basis) = indices(bits(b))
-@inline shift_indices(b::Basis{V}) where V = shift_indices(V,indices(b))
+@inline indices(b::Basis{V}) where V = indices(bits(b),ndims(V))
+@inline shift_indices(b::Basis{V}) where V = shift_indices(V,indices(b,ndims(V)))
 
 @pure Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))

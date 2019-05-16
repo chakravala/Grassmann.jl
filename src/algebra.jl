@@ -5,21 +5,11 @@
 import Base: +, -, *, ^, /, inv
 import AbstractLattices: ∧, ∨, dist
 import AbstractTensors: ⊗
-import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf, hasi2o, haso2i
+import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
 const Field = Number
 const ExprField = Union{Expr,Symbol}
-
-## conformal masking >> transfer to DirectSum
-
-@pure conformalmask(V::T) where T<:VectorSpace = UInt(2)^(hasinf(V)+hasorigin(V))-1
-
-@pure function conformal_checker(V,A,B)
-    bt = conformalmask(V)
-    i2o,o2i = hasi2o(V,A,B),haso2i(V,A,B)
-    A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
-end
 
 @pure g_one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
 @pure g_zero(V::VectorSpace) = 0*one(V)
@@ -30,12 +20,6 @@ end
 ## mutating operations
 
 add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
-
-function add!(out::MultiVector{T,V},val::T,A::Vector{Int},B::Vector{Int}) where {T<:Field,V}
-    (s,c,t) = indexjoin([A;B],V)
-    !t && (out[length(c)][basisindex(N,c)] += s ? -(val) : val)
-    return out
-end
 
 const Sym = :(Reduce.Algebra)
 const SymField = Any
@@ -67,12 +51,12 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                         C,hio = A ⊻ B, geo && hasinforigin(V,A,B)
                         cc = geo && (hio || hasorigininf(V,A,B))
                         pcc,bas = if geo
-                            A3,B3,i2o,o2i,xor = conformal_checker(V,A,B)
+                            A3,B3,i2o,o2i,xor = parityconformal(V,A,B)
                             xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
                         else
                             false, C
                         end
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parity_interior(A,B,V),pcc ? $SUB(v) : v)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
                         $s(m,val,bas,Dimension{N}())
                         cc && $s(m,hio ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
                     end
@@ -110,6 +94,47 @@ end
     return out
 end
 
+## complement
+
+export complementleft, complementright
+
+@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(UInt)<<(N-D)-1))|(B&((one(UInt)<<D-1)<<(N-D)))
+
+for side ∈ (:left,:right)
+    c = Symbol(:complement,side)
+    p = Symbol(:parity,side)
+    @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
+        d = getbasis(V,complement(ndims(V),B,diffmode(V)))
+        dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+        typeof(V)<:Signature ? ($p(b) ? SValue{V}(-value(d),d) : d) : SValue{V}($p(b)*value(d),d)
+    end
+    for Value ∈ MSV
+        @eval $c(b::$Value) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
+    end
+end
+
+export ⋆
+const ⋆ = complementright
+
+## reverse
+
+import Base: reverse, conj, ~
+export involute
+
+for r ∈ (:reverse,:involute,:conj)
+    p = Symbol(:parity,r)
+    @eval @pure $r(b::Basis{V,G,B}) where {V,G,B} =$p(G) ? SValue{V}(-value(b),b) : b
+    for Value ∈ MSV
+        @eval $r(b::$Value) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
+    end
+end
+
+reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
+reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
+
+@inline ~(b::TensorAlgebra) = reverse(b)
+@inline ~(b::UniformScaling) = reverse(b)
+
 ## geometric product
 
 @pure function *(a::Basis{V},b::Basis{V}) where V
@@ -117,16 +142,11 @@ end
     dualcheck(V,A,B) && (return g_zero(V))
     C,hio = A ⊻ B, hasinforigin(V,A,B)
     cc = hio || hasorigininf(V,A,B)
-    A3,B3,i2o,o2i,xor = conformal_checker(V,A,B)
+    A3,B3,i2o,o2i,xor = parityconformal(V,A,B)
     pcc = xor ⊻ i2o ⊻ (i2o & o2i)
     d = Basis{V}(xor ? (A3|B3)⊻C : C)
-    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parity_interior(A,B,V),d)
+    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
     return cc ? (v=value(out);out+SValue{V}(hio ? -(v) : v,Basis{V}(conformalmask(V)⊻bits(d)))) : out
-end
-
-@pure function parity_calc(N,S,a,b)
-    B = digits(b<<1,base=2,pad=N+1)
-    isodd(sum(digits(a,base=2,pad=N+1) .* cumsum!(B,B))+count_ones((a .& b) .& S))
 end
 
 for Value ∈ MSV
@@ -175,109 +195,13 @@ end
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
-
-
-@inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ,Grade{false}())
-
-@inline outer_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ,Grade{false}())
-
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
 #∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
-## complement
+@inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ,Grade{false}())
 
-export complementleft, complementright
-
-@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(Bits)<<(N-D)-1))|(B&((one(Bits)<<D-1)<<(N-D)))
-
-@pure parityright(V::Bits,B::Bits) = parityright(count_ones(V&B),sum(indices(B)),count_ones(B))
-
-@pure parityright(V::Int,B,G,N=nothing) = isodd(V)⊻isodd(B+Int((G+1)*G/2))
-@pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
-
-for side ∈ (:left,:right)
-    c = Symbol(:complement,side)
-    p = Symbol(:parity,side)
-    @eval begin
-        @pure $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B)),G,ndims(V))
-        @pure function $p(V::DiagonalForm,B,G=count_ones(B))
-            ind = indices(B)
-            g = prod(V[ind])
-            $p(0,sum(ind),G,ndims(V)) ? -(g) : g
-        end
-        @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
-        @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-            d = getbasis(V,complement(ndims(V),B,diffmode(V)))
-            dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-            typeof(V)<:Signature ? ($p(b) ? SValue{V}(-value(d),d) : d) : SValue{V}($p(b)*value(d),d)
-        end
-    end
-    for Value ∈ MSV
-        @eval $c(b::$Value) = value(b) ≠ 0 ? value(b) * $c(basis(b)) : g_zero(vectorspace(b))
-    end
-end
-
-export ⋆
-const ⋆ = complementright
-
-## reverse
-
-import Base: reverse, conj, ~
-export involute
-
-@pure parityreverse(G) = isodd(Int((G-1)*G/2))
-@pure parityinvolute(G) = isodd(G)
-@pure parityconj(G) = parityreverse(G)⊻parityinvolute(G)
-
-for r ∈ (:reverse,:involute,:conj)
-    p = Symbol(:parity,r)
-    @eval @pure $r(b::Basis{V,G,B}) where {V,G,B} =$p(G) ? SValue{V}(-value(b),b) : b
-    for Value ∈ MSV
-        @eval $r(b::$Value) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
-    end
-end
-
-reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
-reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
-
-@inline ~(b::TensorAlgebra) = reverse(b)
-@inline ~(b::UniformScaling) = reverse(b)
-
-## inner product: a ∨ ⋆(b)
-
-import LinearAlgebra: dot, ⋅
-export ⋅
-
-@pure function dot(a::Basis{V},b::Basis{V}) where V
-    g,C,t = interior(a,b)
-    !t && (return g_zero(V))
-    d = Basis{V}(C)
-    return typeof(V) <: Signature ? (g ? SValue{V}(-1,d) : d) : SValue{V}(g,d)
-end
-
-function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
-    !t && (return g_zero(V))
-    v = value(a)*value(b)
-    return SValue{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
-end
-
-@pure function interior_calc(V::Signature{N,M,S},A,B) where {N,M,S}
-    dualcheck(V,A,B) && (return false,zero(Bits),false)
-    γ = complement(N,B)
-    p,C,t = regressive_calc(V,A,γ,Grade{true}())
-    return t ? p⊻parityright(S,B) : p, C, t
-end
-
-@pure function interior_calc(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
-    dualcheck(V,A,B) && (return false,zero(Bits),false)
-    γ = complement(N,B)
-    p,C,t = regressive_calc(Signature(V),A,γ,Grade{true}())
-    ind = indices(B)
-    g = prod(V[ind])
-    return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C, t
-end
+@inline outer_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ,Grade{false}())
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
@@ -299,28 +223,23 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-@pure function regressive_calc(V::Signature{N,M,S},A,B,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
-    α,β = complement(N,A),complement(N,B)
-    cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
-    if ((count_ones(α&β)==0) && !dualcheck(V,α,β)) || cc
-        C,L = α ⊻ β, count_ones(A)+count_ones(B)
-        pcc,bas = if skew
-            A3,β3,i2o,o2i,xor = conformal_checker(V,A,β)
-            cx,bas = cc || xor, complement(N,C)
-            cx && parity(A3,β3,V)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
-        else
-            false, A+B≠0 ? complement(N,C) : g_zero(UInt)
-        end
-        par = parityright(S,A)⊻parityright(S,B)⊻parityright(S,C)
-        return (isodd(L*(L-N))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas, true
-    else
-        return false, g_zero(UInt), false
-    end
+## interior product: a ∨ ⋆(b)
+
+import LinearAlgebra: dot, ⋅
+export ⋅
+
+@pure function dot(a::Basis{V},b::Basis{V}) where V
+    g,C,t = interior(a,b)
+    !t && (return g_zero(V))
+    d = Basis{V}(C)
+    return typeof(V) <: Signature ? (g ? SValue{V}(-1,d) : d) : SValue{V}(g,d)
 end
 
-@pure function regressive_calc(V::DiagonalForm,A,B)
-    p,C,t = regressive(A,B,Signature(V))
-    return p ? -1 : 1, C, t
+function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+    g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
+    !t && (return g_zero(V))
+    v = value(a)*value(b)
+    return SValue{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
 end
 
 ## cross product
@@ -344,116 +263,11 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-@pure function crossprod_calc(::Signature{N,M,S},A,B) where {N,M,S}
-    if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
-        C = A ⊻ B
-        return (parity(N,S,A,B)⊻parityright(S,C)), complement(N,C), true
-    else
-        return false, zero(Bits), false
-    end
-end
-
-@pure function crossprod_calc(V::DiagonalForm{N,M,S}) where {N,M,S}
-    if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
-        C = A ⊻ B
-        g = parityright(V,C)
-        return parity(A,B,V) ? -(g) : g, complement(N,C), true
-    else
-        return 1, zero(Bits), false
-    end
-end
-
 ## commutator product
 
 export ⨲
 
 ⨲(a,b) = a*b - b*a
-
-### parity cache
-
-const parity_cache = Dict{Bits,Vector{Vector{Bool}}}[]
-const parity_extra = Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}[]
-@pure function parity(n,s,a,b)::Bool
-    if n > sparse_limit
-        N = n-sparse_limit
-        for k ∈ length(parity_extra)+1:N
-            push!(parity_extra,Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}())
-        end
-        @inbounds !haskey(parity_extra[N],s) && push!(parity_extra[N],s=>Dict{Bits,Dict{Bits,Bool}}())
-        @inbounds !haskey(parity_extra[N][s],a) && push!(parity_extra[N][s],a=>Dict{Bits,Bool}())
-        @inbounds !haskey(parity_extra[N][s][a],b) && push!(parity_extra[N][s][a],b=>parity_calc(n,s,a,b))
-        @inbounds parity_extra[N][s][a][b]
-    else
-        a1 = a+1
-        for k ∈ length(parity_cache)+1:n
-            push!(parity_cache,Dict{Bits,Vector{Bool}}())
-        end
-        @inbounds !haskey(parity_cache[n],s) && push!(parity_cache[n],s=>Vector{Bool}[])
-        @inbounds for k ∈ length(parity_cache[n][s]):a
-            @inbounds push!(parity_cache[n][s],Bool[])
-        end
-        @inbounds for k ∈ length(parity_cache[n][s][a1]):b
-            @inbounds push!(parity_cache[n][s][a1],parity_calc(n,s,a,k))
-        end
-        @inbounds parity_cache[n][s][a1][b+1]
-    end
-end
-@pure parity(a::Bits,b::Bits,v::Signature) = parity(ndims(v),value(v),a,b)
-@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(a,b,Signature(v))
-@pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(bits(a),bits(b),V)
-
-@pure function parity_interior(a::Bits,b::Bits,V::DiagonalForm)
-    g = abs(prod(V[indices(a&b)]))
-    parity(a,b,Signature(V)) ? -(g) : g
-end
-
-### parity cache 2
-
-for par ∈ (:interior,:regressive,:crossprod)
-    calc = Symbol(par,:_calc)
-    for (vs,space,dat) ∈ ((:_sig,Signature,Bool),(:_diag,DiagonalForm,Any))
-        T = Tuple{dat,Bits,Bool}
-        extra = Symbol(par,vs,:_extra)
-        cache = Symbol(par,vs,:_cache)
-        @eval begin
-            const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
-            const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
-            @pure function ($par(a,b,V::$space{n,m,s})::$T) where {n,m,s}
-                m1 = m+1
-                if n > sparse_limit
-                    N = n-sparse_limit
-                    for k ∈ length($extra)+1:N
-                        push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[])
-                    end
-                    for k ∈ length($extra[N])+1:m1
-                        push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
-                    end
-                    @inbounds !haskey($extra[N][m1],s) && push!($extra[N][m1],s=>Dict{Bits,Dict{Bits,$T}}())
-                    @inbounds !haskey($extra[N][m1][s],a) && push!($extra[N][m1][s],a=>Dict{Bits,$T}())
-                    @inbounds !haskey($extra[N][m1][s][a],b) && push!($extra[N][m1][s][a],b=>$calc(V,a,b))
-                    @inbounds $extra[N][m1][s][a][b]
-                else
-                    a1 = a+1
-                    for k ∈ length($cache)+1:n
-                        push!($cache,Dict{Bits,Vector{Vector{$T}}}[])
-                    end
-                    for k ∈ length($cache[n])+1:m1
-                        push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
-                    end
-                    @inbounds !haskey($cache[n][m1],s) && push!($cache[n][m1],s=>Vector{$T}[])
-                    @inbounds for k ∈ length($cache[n][m1][s]):a
-                        @inbounds push!($cache[n][m1][s],$T[])
-                    end
-                    @inbounds for k ∈ length($cache[n][m1][s][a1]):b
-                        @inbounds push!($cache[n][m1][s][a1],$calc(V,a,k))
-                    end
-                    @inbounds $cache[n][m1][s][a1][b+1]
-                end
-            end
-        end
-    end
-    @eval @pure $par(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $par(bits(a),bits(b),V)
-end
 
 ### Product Algebra Constructor
 
@@ -468,27 +282,6 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     end
     TF = Field ≠ Number ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
-    for Value ∈ MSV
-        @eval begin
-            adjoint(b::$Value{V,G,B,T}) where {V,G,B,T<:$Field} = $Value{dual(V),G,B',$TF}($CONJ(value(b)))
-        end
-    end
-    for Blade ∈ MSB
-        @eval begin
-            function adjoint(m::$Blade{T,V,G}) where {T<:$Field,V,G}
-                if dualtype(V)<0
-                    $(insert_expr((:N,:M,:ib),VEC)...)
-                    out = zeros($VEC(N,G,$TF))
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds setblade!(out,$CONJ(m.v[i]),dual(V,ib[i],M),Dimension{N}())
-                    end
-                else
-                    out = $CONJ.(value(m))
-                end
-                $Blade{$TF,dual(V),G}(out)
-            end
-        end
-    end
     @eval begin
         @inline function inner_product!(mv::MValue{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
@@ -512,9 +305,23 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             end
             MultiVector{$TF,dual(V)}(out)
         end
+        *(a::F,b::Basis{V}) where {F<:$EF,V} = SValue{V}(a,b)
+        *(a::Basis{V},b::F) where {F<:$EF,V} = SValue{V}(b,a)
+        *(a::F,b::MultiVector{T,V}) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a,b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a.v,b))
+        *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
+        *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
+        ∧(a::$Field,b::$Field) = $MUL(a,b)
+        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(a,b)
+        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(b,a)
+        #=∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
+        ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
+        ∧(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
+        ∧(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)=#
     end
     for Value ∈ MSV
         @eval begin
+            adjoint(b::$Value{V,G,B,T}) where {V,G,B,T<:$Field} = $Value{dual(V),G,B',$TF}($CONJ(value(b)))
             *(a::F,b::$Value{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = SValue{V,G}($MUL(a,b.v),basis(b))
             *(a::$Value{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = SValue{V,G}($MUL(a.v,b),basis(a))
         end
@@ -528,35 +335,22 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     end
     for Blade ∈ MSB
         @eval begin
+            function adjoint(m::$Blade{T,V,G}) where {T<:$Field,V,G}
+                if dualtype(V)<0
+                    $(insert_expr((:N,:M,:ib),VEC)...)
+                    out = zeros($VEC(N,G,$TF))
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds setblade!(out,$CONJ(m.v[i]),dual(V,ib[i],M),Dimension{N}())
+                    end
+                else
+                    out = $CONJ.(value(m))
+                end
+                $Blade{$TF,dual(V),G}(out)
+            end
             *(a::F,b::$Blade{T,V,G}) where {F<:$Field,T<:$Field,V,G} = SBlade{promote_type(T,F),V,G}(broadcast($MUL,a,b.v))
             *(a::$Blade{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = SBlade{promote_type(T,F),V,G}(broadcast($MUL,a.v,b))
-        end
-    end
-    @eval begin
-        *(a::F,b::Basis{V}) where {F<:$EF,V} = SValue{V}(a,b)
-        *(a::Basis{V},b::F) where {F<:$EF,V} = SValue{V}(b,a)
-        *(a::F,b::MultiVector{T,V}) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a,b.v))
-        *(a::MultiVector{T,V},b::F) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a.v,b))
-        *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
-        *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
-        ∧(a::$Field,b::$Field) = $MUL(a,b)
-        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(a,b)
-        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = SValue{V,G}(b,a)
-        #=
-        ∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
-        ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
-        ∧(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
-        ∧(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)
-        =#
-    end
-    #=for Blade ∈ MSB
-        @eval begin
-            ∧(a::$Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(a.*b.v)
-            ∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
-        end
-    end=#
-    for Blade ∈ MSB
-        @eval begin
+            #∧(a::$Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(a.*b.v)
+            #∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
             function dot(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
@@ -762,6 +556,23 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 return MultiVector{t,V,2^N}(out)::MultiVector{t,V,2^N}
             end
+            function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
+                $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                for g ∈ 1:N+1
+                    Y = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds val = b.v[bs[g]+i]
+                        val≠0 && for G ∈ 1:N+1
+                            @inbounds R = bs[G]
+                            X = indexbasis(N,G-1)
+                            @inbounds for j ∈ 1:bn[G]
+                                @inbounds $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],val))
+                            end
+                        end
+                    end
+                end
+                return MultiVector{t,V}(out)
+            end
         end
         for Value ∈ MSV
             @eval begin
@@ -877,25 +688,6 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end=#
             end
         end
-        @eval begin
-            function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
-                for g ∈ 1:N+1
-                    Y = indexbasis(N,g-1)
-                    @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = b.v[bs[g]+i]
-                        val≠0 && for G ∈ 1:N+1
-                            @inbounds R = bs[G]
-                            X = indexbasis(N,G-1)
-                            @inbounds for j ∈ 1:bn[G]
-                                @inbounds $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],val))
-                            end
-                        end
-                    end
-                end
-                return MultiVector{t,V}(out)
-            end
-        end
     end
 
     ## term addition
@@ -962,10 +754,6 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                         return MultiVector{t,V}(out)
                     end
                 end
-            end
-        end
-        for Value ∈ MSV
-            @eval begin
                 function $op(a::$Value{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = $(bcast(bop,:(value(b,$VEC(N,t)),)))
@@ -1001,8 +789,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 return MultiVector{t,V}(out)
             end
         end
-
         for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
+            C = (A == MSB[1] && B == MSB[1]) ? MSB[1] : MSB[2]
             @eval begin
                 function $op(a::$A{T,V,G},b::$B{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
                     $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
@@ -1012,11 +800,6 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
                     return MultiVector{t,V}(out)
                 end
-            end
-        end
-        for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
-            C = (A == MSB[1] && B == MSB[1]) ? MSB[1] : MSB[2]
-            @eval begin
                 function $op(a::$A{T,V,G},b::$B{S,V,G}) where {T<:$Field,V,G,S<:$Field}
                     return $C{promote_type(valuetype(a),valuetype(b)),V,G}($(bcast(bop,:(a.v,b.v))))
                 end
@@ -1154,11 +937,10 @@ end
 
 ## division
 
-@pure inv_parity(G) = isodd(Int((G*(G-1))/2))
-@pure inv(b::Basis) = inv_parity(grade(b)) ? -1*b : b
+@pure inv(b::Basis) = parityreverse(grade(b)) ? -1*b : b
 for Value ∈ MSV
     @eval function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
-        $Value{V,G,B}((inv_parity(G) ? -one(T) : one(T))/value(b))
+        $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/value(b))
     end
 end
 for Blade ∈ MSB
@@ -1215,4 +997,3 @@ function log(t::T) where T<:TensorAlgebra{V} where V
     end
     return sum(terms[1:end-1])
 end
-
