@@ -38,7 +38,7 @@ end
 
 @pure conformalmask(V::T) where T<:VectorSpace = UInt(2)^(hasinf(V)+hasorigin(V))-1
 
-@pure function conformalcheck(V,A,B)
+@pure function conformalcheck(V::T,A,B) where T<:VectorSpace
     bt = conformalmask(V)
     i2o,o2i = DirectSum.hasi2o(V,A,B),DirectSum.haso2i(V,A,B)
     A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
@@ -160,7 +160,7 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
         @eval begin
             const $cache = Vector{Dict{Bits,Vector{Vector{$T}}}}[]
             const $extra = Vector{Dict{Bits,Dict{Bits,Dict{Bits,$T}}}}[]
-            @pure function ($par(a,b,V::$space{n,m,s})::$T) where {n,m,s}
+            @pure function ($par(a,b,V::W)::$T) where W<:$space{n,m,s} where {n,m,s}
                 m1 = m+1
                 if n > sparse_limit
                     N = n-sparse_limit

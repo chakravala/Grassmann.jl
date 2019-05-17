@@ -7,9 +7,7 @@ export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade
 abstract type TensorTerm{V,G} <: TensorAlgebra{V} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
-# print tools
-
-import DirectSum: shift_indices, printindices, VTI
+# symbolic print types
 
 parany = (Expr,Any)
 parsym = (Expr,Symbol)
@@ -50,14 +48,13 @@ function Base.iterate(r::Basis, i::Int=1)
 end
 
 @inline indices(b::Basis{V}) where V = indices(bits(b),ndims(V))
-@inline shift_indices(b::Basis{V}) where V = shift_indices(V,indices(b,ndims(V)))
 
 @pure Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
 for t ∈ ((:V,),(:V,:G))
     @eval begin
-        function Basis{$(t...)}(b::VTI) where {$(t...)}
+        function Basis{$(t...)}(b::DirectSum.VTI) where {$(t...)}
             Basis{V}(indexbits(ndims(V),b))
         end
         function Basis{$(t...)}(b::Int...) where {$(t...)}
@@ -73,7 +70,7 @@ end
 ==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 ? a==value(b) : 0==a==value(b)
 ==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 ? value(a)==b : 0==value(a)==b
 
-@inline show(io::IO, e::Basis) = printindices(io,vectorspace(e),bits(e))
+@inline show(io::IO, e::Basis) = DirectSum.printindices(io,vectorspace(e),bits(e))
 
 ## S/MValue{N}
 
@@ -145,14 +142,14 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
             else
                 @inbounds print(io,m.v[1])
             end
-            @inbounds printindices(io,V,ib[1])
+            @inbounds DirectSum.printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
                 if T == Any && typeof(m.v[k]) ∈ parsym
                     @inbounds typeof(m.v[k])∉parval ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
                 else
                     @inbounds print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
                 end
-                @inbounds printindices(io,V,ib[k])
+                @inbounds DirectSum.printindices(io,V,ib[k])
             end
         end
         function ==(a::$Blade{S,V,G} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
@@ -283,7 +280,7 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
                 else
                     @inbounds print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
                 end
-                @inbounds printindices(io,V,ib[k])
+                @inbounds DirectSum.printindices(io,V,ib[k])
                 basis_count = false
             end
         end

@@ -46,14 +46,14 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
         end
         for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:join,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorSpace{N,D} where {N,D,T<:$F,S<:$F,M}
                     if v ≠ 0 && !dualcheck(V,A,B)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
                         $s(m,val,A⊻B,Dimension{N}())
                     end
                     return m
                 end
-                @inline function $(Symbol(:geom,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:geom,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorSpace{N,D} where {N,D,T<:$F,S<:$F,M}
                     if v ≠ 0 && !dualcheck(V,A,B)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : false,A⊻B,false
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
@@ -70,7 +70,7 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
                 @eval begin
-                    @inline function $(Symbol(prod,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::T) where {N,D,T,M}
+                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,v::T) where W<:VectorSpace{N,D} where {N,D,T,M}
                         if v ≠ 0
                             g,C,t = $uct(A,B,V)
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
@@ -86,9 +86,9 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
     end
 end
 
-@inline exteraddmulti!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
+@inline exteraddmulti!(V::W,out,α,β,γ) where W<:VectorSpace = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
 
-@inline outeraddblade!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+@inline outeraddblade!(V::W,out,α,β,γ) where W<:VectorSpace = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
 
 @inline function add!(out::MultiVector{T,V},val::T,a::Int,b::Int) where {T,V}
     A,B = Bits(a), Bits(b)
