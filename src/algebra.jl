@@ -46,24 +46,26 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
         end
         for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S,::Grade{geo}=Grade{true}()) where {N,D,T<:$F,S<:$F,M,geo}
+                @inline function $(Symbol(:join,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
                     if v ≠ 0 && !dualcheck(V,A,B)
-                        C,hio = A ⊻ B, geo && hasinforigin(V,A,B)
-                        cc = geo && (hio || hasorigininf(V,A,B))
-                        pcc,bas = if geo
-                            A3,B3,i2o,o2i,xor = parityconformal(V,A,B)
-                            xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
-                        else
-                            false, C
-                        end
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
+                        $s(m,val,A⊻B,Dimension{N}())
+                    end
+                    return m
+                end
+                @inline function $(Symbol(:geom,s))(V::VectorSpace{N,D},m::$M,A::Bits,B::Bits,v::S) where {N,D,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !dualcheck(V,A,B)
+                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : false,A⊻B,false
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
                         $s(m,val,bas,Dimension{N}())
                         cc && $s(m,hio ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
                     end
                     return m
                 end
-                @inline function $(Symbol(:join,s))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
-                    $(Symbol(:join,s))(V,m,bits(A),bits(B),v)
+            end
+            for j ∈ (:join,:geom)
+                @eval @inline function $(Symbol(j,s))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
+                    $(Symbol(j,s))(V,m,bits(A),bits(B),v)
                 end
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
@@ -84,6 +86,10 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
     end
 end
 
+@inline exteraddmulti!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
+
+@inline outeraddblade!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+
 @inline function add!(out::MultiVector{T,V},val::T,a::Int,b::Int) where {T,V}
     A,B = Bits(a), Bits(b)
     add!(out,val,Basis{V,count_ones(A),A},Basis{V,count_ones(B),B})
@@ -96,9 +102,7 @@ end
 
 ## complement
 
-export complementleft, complementright
-
-@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(UInt)<<(N-D)-1))|(B&((one(UInt)<<D-1)<<(N-D)))
+export complementleft, complementright, ⋆
 
 for side ∈ (:left,:right)
     c = Symbol(:complement,side)
@@ -113,7 +117,8 @@ for side ∈ (:left,:right)
     end
 end
 
-export ⋆
+# Hodge star ★
+
 const ⋆ = complementright
 
 ## reverse
@@ -140,11 +145,8 @@ reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
 @pure function *(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
     dualcheck(V,A,B) && (return g_zero(V))
-    C,hio = A ⊻ B, hasinforigin(V,A,B)
-    cc = hio || hasorigininf(V,A,B)
-    A3,B3,i2o,o2i,xor = parityconformal(V,A,B)
-    pcc = xor ⊻ i2o ⊻ (i2o & o2i)
-    d = Basis{V}(xor ? (A3|B3)⊻C : C)
+    pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : false,A⊻B,false
+    d = Basis{V}(bas)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
     return cc ? (v=value(out);out+SValue{V}(hio ? -(v) : v,Basis{V}(conformalmask(V)⊻bits(d)))) : out
 end
@@ -192,16 +194,12 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
 end
 
-@inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
-@inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
-@inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
 #∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
-
-@inline exterior_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ,Grade{false}())
-
-@inline outer_product!(V::VectorSpace,out,α,β,γ) = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ,Grade{false}())
+@inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
+@inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
+@inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
@@ -283,7 +281,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
     TF = Field ≠ Number ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     @eval begin
-        @inline function inner_product!(mv::MValue{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
+        @inline function inneraddvalue!(mv::MValue{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
                 g,C,f = interior(α,β,V)
                 f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,γ) : $ADD(mv.v,γ)) : $ADD(mv.v,$MUL(g,γ)))
@@ -354,14 +352,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             function dot(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
-                    @inbounds inner_product!(mv,ib[i],bits(b),a[i])
+                    @inbounds inneraddvalue!(mv,ib[i],bits(b),a[i])
                 end
                 return mv
             end
             function dot(a::Basis{V,G},b::$Blade{T,V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
-                    @inbounds inner_product!(mv,bits(a),ib[i],b[i])
+                    @inbounds inneraddvalue!(mv,bits(a),ib[i],b[i])
                 end
                 return mv
             end
@@ -372,7 +370,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 out = zeros($VEC(N,2,t))
                 C,y = dualtype(w)>0,dualtype(W)>0 ? dual(V,bits(b)) : bits(b)
                 for i ∈ 1:length(a)
-                    @inbounds outer_product!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])
+                    @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])
                 end
                 return MBlade{t,V,2}(out)
             end
@@ -383,7 +381,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 out = zeros($VEC(N,2,t))
                 C,x = dualtype(W)>0,dualtype(w)>0 ? dual(V,bits(a)) : bits(a)
                 for i ∈ 1:length(b)
-                    @inbounds outer_product!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])
+                    @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])
                 end
                 return MBlade{t,V,2}(out)
             end
@@ -393,14 +391,14 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 function dot(a::$Blade{T,V,G},b::$Value{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds inner_product!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))
+                        @inbounds inneraddvalue!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))
                     end
                     return mv
                 end
                 function dot(a::$Value{V,G,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds inner_product!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
+                        @inbounds inneraddvalue!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
                     end
                     return mv
                 end
@@ -411,7 +409,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     out = zeros($VEC(N,2,t))
                     C,y = dualtype(w)>0,dualtype(W)>0 ? dual(V,bits(basis(b))) : bits(basis(b))
                     for i ∈ 1:length(a)
-                        @inbounds outer_product!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))
+                        @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))
                     end
                     return MBlade{t,V,2}(out)
                 end
@@ -422,7 +420,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     out = zeros($VEC(N,2,t))
                     C,x = dualtype(W)>0,dualtype(w)>0 ? dual(V,bits(basis(a))) : bits(basis(a))
                     for i ∈ 1:length(b)
-                        @inbounds outer_product!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))
+                        @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))
                     end
                     return MBlade{t,V,2}(out)
                 end
@@ -436,7 +434,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 for i ∈ 1:bng
                     @inbounds v,ibi = a[i],ib[i]
                     v≠0 && for j ∈ 1:bng
-                        @inbounds inner_product!(mv,ibi,ib[j],$MUL(v,b[j]))
+                        @inbounds inneraddvalue!(mv,ibi,ib[j],$MUL(v,b[j]))
                     end
                 end
                 return mv
@@ -452,7 +450,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     @inbounds v,iai = a[i],ia[i]
                     x = CA ? dual(V,iai) : iai
                     v≠0 && for j ∈ 1:length(b)
-                        @inbounds outer_product!(V,out,x,CB ? dual(V,ib[j]) : ib[j],$MUL(v,b[j]))
+                        @inbounds outeraddblade!(V,out,x,CB ? dual(V,ib[j]) : ib[j],$MUL(v,b[j]))
                     end
                 end
                 return MBlade{t,V,2}(out)
@@ -532,7 +530,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         end
     end
 
-    for (op,product!) ∈ ((:∧,:exterior_product!),(:*,:joinaddmulti!),
+    for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                          (:∨,:meetaddmulti!),(:dot,:skewaddmulti!),
                          (:cross,:crossaddmulti!))
         @eval begin

@@ -4,7 +4,7 @@
 
 @pure function parityjoin(N,S,a,b)
     B = DirectSum.ndigits(b<<1,N)
-    isodd(sum(DirectSum.ndigits(a,N) .* cumsum(B))+count_ones((a .& b) .& S))
+    isodd(sum(DirectSum.ndigits(a,N) .* cumsum(B))+count_ones((a & b) & S))
 end
 
 ## adjoint parities
@@ -16,12 +16,12 @@ end
 ## complement parity
 
 @pure parityright(V::Int,B,G,N=nothing) = isodd(V)⊻isodd(B+Int((G+1)*G/2))
-@pure parityleft(V::Int,B,G,N=nothing) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
+@pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
 
 for side ∈ (:left,:right)
     p = Symbol(:parity,side)
     @eval begin
-        @pure $p(V::Bits,B::Bits,N::Int) = $p(count_ones(V&B),sum(indices(B,N)),count_ones(B))
+        @pure $p(V::Bits,B::Bits,N::Int) = $p(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
         @pure $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B,ndims(V))),G,ndims(V))
         @pure function $p(V::DiagonalForm,B,G=count_ones(B))
             ind = indices(B,ndims(V))
@@ -32,14 +32,24 @@ for side ∈ (:left,:right)
     end
 end
 
+@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(UInt)<<(N-D)-1))|(B&((one(UInt)<<D-1)<<(N-D)))
+
 ## product parities
 
 @pure conformalmask(V::T) where T<:VectorSpace = UInt(2)^(hasinf(V)+hasorigin(V))-1
 
-@pure function parityconformal(V,A,B)
+@pure function conformalcheck(V,A,B)
     bt = conformalmask(V)
     i2o,o2i = DirectSum.hasi2o(V,A,B),DirectSum.haso2i(V,A,B)
     A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
+end
+
+@pure function parityconformal(V::Signature{N,M,S},A,B) where {N,M,S}
+    C,hio = A ⊻ B, hasinforigin(V,A,B)
+    cc = hio || hasorigininf(V,A,B)
+    A3,B3,i2o,o2i,xor = conformalcheck(V,A,B)
+    pcc,bas = xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
+    return pcc, bas, cc
 end
 
 @pure function parityregressive(V::Signature{N,M,S},A,B,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
@@ -48,7 +58,7 @@ end
     if ((count_ones(α&β)==0) && !dualcheck(V,α,β)) || cc
         C,L = α ⊻ β, count_ones(A)+count_ones(B)
         pcc,bas = if skew
-            A3,β3,i2o,o2i,xor = parityconformal(V,A,β)
+            A3,β3,i2o,o2i,xor = conformalcheck(V,A,β)
             cx,bas = cc || xor, complement(N,C)
             cx && parity(A3,β3,V)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
         else
@@ -141,7 +151,7 @@ end
 
 ### parity product caches
 
-for par ∈ (:interior,:regressive,:crossprod)
+for par ∈ (:conformal,:regressive,:interior,:crossprod)
     calc = Symbol(:parity,par)
     for (vs,space,dat) ∈ ((:_sig,Signature,Bool),(:_diag,DiagonalForm,Any))
         T = Tuple{dat,Bits,Bool}
