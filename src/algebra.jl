@@ -754,7 +754,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::$Value{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
-                    out = $(bcast(bop,:(value(b,$VEC(N,t)),)))
+                    out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
@@ -770,7 +770,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
             $op(a::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{$TF,V}($(bcast(bop,:(value(a),))))
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
-                out = $(bcast(bop,:(value(b,$VEC(N,t)),)))
+                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
                 addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
@@ -814,7 +814,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     end
                     function $op(a::$Value{V,G,A,S} where A,b::$Blade{T,V,G}) where {T<:$Field,V,G,S<:$Field}
                         $(insert_expr((:N,:t),VEC)...)
-                        out = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
+                        out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
                         addblade!(out,value(a,t),basis(a),Dimension{N}())
                         return MBlade{t,V,G}(out)
                     end
@@ -842,7 +842,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::Basis{V,G},b::$Blade{T,V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
-                    out = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
+                    out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
                     addblade!(out,value(a,t),basis(a),Dimension{N}())
                     return MBlade{t,V,G}(out)
                 end
