@@ -860,7 +860,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 end
                 function $op(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                    out = $(bcast(bop,:(value(b,$VEC(N,t)),)))
+                    out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
                     @inbounds out[r+1:r+bng] += value(a,$VEC(N,G,t))
                     return MultiVector{t,V}(out)
                 end
