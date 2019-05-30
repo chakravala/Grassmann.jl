@@ -306,8 +306,8 @@ function ==(a::MultiVector{S,V} where S,b::T) where T<:TensorTerm{V,G} where {V,
     @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
 end
 ==(a::T,b::MultiVector{S,V} where S) where T<:TensorTerm{V} where V = b==a
-==(a::Number,b::MultiVector{S,V,G} where {S,V}) where G = prod(0 == a .== value(b))
-==(a::MultiVector{S,V,G} where {S,V},b::Number) where G = prod(0 == b .== value(a))
+==(a::Number,b::MultiVector{S,V,G} where {S,V}) where G = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
+==(a::MultiVector{S,V,G} where {S,V},b::Number) where G = b == a
 
 ## Generic
 

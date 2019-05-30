@@ -466,6 +466,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                     dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                     $(insert_expr((:N,:ib,:D),VEC)...)
                     out = zeros($VEC(N,G,T))
+                    D = diffmode(V)
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
@@ -483,6 +484,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
                 dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                 $(insert_expr((:N,:bs,:bn),VEC)...)
                 out = zeros($VEC(N,T))
+                D = diffmode(V)
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
