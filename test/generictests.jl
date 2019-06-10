@@ -77,7 +77,7 @@ for 𝔽 in [Float64]
                   S"∞∅+" # is currently broken for associativity
                   ]
             @testset "Algebra: $(G)" begin
-                dims = length(G)
+                dims = ndims(G)
 
                 # all basis elements of the whole algebra
                 basis = collect(G)[1:end]
