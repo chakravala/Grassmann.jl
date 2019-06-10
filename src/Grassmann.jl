@@ -322,8 +322,9 @@ end
 # ParaAlgebra
 
 function __init__()
+    @require Leibniz="edad4870-8a01-11e9-2d75-8f02e448fc59" generate_product_algebra(:(Leibniz.Operator),:svec)
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
-    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:svec,:(SymPy.conj))
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:svec,:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:(SymPy.conj))
 end
 
 end # module

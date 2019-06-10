@@ -58,7 +58,7 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
                         $s(m,val,bas,Dimension{N}())
-                        cc && $s(m,DirectSum.hasinforigin(V,A,B) ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
+                        cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
                     end
                     return m
                 end
@@ -269,7 +269,7 @@ export ⨲
 
 ### Product Algebra Constructor
 
-function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CONJ=:conj)
+function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj)
     if Field == Grassmann.Field
         declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Field,Expr,:-,:*)
     elseif Field ∈ (SymField,:(SymPy.Sym))
@@ -305,8 +305,8 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
         end
         *(a::F,b::Basis{V}) where {F<:$EF,V} = SValue{V}(a,b)
         *(a::Basis{V},b::F) where {F<:$EF,V} = SValue{V}(b,a)
-        *(a::F,b::MultiVector{T,V}) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a,b.v))
-        *(a::MultiVector{T,V},b::F) where {F<:$EF,T<:$EF,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a.v,b))
+        *(a::F,b::MultiVector{T,V}) where {F<:$Field,T<:$Field,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a,b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$Field,T<:$Field,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a.v,b))
         *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
         *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
         ∧(a::$Field,b::$Field) = $MUL(a,b)
@@ -878,7 +878,7 @@ function generate_product_algebra(Field=Field,MUL=:*,ADD=:+,SUB=:-,VEC=:mvec,CON
 end
 
 generate_product_algebra()
-generate_product_algebra(SymField,:($Sym.:*),:($Sym.:+),:($Sym.:-),:svec,:($Sym.conj))
+generate_product_algebra(SymField,:svec,:($Sym.:*),:($Sym.:+),:($Sym.:-),:($Sym.conj))
 
 const NSE = Union{Symbol,Expr,<:Number}
 

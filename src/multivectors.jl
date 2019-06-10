@@ -130,7 +130,8 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
         end
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
-            SBlade{T,V}(setblade!(zeros(mvec(ndims(V),G,T)),val,bits(v),Dimension{N}()))
+            N = ndims(V)
+            SBlade{T,V}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
@@ -258,7 +259,7 @@ for var ∈ ((:T,:V),(:T,),())
                 N = ndims(V)
                 out = zeros(mvec(N,T))
                 r = binomsum(N,G)
-                @inbounds out.v[r+1:r+binomial(N,G)] = v.v
+                @inbounds out[r+1:r+binomial(N,G)] = v.v
                 return MultiVector{T,V}(out)
             end
         end
