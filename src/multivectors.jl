@@ -131,7 +131,7 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            SBlade{T,V}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
+            $Blade{T,V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)

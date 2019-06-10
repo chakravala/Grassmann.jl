@@ -78,6 +78,6 @@ end
     @test typeof(a) <: MBlade
 
     @test MultiVector(a) == v1 + v2
-    @test_broken SBlade(v) == v
+    @test SBlade(v) == v
 end
 end
