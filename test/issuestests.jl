@@ -71,13 +71,13 @@ end
     @test_broken SValue{V}(-1, a)
 end
 
-@testset "Issue 22: Error in MultiVector constructor for Blades" begin
+@testset "Issue #22: Error in MultiVector constructor for Blades" begin
     basis"++"
 
     a = v1 + v2
     @test typeof(a) <: MBlade
 
-    @test_broken MultiVector(a)
-    @test_broken SBlade(v)
+    @test MultiVector(a) == v1 + v2
+    @test_broken SBlade(v) == v
 end
 end
