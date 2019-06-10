@@ -7,17 +7,9 @@ module GenericTests
 using Grassmann
 using Test
 using LinearAlgebra
-import Base: isapprox
 
-# we need an approx method for multivectors for the tests
-function isapprox(a::TensorMixed{T1}, b::TensorMixed{T2}) where {T1, T2}
-    rtol = Base.rtoldefault(T1, T2, 0)    
-    return norm(value(a-b)) <= rtol * max(norm(value(a)), norm(value(b)))
-end
-isapprox(a::TensorMixed, b::TensorTerm) = isapprox(a, MultiVector(b))
-isapprox(b::TensorTerm, a::TensorMixed) = isapprox(a, MultiVector(b))
-isapprox(a::TensorTerm, b::TensorTerm) = isapprox(MultiVector(a), MultiVector(b))
-
+# TODO: move tests for isapprox and scalar to a more appropriate file
+#       since they are no general mathematical properties of an GA
 @testset "Test isapprox" begin
     basis"2"
     
@@ -66,12 +58,6 @@ isapprox(a::TensorTerm, b::TensorTerm) = isapprox(MultiVector(a), MultiVector(b)
     @test !(v+v1+v12 ≈ v1+v12)
 end
 
-"""
-Return the scalar (grade 0) part of any multivector.
-"""
-scalar(a::TensorMixed) = grade(a) == 0 ? a[1] : 0
-scalar(a::MultiVector) = a[0][1]
-scalar(a::TensorAlgebra) = scalar(MultiVector(a))
 @testset "method: scalar" begin
     basis"2"
     @test scalar(v) == 1v
