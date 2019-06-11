@@ -131,7 +131,7 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
 
         function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            SBlade{T,V}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
+            $Blade{T,V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
         end
 
         $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
@@ -312,8 +312,8 @@ end
 
 ## Generic
 
-import Base: isinf
-export basis, grade, hasinf, hasorigin, isorigin
+import Base: isinf, isapprox
+export basis, grade, hasinf, hasorigin, isorigin, scalar
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
@@ -336,6 +336,23 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasinf(V) ? e[2] : isodd(bits(e)))
 @pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
+
+function isapprox(a::TensorMixed{T1}, b::TensorMixed{T2}) where {T1, T2}
+    rtol = Base.rtoldefault(T1, T2, 0)    
+    return norm(value(a-b)) <= rtol * max(norm(value(a)), norm(value(b)))
+end
+isapprox(a::TensorMixed, b::TensorTerm) = isapprox(a, MultiVector(b))
+isapprox(b::TensorTerm, a::TensorMixed) = isapprox(a, MultiVector(b))
+isapprox(a::TensorTerm, b::TensorTerm) = isapprox(MultiVector(a), MultiVector(b))
+
+"""
+    scalar(multivector)
+    
+Return the scalar (grade 0) part of any multivector.
+"""
+scalar(a::TensorMixed) = grade(a) == 0 ? a[1] : 0
+scalar(a::MultiVector) = a[0][1]
+scalar(a::TensorAlgebra) = scalar(MultiVector(a))
 
 ## MultiGrade{N}
 
