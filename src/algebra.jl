@@ -261,11 +261,21 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SValue{V}(p ? -v : v,Basis{V}(C))
 end
 
-## commutator product
+# symmetrization and anti-symmetrization
 
-export ⨲
+export ⊙, ⊠
 
-⨲(a,b) = a*b - b*a
+⊙(x...) = (K=length(x); sum([prod(x[k]) for k ∈ collect(permutations(1:K))])/factorial(K))
+
+function ⊠(x...)
+    K,V,out = length(x),∪(vectorspace.(x)...),prod(x)
+    P,F = collect(permutations(1:K)),factorial(K)
+    for n ∈ 2:F
+        p = prod(x[P[n]])
+        DirectSum.indexparity!(P[n],V)[1] ? (out-=p) : (out+=p)
+    end
+    return out/F
+end
 
 ### Product Algebra Constructor
 
