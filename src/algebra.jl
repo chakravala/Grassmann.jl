@@ -2,9 +2,9 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-import Base: +, -, *, ^, /, inv
+import Base: +, -, *, ^, /, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
-import AbstractTensors: ⊗
+import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆
 import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
@@ -100,6 +100,10 @@ end
     return out
 end
 
+# Hodge star ★
+
+const complementright = ⋆
+
 ## complement
 
 export complementleft, complementright, ⋆
@@ -116,10 +120,6 @@ for side ∈ (:left,:right)
         @eval $c(b::$Value) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
     end
 end
-
-# Hodge star ★
-
-const ⋆ = complementright
 
 ## reverse
 
@@ -177,7 +177,7 @@ end
 
 ## exterior product
 
-export ∧, ∨
+export ∧, ∨, ⊗
 
 @pure function ∧(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
@@ -201,6 +201,10 @@ end
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 
+for op ∈ (:⊗,:^)
+    @eval $op(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∧b
+end
+
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
 @pure function ∨(a::Basis{V},b::Basis{V}) where V
@@ -221,6 +225,8 @@ end
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
+Base.:&(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∨b
+
 ## interior product: a ∨ ⋆(b)
 
 import LinearAlgebra: dot, ⋅
@@ -239,6 +245,12 @@ function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     return SValue{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
 end
+
+export ⨼, ⨽
+
+⨼(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a)∨b
+<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a)∨b
+>(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(a,b)
 
 ## cross product
 
@@ -276,6 +288,13 @@ function ⊠(x...)
     end
     return out/F
 end
+
+<<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊙b
+>>(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊠b
+
+## sandwich product
+
+>>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
 
 ### Product Algebra Constructor
 
@@ -949,12 +968,20 @@ end
 
 @pure inv(b::Basis) = parityreverse(grade(b)) ? -1*b : b
 for Value ∈ MSV
-    @eval function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
-        $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/value(b))
+    @eval begin
+        function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
+            $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/value(b))
+        end
+        rem(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(rem(value(b),m))
+        div(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(div(value(b),m))
     end
 end
 for Blade ∈ MSB
-    @eval inv(a::$Blade) = (A=~a; A/(A⋅a))
+    @eval begin
+        inv(a::$Blade) = (A=~a; A/(A⋅a))
+        rem(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(rem.(value(a),m))
+        div(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(div.(value(a),m))
+    end
 end
 for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
@@ -963,6 +990,8 @@ for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
         @pure /(a::$Term,b::UniformScaling) = a*inv(vectorspace(a)(b))
     end
 end
+rem(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(rem.(value(a),m))
+div(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(div.(value(a),m))
 
 ## exponential & logarithm function
 
