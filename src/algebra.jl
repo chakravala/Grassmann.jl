@@ -277,9 +277,9 @@ end
 
 export ⊙, ⊠
 
-⊙(x...) = (K=length(x); sum([prod(x[k]) for k ∈ collect(permutations(1:K))])/factorial(K))
+⊙(x::TensorAlgebra...) = (K=length(x); sum([prod(x[k]) for k ∈ collect(permutations(1:K))])/factorial(K))
 
-function ⊠(x...)
+function ⊠(x::TensorAlgebra...)
     K,V,out = length(x),∪(vectorspace.(x)...),prod(x)
     P,F = collect(permutations(1:K)),factorial(K)
     for n ∈ 2:F
