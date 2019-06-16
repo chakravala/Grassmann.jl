@@ -969,10 +969,7 @@ end
 @pure inv(b::Basis{V,G}) where {V,G} = ((parityreverse(G) ? -1 : 1)/value(b⋅b))*b
 for Value ∈ MSV
     @eval begin
-        function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
-            t=basis(b)
-            $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/value(t⋅t))
-        end
+        inv(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/(value(B⋅B)*value(b)))
         rem(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(rem(value(b),m))
         div(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(div(value(b),m))
     end
