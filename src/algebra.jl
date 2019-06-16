@@ -966,10 +966,7 @@ end
 
 ## division
 
-@pure function inv(b::Basis{V}) where V
-    pvi,pr = prod(V[indices(b)]),parityreverse(grade(b))
-    typeof(V)<:Signature ? (pvi⊻pr ? -1*b : b) : (pr ? -pvi : pvi)*b
-end
+@pure inv(b::Basis{V}) where V = (p=prod(V[indices(b)]);typeof(V)<:Signature ? (p ? -1*b : b) : p*b)
 for Value ∈ MSV
     @eval begin
         function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
