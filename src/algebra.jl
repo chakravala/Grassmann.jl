@@ -4,7 +4,7 @@
 
 import Base: +, -, *, ^, /, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
-import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆
+import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, rem, div
 import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
@@ -966,7 +966,10 @@ end
 
 ## division
 
-@pure inv(b::Basis) = parityreverse(grade(b)) ? -1*b : b
+@pure function inv(b::Basis{V}) where V
+    pvi,pr = prod(V[indices(b)]),parityreverse(grade(b))
+    typeof(V)<:Signature ? (pvi⊻pr ? -1*b : b) : (pr ? -pvi : pvi)*b
+end
 for Value ∈ MSV
     @eval begin
         function inv(b::$Value{V,G,B,T}) where {V,G,B,T}
