@@ -337,22 +337,46 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
-function isapprox(a::TensorMixed{T1}, b::TensorMixed{T2}) where {T1, T2}
+function isapprox(a::S,b::T) where {S<:TensorMixed{T1},T<:TensorMixed{T2}} where {T1, T2}
     rtol = Base.rtoldefault(T1, T2, 0)    
     return norm(value(a-b)) <= rtol * max(norm(value(a)), norm(value(b)))
 end
-isapprox(a::TensorMixed, b::TensorTerm) = isapprox(a, MultiVector(b))
-isapprox(b::TensorTerm, a::TensorMixed) = isapprox(a, MultiVector(b))
-isapprox(a::TensorTerm, b::TensorTerm) = isapprox(MultiVector(a), MultiVector(b))
+isapprox(a::S,b::T) where {S<:TensorMixed,T<:TensorTerm} = isapprox(a, MultiVector(b))
+isapprox(b::S,a::T) where {S<:TensorTerm,T<:TensorMixed} = isapprox(a, MultiVector(b))
+isapprox(a::S,b::T) where {S<:TensorTerm,T<:TensorTerm} = isapprox(MultiVector(a), MultiVector(b))
 
 """
     scalar(multivector)
     
 Return the scalar (grade 0) part of any multivector.
 """
-scalar(a::TensorMixed) = grade(a) == 0 ? a[1] : 0
-scalar(a::MultiVector) = a[0][1]
-scalar(a::TensorAlgebra) = scalar(MultiVector(a))
+scalar(t::T) where T<:TensorTerm{V,0} where V = t
+scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
+scalar(t::MultiVector) = t(0,1)
+for Blade ∈ MSB
+    @eval begin
+        scalar(t::$Blade{T,V,0} where {T,V}) = a(1)
+        scalar(t::$Blade{T,V} where T) where V = zero(V)
+    end
+end
+
+vector(t::T) where T<:TensorTerm{V,1} where V = t
+vector(t::T) where T<:TensorTerm{V} where V = zero(V)
+vector(t::MultiVector) = t(1)
+for Blade ∈ MSB
+    @eval begin
+        vector(t::$Blade{T,V,1} where {T,V}) = a
+        vector(t::$Blade{T,V} where T) where V = zero(V)
+    end
+end
+
+volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
+volume(t::MultiVector{T,V} where T) where V = t(ndims(V),1)
+for Blade ∈ MSB
+    @eval begin
+        volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
+    end
+end
 
 ## MultiGrade{N}
 

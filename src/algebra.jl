@@ -175,6 +175,10 @@ for Blade ∈ MSB
     end
 end
 
+export ⊛
+
+⊛(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = scalar(a*conj(b))
+
 ## exterior product
 
 export ∧, ∨, ⊗
@@ -981,11 +985,14 @@ for Blade ∈ MSB
         div(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(div.(value(a),m))
     end
 end
+@pure /(a,b::T) where T<:TensorTerm = a*inv(b)
+for Blade ∈ MSB
+    @eval /(a,b::T) where T<:$Blade = a*inv(b)
+end
 for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
-        @pure /(a::$Term,b::TensorTerm) = a*inv(b)
-        @pure /(a::$Term,b::Number) = a*inv(b)
-        @pure /(a::$Term,b::UniformScaling) = a*inv(vectorspace(a)(b))
+        @pure /(a::S,b::T) where {S<:$Term,T<:Number} = a*inv(b)
+        @pure /(a::S,b::UniformScaling) where S<:$Term = a*inv(vectorspace(a)(b))
     end
 end
 rem(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(rem.(value(a),m))
