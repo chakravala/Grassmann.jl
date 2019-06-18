@@ -2,7 +2,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-import Base: +, -, *, ^, /, inv, <, >, <<, >>, >>>
+import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
 import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, rem, div
 import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
@@ -205,9 +205,7 @@ end
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 
-for op ∈ (:⊗,:^)
-    @eval $op(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∧b
-end
+⊗(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∧b
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
@@ -970,46 +968,71 @@ end
 
 ## division
 
-@pure inv(b::Basis{V,G}) where {V,G} = ((parityreverse(G) ? -1 : 1)/value(b⋅b))*b
-for Value ∈ MSV
+for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
-        inv(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}((parityreverse(G) ? -one(T) : one(T))/(value(B⋅B)*value(b)))
-        rem(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(rem(value(b),m))
-        div(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}(div(value(b),m))
+        @pure $nv(b::Basis{V,G}) where {V,G}=$d(parityreverse(G) ? -1 : 1,value(b⋅b))*b
+        @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
+        function $nv(m::MultiVector{T,V}) where {T,V}
+            rm = ~m
+            d = m*rm
+            fd = frobenius(d)
+            for k ∈ 0:ndims(V)
+                dk = d(k)
+                frobenius(dk) ≈ fd && (return $d(rm,dk))
+            end
+            throw(error("inv($m) is undefined"))
+        end
     end
+    for Value ∈ MSV
+        @eval $nv(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}($d(parityreverse(G) ? -one(T) : one(T),value(B⋅B)*value(b)))
+    end
+    for Blade ∈ MSB
+        @eval $nv(a::$Blade) = $d(~a,value(a⋅a))
+    end
+    for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
+        @eval begin
+            @pure $d(a::S,b::T) where {S<:$Term,T<:Number} = a*$nv(b)
+            @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
+        end
+    end
+end
+for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
+    for Value ∈ MSV
+        @eval Base.$op(b::$Value{V,G,B,T},m) where {V,G,B,T} = $Value{V,G,B}($op(value(b),m))
+    end
+    for Blade ∈ MSB
+        @eval Base.$op(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}($op.(value(a),m))
+    end
+    @eval begin
+        Base.$op(a::Basis{V,G},m) where {V,G} = Basis{V,G}($op(value(a),m))
+        Base.$op(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}($op.(value(a),m))
+    end
+end
+for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad)
+    for Value ∈ MSV
+        @eval Base.$op(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}($op(value(b)))
+    end
+    for Blade ∈ MSB
+        @eval Base.$op(a::$Blade{T,V,G}) where {T,V,G} = $Blade{T,V,G}($op.(value(a)))
+    end
+    @eval begin
+        Base.$op(a::Basis{V,G}) where {V,G} = Basis{V,G}($op(value(a)))
+        Base.$op(a::MultiVector{T,V}) where {T,V} = MultiVector{T,V}($op.(value(a)))
+    end
+end
+for Value ∈ MSV
+    @eval Base.rationalize(t::Type,b::$Value{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = $Value{V,G,B}(rationalize(t,value(b),tol))
 end
 for Blade ∈ MSB
-    @eval begin
-        inv(a::$Blade) = (~a)/value(a⋅a)
-        rem(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(rem.(value(a),m))
-        div(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(div.(value(a),m))
-    end
+    @eval Base.rationalize(t::Type,a::$Blade{T,V,G};tol::Real=eps(T)) where {T,V,G} = $Blade{T,V,G}(rationalize.(t,value(a),tol))
 end
-function inv(m::MultiVector{T,V}) where {T,V}
-    rm = ~m
-    d = m*rm
-    fd = frobenius(d)
-    for k ∈ 0:ndims(V)
-        dk = d(k)
-        frobenius(dk) ≈ fd && (return rm/dk)
-    end
-    throw(error("inv($m) is undefined"))
-end
-rem(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(rem.(value(a),m))
-div(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(div.(value(a),m))
-@pure /(a,b::T) where T<:TensorAlgebra = a*inv(b)
-for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
-    @eval begin
-        @pure /(a::S,b::T) where {S<:$Term,T<:Number} = a*inv(b)
-        @pure /(a::S,b::UniformScaling) where S<:$Term = a*inv(vectorspace(a)(b))
-    end
-end
+Base.rationalize(t::Type,a::Basis{V,G},tol::Real=eps(T)) where {V,G} = Basis{V,G}(rationalize(t,value(a),tol))
+Base.rationalize(t::Type,a::MultiVector{T,V};tol::Real=eps(T)) where {T,V} = MultiVector{T,V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
 
 ## exponential & logarithm function
 
-import Base: exp, log, log1p
-
-function exp(t::T) where T<:TensorAlgebra{V} where V
+function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     terms = TensorAlgebra{V}[t,(t^2)/2]
     norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
     k::Int = 3
@@ -1018,8 +1041,15 @@ function exp(t::T) where T<:TensorAlgebra{V} where V
         norms = (norms[2],frobenius(terms[end]))
         k += 1
     end
-    return 1+sum(terms[1:end-1])
+    return sum(terms[1:end-1])
 end
+
+@inline Base.exp(t::T) where T<:TensorAlgebra = 1+expm1(t)
+
+@inline ^(b::S,t::T) where {S<:TensorAlgebra{V},T<:TensorAlgebra{V}} where V = exp(t*log(b))
+@inline ^(b::S,t::T) where {S<:Number,T<:TensorAlgebra} = exp(t*log(b))
+
+
 
 function qlog(w::T) where T<:TensorAlgebra{V} where V
     w2 = w^2
@@ -1036,13 +1066,71 @@ function qlog(w::T) where T<:TensorAlgebra{V} where V
     return 2sum(terms[1:end-1])
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
-log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
+@inline Base.log(b,t::T) where T<:TensorAlgebra = log(t)/log(b)
+@inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
+@inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
 for base ∈ (2,10)
-    fun = Symbol(:log,base)
-    @eval Base.$fun(t::T) where T<:TensorAlgebra = $fun(ℯ)*log(t)
+    fl,fe = (Symbol(:log,base),Symbol(:exp,base))
+    @eval Base.$fl(t::T) where T<:TensorAlgebra = $fl(ℯ)*log(t)
+    @eval Base.$fe(t::T) where T<:TensorAlgebra = exp(log($base)*t)
 end
+
+@inline Base.sqrt(t::T) where T<:TensorAlgebra = exp(log(t)/2)
+@inline Base.cbrt(t::T) where T<:TensorAlgebra = exp(log(t)/3)
+
+## trigonometric
+
+function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
+    τ = t^2
+    terms = TensorAlgebra{V}[τ/2,(τ^2)/24]
+    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    k::Int = 6
+    while norms[2]<norms[1] || norms[2]>1
+        push!(terms,(terms[end]*τ)/(k*(k-1)))
+        norms = (norms[2],frobenius(terms[end]))
+        k += 2
+    end
+    return 1+sum(terms[1:end-1])
+end
+
+function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
+    τ = t^2
+    terms = TensorAlgebra{V}[t,(t*τ)/6]
+    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    k::Int = 5
+    while norms[2]<norms[1] || norms[2]>1
+        push!(terms,(terms[end]*τ)/(k*(k-1)))
+        norms = (norms[2],frobenius(terms[end]))
+        k += 2
+    end
+    return sum(terms[1:end-1])
+end
+
+@inline Base.cos(t::T) where T<:TensorAlgebra{V} where V = cosh(V(I)*t)
+@inline Base.sin(t::T) where T<:TensorAlgebra{V} where V = (i=V(I);sinh(i*t)/i)
+@inline Base.tan(t::T) where T<:TensorAlgebra = sin(t)/cos(t)
+@inline Base.cot(t::T) where T<:TensorAlgebra = cos(t)/sin(t)
+@inline Base.sec(t::T) where T<:TensorAlgebra = inv(cos(t))
+@inline Base.csc(t::T) where T<:TensorAlgebra = inv(sin(t))
+@inline Base.asec(t::T) where T<:TensorAlgebra = acos(inv(t))
+@inline Base.acsc(t::T) where T<:TensorAlgebra = asin(inv(t))
+@inline Base.sech(t::T) where T<:TensorAlgebra = inv(cosh(t))
+@inline Base.csch(t::T) where T<:TensorAlgebra = inv(sinh(t))
+@inline Base.asech(t::T) where T<:TensorAlgebra = acosh(inv(t))
+@inline Base.acsch(t::T) where T<:TensorAlgebra = asinh(inv(t))
+@inline Base.tanh(t::T) where T<:TensorAlgebra = sinh(t)/cosh(t)
+@inline Base.coth(t::T) where T<:TensorAlgebra = cosh(t)/sinh(t)
+@inline Base.asinh(t::T) where T<:TensorAlgebra = log(t+sqrt(1+t^2))
+@inline Base.acosh(t::T) where T<:TensorAlgebra = log(t+sqrt(t^2-1))
+@inline Base.atanh(t::T) where T<:TensorAlgebra = (log(1+t)-log(1-t))/2
+@inline Base.acoth(t::T) where T<:TensorAlgebra = (log(t+1)-log(t-1))/2
+Base.asin(t::T) where T<:TensorAlgebra{V} where V =(i=V(I);-i*log(i*t+sqrt(1-t^2)))
+Base.acos(t::T) where T<:TensorAlgebra{V} where V =(i=V(I);-i*log(t+i*sqrt(1-t^2)))
+Base.atan(t::T) where T<:TensorAlgebra{V} where V =(i=V(I);(-i/2)*(log(1+i*t)-log(1-i*t)))
+Base.acot(t::T) where T<:TensorAlgebra{V} where V =(i=V(I);(-i/2)*(log(t-i)-log(t+i)))
+Base.sinc(t::T) where T<:TensorAlgebra{V} where V = iszero(t) ? one(V) : (x=(1*π)*t;sin(x)/x)
+Base.cosc(t::T) where T<:TensorAlgebra{V} where V = iszero(t) ? zero(V) : (x=(1*π)*t; cos(x)/t - sin(x)/(x*t))
 
 #=function log(t::T) where T<:TensorAlgebra{V} where V
     norms::Tuple = (frobenius(t),0)

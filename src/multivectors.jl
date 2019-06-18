@@ -338,6 +338,8 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
 @inline frobenius(t::T) where T<:TensorAlgebra = norm(value(t))
+@inline Base.iszero(t::T) where T<:TensorAlgebra = frobenius(t) == 0
+@inline Base.isone(t::T) where T<:TensorAlgebra = frobenius(t) == scalar(t) == 1
 
 function isapprox(a::S,b::T) where {S<:TensorMixed{T1},T<:TensorMixed{T2}} where {T1, T2}
     rtol = Base.rtoldefault(T1, T2, 0)    
