@@ -988,9 +988,10 @@ end
 function inv(m::MultiVector{T,V}) where {T,V}
     rm = ~m
     d = m*rm
+    fd = frobenius(d)
     for k ∈ 0:ndims(V)
         dk = d(k)
-        frobenius(dk) ≈ frobenius(d) && (return rm/dk)
+        frobenius(dk) ≈ fd && (return rm/dk)
     end
     throw(error("inv($m) is undefined"))
 end
@@ -1006,45 +1007,68 @@ end
 
 ## exponential & logarithm function
 
-import Base: exp, log
+import Base: exp, log, log1p
 
 function exp(t::T) where T<:TensorAlgebra{V} where V
     terms = TensorAlgebra{V}[t,(t^2)/2]
-    norms = frobenius.(terms)
-    k = 3
-    while norms[end]<norms[end-1] || norms[end]>1
+    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    k::Int = 3
+    while norms[2]<norms[1] || norms[2]>1
         push!(terms,(terms[end]*t)/k)
-        push!(norms,frobenius(terms[end]))
+        norms = (norms[2],frobenius(terms[end]))
         k += 1
     end
     return 1+sum(terms[1:end-1])
 end
 
-function log(t::T) where T<:TensorAlgebra{V} where V
-    frob = frobenius(t)
-    k = 3
+function qlog(w::T) where T<:TensorAlgebra{V} where V
+    w2 = w^2
+    prods = w*w2
+    terms = TensorAlgebra{V}[w,prods/3]
+    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    k::Int = 5
+    while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+        prods = prods*w2
+        push!(terms,prods/k)
+        norms = (norms[2],frobenius(terms[end]))
+        k += 2
+    end
+    return 2sum(terms[1:end-1])
+end # http://www.netlib.org/cephes/qlibdoc.html#qlog
+
+log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
+log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
+
+for base ∈ (2,10)
+    fun = Symbol(:log,base)
+    @eval Base.$fun(t::T) where T<:TensorAlgebra = $fun(ℯ)*log(t)
+end
+
+#=function log(t::T) where T<:TensorAlgebra{V} where V
+    norms::Tuple = (frobenius(t),0)
+    k::Int = 3
     τ = t-1
-    if frob ≤ 5/4
-        prods = TensorAlgebra{V}[τ,τ^2]
-        terms = TensorAlgebra{V}[τ,prods[2]/2]
-        norms = [frob,frobenius(terms[2])]
-        while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
-            push!(prods,prods[end]*τ)
-            push!(terms,prods[end]/(k*(-1)^(k+1)))
-            push!(norms,frobenius(terms[end]))
+    if true #norms[1] ≤ 5/4
+        prods = τ^2
+        terms = TensorAlgebra{V}[τ,prods/2]
+        norms = (norms[1],frobenius(terms[2]))
+        while (norms[2]<norms[1] || norms[2]>1) && k ≤ 3000
+            prods = prods*t
+            push!(terms,prods/(k*(-1)^(k+1)))
+            norms = (norms[2],frobenius(terms[end]))
             k += 1
         end
     else
         s = inv(t*inv(τ))
-        prods = TensorAlgebra{V}[s,s^2]
-        terms = TensorAlgebra{V}[s,2prods[2]]
-        norms = frobenius.(terms)
-        while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
-            push!(prods,prods[end]*s)
-            push!(terms,k*prods[end])
-            push!(norms,frobenius(terms[end]))
+        prods = s^2
+        terms = TensorAlgebra{V}[s,2prods]
+        norms = (frobenius(terms[1]),frobenius(terms[2]))
+        while (norms[2]<norms[1] || norms[2]>1) && k ≤ 3000
+            prods = prods*s
+            push!(terms,k*prods)
+            norms = (norms[2],frobenius(terms[end]))
             k += 1
         end
     end
     return sum(terms[1:end-1])
-end
+end=#

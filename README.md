@@ -236,6 +236,20 @@ julia> basis"--"
 julia> v1^2, v2^2, v12^2, v1*v2*v12
 (-1v, -1v, -1v, -1v)
 ```
+With the preliminary implementations of the `exp` and `log` functions one can compute
+```Julia
+julia> exp(0.5π/2*(i+j)/sqrt(2))
+0.7071067811865476 + 0.5v₁₃ - 0.5v₂₃
+
+julia> ans == (sqrt(2)+j+i)/2
+true
+
+julia> log1p(i)
+0.34657359027997264 - 0.7853981633974485v₂₃
+
+julia> log(i)
+0.0 - 1.5708963467978978v₂₃
+```
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 
 ### Approaching ∞ dimensions with `SparseAlgebra` and `ExtendedAlgebra`
