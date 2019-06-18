@@ -313,7 +313,7 @@ end
 ## Generic
 
 import Base: isinf, isapprox
-export basis, grade, hasinf, hasorigin, isorigin, scalar
+export basis, grade, hasinf, hasorigin, isorigin, scalar, frobenius, norm, norm2
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
@@ -337,9 +337,11 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
+@inline frobenius(t::T) where T<:TensorAlgebra = norm(value(t))
+
 function isapprox(a::S,b::T) where {S<:TensorMixed{T1},T<:TensorMixed{T2}} where {T1, T2}
     rtol = Base.rtoldefault(T1, T2, 0)    
-    return norm(value(a-b)) <= rtol * max(norm(value(a)), norm(value(b)))
+    return frobenius(a-b) <= rtol * max(frobenius(a), frobenius(b))
 end
 isapprox(a::S,b::T) where {S<:TensorMixed,T<:TensorTerm} = isapprox(a, MultiVector(b))
 isapprox(b::S,a::T) where {S<:TensorTerm,T<:TensorMixed} = isapprox(a, MultiVector(b))
@@ -377,6 +379,8 @@ for Blade ∈ MSB
         volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
     end
 end
+
+isscalar(t::MultiVector) = frobenius(t) == scalar(t)
 
 ## MultiGrade{N}
 

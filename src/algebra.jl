@@ -985,18 +985,24 @@ for Blade ∈ MSB
         div(a::$Blade{T,V,G},m) where {T,V,G} = $Blade{T,V,G}(div.(value(a),m))
     end
 end
-@pure /(a,b::T) where T<:TensorTerm = a*inv(b)
-for Blade ∈ MSB
-    @eval /(a,b::T) where T<:$Blade = a*inv(b)
+function inv(m::MultiVector{T,V}) where {T,V}
+    rm = ~m
+    d = m*rm
+    for k ∈ 0:ndims(V)
+        dk = d(k)
+        frobenius(dk) ≈ frobenius(d) && (return rm/dk)
+    end
+    throw(error("inv($m) is undefined"))
 end
+rem(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(rem.(value(a),m))
+div(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(div.(value(a),m))
+@pure /(a,b::T) where T<:TensorAlgebra = a*inv(b)
 for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
     @eval begin
         @pure /(a::S,b::T) where {S<:$Term,T<:Number} = a*inv(b)
         @pure /(a::S,b::UniformScaling) where S<:$Term = a*inv(vectorspace(a)(b))
     end
 end
-rem(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(rem.(value(a),m))
-div(a::MultiVector{T,V},m) where {T,V} = MultiVector{T,V}(div.(value(a),m))
 
 ## exponential & logarithm function
 
@@ -1004,38 +1010,39 @@ import Base: exp, log
 
 function exp(t::T) where T<:TensorAlgebra{V} where V
     terms = TensorAlgebra{V}[t,(t^2)/2]
-    norms = abs.(terms)
+    norms = frobenius.(terms)
     k = 3
     while norms[end]<norms[end-1] || norms[end]>1
         push!(terms,(terms[end]*t)/k)
-        push!(norms,abs(terms[end]))
+        push!(norms,frobenius(terms[end]))
         k += 1
     end
     return 1+sum(terms[1:end-1])
 end
 
 function log(t::T) where T<:TensorAlgebra{V} where V
-    frob = abs(t)
+    frob = frobenius(t)
     k = 3
+    τ = t-1
     if frob ≤ 5/4
-        prods = TensorAlgebra{V}[t-1,(t-1)^2]
-        terms = TensorAlgebra{V}[t,prods[2]/2]
-        norms = [frob,abs(terms[2])]
+        prods = TensorAlgebra{V}[τ,τ^2]
+        terms = TensorAlgebra{V}[τ,prods[2]/2]
+        norms = [frob,frobenius(terms[2])]
         while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
-            push!(prods,prods[end]*(t-1))
+            push!(prods,prods[end]*τ)
             push!(terms,prods[end]/(k*(-1)^(k+1)))
-            push!(norms,abs(terms[end]))
+            push!(norms,frobenius(terms[end]))
             k += 1
         end
     else
-        s = inv(t*inv(t-1))
+        s = inv(t*inv(τ))
         prods = TensorAlgebra{V}[s,s^2]
         terms = TensorAlgebra{V}[s,2prods[2]]
-        norms = abs.(terms)
+        norms = frobenius.(terms)
         while (norms[end]<norms[end-1] || norms[end]>1) && k ≤ 300
             push!(prods,prods[end]*s)
             push!(terms,k*prods[end])
-            push!(norms,abs(terms[end]))
+            push!(norms,frobenius(terms[end]))
             k += 1
         end
     end
