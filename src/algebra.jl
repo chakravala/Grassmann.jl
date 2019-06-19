@@ -250,8 +250,8 @@ end
 
 export ⨼, ⨽
 
-⨼(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a)∨b
-<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a)∨b
+⨼(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(b,a)
+<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(b,a)
 >(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(a,b)
 
 ## cross product
