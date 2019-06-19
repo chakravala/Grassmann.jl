@@ -14,6 +14,7 @@ include("utilities.jl")
 include("multivectors.jl")
 include("parity.jl")
 include("algebra.jl")
+include("composite.jl")
 include("forms.jl")
 
 ## generators
@@ -61,6 +62,7 @@ function basis(V::VectorSpace,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pr
     @inbounds exp = Expr[Expr(:(=),esc(sig),V),
         Expr(:(=),esc(Symbol(vec)),basis[1])]
     for i ∈ 2:1<<N
+        @inbounds push!(exp,Expr(:(=),esc(Symbol("$(basis[i])")),basis[i]))
         @inbounds push!(exp,Expr(:(=),esc(sym[i]),basis[i]))
     end
     push!(exp,Expr(:(=),esc(Symbol(vec,'⃖')) ,MultiVector(basis[1])))
@@ -323,7 +325,21 @@ end
 
 function __init__()
     @require Leibniz="edad4870-8a01-11e9-2d75-8f02e448fc59" generate_product_algebra(:(Leibniz.Operator),:svec)
-    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("symbolic.jl")
+    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
+        import Reduce: RExpr
+        *(a::RExpr,b::Basis{V}) where V = SValue{V}(a,b)
+        *(a::Basis{V},b::RExpr) where V = SValue{V}(b,a)
+        *(a::RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a,b.v))
+        *(a::MultiVector{T,V},b::RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,b))
+        *(a::RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a,b.v))
+        *(a::MultiGrade{V},b::RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,b))
+        ∧(a::RExpr,b::RExpr) = Reduce.Algebra.:*(a,b)
+        ∧(a::RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SValue{V,G}(a,b)
+        ∧(a::A,b::RExpr) where A<:TensorTerm{V,G} where {V,G} = SValue{V,G}(b,a)
+        parany = (parany...,RExpr)
+        parval = (parval...,RExpr)
+        parsym = (parsym...,RExpr)
+    end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:svec,:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:(SymPy.conj))
 end
 
