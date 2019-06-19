@@ -991,7 +991,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     end
     for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
         @eval begin
-            @pure $d(a::S,b::T) where {S<:$Term,T<:Number} = a*$nv(b)
+            @pure $d(a::S,b::T) where {S<:$Term,T<:Number} = a*$d(1,b)
             @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
         end
     end
@@ -1033,15 +1033,16 @@ Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
 ## exponential & logarithm function
 
 function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
-    terms = TensorAlgebra{V}[t,(t^2)/2]
-    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    S,term = t,(t^2)/2
+    norms::Tuple = (frobenius(S),frobenius(term))
     k::Int = 3
     while norms[2]<norms[1] || norms[2]>1
-        push!(terms,(terms[end]*t)/k)
-        norms = (norms[2],frobenius(terms[end]))
+        S += term
+        term *= t/k
+        norms = (norms[2],frobenius(term))
         k += 1
     end
-    return sum(terms[1:end-1])
+    return S
 end
 
 @inline Base.exp(t::T) where T<:TensorAlgebra = 1+expm1(t)
@@ -1049,21 +1050,20 @@ end
 @inline ^(b::S,t::T) where {S<:TensorAlgebra{V},T<:TensorAlgebra{V}} where V = exp(t*log(b))
 @inline ^(b::S,t::T) where {S<:Number,T<:TensorAlgebra} = exp(t*log(b))
 
-
-
 function qlog(w::T) where T<:TensorAlgebra{V} where V
     w2 = w^2
-    prods = w*w2
-    terms = TensorAlgebra{V}[w,prods/3]
-    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    prod = w*w2
+    S,term = w,prod/3
+    norms::Tuple = (frobenius(S),frobenius(term))
     k::Int = 5
     while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-        prods = prods*w2
-        push!(terms,prods/k)
-        norms = (norms[2],frobenius(terms[end]))
+        S += term
+        prod *= w2
+        term = prod/k
+        norms = (norms[2],frobenius(term))
         k += 2
     end
-    return 2sum(terms[1:end-1])
+    return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
 @inline Base.log(b,t::T) where T<:TensorAlgebra = log(t)/log(b)
@@ -1083,28 +1083,30 @@ end
 
 function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
-    terms = TensorAlgebra{V}[τ/2,(τ^2)/24]
-    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    S,term = τ/2,(τ^2)/24
+    norms::Tuple = (frobenius(S),frobenius(term))
     k::Int = 6
     while norms[2]<norms[1] || norms[2]>1
-        push!(terms,(terms[end]*τ)/(k*(k-1)))
-        norms = (norms[2],frobenius(terms[end]))
+        S += term
+        term *= τ/(k*(k-1))
+        norms = (norms[2],frobenius(term))
         k += 2
     end
-    return 1+sum(terms[1:end-1])
+    return 1+S
 end
 
 function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
-    terms = TensorAlgebra{V}[t,(t*τ)/6]
-    norms::Tuple = (frobenius(terms[1]),frobenius(terms[2]))
+    S,term = t,(t*τ)/6
+    norms::Tuple = (frobenius(S),frobenius(term))
     k::Int = 5
     while norms[2]<norms[1] || norms[2]>1
-        push!(terms,(terms[end]*τ)/(k*(k-1)))
-        norms = (norms[2],frobenius(terms[end]))
+        S += term
+        term *= τ/(k*(k-1))
+        norms = (norms[2],frobenius(term))
         k += 2
     end
-    return sum(terms[1:end-1])
+    return S
 end
 
 @inline Base.cos(t::T) where T<:TensorAlgebra{V} where V = cosh(V(I)*t)
