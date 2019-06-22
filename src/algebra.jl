@@ -4,7 +4,7 @@
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
-import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, rem, div
+import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, rem, div, contraction
 import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
@@ -177,8 +177,6 @@ end
 
 export ⊛
 
-⊛(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = scalar(a*conj(b))
-
 ## exterior product
 
 export ∧, ∨, ⊗
@@ -234,14 +232,14 @@ Base.:&(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∨b
 import LinearAlgebra: dot, ⋅
 export ⋅
 
-@pure function dot(a::Basis{V},b::Basis{V}) where V
+@pure function contraction(a::Basis{V},b::Basis{V}) where V
     g,C,t = interior(a,b)
     !t && (return g_zero(V))
     d = Basis{V}(C)
     return typeof(V) <: Signature ? (g ? SValue{V}(-1,d) : d) : SValue{V}(g,d)
 end
 
-function dot(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
     !t && (return g_zero(V))
     v = value(a)*value(b)
@@ -250,9 +248,15 @@ end
 
 export ⨼, ⨽
 
-⨼(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(b,a)
-<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(b,a)
->(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = dot(a,b)
+for T ∈ (:TensorTerm,MSB...)
+    @eval @inline Base.abs2(t::T) where T<:$T = contraction(t,t)
+end
+
+@inline dot(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = contraction(a,b)
+
+#=for A ∈ (:TensorTerm,MSB...), B ∈ (:TensorTerm,MSB...)
+    @eval contraction(a::A,b::B) where {A<:$A,B<:$B} where V = contraction(a,b)
+end=#
 
 ## cross product
 
@@ -380,14 +384,14 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
             *(a::$Blade{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = SBlade{promote_type(T,F),V,G}(broadcast($MUL,a.v,b))
             #∧(a::$Field,b::$Blade{T,V,G}) where {T<:$Field,V,G} = SBlade{T,V,G}(a.*b.v)
             #∧(a::$Blade{T,V,G},b::$Field) where {T<:$Field,V,G} = SBlade{T,V,G}(a.v.*b)
-            function dot(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
+            function contraction(a::$Blade{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
                     @inbounds inneraddvalue!(mv,ib[i],bits(b),a[i])
                 end
                 return mv
             end
-            function dot(a::Basis{V,G},b::$Blade{T,V,G}) where {V,T<:$Field,G}
+            function contraction(a::Basis{V,G},b::$Blade{T,V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                 for i ∈ 1:binomial(N,G)
                     @inbounds inneraddvalue!(mv,bits(a),ib[i],b[i])
@@ -419,14 +423,14 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         end
         for Value ∈ MSV
             @eval begin
-                function dot(a::$Blade{T,V,G},b::$Value{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
+                function contraction(a::$Blade{T,V,G},b::$Value{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
                         @inbounds inneraddvalue!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))
                     end
                     return mv
                 end
-                function dot(a::$Value{V,G,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
+                function contraction(a::$Value{V,G,B,S},b::$Blade{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib),VEC)...)
                     for i ∈ 1:binomial(N,G)
                         @inbounds inneraddvalue!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
@@ -460,7 +464,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     end
     for Blade ∈ MSB, Other ∈ MSB
         @eval begin
-            function dot(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T<:$Field,V,G,S<:$Field}
+            function contraction(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T<:$Field,V,G,S<:$Field}
                 $(insert_expr((:N,:t,:mv,:bng,:ib),VEC)...)
                 for i ∈ 1:bng
                     @inbounds v,ibi = a[i],ib[i]
@@ -564,7 +568,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     end
 
     for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
-                         (:∨,:meetaddmulti!),(:dot,:skewaddmulti!),
+                         (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!),
                          (:cross,:crossaddmulti!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
@@ -974,20 +978,20 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
         function $nv(m::MultiVector{T,V}) where {T,V}
             rm = ~m
-            d = m*rm
-            fd = frobenius(d)
+            d = rm*m
+            fd = norm(d)
             for k ∈ 0:ndims(V)
                 dk = d(k)
-                frobenius(dk) ≈ fd && (return $d(rm,dk))
+                norm(dk) ≈ fd && (return $d(rm,dk))
             end
             throw(error("inv($m) is undefined"))
         end
     end
     for Value ∈ MSV
-        @eval $nv(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}($d(parityreverse(G) ? -one(T) : one(T),value(B⋅B)*value(b)))
+        @eval $nv(b::$Value{V,G,B,T}) where {V,G,B,T} = $Value{V,G,B}($d(parityreverse(G) ? -one(T) : one(T),value(abs2(B))*value(b)))
     end
     for Blade ∈ MSB
-        @eval $nv(a::$Blade) = $d(~a,value(a⋅a))
+        @eval $nv(a::$Blade) = $d(~a,value(abs2(a)))
     end
     for Term ∈ (:TensorTerm,MSB...,:MultiVector,:MultiGrade)
         @eval begin

@@ -1,7 +1,7 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.1.7"
+version = "0.2.0"
 
 [deps]
 AbstractLattices = "398f06c4-4d28-53ec-89ca-5b2656b7603d"
@@ -19,7 +19,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 julia = "1"
 Reduce = "1.1"
 DirectSum = "0.2.3"
-AbstractTensors = "0.1.6"
+AbstractTensors = "0.2.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

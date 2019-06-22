@@ -314,11 +314,11 @@ end
 ## Generic
 
 import Base: isinf, isapprox
-export basis, grade, hasinf, hasorigin, isorigin, scalar, frobenius, norm, norm2
+import AbstractTensors: scalar, involute, unit, even, odd
+export basis, grade, hasinf, hasorigin, isorigin, scalar, norm
 
 const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
-@pure ndims(::Basis{V}) where V = ndims(V)
 @pure valuetype(::Basis) = Int
 @pure valuetype(::Union{MValue{V,G,B,T},SValue{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
@@ -338,22 +338,15 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
-@inline frobenius(t::T) where T<:TensorAlgebra = norm(value(t))
-@inline Base.iszero(t::T) where T<:TensorAlgebra = frobenius(t) ≈ 0
-@inline Base.isone(t::T) where T<:TensorAlgebra = frobenius(t) ≈ scalar(t) ≈ 1
-
 for A ∈ (:TensorTerm,MSB...), B ∈ (:TensorTerm,MSB...)
-    @eval isapprox(a::S,b::T) where {S<:$A,T<:$B} = vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? frobenius(a)≈frobenius(b) : (iszero(a) && iszero(b)))
+    @eval isapprox(a::S,b::T) where {S<:$A,T<:$B} = vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? norm(a)≈norm(b) : (iszero(a) && iszero(b)))
 end
-isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
 function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
     rtol = Base.rtoldefault(valuetype(a), valuetype(b), 0)
-    return frobenius(a-b) <= rtol * max(frobenius(a), frobenius(b))
+    return norm(a-b) <= rtol * max(norm(a), norm(b))
 end
-function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:Number}
-    rtol = Base.rtoldefault(valuetype(a), T, 0)
-    return frobenius(a-b) <= rtol * max(frobenius(a), b)
-end
+isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
+isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:Number} where V =isapprox(a,SValue{V}(b))
 isapprox(a::S,b::T) where {S<:Number,T<:TensorAlgebra} = isapprox(b,a)
 
 """
@@ -392,10 +385,7 @@ end
 @inline isscalar(t::T) where T<:TensorTerm = grade(t) == 0 || iszero(t)
 @inline isscalar(t::T) where T<:SBlade = grade(t) == 0 || iszero(t)
 @inline isscalar(t::T) where T<:MBlade = grade(t) == 0 || iszero(t)
-@inline isscalar(t::MultiVector) = frobenius(t) ≈ scalar(t)
-
-@inline Base.real(t::T) where T<:TensorAlgebra = scalar(t)
-@inline Base.imag(t::T) where T<:TensorAlgebra = t-real(t)
+@inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
 
 ## MultiGrade{N}
 
