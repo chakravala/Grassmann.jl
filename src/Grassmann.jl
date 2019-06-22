@@ -323,8 +323,20 @@ end
 
 # ParaAlgebra
 
+using Leibniz
+import Leibniz: ∂, d
+
+generate_product_algebra(:(Leibniz.Operator),:svec)
+
+function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
+    x=sum([(∂(V,k)^2) for k ∈ 1:N])^div(isodd(O) ? O-1 : O,2)
+    isodd(O) ? sum([(x*∂(V,k))*getbasis(V,1<<(k-1)) for k ∈ 1:N]) : x*getbasis(V,0)
+end
+
+∂(ω::T) where T<:TensorAlgebra{V} where V = ω⋅V(∇)
+d(ω::T) where T<:TensorAlgebra{V} where V = V(∇)∧ω
+
 function __init__()
-    @require Leibniz="edad4870-8a01-11e9-2d75-8f02e448fc59" generate_product_algebra(:(Leibniz.Operator),:svec)
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
         import Reduce: RExpr
         *(a::RExpr,b::Basis{V}) where V = SValue{V}(a,b)

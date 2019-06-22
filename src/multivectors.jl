@@ -49,6 +49,7 @@ end
 
 @inline indices(b::Basis{V}) where V = indices(bits(b),ndims(V))
 
+@pure Basis{V}() where V = getbasis(V,0)
 @pure Basis{V}(i::Bits) where V = getbasis(V,i)
 Basis{V}(b::BitArray{1}) where V = getbasis(V,bit2int(b))
 
@@ -338,51 +339,63 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
 @inline frobenius(t::T) where T<:TensorAlgebra = norm(value(t))
-@inline Base.iszero(t::T) where T<:TensorAlgebra = frobenius(t) == 0
-@inline Base.isone(t::T) where T<:TensorAlgebra = frobenius(t) == scalar(t) == 1
+@inline Base.iszero(t::T) where T<:TensorAlgebra = frobenius(t) ≈ 0
+@inline Base.isone(t::T) where T<:TensorAlgebra = frobenius(t) ≈ scalar(t) ≈ 1
 
-function isapprox(a::S,b::T) where {S<:TensorMixed{T1},T<:TensorMixed{T2}} where {T1, T2}
-    rtol = Base.rtoldefault(T1, T2, 0)    
+for A ∈ (:TensorTerm,MSB...), B ∈ (:TensorTerm,MSB...)
+    @eval isapprox(a::S,b::T) where {S<:$A,T<:$B} = vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? frobenius(a)≈frobenius(b) : (iszero(a) && iszero(b)))
+end
+isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
+function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
+    rtol = Base.rtoldefault(valuetype(a), valuetype(b), 0)
     return frobenius(a-b) <= rtol * max(frobenius(a), frobenius(b))
 end
-isapprox(a::S,b::T) where {S<:TensorMixed,T<:TensorTerm} = isapprox(a, MultiVector(b))
-isapprox(b::S,a::T) where {S<:TensorTerm,T<:TensorMixed} = isapprox(a, MultiVector(b))
-isapprox(a::S,b::T) where {S<:TensorTerm,T<:TensorTerm} = isapprox(MultiVector(a), MultiVector(b))
+function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:Number}
+    rtol = Base.rtoldefault(valuetype(a), T, 0)
+    return frobenius(a-b) <= rtol * max(frobenius(a), b)
+end
+isapprox(a::S,b::T) where {S<:Number,T<:TensorAlgebra} = isapprox(b,a)
 
 """
     scalar(multivector)
     
 Return the scalar (grade 0) part of any multivector.
 """
-scalar(t::T) where T<:TensorTerm{V,0} where V = t
-scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
-scalar(t::MultiVector) = t(0,1)
+@inline scalar(t::T) where T<:TensorTerm{V,0} where V = t
+@inline scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
+@inline scalar(t::MultiVector) = t(0,1)
 for Blade ∈ MSB
     @eval begin
-        scalar(t::$Blade{T,V,0} where {T,V}) = a(1)
-        scalar(t::$Blade{T,V} where T) where V = zero(V)
+        @inline scalar(t::$Blade{T,V,0} where {T,V}) = t(1)
+        @inline scalar(t::$Blade{T,V} where T) where V = zero(V)
     end
 end
 
-vector(t::T) where T<:TensorTerm{V,1} where V = t
-vector(t::T) where T<:TensorTerm{V} where V = zero(V)
-vector(t::MultiVector) = t(1)
+@inline vector(t::T) where T<:TensorTerm{V,1} where V = t
+@inline vector(t::T) where T<:TensorTerm{V} where V = zero(V)
+@inline vector(t::MultiVector) = t(1)
 for Blade ∈ MSB
     @eval begin
-        vector(t::$Blade{T,V,1} where {T,V}) = a
-        vector(t::$Blade{T,V} where T) where V = zero(V)
+        @inline vector(t::$Blade{T,V,1} where {T,V}) = t
+        @inline vector(t::$Blade{T,V} where T) where V = zero(V)
     end
 end
 
-volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
-volume(t::MultiVector{T,V} where T) where V = t(ndims(V),1)
+@inline volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
+@inline volume(t::MultiVector{T,V} where T) where V = t(ndims(V),1)
 for Blade ∈ MSB
     @eval begin
-        volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
+        @inline volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
     end
 end
 
-isscalar(t::MultiVector) = frobenius(t) == scalar(t)
+@inline isscalar(t::T) where T<:TensorTerm = grade(t) == 0 || iszero(t)
+@inline isscalar(t::T) where T<:SBlade = grade(t) == 0 || iszero(t)
+@inline isscalar(t::T) where T<:MBlade = grade(t) == 0 || iszero(t)
+@inline isscalar(t::MultiVector) = frobenius(t) ≈ scalar(t)
+
+@inline Base.real(t::T) where T<:TensorAlgebra = scalar(t)
+@inline Base.imag(t::T) where T<:TensorAlgebra = t-real(t)
 
 ## MultiGrade{N}
 
