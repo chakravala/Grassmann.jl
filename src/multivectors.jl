@@ -356,17 +356,17 @@ Return the scalar (grade 0) part of any multivector.
 """
 @inline scalar(t::T) where T<:TensorTerm{V,0} where V = t
 @inline scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline scalar(t::MultiVector) = t(0,1)
+@inline scalar(t::MultiVector{T,V}) where {T,V} = SValue{V}(t.v[1])
 for Blade ∈ MSB
     @eval begin
-        @inline scalar(t::$Blade{T,V,0} where {T,V}) = t(1)
+        @inline scalar(t::$Blade{T,V,0}) where {T,V} = SValue{V}(t.v[1])
         @inline scalar(t::$Blade{T,V} where T) where V = zero(V)
     end
 end
 
 @inline vector(t::T) where T<:TensorTerm{V,1} where V = t
 @inline vector(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline vector(t::MultiVector) = t(1)
+@inline vector(t::MultiVector{T,V}) where {T,V} = SBlade{T,V,0}(t[1])
 for Blade ∈ MSB
     @eval begin
         @inline vector(t::$Blade{T,V,1} where {T,V}) = t
@@ -375,7 +375,7 @@ for Blade ∈ MSB
 end
 
 @inline volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
-@inline volume(t::MultiVector{T,V} where T) where V = t(ndims(V),1)
+@inline volume(t::MultiVector{T,V}) where {T,V} = SValue{V}(t.v[end])
 for Blade ∈ MSB
     @eval begin
         @inline volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
