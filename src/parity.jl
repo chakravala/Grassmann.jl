@@ -197,3 +197,96 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
     @eval @pure $par(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = $par(bits(a),bits(b),V)
 end
 
+import Base: signbit, imag, real
+export odd, even, angular, radial
+
+@pure signbit(V::T) where T<:VectorSpace{N} where N = (ib=indexbasis(N); parity.(ib,ib,Ref(V)))
+@pure signbit(V::T,G) where T<:VectorSpace{N} where N = (ib=indexbasis(N,G); parity.(ib,ib,Ref(V)))
+@pure angular(V::T) where T<:VectorSpace = SVector(findall(signbit(V))...)
+@pure radial(V::T) where T<:VectorSpace = SVector(findall(.!signbit(V))...)
+@pure angular(V::T,G) where T<:VectorSpace = findall(signbit(V,G))
+@pure radial(V::T,G) where T<:VectorSpace = findall(.!signbit(V,G))
+
+for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
+    @eval $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
+    for Blade ∈ MSB
+        @eval function $op(t::$Blade{T,V,G}) where {T,V,G}
+            out = copy(value(t,mvec(ndims(V),G,T)))
+            for k ∈ $other(V,G)
+                @inbounds out[k]≠0 && (out[k] = zero(T))
+            end
+            MBlade{T,V,G}(out)
+        end
+    end
+    @eval function $op(t::MultiVector{T,V}) where {T,V}
+        out = copy(value(t,mvec(ndims(V),T)))
+        for k ∈ $other(V)
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+        MultiVector{T,V}(out)
+    end
+end
+
+odd(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
+even(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
+for Blade ∈ MSB
+    @eval begin
+        odd(t::$Blade{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
+        even(t::$Blade{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
+    end
+end
+function odd(t::MultiVector{T,V}) where {T,V}
+    N = ndims(V)
+    out = copy(value(t,mvec(N,T)))
+    bs = binomsum_set(N)
+    out[1]≠0 && (out[1] = zero(T))
+    for g ∈ 3:2:N+1
+        for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    MultiVector{T,V}(out)
+end
+function even(t::MultiVector{T,V}) where {T,V}
+    N = ndims(V)
+    out = copy(value(t,mvec(N,T)))
+    bs = binomsum_set(N)
+    for g ∈ 2:2:N+1
+        for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    MultiVector{T,V}(out)
+end
+
+imag(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
+real(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
+for Blade ∈ MSB
+    @eval begin
+        imag(t::$Blade{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
+        real(t::$Blade{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
+    end
+end
+function imag(t::MultiVector{T,V}) where {T,V}
+    N = ndims(V)
+    out = copy(value(t,mvec(N,T)))
+    bs = binomsum_set(N)
+    out[1]≠0 && (out[1] = zero(T))
+    for g ∈ 3:N+1
+        !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    MultiVector{T,V}(out)
+end
+function real(t::MultiVector{T,V}) where {T,V}
+    N = ndims(V)
+    out = copy(value(t,mvec(N,T)))
+    bs = binomsum_set(N)
+    for g ∈ 3:N+1
+        parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    MultiVector{T,V}(out)
+end

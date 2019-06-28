@@ -213,7 +213,8 @@ setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 
-function (m::MultiVector{T,V})(g::Int,::Type{B}=SBlade) where {T,V,B}
+(m::MultiVector{T,V})(g::Int,b::Type{B}=SBlade) where {T,V,B} = m(Dim{g}(),b)
+function (m::MultiVector{T,V})(::Dim{g},::Type{B}=SBlade) where {T,V,g,B}
     B ≠ SBlade ? MBlade{T,V,g}(m[g]) : SBlade{T,V,g}(m[g])
 end
 function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SValue) where {T,V,B}
@@ -366,7 +367,7 @@ end
 
 @inline vector(t::T) where T<:TensorTerm{V,1} where V = t
 @inline vector(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline vector(t::MultiVector{T,V}) where {T,V} = SBlade{T,V,0}(t[1])
+@inline vector(t::MultiVector{T,V}) where {T,V} = SBlade{T,V,1}(t[1])
 for Blade ∈ MSB
     @eval begin
         @inline vector(t::$Blade{T,V,1} where {T,V}) = t

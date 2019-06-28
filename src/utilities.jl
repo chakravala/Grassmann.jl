@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode
+import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode, Dim, Grade
 
 bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
@@ -200,6 +200,8 @@ end
 indexbasis(Int((sparse_limit+cache_limit)/2),1)
 
 @pure indexbasis_set(N) = SVector(((N≠0 && N<sparse_limit) ? indexbasis_cache[N] : Vector{Bits}[indexbasis(N,g) for g ∈ 0:N])...)
+
+@pure indexbasis(N) = vcat(indexbasis(N,0),indexbasis_set(N)...)
 
 ## Grade{G}
 
