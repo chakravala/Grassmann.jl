@@ -175,8 +175,9 @@ for Blade ∈ MSB
     end
 end
 
-export ⊛, ⊖
+export ∗, ⊛, ⊖
 const ⊖ = *
+@inline ∗(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = (~a)*b
 
 ## exterior product
 
@@ -960,17 +961,27 @@ function ^(v::T,i::Integer) where T<:TensorTerm
     end
     return typeof(v)<:Basis ? out : out*value(v)^i
 end
-for Term ∈ (MSB...,:MultiVector,:MultiGrade)
-    @eval begin
-        function ^(v::$Term,i::Integer)
-            i == 0 && (return getbasis(vectorspace(v),0))
-            out = v
-            for k ∈ 1:i-1
-                out *= v
-            end
-            return out
+
+function Base.:^(v::T,i::S) where {T<:TensorAlgebra{V},S<:Integer} where V
+    out = one(V)
+    if i < 8 # optimal choice ?
+        for k ∈ 1:i
+            out *= v
+        end
+    else
+        ind = indices(UInt(i))
+        K = length(ind)>0 ? ind[end] : 0
+        b = falses(K)
+        for k ∈ ind
+            b[k] = true
+        end
+        p = v
+        for k ∈ 1:K
+            b[k] && (out *= p)
+            k ≠ K && (p *= p)
         end
     end
+    return out
 end
 
 ## division

@@ -198,7 +198,7 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
 end
 
 import Base: signbit, imag, real
-export odd, even, angular, radial
+export odd, even, angular, radial, ₊, ₋, ǂ
 
 @pure signbit(V::T) where T<:VectorSpace{N} where N = (ib=indexbasis(N); parity.(ib,ib,Ref(V)))
 @pure signbit(V::T,G) where T<:VectorSpace{N} where N = (ib=indexbasis(N,G); parity.(ib,ib,Ref(V)))
