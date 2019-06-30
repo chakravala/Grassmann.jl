@@ -27,8 +27,8 @@ end
 
 @pure bits(b::Basis{V,G,B} where {V,G}) where B = B
 Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-Base.zero(V::VectorSpace) = 0*one(V)
-Base.one(V::VectorSpace) = Basis{V}()
+Base.zero(V::VectorBundle) = 0*one(V)
+Base.one(V::VectorBundle) = Basis{V}()
 
 function getindex(b::Basis,i::Int)
     d = one(Bits) << (i-1)
@@ -399,7 +399,7 @@ end
 MultiGrade{V}(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
 MultiGrade(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
 
-function bladevalues(V::VectorSpace{N},m,G::Int,T::Type) where N
+function bladevalues(V::VectorBundle{N},m,G::Int,T::Type) where N
     com = indexbasis(N,G)
     out = (SValue{V,G,B,T} where B)[]
     for i ∈ 1:binomial(N,G)
@@ -460,7 +460,7 @@ end
 import Base: adjoint # conj
 
 function adjoint(b::Basis{V,G,B}) where {V,G,B}
-    Basis{dual(V)}(dualtype(V)<0 ? dual(V,B) : B)
+    Basis{dual(V)}(mixedmode(V)<0 ? dual(V,B) : B)
 end
 
 ## conversions
@@ -470,14 +470,14 @@ end
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
-    WC,VC = dualtype(W),dualtype(V)
+    WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     if WC<0 && VC≥0
         N = ndims(V)
         dm = diffmode(V)
         if dm≠0
-            D = DirectSum.dualbits(V)
+            D = DirectSum.diffmask(V)
             m = (~D)&bits(b)
             d = (D&bits(b))<<(N-dm+(VC>0 ? dm : 0))
             return getbasis(W,(VC>0 ? m<<(N-dm) : m)⊻d)
@@ -485,7 +485,7 @@ end
             return getbasis(W,VC>0 ? bits(b)<<(N-dm) : bits(b))
         end
     else
-        throw(error("arbitrary VectorSpace intersection not yet implemented."))
+        throw(error("arbitrary VectorBundle intersection not yet implemented."))
     end
 end
 (W::Signature)(b::SValue) = SValue{W}(value(b),W(basis(b)))
@@ -496,7 +496,7 @@ for Blade ∈ MSB
         function (W::Signature)(b::$Blade{T,V,G}) where {T,V,G}
             V==W && (return b)
             !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
-            WC,VC = dualtype(W),dualtype(V)
+            WC,VC = mixedmode(W),mixedmode(V)
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
             if WC<0 && VC≥0
@@ -510,7 +510,7 @@ for Blade ∈ MSB
                 end
                 return $Blade{T,W,G}(out)
             else
-                throw(error("arbitrary VectorSpace intersection not yet implemented."))
+                throw(error("arbitrary VectorBundle intersection not yet implemented."))
             end
         end
 
@@ -520,7 +520,7 @@ end
 function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     V==W && (return m)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
-    WC,VC = dualtype(W),dualtype(V)
+    WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     if WC<0 && VC≥0
@@ -538,7 +538,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
         end
         return MultiVector{T,W}(out)
     else
-        throw(error("arbitrary VectorSpace intersection not yet implemented."))
+        throw(error("arbitrary VectorBundle intersection not yet implemented."))
     end
 end
 

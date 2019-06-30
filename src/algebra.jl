@@ -4,16 +4,16 @@
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
-import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, rem, div, contraction
-import DirectSum: dualcheck, tangent, hasinforigin, hasorigininf
+import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction
+import DirectSum: diffcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
 const Field = Number
 const ExprField = Union{Expr,Symbol}
 
 @pure g_one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-@pure g_zero(V::VectorSpace) = 0*one(V)
-@pure g_one(V::VectorSpace) = Basis{V}()
+@pure g_zero(V::VectorBundle) = 0*one(V)
+@pure g_one(V::VectorBundle) = Basis{V}()
 @pure g_one(::Type{T}) where T = one(T)
 @pure g_zero(::Type{T}) where T = zero(T)
 
@@ -21,10 +21,10 @@ const ExprField = Union{Expr,Symbol}
 
 add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
 
-const Sym = :(Reduce.Algebra)
+const Sym = :DirectSum
 const SymField = Any
 
-set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:+),expr,val) : val)
+set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
 
 function declare_mutating_operations(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
@@ -46,15 +46,15 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
         end
         for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorSpace{N,D} where {N,D,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !dualcheck(V,A,B)
+                @inline function $(Symbol(:join,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorBundle{N,D} where {N,D,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,A,B)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
                         $s(m,val,A⊻B,Dimension{N}())
                     end
                     return m
                 end
-                @inline function $(Symbol(:geom,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorSpace{N,D} where {N,D,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !dualcheck(V,A,B)
+                @inline function $(Symbol(:geom,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorBundle{N,D} where {N,D,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,A,B)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
                         $s(m,val,bas,Dimension{N}())
@@ -70,7 +70,7 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
                 @eval begin
-                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,v::T) where W<:VectorSpace{N,D} where {N,D,T,M}
+                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,v::T) where W<:VectorBundle{N,D} where {N,D,T,M}
                         if v ≠ 0
                             g,C,t = $uct(A,B,V)
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
@@ -86,9 +86,9 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
     end
 end
 
-@inline exteraddmulti!(V::W,out,α,β,γ) where W<:VectorSpace = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
+@inline exteraddmulti!(V::W,out,α,β,γ) where W<:VectorBundle = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
 
-@inline outeraddblade!(V::W,out,α,β,γ) where W<:VectorSpace = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+@inline outeraddblade!(V::W,out,α,β,γ) where W<:VectorBundle = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
 
 @inline function add!(out::MultiVector{T,V},val::T,a::Int,b::Int) where {T,V}
     A,B = Bits(a), Bits(b)
@@ -96,7 +96,7 @@ end
 end
 @inline function add!(m::MultiVector{T,V},v::T,a::Basis{V},b::Basis{V}) where {T<:Field,V}
     A,B = bits(a), bits(b)
-    !dualcheck(V,A,B) && addmulti!(m.v,parity(A,B) ? -(v) : v,A.⊻B)
+    !diffcheck(V,A,B) && addmulti!(m.v,parity(A,B) ? -(v) : v,A.⊻B)
     return out
 end
 
@@ -113,7 +113,7 @@ for side ∈ (:left,:right)
     p = Symbol(:parity,side)
     @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
         d = getbasis(V,complement(ndims(V),B,diffmode(V)))
-        dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+        mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
         typeof(V)<:Signature ? ($p(b) ? SValue{V}(-value(d),d) : d) : SValue{V}($p(b)*value(d),d)
     end
     for Value ∈ MSV
@@ -144,7 +144,7 @@ reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
 
 @pure function *(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
-    dualcheck(V,A,B) && (return g_zero(V))
+    diffcheck(V,A,B) && (return g_zero(V))
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
     d = Basis{V}(bas)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SValue{V}(-1,d) : d) : SValue{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
@@ -302,9 +302,10 @@ end
 
 ## sandwich product
 
->>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (~x) * y * x
-const ⊘ = >>>
 export ⊘
+
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (x ∗ y) * x
+>>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
 
 ### Product Algebra Constructor
 
@@ -328,7 +329,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
             return mv
         end
         function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
-            if dualtype(V)<0
+            if mixedmode(V)<0
                 $(insert_expr((:N,:M,:bs,:bn),VEC)...)
                 out = zeros($VEC(N,$TF))
                 for g ∈ 1:N+1
@@ -373,7 +374,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     for Blade ∈ MSB
         @eval begin
             function adjoint(m::$Blade{T,V,G}) where {T<:$Field,V,G}
-                if dualtype(V)<0
+                if mixedmode(V)<0
                     $(insert_expr((:N,:M,:ib),VEC)...)
                     out = zeros($VEC(N,G,$TF))
                     for i ∈ 1:binomial(N,G)
@@ -403,22 +404,22 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                 return mv
             end
             function ∧(a::$Blade{T,w,1},b::Basis{W,1}) where {T<:$Field,w,W}
-                V = w==W ? w : ((w==dual(W)) ? (dualtype(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
+                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                 $(insert_expr((:N,:t),VEC)...)
                 ib = indexbasis(ndims(w),1)
                 out = zeros($VEC(N,2,t))
-                C,y = dualtype(w)>0,dualtype(W)>0 ? dual(V,bits(b)) : bits(b)
+                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
                 for i ∈ 1:length(a)
                     @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])
                 end
                 return MBlade{t,V,2}(out)
             end
             function ∧(a::Basis{w,1},b::$Blade{T,W,1}) where {w,W,T<:$Field}
-                V = w==W ? w : ((w==dual(W)) ? (dualtype(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
+                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                 $(insert_expr((:N,:t),VEC)...)
                 ib = indexbasis(ndims(W),1)
                 out = zeros($VEC(N,2,t))
-                C,x = dualtype(W)>0,dualtype(w)>0 ? dual(V,bits(a)) : bits(a)
+                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
                 for i ∈ 1:length(b)
                     @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])
                 end
@@ -442,22 +443,22 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                     return mv
                 end
                 function ∧(a::$Blade{T,w,1},b::$Value{W,1,B,S}) where {T<:$Field,w,W,B,S<:$Field}
-                    V = w==W ? w : ((w==dual(W)) ? (dualtype(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
+                    V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                     $(insert_expr((:N,:t),VEC)...)
                     ib = indexbasis(ndims(w),1)
                     out = zeros($VEC(N,2,t))
-                    C,y = dualtype(w)>0,dualtype(W)>0 ? dual(V,bits(basis(b))) : bits(basis(b))
+                    C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(basis(b))) : bits(basis(b))
                     for i ∈ 1:length(a)
                         @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))
                     end
                     return MBlade{t,V,2}(out)
                 end
                 function ∧(a::$Value{w,1,B,S},b::$Blade{T,W,1}) where {T<:$Field,w,W,B,S<:$Field}
-                    V = w==W ? w : ((w==dual(W)) ? (dualtype(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
+                    V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                     $(insert_expr((:N,:t),VEC)...)
                     ib = indexbasis(ndims(W),1)
                     out = zeros($VEC(N,2,t))
-                    C,x = dualtype(W)>0,dualtype(w)>0 ? dual(V,bits(basis(a))) : bits(basis(a))
+                    C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(basis(a))) : bits(basis(a))
                     for i ∈ 1:length(b)
                         @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))
                     end
@@ -479,12 +480,12 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                 return mv
             end
             function ∧(a::$Blade{T,w,1},b::$Other{S,W,1}) where {T<:$Field,w,S<:$Field,W}
-                V = w==W ? w : ((w==dual(W)) ? (dualtype(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
+                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                 $(insert_expr((:N,:t),VEC)...)
                 ia = indexbasis(ndims(w),1)
                 ib = indexbasis(ndims(W),1)
                 out = zeros($VEC(N,2,t))
-                CA,CB = dualtype(w)>0,dualtype(W)>0
+                CA,CB = mixedmode(w)>0,mixedmode(W)>0
                 for i ∈ 1:length(a)
                     @inbounds v,iai = a[i],ia[i]
                     x = CA ? dual(V,iai) : iai
@@ -502,7 +503,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for Blade ∈ MSB
             @eval begin
                 function $c(b::$Blade{T,V,G}) where {T<:$Field,V,G}
-                    dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                     $(insert_expr((:N,:ib,:D),VEC)...)
                     out = zeros($VEC(N,G,T))
                     D = diffmode(V)
@@ -520,7 +521,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         end
         @eval begin
             function $c(m::MultiVector{T,V}) where {T<:$Field,V}
-                dualtype(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                 $(insert_expr((:N,:bs,:bn),VEC)...)
                 out = zeros($VEC(N,T))
                 D = diffmode(V)
@@ -917,7 +918,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
 end
 
 generate_product_algebra()
-generate_product_algebra(SymField,:svec,:($Sym.:*),:($Sym.:+),:($Sym.:-),:($Sym.conj))
+generate_product_algebra(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
 
 const NSE = Union{Symbol,Expr,<:Number}
 

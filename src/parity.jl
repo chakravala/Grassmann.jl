@@ -3,8 +3,8 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 @pure function parityjoin(N,S,a,b)
-    B = DirectSum.ndigits(b<<1,N)
-    isodd(sum(DirectSum.ndigits(a,N) .* cumsum(B))+count_ones((a & b) & S))
+    B = DirectSum.digits_fast(b<<1,N)
+    isodd(sum(DirectSum.digits_fast(a,N) .* cumsum(B))+count_ones((a & b) & S))
 end
 
 ## adjoint parities
@@ -36,11 +36,11 @@ end
 
 ## product parities
 
-@pure conformalmask(V::T) where T<:VectorSpace = UInt(2)^(hasinf(V)+hasorigin(V))-1
+@pure conformalmask(V::T) where T<:VectorBundle = UInt(2)^(hasinf(V)+hasorigin(V))-1
 
-@pure function conformalcheck(V::T,A,B) where T<:VectorSpace
+@pure function conformalcheck(V::T,A,B) where T<:VectorBundle
     bt = conformalmask(V)
-    i2o,o2i = DirectSum.hasi2o(V,A,B),DirectSum.haso2i(V,A,B)
+    i2o,o2i = DirectSum.hasinf2origin(V,A,B),DirectSum.hasorigin2inf(V,A,B)
     A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
 end
 
@@ -55,7 +55,7 @@ end
 @pure function parityregressive(V::Signature{N,M,S},A,B,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
     α,β = complement(N,A),complement(N,B)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
-    if ((count_ones(α&β)==0) && !dualcheck(V,α,β)) || cc
+    if ((count_ones(α&β)==0) && !diffcheck(V,α,β)) || cc
         C,L = α ⊻ β, count_ones(A)+count_ones(B)
         pcc,bas = if skew
             A3,β3,i2o,o2i,xor = conformalcheck(V,A,β)
@@ -77,14 +77,14 @@ end
 end
 
 @pure function parityinterior(V::Signature{N,M,S},A,B) where {N,M,S}
-    dualcheck(V,A,B) && (return false,g_zero(UInt),false)
+    diffcheck(V,A,B) && (return false,g_zero(UInt),false)
     γ = complement(N,B)
     p,C,t = parityregressive(V,A,γ,Grade{true}())
     return t ? p⊻parityright(S,B,N) : p, C, t
 end
 
 @pure function parityinterior(V::DiagonalForm{N,M,S},A,B) where {N,M,S}
-    dualcheck(V,A,B) && (return false,g_zero(UInt),false)
+    diffcheck(V,A,B) && (return false,g_zero(UInt),false)
     γ = complement(N,B)
     p,C,t = parityregressive(Signature(V),A,γ,Grade{true}())
     ind = indices(B,N)
@@ -146,7 +146,7 @@ const parity_extra = Dict{Bits,Dict{Bits,Dict{Bits,Bool}}}[]
     end
 end
 @pure parity(a::Bits,b::Bits,v::Signature) = parity(ndims(v),value(v),a,b)
-@pure parity(a::Bits,b::Bits,v::VectorSpace) = parity(a,b,Signature(v))
+@pure parity(a::Bits,b::Bits,v::VectorBundle) = parity(a,b,Signature(v))
 @pure parity(a::Basis{V,G,B},b::Basis{V,L,C}) where {V,G,B,L,C} = parity(bits(a),bits(b),V)
 
 ### parity product caches
@@ -200,12 +200,12 @@ end
 import Base: signbit, imag, real
 export odd, even, angular, radial, ₊, ₋, ǂ
 
-@pure signbit(V::T) where T<:VectorSpace{N} where N = (ib=indexbasis(N); parity.(ib,ib,Ref(V)))
-@pure signbit(V::T,G) where T<:VectorSpace{N} where N = (ib=indexbasis(N,G); parity.(ib,ib,Ref(V)))
-@pure angular(V::T) where T<:VectorSpace = SVector(findall(signbit(V))...)
-@pure radial(V::T) where T<:VectorSpace = SVector(findall(.!signbit(V))...)
-@pure angular(V::T,G) where T<:VectorSpace = findall(signbit(V,G))
-@pure radial(V::T,G) where T<:VectorSpace = findall(.!signbit(V,G))
+@pure signbit(V::T) where T<:VectorBundle{N} where N = (ib=indexbasis(N); parity.(ib,ib,Ref(V)))
+@pure signbit(V::T,G) where T<:VectorBundle{N} where N = (ib=indexbasis(N,G); parity.(ib,ib,Ref(V)))
+@pure angular(V::T) where T<:VectorBundle = SVector(findall(signbit(V))...)
+@pure radial(V::T) where T<:VectorBundle = SVector(findall(.!signbit(V))...)
+@pure angular(V::T,G) where T<:VectorBundle = findall(signbit(V,G))
+@pure radial(V::T,G) where T<:VectorBundle = findall(.!signbit(V,G))
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
@@ -272,7 +272,7 @@ function imag(t::MultiVector{T,V}) where {T,V}
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     out[1]≠0 && (out[1] = zero(T))
-    for g ∈ 3:N+1
+    for g ∈ 2:N+1
         !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             out[k]≠0 && (out[k] = zero(T))
         end
