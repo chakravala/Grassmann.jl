@@ -18,10 +18,10 @@ using LinearAlgebra
     @test v1 ≈ v1 
     @test v2 ≈ v2
     @test v12 ≈ v12
-    # S/MValue
+    # S/MBlade
     @test 2v ≈ 2v 
     @test 2v1 ≈ 2v1 
-    # blade
+    # chain
     @test v1 + v2 ≈ v1 + v2
     # multivector
     @test v + v2 ≈ v + v2
@@ -36,7 +36,7 @@ using LinearAlgebra
     @test !(v ≈ v1+v12)
     @test !(v ≈ v+v1+v12)
     
-    # S/MValue and others
+    # S/MBlade and others
     @test !(2v ≈ v1)
     @test !(2v ≈ v12)
     @test !(2v ≈ v1+v2)
@@ -44,7 +44,7 @@ using LinearAlgebra
     @test !(2v ≈ v1+v12)
     @test !(2v ≈ v+v1+v12)
     
-    # Blade and others
+    # Chain and others
     @test !(v1 + v2 ≈ v1)
     @test !(v1 + v2 ≈ v12)
     @test !(v1 + v2 ≈ v1+v)

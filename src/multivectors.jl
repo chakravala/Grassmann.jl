@@ -73,71 +73,71 @@ end
 
 @inline show(io::IO, e::Basis) = DirectSum.printindices(io,vectorspace(e),bits(e))
 
-## S/MValue{N}
+## S/MBlade{N}
 
-const MSV = (:MValue,:SValue)
+const MSB = (:MBlade,:SBlade)
 
-for Value ∈ MSV
-    eval(Expr(:struct,Value ≠ :SValue,:($Value{V,G,B,T} <: TensorTerm{V,G}),quote
+for Blade ∈ MSB
+    eval(Expr(:struct,Blade ≠ :SBlade,:($Blade{V,G,B,T} <: TensorTerm{V,G}),quote
         v::T
     end))
 end
-for Value ∈ MSV
+for Blade ∈ MSB
     @eval begin
-        export $Value
-        @pure $Value(b::Basis{V,G}) where {V,G} = $Value{V}(b)
-        @pure $Value{V}(b::Basis{V,G}) where {V,G} = $Value{V,G,b,Int}(1)
-        $Value(v,b::TensorTerm{V}) where V = $Value{V}(v,b)
-        $Value{V}(v,b::SValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
-        $Value{V}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
-        $Value{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
-        $Value{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Value{V,G,b,T}(v)
-        $Value{V,G}(v,b::SValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
-        $Value{V,G}(v,b::MValue{V,G}) where {V,G} = $Value{V,G,basis(b)}(v*b.v)
-        $Value{V,G,B}(v::T) where {V,G,B,T} = $Value{V,G,B,T}(v)
-        $Value{V}(v::T) where {V,T} = $Value{V,0,Basis{V}(),T}(v)
-        show(io::IO,m::$Value) = print(io,(valuetype(m)∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
+        export $Blade
+        @pure $Blade(b::Basis{V,G}) where {V,G} = $Blade{V}(b)
+        @pure $Blade{V}(b::Basis{V,G}) where {V,G} = $Blade{V,G,b,Int}(1)
+        $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
+        $Blade{V}(v,b::SBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
+        $Blade{V}(v,b::MBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
+        $Blade{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G,b,T}(v)
+        $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G,b,T}(v)
+        $Blade{V,G}(v,b::SBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
+        $Blade{V,G}(v,b::MBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
+        $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
+        $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
+        show(io::IO,m::$Blade) = print(io,(valuetype(m)∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
     end
 end
 
 ==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) ? value(a) == value(b) : 0 == value(a) == value(b)
 ==(a::TensorTerm,b::TensorTerm) = 0 == value(a) == value(b)
 
-## S/MBlade{T,N}
+## S/MChain{T,N}
 
-const MSB = (:MBlade,:SBlade)
+const MSC = (:MChain,:SChain)
 
-for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
+for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
     @eval begin
-        @computed struct $Blade{T,V,G} <: TensorMixed{T,V}
+        @computed struct $Chain{T,V,G} <: TensorMixed{T,V}
             v::$vector{binomial(ndims(V),G),T}
         end
 
-        export $Blade
-        getindex(m::$Blade,i::Int) = m.v[i]
-        getindex(m::$Blade,i::UnitRange{Int}) = m.v[i]
-        setindex!(m::$Blade{T},k::T,i::Int) where T = (m.v[i] = k)
-        Base.firstindex(m::$Blade) = 1
-        @pure Base.lastindex(m::$Blade{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
-        @pure Base.length(m::$Blade{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
+        export $Chain
+        getindex(m::$Chain,i::Int) = m.v[i]
+        getindex(m::$Chain,i::UnitRange{Int}) = m.v[i]
+        setindex!(m::$Chain{T},k::T,i::Int) where T = (m.v[i] = k)
+        Base.firstindex(m::$Chain) = 1
+        @pure Base.lastindex(m::$Chain{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
+        @pure Base.length(m::$Chain{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
     end
     @eval begin
-        function (m::$Blade{T,V,G})(i::Integer,B::Type=SValue) where {T,V,G}
-            if B ≠ SValue
-                MValue{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
+        function (m::$Chain{T,V,G})(i::Integer,B::Type=SBlade) where {T,V,G}
+            if B ≠ SBlade
+                MBlade{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             else
-                SValue{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
+                SBlade{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             end
         end
 
-        function $Blade{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
+        function $Chain{T,V,G}(val::T,v::Basis{V,G}) where {T,V,G}
             N = ndims(V)
-            $Blade{T,V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
+            $Chain{T,V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Dimension{N}()))
         end
 
-        $Blade(v::Basis{V,G}) where {V,G} = $Blade{Int,V,G}(one(Int),v)
+        $Chain(v::Basis{V,G}) where {V,G} = $Chain{Int,V,G}(one(Int),v)
 
-        function show(io::IO, m::$Blade{T,V,G}) where {T,V,G}
+        function show(io::IO, m::$Chain{T,V,G}) where {T,V,G}
             ib = indexbasis(ndims(V),G)
             @inbounds if T == Any && typeof(m.v[1]) ∈ parsym
                 @inbounds typeof(m.v[1])∉parval ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
@@ -154,43 +154,43 @@ for (Blade,vector,Value) ∈ ((MSB[1],:MVector,MSV[1]),(MSB[2],:SVector,MSV[2]))
                 @inbounds DirectSum.printindices(io,V,ib[k])
             end
         end
-        function ==(a::$Blade{S,V,G} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
+        function ==(a::$Chain{S,V,G} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
             i = bladeindex(ndims(V),bits(basis(b)))
             @inbounds a[i] == value(b) && prod(a[1:i-1] .== 0) && prod(a[i+1:end] .== 0)
         end
-        ==(a::T,b::$Blade{S,V} where S) where T<:TensorTerm{V} where V = b==a
-        ==(a::$Blade{S,V} where S,b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
-        ==(a::Number,b::$Blade{S,V,G} where {S,V}) where G = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
-        ==(a::$Blade{S,V,G} where {S,V},b::Number) where G = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
+        ==(a::T,b::$Chain{S,V} where S) where T<:TensorTerm{V} where V = b==a
+        ==(a::$Chain{S,V} where S,b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
+        ==(a::Number,b::$Chain{S,V,G} where {S,V}) where G = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
+        ==(a::$Chain{S,V,G} where {S,V},b::Number) where G = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
     end
     for var ∈ ((:T,:V,:G),(:T,:V),(:T,))
         @eval begin
-            $Blade{$(var...)}(v::Basis{V,G}) where {T,V,G} = $Blade{T,V,G}(one(T),v)
+            $Chain{$(var...)}(v::Basis{V,G}) where {T,V,G} = $Chain{T,V,G}(one(T),v)
         end
     end
     for var ∈ [[:T,:V,:G],[:T,:V],[:T],[]]
         @eval begin
-            $Blade{$(var...)}(v::SValue{V,G,B,T}) where {T,V,G,B} = $Blade{T,V,G}(v.v,basis(v))
-            $Blade{$(var...)}(v::MValue{V,G,B,T}) where {T,V,G,B} = $Blade{T,V,G}(v.v,basis(v))
+            $Chain{$(var...)}(v::SBlade{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
+            $Chain{$(var...)}(v::MBlade{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
         end
     end
 end
-for (Blade,Other,Vec) ∈ ((MSB...,:MVector),(reverse(MSB)...,:SVector))
+for (Chain,Other,Vec) ∈ ((MSC...,:MVector),(reverse(MSC)...,:SVector))
     for var ∈ ((:T,:V,:G),(:T,:V),(:T,),())
         @eval begin
-            $Blade{$(var...)}(v::$Other{T,V,G}) where {T,V,G} = $Blade{T,V,G}($Vec{binomial(ndims(V),G),T}(v.v))
+            $Chain{$(var...)}(v::$Other{T,V,G}) where {T,V,G} = $Chain{T,V,G}($Vec{binomial(ndims(V),G),T}(v.v))
         end
     end
 end
-for (Blade,Vec1,Vec2) ∈ ((MSB[1],:SVector,:MVector),(MSB[2],:MVector,:SVector))
+for (Chain,Vec1,Vec2) ∈ ((MSC[1],:SVector,:MVector),(MSC[2],:MVector,:SVector))
     @eval begin
-        $Blade{T,V,G}(v::$Vec1{M,T} where M) where {T,V,G} = $Blade{T,V,G}($Vec2{binomial(ndims(V),G),T}(v))
+        $Chain{T,V,G}(v::$Vec1{M,T} where M) where {T,V,G} = $Chain{T,V,G}($Vec2{binomial(ndims(V),G),T}(v))
     end
 end
-for Blade ∈ MSB, Other ∈ MSB
+for Chain ∈ MSC, Other ∈ MSC
     @eval begin
-        ==(a::$Blade{T,V,G},b::$Other{S,V,G}) where {T,V,G,S} = prod(a.v .== b.v)
-        ==(a::$Blade{T,V} where T,b::$Other{S,V} where S) where V = prod(0 .==value(a)) && prod(0 .== value(b))
+        ==(a::$Chain{T,V,G},b::$Other{S,V,G}) where {T,V,G,S} = prod(a.v .== b.v)
+        ==(a::$Chain{T,V} where T,b::$Other{S,V} where S) where V = prod(0 .==value(a)) && prod(0 .== value(b))
     end
 end
 
@@ -213,15 +213,15 @@ setindex!(m::MultiVector{T},k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 
-(m::MultiVector{T,V})(g::Int,b::Type{B}=SBlade) where {T,V,B} = m(Dim{g}(),b)
-function (m::MultiVector{T,V})(::Dim{g},::Type{B}=SBlade) where {T,V,g,B}
-    B ≠ SBlade ? MBlade{T,V,g}(m[g]) : SBlade{T,V,g}(m[g])
+(m::MultiVector{T,V})(g::Int,b::Type{B}=SChain) where {T,V,B} = m(Dim{g}(),b)
+function (m::MultiVector{T,V})(::Dim{g},::Type{B}=SChain) where {T,V,g,B}
+    B ≠ SChain ? MChain{T,V,g}(m[g]) : SChain{T,V,g}(m[g])
 end
-function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SValue) where {T,V,B}
-    if B ≠ SValue
-        MValue{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
+function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SBlade) where {T,V,B}
+    if B ≠ SBlade
+        MBlade{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     else
-        SValue{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
+        SBlade{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     end
 end
 
@@ -252,12 +252,12 @@ for var ∈ ((:T,:V),(:T,))
     end
 end
 for var ∈ ((:T,:V),(:T,),())
-    for (Value,Blade) ∈ ((MSV[1],MSB[1]),(MSV[2],MSB[2]))
+    for (Blade,Chain) ∈ ((MSB[1],MSC[1]),(MSB[2],MSC[2]))
         @eval begin
-            function MultiVector{$(var...)}(v::$Value{V,G,B,T}) where {V,G,B,T}
+            function MultiVector{$(var...)}(v::$Blade{V,G,B,T}) where {V,G,B,T}
                 return MultiVector{T,V}(v.v,basis(v))
             end
-            function MultiVector{$(var...)}(v::$Blade{T,V,G}) where {T,V,G}
+            function MultiVector{$(var...)}(v::$Chain{T,V,G}) where {T,V,G}
                 N = ndims(V)
                 out = zeros(mvec(N,T))
                 r = binomsum(N,G)
@@ -293,14 +293,14 @@ end
 
 ==(a::MultiVector{T,V},b::MultiVector{S,V}) where {T,V,S} = prod(a.v .== b.v)
 
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        function ==(a::MultiVector{T,V},b::$Blade{S,V,G}) where {T,V,S,G}
+        function ==(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T,V,S,G}
             N = ndims(V)
             r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 2^N+1
             prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
         end
-        ==(a::$Blade{T,V,G},b::MultiVector{S,V}) where {T,V,S,G} = b == a
+        ==(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T,V,S,G} = b == a
     end
 end
 
@@ -318,17 +318,17 @@ import Base: isinf, isapprox
 import AbstractTensors: scalar, involute, unit, even, odd
 export basis, grade, hasinf, hasorigin, isorigin, scalar, norm
 
-const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
+const VBV = Union{MBlade,SBlade,MChain,SChain,MultiVector}
 
 @pure valuetype(::Basis) = Int
-@pure valuetype(::Union{MValue{V,G,B,T},SValue{V,G,B,T}} where {V,G,B}) where T = T
+@pure valuetype(::Union{MBlade{V,G,B,T},SBlade{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @pure basis(m::Basis) = m
-@pure basis(m::Union{MValue{V,G,B},SValue{V,G,B}}) where {V,G,B} = B
+@pure basis(m::Union{MBlade{V,G,B},SBlade{V,G,B}}) where {V,G,B} = B
 @pure grade(m::TensorTerm{V,G} where V) where G = G
-@pure grade(m::Union{MBlade{T,V,G},SBlade{T,V,G}} where {T,V}) where G = G
+@pure grade(m::Union{MChain{T,V,G},SChain{T,V,G}} where {T,V}) where G = G
 @pure grade(m::Number) = 0
 
 @pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
@@ -336,10 +336,10 @@ const VBV = Union{MValue,SValue,MBlade,SBlade,MultiVector}
 
 @pure isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasinf(V)+1]
 @pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasinf(V) ? e[2] : isodd(bits(e)))
-@pure hasorigin(t::Union{MValue,SValue}) = hasorigin(basis(t))
+@pure hasorigin(t::Union{MBlade,SBlade}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
-for A ∈ (:TensorTerm,MSB...), B ∈ (:TensorTerm,MSB...)
+for A ∈ (:TensorTerm,MSC...), B ∈ (:TensorTerm,MSC...)
     @eval isapprox(a::S,b::T) where {S<:$A,T<:$B} = vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? norm(a)≈norm(b) : (iszero(a) && iszero(b)))
 end
 function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
@@ -347,7 +347,7 @@ function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
     return norm(a-b) <= rtol * max(norm(a), norm(b))
 end
 isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
-isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:Number} where V =isapprox(a,SValue{V}(b))
+isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:Number} where V =isapprox(a,SBlade{V}(b))
 isapprox(a::S,b::T) where {S<:Number,T<:TensorAlgebra} = isapprox(b,a)
 
 """
@@ -357,35 +357,35 @@ Return the scalar (grade 0) part of any multivector.
 """
 @inline scalar(t::T) where T<:TensorTerm{V,0} where V = t
 @inline scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline scalar(t::MultiVector{T,V}) where {T,V} = SValue{V}(t.v[1])
-for Blade ∈ MSB
+@inline scalar(t::MultiVector{T,V}) where {T,V} = SBlade{V}(t.v[1])
+for Chain ∈ MSC
     @eval begin
-        @inline scalar(t::$Blade{T,V,0}) where {T,V} = SValue{V}(t.v[1])
-        @inline scalar(t::$Blade{T,V} where T) where V = zero(V)
+        @inline scalar(t::$Chain{T,V,0}) where {T,V} = SBlade{V}(t.v[1])
+        @inline scalar(t::$Chain{T,V} where T) where V = zero(V)
     end
 end
 
 @inline vector(t::T) where T<:TensorTerm{V,1} where V = t
 @inline vector(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline vector(t::MultiVector{T,V}) where {T,V} = SBlade{T,V,1}(t[1])
-for Blade ∈ MSB
+@inline vector(t::MultiVector{T,V}) where {T,V} = SChain{T,V,1}(t[1])
+for Chain ∈ MSC
     @eval begin
-        @inline vector(t::$Blade{T,V,1} where {T,V}) = t
-        @inline vector(t::$Blade{T,V} where T) where V = zero(V)
+        @inline vector(t::$Chain{T,V,1} where {T,V}) = t
+        @inline vector(t::$Chain{T,V} where T) where V = zero(V)
     end
 end
 
 @inline volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
-@inline volume(t::MultiVector{T,V}) where {T,V} = SValue{V}(t.v[end])
-for Blade ∈ MSB
+@inline volume(t::MultiVector{T,V}) where {T,V} = SBlade{V}(t.v[end])
+for Chain ∈ MSC
     @eval begin
-        @inline volume(t::$Blade{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
+        @inline volume(t::$Chain{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
     end
 end
 
 @inline isscalar(t::T) where T<:TensorTerm = grade(t) == 0 || iszero(t)
-@inline isscalar(t::T) where T<:SBlade = grade(t) == 0 || iszero(t)
-@inline isscalar(t::T) where T<:MBlade = grade(t) == 0 || iszero(t)
+@inline isscalar(t::T) where T<:SChain = grade(t) == 0 || iszero(t)
+@inline isscalar(t::T) where T<:MChain = grade(t) == 0 || iszero(t)
 @inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
 
 ## MultiGrade{N}
@@ -401,28 +401,28 @@ MultiGrade(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}
 
 function bladevalues(V::VectorBundle{N},m,G::Int,T::Type) where N
     com = indexbasis(N,G)
-    out = (SValue{V,G,B,T} where B)[]
+    out = (SBlade{V,G,B,T} where B)[]
     for i ∈ 1:binomial(N,G)
-        m[i] ≠ 0 && push!(out,SValue{V,G,Basis{V,G}(com[i]),T}(m[i]))
+        m[i] ≠ 0 && push!(out,SBlade{V,G,Basis{V,G}(com[i]),T}(m[i]))
     end
     return out
 end
 
 MultiGrade(v::MultiVector{T,V}) where {T,V} = MultiGrade{V}(vcat([bladevalues(V,v[g],g,T) for g ∈ 1:ndims(V)]...))
 
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        MultiGrade(v::$Blade{T,V,G}) where {T,V,G} = MultiGrade{V}(bladevalues(V,v,G,T))
+        MultiGrade(v::$Chain{T,V,G}) where {T,V,G} = MultiGrade{V}(bladevalues(V,v,G,T))
     end
 end
 
-#=function MultiGrade{V}(v::(MultiBlade{T,V} where T <: Number)...) where V
+#=function MultiGrade{V}(v::(MultiChain{T,V} where T <: Number)...) where V
     sigcheck(v.s,V)
     t = typeof.(v)
     MultiGrade{V}([bladevalues(V,v[i],N,t[i].parameters[3],t[i].parameters[1]) for i ∈ 1:length(v)])
 end
 
-MultiGrade(v::(MultiBlade{T,N} where T <: Number)...) where N = MultiGrade{N}(v)=#
+MultiGrade(v::(MultiChain{T,N} where T <: Number)...) where N = MultiGrade{N}(v)=#
 
 function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
     N = ndims(V)
@@ -442,7 +442,7 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)..
 function show(io::IO,m::MultiGrade)
     for k ∈ 1:length(m.v)
         x = m.v[k]
-        t = (typeof(x) <: MValue) | (typeof(x) <: SValue)
+        t = (typeof(x) <: MBlade) | (typeof(x) <: SBlade)
         if t && signbit(x.v)
             print(io," - ")
             ax = abs(x.v)
@@ -465,7 +465,7 @@ end
 
 ## conversions
 
-@inline (V::Signature)(s::UniformScaling{T}) where T = SValue{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffmode(V)))-1))
+@inline (V::Signature)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffmode(V)))-1))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
@@ -488,12 +488,12 @@ end
         throw(error("arbitrary VectorBundle intersection not yet implemented."))
     end
 end
-(W::Signature)(b::SValue) = SValue{W}(value(b),W(basis(b)))
-(W::Signature)(b::MValue) = MValue{W}(value(b),W(basis(b)))
+(W::Signature)(b::SBlade) = SBlade{W}(value(b),W(basis(b)))
+(W::Signature)(b::MBlade) = MBlade{W}(value(b),W(basis(b)))
 
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        function (W::Signature)(b::$Blade{T,V,G}) where {T,V,G}
+        function (W::Signature)(b::$Chain{T,V,G}) where {T,V,G}
             V==W && (return b)
             !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
             WC,VC = mixedmode(W),mixedmode(V)
@@ -508,7 +508,7 @@ for Blade ∈ MSB
                         @inbounds setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
                     end
                 end
-                return $Blade{T,W,G}(out)
+                return $Chain{T,W,G}(out)
             else
                 throw(error("arbitrary VectorBundle intersection not yet implemented."))
             end

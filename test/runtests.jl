@@ -11,7 +11,7 @@ using Test
 !Sys.iswindows() && @test Λ(62).v32a87Ng == -1Λ(62).v2378agN
 @test Λ.V3 == Λ.C3'
 @test Λ(14) + Λ(14)' == Λ(vectorspace(14)+vectorspace(14)')
-@test ((a,b) = ((:a*Λ(2).v1 + :b*Λ(2).v2),(:c*Λ(2).v1 + :d*Λ(2).v2)); Algebra.:+(a∧b,a⋅b)==a*b)
+@test ((a,b) = (:a*Λ(2).v1 + :b*Λ(2).v2,:c*Λ(2).v1 + :d*Λ(2).v2); Algebra.:+(a∧b,a⋅b)==a*b)
 
 include("issuestests.jl")
 include("generictests.jl")

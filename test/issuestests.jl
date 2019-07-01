@@ -68,16 +68,16 @@ end
     
     a = v∅*basis(-v∞)
     @test a == -1 - v∞∅
-    @test_broken SValue{V}(-1, a)
+    @test_broken SBlade{V}(-1, a)
 end
 
-@testset "Issue #22: Error in MultiVector constructor for Blades" begin
+@testset "Issue #22: Error in MultiVector constructor for Chains" begin
     basis"++"
 
     a = v1 + v2
-    @test typeof(a) <: MBlade
+    @test typeof(a) <: MChain
 
     @test MultiVector(a) == v1 + v2
-    @test SBlade(v) == v
+    @test SChain(v) == v
 end
 end

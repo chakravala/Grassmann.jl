@@ -72,26 +72,26 @@ function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
     @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -one(T) : one(T))*getbasis(V,ib[bi[1]]))
 end
 
-# Value forms
+# Blade forms
 
-for Value ∈ MSV
+for Blade ∈ MSB
     @eval begin
-        (a::$Value)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-        function (a::Basis{V,1,A})(b::$Value{V,1,X,T} where X) where {V,A,T}
+        (a::$Blade)(b::T) where {T<:TensorAlgebra} = interform(a,b)
+        function (a::Basis{V,1,A})(b::$Blade{V,1,X,T} where X) where {V,A,T}
             x = bits(a)
             X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
             Y = bits(basis(b))
             Y∉(x,X) && (return zero(V))
             (V[intlog(Y)+1] ? -(b.v) : b.v) * Basis{V}()
         end
-        function (a::$Value{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
+        function (a::$Blade{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
             x = bits(basis(a))
             X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
             Y = bits(b)
             Y∉(x,X) && (return zero(V))
             (V[intlog(Y)+1] ? -(a.v) : a.v) * Basis{V}()
         end
-        function (a::$Value{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
+        function (a::$Blade{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
             C = mixedmode(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
@@ -101,7 +101,7 @@ for Value ∈ MSV
             t = bits(b)≠v
             @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
         end
-        function (a::$Basis{V,2,A})(b::$Value{V,1,B,T}) where {V,A,B,T}
+        function (a::$Basis{V,2,A})(b::$Blade{V,1,B,T}) where {V,A,B,T}
             C = mixedmode(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
@@ -112,17 +112,17 @@ for Value ∈ MSV
             @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
         end
     end
-    for Other ∈ MSV
+    for Other ∈ MSB
         @eval begin
-            function (a::$Value{V,1,X,T} where X)(b::$Other{V,1,Y,S} where Y) where {V,T,S}
+            function (a::$Blade{V,1,X,T} where X)(b::$Other{V,1,Y,S} where Y) where {V,T,S}
                 $(insert_expr((:t,))...)
                 x = bits(basis(a))
                 X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
                 Y = bits(basis(b))
                 Y∉(x,X) && (return zero(V))
-                SValue{V}((a.v*(V[intlog(Y)+1] ? -(b.v) : b.v))::t,Basis{V}())
+                SBlade{V}((a.v*(V[intlog(Y)+1] ? -(b.v) : b.v))::t,Basis{V}())
             end
-            function (a::$Value{V,2,A,T})(b::$Other{V,1,B,S}) where {V,A,T,B,S}
+            function (a::$Blade{V,2,A,T})(b::$Other{V,1,B,S}) where {V,A,T,B,S}
                 C = mixedmode(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:M,:t))...)
@@ -136,26 +136,26 @@ for Value ∈ MSV
     end
 end
 
-## Blade forms
+## Chain forms
 
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        (a::$Blade)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-        function (a::Basis{V,1,A})(b::$Blade{T,V,1}) where {V,A,T}
+        (a::$Chain)(b::T) where {T<:TensorAlgebra} = interform(a,b)
+        function (a::Basis{V,1,A})(b::$Chain{T,V,1}) where {V,A,T}
             x = bits(a)
             X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
             Y = 0≠X ? X : x
             @inbounds out = b.v[bladeindex(ndims(V),Y)]
-            SValue{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
+            SBlade{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
         end
-        function (a::$Blade{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
+        function (a::$Chain{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
             x = bits(b)
             X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
             Y = X>2^ndims(V) ? x : X
             @inbounds out = a.v[bladeindex(ndims(V),Y)]
-            SValue{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
+            SBlade{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
         end
-        function (a::Basis{V,2,A})(b::$Blade{T,V,1}) where {V,A,T}
+        function (a::Basis{V,2,A})(b::$Chain{T,V,1}) where {V,A,T}
             C = mixedmode(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:M))...)
@@ -164,7 +164,7 @@ for Blade ∈ MSB
             @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
             @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
         end
-        function (a::$Blade{T,V,2})(b::Basis{V,1,B}) where {T,V,B}
+        function (a::$Chain{T,V,2})(b::Basis{V,1,B}) where {T,V,B}
             C = mixedmode(V)
             (C ≥ 0) && throw(error("wrong basis"))
             $(insert_expr((:N,:df,:di))...)
@@ -174,28 +174,28 @@ for Blade ∈ MSB
             for i ∈ 1:N
                 i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
             end
-            return $Blade{T,V,1}(out)
+            return $Chain{T,V,1}(out)
         end
     end
-    for Value ∈ MSV
+    for Blade ∈ MSB
         @eval begin
-            function (a::$Blade{T,V,1})(b::$Value{V,1,X,S} where X) where {V,A,T,S}
+            function (a::$Chain{T,V,1})(b::$Blade{V,1,X,S} where X) where {V,A,T,S}
                 $(insert_expr((:t,))...)
                 x = bits(basis(b))
                 X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
                 Y = X>2^ndims(V) ? x : X
                 @inbounds out = a.v[bladeindex(ndims(V),Y)]
-                SValue{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
+                SBlade{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
             end
-            function (a::$Value{V,1,X,T} where X)(b::$Blade{S,V,1}) where {V,T,S}
+            function (a::$Blade{V,1,X,T} where X)(b::$Chain{S,V,1}) where {V,T,S}
                 $(insert_expr((:t,))...)
                 x = bits(basis(a))
                 X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
                 Y = 0≠X ? X : x
                 @inbounds out = b.v[bladeindex(ndims(V),Y)]
-                SValue{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
+                SBlade{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
             end
-            function (a::$Value{V,2,A,T})(b::$Blade{S,V,1}) where {V,A,T,S}
+            function (a::$Blade{V,2,A,T})(b::$Chain{S,V,1}) where {V,A,T,S}
                 C = mixedmode(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:M,:t))...)
@@ -204,7 +204,7 @@ for Blade ∈ MSB
                 @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
                 @inbounds (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])
             end
-            function (a::$Blade{T,V,2})(b::$Value{V,1,B,S}) where {V,T,S,B}
+            function (a::$Chain{T,V,2})(b::$Blade{V,1,B,S}) where {V,T,S,B}
                 C = mixedmode(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:t,:df,:di))...)
@@ -214,14 +214,14 @@ for Blade ∈ MSB
                 for i ∈ 1:N
                     i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
                 end
-                return $Blade{t,V,1}(out)
+                return $Chain{t,V,1}(out)
             end
         end
     end
-    for Other ∈ MSB
-        Final = ((Blade == MSB[1]) && (Other == MSB[1])) ? MSV[1] : MSV[2]
+    for Other ∈ MSC
+        Final = ((Chain == MSC[1]) && (Other == MSC[1])) ? MSB[1] : MSB[2]
         @eval begin
-            function (a::$Blade{T,V,1})(b::$Other{S,V,1}) where {V,T,S}
+            function (a::$Chain{T,V,1})(b::$Other{S,V,1}) where {V,T,S}
                 $(insert_expr((:N,:M,:t,:df))...)
                 out = zero(t)
                 for Q ∈ 1:M
@@ -229,7 +229,7 @@ for Blade ∈ MSB
                 end
                 return $Final{V}(out::t,Basis{V}())
             end
-            function (a::$Blade{T,V,2})(b::$Other{S,V,1}) where {V,T,S}
+            function (a::$Chain{T,V,2})(b::$Other{S,V,1}) where {V,T,S}
                 C = mixedmode(V)
                 (C ≥ 0) && throw(error("wrong basis"))
                 $(insert_expr((:N,:t,:df,:di))...)
@@ -240,16 +240,16 @@ for Blade ∈ MSB
                         @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
-                return $Blade{t,V,1}(out)
+                return $Chain{t,V,1}(out)
             end
         end
     end
 end
 
 
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        function $Blade{T,V}(b::Matrix{T}) where {T,V}
+        function $Chain{T,V}(b::Matrix{T}) where {T,V}
             mixedmode(V)≥0 && throw(error("$V does not support this conversion"))
             $(insert_expr((:N,:M))...)
             size(b) ≠ (M,M) && throw(error("dimension mismatch"))
@@ -260,7 +260,7 @@ for Blade ∈ MSB
                     @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
                 end
             end
-            return $Blade{T,V,2}(out)
+            return $Chain{T,V,2}(out)
         end
     end
 end

@@ -209,13 +209,13 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
-    for Blade ∈ MSB
-        @eval function $op(t::$Blade{T,V,G}) where {T,V,G}
+    for Chain ∈ MSC
+        @eval function $op(t::$Chain{T,V,G}) where {T,V,G}
             out = copy(value(t,mvec(ndims(V),G,T)))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            MBlade{T,V,G}(out)
+            MChain{T,V,G}(out)
         end
     end
     @eval function $op(t::MultiVector{T,V}) where {T,V}
@@ -229,10 +229,10 @@ end
 
 odd(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
 even(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        odd(t::$Blade{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
-        even(t::$Blade{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
+        odd(t::$Chain{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
+        even(t::$Chain{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
     end
 end
 function odd(t::MultiVector{T,V}) where {T,V}
@@ -261,10 +261,10 @@ end
 
 imag(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
 real(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
-for Blade ∈ MSB
+for Chain ∈ MSC
     @eval begin
-        imag(t::$Blade{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
-        real(t::$Blade{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
+        imag(t::$Chain{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
+        real(t::$Chain{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
     end
 end
 function imag(t::MultiVector{T,V}) where {T,V}

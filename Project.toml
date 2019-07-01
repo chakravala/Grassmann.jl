@@ -17,7 +17,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 julia = "1"
-Reduce = "1.1"
+Reduce = "1.2"
 DirectSum = "0.3"
 AbstractTensors = "0.2"
 

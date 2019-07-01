@@ -97,11 +97,11 @@ macro mixedbasis_str(str)
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
-@inline function lookup_basis(V::VectorBundle,v::Symbol)::Union{SValue,Basis}
+@inline function lookup_basis(V::VectorBundle,v::Symbol)::Union{SBlade,Basis}
     p,b,w,z = DirectSum.indexparity(V,v)
     z && return g_zero(V)
     d = Basis{w}(b)
-    return p ? SValue(-1,d) : d
+    return p ? SBlade(-1,d) : d
 end
 
 ## fundamentals
@@ -343,15 +343,15 @@ d(ω::T) where T<:TensorAlgebra{V} where V = V(∇)∧ω
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
         import Reduce: RExpr
-        *(a::RExpr,b::Basis{V}) where V = SValue{V}(a,b)
-        *(a::Basis{V},b::RExpr) where V = SValue{V}(b,a)
+        *(a::RExpr,b::Basis{V}) where V = SBlade{V}(a,b)
+        *(a::Basis{V},b::RExpr) where V = SBlade{V}(b,a)
         *(a::RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a,b.v))
         *(a::MultiVector{T,V},b::RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,b))
         *(a::RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a,b.v))
         *(a::MultiGrade{V},b::RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,b))
         ∧(a::RExpr,b::RExpr) = Reduce.Algebra.:*(a,b)
-        ∧(a::RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SValue{V,G}(a,b)
-        ∧(a::A,b::RExpr) where A<:TensorTerm{V,G} where {V,G} = SValue{V,G}(b,a)
+        ∧(a::RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(a,b)
+        ∧(a::A,b::RExpr) where A<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(b,a)
         parany = (parany...,RExpr)
         parval = (parval...,RExpr)
         parsym = (parsym...,RExpr)
