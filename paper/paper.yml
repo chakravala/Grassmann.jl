@@ -1,0 +1,16 @@
+title: "Differential goemtric algebra using Leibniz.jl and Grassmann.jl"
+keywords:
+  - Julia
+  - Geometric Algebra
+  - Differential Geometry
+  - Multiple Dispatch
+  - Metaprogramming
+authors:
+  - name: Michael Reed
+    orcid: 0000-0002-8006-7816
+    affiliation: 1
+affiliations:
+  - name: Crucial Flow Research, Computational Meta-Linguist
+    index: 1
+date: 2 July 2019
+bibliography: ref.bib
