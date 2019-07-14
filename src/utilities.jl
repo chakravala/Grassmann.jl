@@ -5,7 +5,7 @@
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
 import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode, Dim
 
-bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
+bcast(op,arg) = op ∈ (:(DirectSum.:∑),:(DirectSum.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
 @pure binomial_set(N) = SVector(Int[binomial(N,g) for g ∈ 0:N]...)
 @pure binomial(N,G) = Base.binomial(N,G)
@@ -17,6 +17,7 @@ bcast(op,arg) = op ∈ (:(Reduce.Algebra.:+),:(Reduce.Algebra.:-)) ? Expr(:.,op,
 const algebra_limit = 8
 const sparse_limit = 22
 const cache_limit = 12
+const fill_limit = 0.5
 
 const binomsum_cache = [[0],[0,1]]
 const binomsum_extra = Vector{Int}[]
@@ -61,11 +62,11 @@ function combo(n::Int,g::Int)::Vector{Vector{Int}}
         for k ∈ length(combo_extra)+1:N
             push!(combo_extra,Vector{Vector{Int}}[])
         end
-        for k ∈ length(combo_extra[N])+1:g
-            push!(combo_extra[N],Vector{Int}[])
+        @inbounds for k ∈ length(combo_extra[N])+1:g
+            @inbounds push!(combo_extra[N],Vector{Int}[])
         end
-        isempty(combo_extra[N][g]) && (combo_extra[N][g]=collect(combinations(1:n,g)))
-        combo_extra[N][g]
+        @inbounds isempty(combo_extra[N][g]) && (combo_extra[N][g]=collect(combinations(1:n,g)))
+        @inbounds combo_extra[N][g]
     else
         for k ∈ length(combo_cache)+1:min(n,sparse_limit)
             z = 1:k
@@ -103,8 +104,8 @@ const bladeindex_extra = Vector{Int}[]
         for k ∈ length(bladeindex_extra)+1:N
             push!(bladeindex_extra,Int[])
         end
-        isempty(bladeindex_extra[N]) && (bladeindex_extra[N]=-ones(Int,1<<n-1))
-        signbit(bladeindex_extra[N][s]) && (bladeindex_extra[N][s]=bladeindex_calc(s,n))
+        @inbounds isempty(bladeindex_extra[N]) && (bladeindex_extra[N]=-ones(Int,1<<n-1))
+        @inbounds signbit(bladeindex_extra[N][s]) && (bladeindex_extra[N][s]=bladeindex_calc(s,n))
         @inbounds bladeindex_extra[N][s]
     else
         j = length(bladeindex_cache)+1
@@ -129,8 +130,8 @@ const basisindex_extra = Vector{Int}[]
         for k ∈ length(basisindex_extra)+1:N
             push!(basisindex_extra,Int[])
         end
-        isempty(basisindex_extra[N]) && (basisindex_extra[N]=-ones(Int,1<<n-1))
-        signbit(basisindex_extra[N][s]) && (basisindex_extra[N][s]=basisindex_calc(s,n))
+        @inbounds isempty(basisindex_extra[N]) && (basisindex_extra[N]=-ones(Int,1<<n-1))
+        @inbounds signbit(basisindex_extra[N][s]) && (basisindex_extra[N][s]=basisindex_calc(s,n))
         @inbounds basisindex_extra[N][s]
     else
         j = length(basisindex_cache)+1
@@ -190,7 +191,7 @@ end
             @inbounds indexbasis_extra[N][g]
         else
             for k ∈ length(indexbasis_cache)+1:n
-                push!(indexbasis_cache,[[bit2int(indexbits(k,combo(k,G)[q])) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
+                push!(indexbasis_cache,[[bit2int(indexbits(k,@inbounds(combo(k,G)[q]))) for q ∈ 1:binomial(k,G)] for G ∈ 1:k])
             end
             @inbounds g>0 ? indexbasis_cache[n][g] : [zero($Bits)]
         end
@@ -199,7 +200,7 @@ end
 
 indexbasis(Int((sparse_limit+cache_limit)/2),1)
 
-@pure indexbasis_set(N) = SVector(((N≠0 && N<sparse_limit) ? indexbasis_cache[N] : Vector{Bits}[indexbasis(N,g) for g ∈ 0:N])...)
+@pure indexbasis_set(N) = SVector(((N≠0 && N<sparse_limit) ? @inbounds(indexbasis_cache[N]) : Vector{Bits}[indexbasis(N,g) for g ∈ 0:N])...)
 
 @pure indexbasis(N) = vcat(indexbasis(N,0),indexbasis_set(N)...)
 

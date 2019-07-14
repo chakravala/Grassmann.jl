@@ -285,7 +285,7 @@ end
 
 export ⊙, ⊠
 
-⊙(x::TensorAlgebra...) = (K=length(x); sum([prod(x[k]) for k ∈ collect(permutations(1:K))])/factorial(K))
+⊙(x::TensorAlgebra...) = (K=length(x); sum([prod(x[k]) for k ∈ permutations(1:K)])/factorial(K))
 
 function ⊠(x::TensorAlgebra...)
     K,V,out = length(x),∪(vectorspace.(x)...),prod(x)
@@ -510,7 +510,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
-                            p = $p(V,ib[k])
+                            @inbounds p = $p(V,ib[k])
                             v = typeof(V)<:Signature ? (p ? $SUB(val) : val) : p*val
                             @inbounds setblade!(out,v,complement(N,ib[k],D),Dimension{N}())
                         end
@@ -828,6 +828,68 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                 $(add_val(eop,:out,:(value(b,$VEC(N,t))),bop))
                 return MultiVector{t,V}(out)
             end
+            function $op(a::SparseChain{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                at = terms(a)
+                t = promote_type(T,valuetype.(at)...)
+                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                for A ∈ at
+                    addmulti!(out,value(A,t),bits(A),Dimension{N}())
+                end
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::MultiVector{T,V},b::SparseChain{V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                bt = terms(b)
+                t = promote_type(T,valuetype.(bt)...)
+                out = copy(value(a,$VEC(N,t)))
+                for B ∈ bt
+                    addmulti!(out,$bop(value(B,t)),bits(B),Dimension{N}())
+                end
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::MultiGrade{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                at = terms(a)
+                t = promote_type(T,valuetype.(at)...)
+                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                for A ∈ at
+                    TA = typeof(A)
+                    if TA <: TensorTerm
+                        addmulti!(out,value(A,t),bits(A),Dimension{N}())
+                    elseif TA <: SparseChain
+                        for α ∈ terms(A)
+                            addmulti!(out,value(α,t),bits(α),Dimension{N}())
+                        end
+                    elseif TA <: TensorMixed
+                        g = grade(A)
+                        r = binomsum(N,g)
+                        @inbounds out[r+1:r+binomial(N,g)] += value(A,$VEC(N,g,t))
+                    end
+                end
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::MultiVector{T,V},b::MultiGrade{V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                bt = terms(b)
+                t = promote_type(T,valuetype.(bt)...)
+                out = copy(value(a,$VEC(N,t)))
+                for B ∈ bt
+                    TB = typeof(B)
+                    if TB <: TensorTerm
+                        addmulti!(out,$bop(value(B,t)),bits(B),Dimension{N}())
+                    elseif TB <: SparseChain
+                        for β ∈ terms(B)
+                            addmulti!(out,$bop(value(β,t)),bits(β),Dimension{N}())
+                        end
+                    elseif TB <: TensorMixed
+                        g = grade(B)
+                        r = binomsum(N,g)
+                        @inbounds $(Expr(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t)))))
+                    end
+                end
+                return MultiVector{t,V}(out)
+            end
         end
         for (A,B) ∈ [(A,B) for A ∈ MSC, B ∈ MSC]
             C = (A == MSC[1] && B == MSC[1]) ? MSC[1] : MSC[2]
@@ -900,6 +962,26 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
+                function $op(a::$Chain{T,V,G},b::SparseChain{V,G}) where {T<:$Field,V,G}
+                    $(insert_expr((:N,),VEC)...)
+                    bt = terms(b)
+                    t = promote_type(T,valuetype.(bt)...)
+                    out = copy(value(a,$VEC(N,G,t)))
+                    for B ∈ bt
+                        addblade!(out,$bop(value(B,t)),bits(B),Dimension{N}())
+                    end
+                    return MChain{t,V,G}(out)
+                end
+                function $op(a::SparseChain{V,G},b::$Chain{T,V,G}) where {T<:$Field,V,G}
+                    $(insert_expr((:N,),VEC)...)
+                    at = terms(a)
+                    t = promote_type(T,valuetype.(at)...)
+                    out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
+                    for A ∈ at
+                        addblade!(out,value(A,t),basis(A),Dimension{N}())
+                    end
+                    return MChain{t,V,G}(out)
+                end
                 function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
@@ -949,6 +1031,122 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                 return MultiVector{t,V}(out)
             end
         end
+        function $op(a::SparseChain{V,G},b::SparseChain{V,G}) where {V,G}
+            at,bt = terms(a),terms(b)
+            isempty(at) && (return b)
+            isempty(bt) && (return a)
+            bl = length(bt)
+            out = copy(at)
+            N = ndims(V)
+            i,k,bk = 0,1,basisindex(N,bits(out[1]))
+            while i < bl
+                k += 1
+                i += 1
+                bas = basisindex(N,bits(bt[i]))
+                if bas == bk
+                    $(Expr(eop,:(out[k-1]),:(bt[i])))
+                    k < length(out) ? (bk = basisindex(N,bits(out[k]))) : (k -= 1)
+                elseif bas<bk
+                    insert!(out,k-1,bt[i])
+                elseif k ≤ length(out)
+                    bk = basisindex(N,bits(out[k]))
+                    i -= 1
+                else
+                    insert!(out,k,bt[i])
+                end
+            end
+            SparseChain{V,G}(out)
+        end
+        function $op(a::SparseChain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
+            N = ndims(V)
+            bas = basisindex(N,bits(b))
+            out = copy(terms(a))
+            i,k,bk = 0,1,basisindex(N,bits(out[1]))
+            while i < length(out)
+                k += 1
+                i += 1
+                if bk == bas
+                    $(Expr(eop,:(out[k-1]),:b))
+                    break
+                elseif bas<bk
+                    insert!(out,k-1,b)
+                    break
+                elseif k ≤ length(out)
+                    bk = basisindex(N,bits(out[k]))
+                else
+                    insert!(out,k,b)
+                    break
+                end
+            end
+            SparseChain{V,G}(out)
+        end
+        function $op(a::MultiGrade{V,A},b::MultiGrade{V,B}) where {V,A,B}
+            at,bt = terms(a),terms(b)
+            isempty(at) && (return b)
+            isempty(bt) && (return a)
+            bl = length(bt)
+            out = copy(at)
+            N = ndims(V)
+            i,k,bk = 0,1,grade(out[1])
+            while i < bl
+                k += 1
+                i += 1
+                bas = grade(bt[i])
+                if bas == bk
+                    $(Expr(eop,:(out[k-1]),:(bt[i])))
+                    k < length(out) ? (bk = grade(out[k])) : (k -= 1)
+                elseif bas<bk
+                    insert!(out,k-1,bt[i])
+                elseif k ≤ length(out)
+                    bk = grade(out[k])
+                    i -= 1
+                else
+                    insert!(out,k,bt[i])
+                end
+            end
+            MultiGrade{V,A|B}(out)
+        end
+    end
+    for Tens ∈ (:(TensorTerm{V,B}),[:($(MSC[k]){T,V,B} where T) for k ∈ 1:2]...,:(SparseChain{V,B}))
+        @eval begin
+            function $op(a::MultiGrade{V,A},b::T) where {T<:$Tens} where {V,A,B}
+                N = ndims(V)
+                out = copy(terms(a))
+                i,k,bk,bl = 0,1,grade(out[1]),length(out)
+                while i < bl
+                    k += 1
+                    i += 1
+                    if bk == B
+                        $(Expr(eop,:(out[k-1]),:b))
+                        break
+                    elseif B<bk
+                        insert!(out,k-1,b)
+                        break
+                    elseif k ≤ length(out)
+                        bk = grade(out[k])
+                    else
+                        insert!(out,k,b)
+                        break
+                    end
+                end
+                MultiGrade{V,A|(UInt(1)<<B)}(out)
+            end
+            $op(a::SparseChain{V,A},b::T) where {T<:$Tens} where {V,A,B} = MultiGrade{V,(UInt(1)<<A)|(UInt(1)<<B)}(A<B ? [a,b] : [b,a])
+        end
+        Tens≠:(SparseChain{V,B}) && (@eval $op(a::T,b::SparseChain{V,A}) where {T<:$Tens} where {V,A,B} = b+a)
+    end
+end
+
+for un ∈ (:complementleft,:complementright)
+    @eval begin
+        $un(t::SparseChain{V,G}) where {V,G} = SparseChain{V,ndims(V)-G}($un.(terms(t)))
+        $un(t::MultiGrade{V,G}) where {V,G} = SparseChain{V,G⊻(UInt(1)<<ndims(V)-1)}(reverse($un.(terms(t))))
+    end
+end
+for un ∈ (:reverse,:involute,:conj,:+,:-)
+    @eval begin
+        $un(t::SparseChain{V,G}) where {V,G} = SparseChain{V,G}($un.(terms(t)))
+        $un(t::MultiGrade{V,G}) where {V,G} = SparseChain{V,G}($un.(terms(t)))
     end
 end
 
@@ -998,7 +1196,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             sd = scalar(d)
             value(sd) ≈ fd && (return $d(rm,sd))
             for k ∈ 1:ndims(V)
-                norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                @inbounds norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
         end

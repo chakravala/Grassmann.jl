@@ -26,7 +26,7 @@ function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],di
     for i ∈ 1:N
         set = combo(N,i)
         for k ∈ 1:length(set)
-            DirectSum.printlabel(io,V,bit2int(indexbits(N,set[k])),true,vec,cov,duo,dif)
+            @inbounds DirectSum.printlabel(io,V,bit2int(indexbits(N,set[k])),true,vec,cov,duo,dif)
             icr += 1
             @inbounds els[icr] = Symbol(String(take!(io)))
         end
@@ -200,8 +200,8 @@ for (vs,dat) ∈ ((:Signature,Bits),(:DiagonalForm,Int))
             for D ∈ length($algebra_cache)+1:d+1
                 push!($algebra_cache,Vector{Dict{$dat,Λ}}[])
             end
-            for N ∈ length($algebra_cache[d+1])+1:n
-                push!($algebra_cache[d+1],[Dict{$dat,Λ}() for k∈1:12])
+            @inbounds for N ∈ length($algebra_cache[d+1])+1:n
+                @inbounds push!($algebra_cache[d+1],[Dict{$dat,Λ}() for k∈1:12])
             end
             @inbounds if !haskey($algebra_cache[d+1][n][m+1],s)
                 @inbounds push!($algebra_cache[d+1][n][m+1],s=>collect($vs{n,m,s,d}()))
@@ -308,8 +308,8 @@ for (ExtraAlgebra,extra) ∈ ((SparseAlgebra,:sparse),(ExtendedAlgebra,:extended
                 for D ∈ length($extra_cache)+1:d+1
                     push!($extra_cache,Vector{Dict{$dat,$ExtraAlgebra}}[])
                 end
-                for N ∈ length($extra_cache[d+1])+1:n
-                    push!($extra_cache[d+1],[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
+                @inbounds for N ∈ length($extra_cache[d+1])+1:n
+                    @inbounds push!($extra_cache[d+1],[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
                 end
                 @inbounds if !haskey($extra_cache[d+1][n][m+1],s)
                     @inbounds push!($extra_cache[d+1][n][m+1],s=>$ExtraAlgebra($vs{n,m,s,d}()))

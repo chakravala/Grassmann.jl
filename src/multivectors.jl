@@ -2,9 +2,10 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorTerm, TensorMixed, Basis, MultiVector, MultiGrade
+export TensorTerm, TensorMixed, Basis, MultiVector, SparseChain, MultiGrade
 
-abstract type TensorTerm{V,G} <: TensorAlgebra{V} end
+abstract type GradedAlgebra{V,G} <: TensorAlgebra{V} end
+abstract type TensorTerm{V,G} <: GradedAlgebra{V,G} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
 # symbolic print types
@@ -298,7 +299,7 @@ for Chain ∈ MSC
         function ==(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T,V,S,G}
             N = ndims(V)
             r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 2^N+1
-            prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
+            @inbounds prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
         end
         ==(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T,V,S,G} = b == a
     end
@@ -312,6 +313,114 @@ end
 ==(a::Number,b::MultiVector{S,V,G} where {S,V}) where G = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
 ==(a::MultiVector{S,V,G} where {S,V},b::Number) where G = b == a
 
+## SparseChain{V,G}
+
+struct SparseChain{V,G} <: TensorAlgebra{V}
+    v::Vector{<:TensorTerm{V,G}}
+end
+
+terms(v::SparseChain) = v.v
+value(v::SparseChain) = value.(terms(v))
+
+#SparseChain{V,G}(v::Vector{<:TensorTerm{V,G}}) where {V,G} = SparseChain{V,G}(v)
+SparseChain{V}(v::Vector{<:TensorTerm{V,G}}) where {V,G} = SparseChain{V,G}(v)
+SparseChain{V}(v::T) where T <: (TensorTerm{V,G}) where {V,G} = v
+SparseChain(v::T) where T <: (TensorTerm{V,G}) where {V,G} = v
+
+for (Chain,vec) ∈ ((MSC[1],:MVector),(MSC[2],:SVector))
+    for Vec ∈ (:($vec{L,T}),:(SubArray{T,1,$vec{L,T}}))
+        @eval function chainvalues(V::VectorBundle{N},m::$Vec,::Dim{G}) where {N,G,L,T}
+            bng = binomial(N,G)
+            G∉(0,N) && sum(m .== 0)/bng < fill_limit && (return $Chain{T,V,G}(m))
+            com = indexbasis(N,G)
+            out = (SBlade{V,G,B,T} where B)[]
+            for i ∈ 1:bng
+                @inbounds m[i] ≠ 0 && push!(out,SBlade{V,G,getbasis(V,com[i]),T}(m[i]))
+            end
+            length(out)≠1 ? SparseChain{V,G}(out) : out[1]::SBlade{V,G,B,T} where B
+        end
+    end
+    @eval begin
+        SparseChain{V,G}(m::$Chain{T,V,G}) where {T,V,G} = chainvalues(V,value(m),Dim{G}())
+        SparseChain{V}(m::$Chain{T,V,G}) where {T,V,G} = SparseChain{V,G}(m)
+        SparseChain(m::$Chain{T,V,G}) where {T,V,G} = SparseChain{V,G}(m)
+    end
+end
+
+function show(io::IO, m::SparseChain{V}) where V
+    t = terms(m)
+    isempty(t) && print(io,zero(V))
+    for k ∈ 1:length(t)
+        k ≠ 1 && print(io," + ")
+        print(io,t[k])
+    end
+end
+
+==(a::SparseChain{V,G},b::SparseChain{V,G}) where {V,G} = prod(terms(a) .== terms(b))
+==(a::SparseChain{V},b::SparseChain{V}) where V = iszero(a) && iszero(b)
+==(a::SparseChain{V},b::T) where T<:TensorTerm{V} where V = false
+==(a::T,b::SparseChain{V}) where T<:TensorTerm{V} where V = false
+
+## MultiGrade{V,G}
+
+struct MultiGrade{V,G} <: TensorAlgebra{V}
+    v::Vector{<:TensorAlgebra{V}}
+end
+
+terms(v::MultiGrade) = v.v
+value(v::MultiGrade) = collect(Base.Iterators.flatten(value.(terms(v))))
+
+MultiGrade{V}(v::Vector{<:TensorAlgebra{V}}) where V = MultiGrade{V}(v)
+MultiGrade{V}(m::T) where {T<:TensorTerm{V,G}} where {V,G} = m
+MultiGrade(m::T) where {T<:TensorTerm{V,G}} where {V,G} = m
+MultiGrade{V}(v::SparseChain{V,G}) where {V,G} = v
+MultiGrade(v::SparseChain{V,G}) where {V,G} = v
+
+for Chain ∈ MSC
+    @eval begin
+        MultiGrade{V}(m::$Chain{T,V,G}) where {T,V,G} = chainvalues(V,value(m),Dim{G}())
+        MultiGrade(m::$Chain{T,V,G}) where {T,V,G} = chainvalues(V,value(m),Dim{G}())
+    end
+end
+
+MultiGrade(v::MultiVector{T,V}) where {T,V} = MultiGrade{V}(v)
+function MultiGrade{V}(m::MultiVector{T,V}) where {T,V}
+    N = ndims(V)
+    sum(m.v .== 0)/(1<<N) < fill_limit && (return m)
+    out = TensorAlgebra{V}[]
+    G = zero(UInt)
+    for i ∈ 0:N
+        @inbounds !prod(m[i].==0) && (G|=UInt(1)<<i;push!(out,chainvalues(V,m[i],Dim{i}())))
+    end
+    return length(out)≠1 ? MultiGrade{V,G}(out) : out[1]
+end
+
+function show(io::IO, m::MultiGrade{V}) where V
+    t = terms(m)
+    isempty(t) && print(io,zero(V))
+    for k ∈ 1:length(t)
+        k ≠ 1 && print(io," + ")
+        print(io,t[k])
+    end
+end
+
+#=function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
+    N = ndims(V)
+    sigcheck(v.s,V)
+    g = grade.(v.v)
+    out = zeros(mvec(N,T))
+    for k ∈ 1:length(v.v)
+        @inbounds (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
+        setmulti!(out,convert(T,val),bits(b),Dimension{N}())
+    end
+    return MultiVector{T,V}(out)
+end
+
+MultiVector{T}(v::MultiGrade{V}) where {T,V} = MultiVector{T,V}(v)
+MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)...),V}(v)=#
+
+==(a::MultiGrade{V,G},b::MultiGrade{V,G}) where {V,G} = prod(terms(a) .== terms(b))
+
 ## Generic
 
 import Base: isinf, isapprox
@@ -320,6 +429,8 @@ export basis, grade, hasinf, hasorigin, isorigin, scalar, norm
 
 const VBV = Union{MBlade,SBlade,MChain,SChain,MultiVector}
 
+valuetype(t::SparseChain) = promote_type(valuetype.(terms(t))...)
+valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure valuetype(::Basis) = Int
 @pure valuetype(::Union{MBlade{V,G,B,T},SBlade{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
@@ -329,7 +440,9 @@ const VBV = Union{MBlade,SBlade,MChain,SChain,MultiVector}
 @pure basis(m::Union{MBlade{V,G,B},SBlade{V,G,B}}) where {V,G,B} = B
 @pure grade(m::TensorTerm{V,G} where V) where G = G
 @pure grade(m::Union{MChain{T,V,G},SChain{T,V,G}} where {T,V}) where G = G
+@pure grade(m::SparseChain{V,G} where V) where G = G
 @pure grade(m::Number) = 0
+@pure bits(m::T) where T<:TensorTerm = bits(basis(m))
 
 @pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
 @pure hasinf(e::Basis{V}) where V = hasinf(V) && isodd(bits(e))
@@ -357,17 +470,23 @@ Return the scalar (grade 0) part of any multivector.
 """
 @inline scalar(t::T) where T<:TensorTerm{V,0} where V = t
 @inline scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline scalar(t::MultiVector{T,V}) where {T,V} = SBlade{V}(t.v[1])
+@inline scalar(t::SparseChain{V,0}) where V = t
+@inline scalar(t::SparseChain{V}) where V = zero(V)
+@inline scalar(t::MultiVector{T,V}) where {T,V} = @inbounds SBlade{V}(t.v[1])
+@inline scalar(t::MultiGrade{V,G}) where {V,G} = @inbounds 1 ∈ indices(G) ? terms(t)[1] : zero(V)
 for Chain ∈ MSC
     @eval begin
-        @inline scalar(t::$Chain{T,V,0}) where {T,V} = SBlade{V}(t.v[1])
+        @inline scalar(t::$Chain{T,V,0}) where {T,V} = @inbounds SBlade{V}(t.v[1])
         @inline scalar(t::$Chain{T,V} where T) where V = zero(V)
     end
 end
 
 @inline vector(t::T) where T<:TensorTerm{V,1} where V = t
 @inline vector(t::T) where T<:TensorTerm{V} where V = zero(V)
-@inline vector(t::MultiVector{T,V}) where {T,V} = SChain{T,V,1}(t[1])
+@inline vector(t::SparseChain{V,1}) where V = t
+@inline vector(t::SparseChain{V}) where V = zero(V)
+@inline vector(t::MultiVector{T,V}) where {T,V} = @inbounds SChain{T,V,1}(t[1])
+@inline vector(t::MultiGrade{V,G}) where {V,G} = @inbounds (i=indices(G);2∈i ? terms(t)[findfirst(x->x==2,i)] : zero(V))
 for Chain ∈ MSC
     @eval begin
         @inline vector(t::$Chain{T,V,1} where {T,V}) = t
@@ -376,7 +495,9 @@ for Chain ∈ MSC
 end
 
 @inline volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
-@inline volume(t::MultiVector{T,V}) where {T,V} = SBlade{V}(t.v[end])
+@inline volume(t::SparseChain{V,G}) where {V,G} = G == ndims(V) ? t : zero(V)
+@inline volume(t::MultiVector{T,V}) where {T,V} = @inbounds SBlade{V}(t.v[end])
+@inline volume(t::MultiGrade{V,G}) where {V,G} = @inbounds ndims(V)+1∈indices(G) ? terms(t)[end] : zero(V)
 for Chain ∈ MSC
     @eval begin
         @inline volume(t::$Chain{T,V,G} where T) where {V,G} = G == ndims(V) ? t : zero(V)
@@ -386,82 +507,17 @@ end
 @inline isscalar(t::T) where T<:TensorTerm = grade(t) == 0 || iszero(t)
 @inline isscalar(t::T) where T<:SChain = grade(t) == 0 || iszero(t)
 @inline isscalar(t::T) where T<:MChain = grade(t) == 0 || iszero(t)
+@inline isscalar(t::SparseChain) = grade(t) == 0 || iszero(t)
 @inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
-
-## MultiGrade{N}
-
-struct MultiGrade{V} <: TensorAlgebra{V}
-    v::Vector{<:TensorTerm{V}}
-end
-
-#convert(::Type{Vector{<:TensorTerm{V}}},m::Tuple) where V = [m...]
-
-MultiGrade{V}(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
-MultiGrade(v::T...) where T <: (TensorTerm{V,G} where G) where V = MultiGrade{V}(v)
-
-function bladevalues(V::VectorBundle{N},m,G::Int,T::Type) where N
-    com = indexbasis(N,G)
-    out = (SBlade{V,G,B,T} where B)[]
-    for i ∈ 1:binomial(N,G)
-        m[i] ≠ 0 && push!(out,SBlade{V,G,Basis{V,G}(com[i]),T}(m[i]))
-    end
-    return out
-end
-
-MultiGrade(v::MultiVector{T,V}) where {T,V} = MultiGrade{V}(vcat([bladevalues(V,v[g],g,T) for g ∈ 1:ndims(V)]...))
-
-for Chain ∈ MSC
-    @eval begin
-        MultiGrade(v::$Chain{T,V,G}) where {T,V,G} = MultiGrade{V}(bladevalues(V,v,G,T))
-    end
-end
-
-#=function MultiGrade{V}(v::(MultiChain{T,V} where T <: Number)...) where V
-    sigcheck(v.s,V)
-    t = typeof.(v)
-    MultiGrade{V}([bladevalues(V,v[i],N,t[i].parameters[3],t[i].parameters[1]) for i ∈ 1:length(v)])
-end
-
-MultiGrade(v::(MultiChain{T,N} where T <: Number)...) where N = MultiGrade{N}(v)=#
-
-function MultiVector{T,V}(v::MultiGrade{V}) where {T,V}
-    N = ndims(V)
-    sigcheck(v.s,V)
-    g = grade.(v.v)
-    out = zeros(mvec(N,T))
-    for k ∈ 1:length(v.v)
-        @inbounds (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
-        setmulti!(out,convert(T,val),bits(b),Dimension{N}())
-    end
-    return MultiVector{T,V}(out)
-end
-
-MultiVector{T}(v::MultiGrade{V}) where {T,V} = MultiVector{T,V}(v)
-MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)...),V}(v)
-
-function show(io::IO,m::MultiGrade)
-    for k ∈ 1:length(m.v)
-        x = m.v[k]
-        t = (typeof(x) <: MBlade) | (typeof(x) <: SBlade)
-        if t && signbit(x.v)
-            print(io," - ")
-            ax = abs(x.v)
-            ax ≠ 1 && print(io,ax)
-        else
-            k ≠ 1 && print(io," + ")
-            t && x.v ≠ 1 && print(io,x.v)
-        end
-        show(io,t ? basis(x) : x)
-    end
-end
+@inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
 
 ## Adjoint
 
 import Base: adjoint # conj
 
-function adjoint(b::Basis{V,G,B}) where {V,G,B}
-    Basis{dual(V)}(mixedmode(V)<0 ? dual(V,B) : B)
-end
+adjoint(b::Basis{V,G,B}) where {V,G,B} = Basis{dual(V)}(mixedmode(V)<0 ? dual(V,B) : B)
+adjoint(b::SparseChain{V,G}) where {V,G} = SparseChain{dual(V),G}(adjoint.(terms(b)))
+adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b)))
 
 ## conversions
 

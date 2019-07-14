@@ -168,7 +168,7 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
                         push!($extra,Dict{Bits,Dict{Bits,Dict{Bits,$T}}}[])
                     end
                     for k ∈ length($extra[N])+1:m1
-                        push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
+                        @inbounds push!($extra[N],Dict{Bits,Dict{Bits,Dict{Bits,$T}}}())
                     end
                     @inbounds !haskey($extra[N][m1],s) && push!($extra[N][m1],s=>Dict{Bits,Dict{Bits,$T}}())
                     @inbounds !haskey($extra[N][m1][s],a) && push!($extra[N][m1][s],a=>Dict{Bits,$T}())
@@ -179,8 +179,8 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
                     for k ∈ length($cache)+1:n
                         push!($cache,Dict{Bits,Vector{Vector{$T}}}[])
                     end
-                    for k ∈ length($cache[n])+1:m1
-                        push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
+                    @inbounds for k ∈ length($cache[n])+1:m1
+                        @inbounds push!($cache[n],Dict{Bits,Vector{Vector{$T}}}())
                     end
                     @inbounds !haskey($cache[n][m1],s) && push!($cache[n][m1],s=>Vector{$T}[])
                     @inbounds for k ∈ length($cache[n][m1][s]):a
@@ -239,9 +239,9 @@ function odd(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
-    out[1]≠0 && (out[1] = zero(T))
+    @inbounds out[1]≠0 && (out[1] = zero(T))
     for g ∈ 3:2:N+1
-        for k ∈ bs[g]+1:bs[g+1]
+        @inbounds for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
@@ -252,7 +252,7 @@ function even(t::MultiVector{T,V}) where {T,V}
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     for g ∈ 2:2:N+1
-        for k ∈ bs[g]+1:bs[g+1]
+        @inbounds for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
@@ -271,10 +271,10 @@ function imag(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
-    out[1]≠0 && (out[1] = zero(T))
+    @inbounds out[1]≠0 && (out[1] = zero(T))
     for g ∈ 2:N+1
-        !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
-            out[k]≠0 && (out[k] = zero(T))
+        @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
     MultiVector{T,V}(out)
@@ -284,8 +284,8 @@ function real(t::MultiVector{T,V}) where {T,V}
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     for g ∈ 3:N+1
-        parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
-            out[k]≠0 && (out[k] = zero(T))
+        @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
     MultiVector{T,V}(out)
