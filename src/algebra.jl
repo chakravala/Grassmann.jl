@@ -1227,7 +1227,7 @@ for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
         Base.$op(a::MultiVector{T,V},m::S) where {T,V,S} = MultiVector{promote_type(T,S),V}($op.(value(a),m))
     end
 end
-for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad)
+for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
     for Blade ∈ MSB
         @eval Base.$op(b::$Blade{V,G,B,T}) where {V,G,B,T} = $Blade{V,G,B}($op(value(b)))
     end
