@@ -598,3 +598,36 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     end
 end
 
+
+# QR compatibility
+
+convert(a::Type{SBlade{V,G,B,A}},b::SBlade{V,G,B,T}) where {V,G,A,B,T} = SBlade{V,G,B,A}(convert(A,value(b)))
+convert(::Type{SBlade{V,G,B,X}},t::Y) where {V,G,B,X,Y} = SBlade{V,G,B,X}(convert(X,t))
+
+Base.copysign(x::SBlade{V,G,B,T},y::SBlade{V,G,B,T}) where {V,G,B,T} = SBlade{V,G,B,T}(copysign(value(x),value(y)))
+
+@inline function LinearAlgebra.reflectorApply!(x::AbstractVector, τ::TensorAlgebra, A::StridedMatrix)
+    @assert !LinearAlgebra.has_offset_axes(x)
+    m, n = size(A)
+    if length(x) != m
+        throw(DimensionMismatch("reflector has length $(length(x)), which must match the dimension of matrix A, $m"))
+    end
+    @inbounds begin
+        for j = 1:n
+            #dot
+            vAj = A[1,j]
+            for i = 2:m
+                vAj += conj(x[i])*A[i,j]
+            end
+
+            vAj = conj(τ)*vAj
+
+            #ger
+            A[1, j] -= vAj
+            for i = 2:m
+                A[i,j] -= x[i]*vAj
+            end
+        end
+    end
+    return A
+end
