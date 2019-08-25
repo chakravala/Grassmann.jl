@@ -121,6 +121,18 @@ for side ∈ (:left,:right)
     end
 end
 
+@doc """
+    complementright(ω::TensorAlgebra)
+
+Grassmann-Poincare-Hodge complement: ⋆ω = ω∗I
+""" complementright
+
+@doc """
+    complementleft(ω::TensorAlgebra)
+
+Grassmann-Poincare left complement: ⋆'ω = I∗'ω
+""" complementleft
+
 ## reverse
 
 import Base: reverse, conj, ~
@@ -134,14 +146,41 @@ for r ∈ (:reverse,:involute,:conj)
     end
 end
 
+"""
+    ~(ω::TensorAlgebra)
+
+Reverse of a `MultiVector` element: ~ω = (-1)^(grade(ω)*(grade(ω)-1)/2)*ω
+"""
 reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
 reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
 
+"""
+    reverse(ω::TensorAlgebra)
+
+Reverse of a `MultiVector` element: ~ω = (-1)^(grade(ω)*(grade(ω)-1)/2)*ω
+"""
 @inline ~(b::TensorAlgebra) = reverse(b)
 @inline ~(b::UniformScaling) = reverse(b)
 
+@doc """
+    involute(ω::TensorAlgebra)
+
+Involute of a `MultiVector` element: ~ω = (-1)^grade(ω)*ω
+""" involute
+
+@doc """
+    conj(ω::TensorAlgebra)
+
+Clifford conjugate of a `MultiVector` element: conj(ω) = involute(~ω)
+""" conj
+
 ## geometric product
 
+"""
+    *(a::TensorAlgebra,b::TensorAlgebra)
+
+Geometric algebraic product: a*b = (-1)ᵖdet(a∩b)⊗(Λ(a⊖b)∪L(a⊕b))
+"""
 @pure function *(a::Basis{V},b::Basis{V}) where V
     A,B = bits(a), bits(b)
     diffcheck(V,A,B) && (return g_zero(V))
@@ -177,6 +216,12 @@ end
 
 export ∗, ⊛, ⊖
 const ⊖ = *
+
+"""
+    ∗(a::TensorAlgebra,b::TensorAlgebra)
+
+Reversed geometric product: a∗b = (~a)*b
+"""
 @inline ∗(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = (~a)*b
 
 ## exterior product
@@ -201,6 +246,12 @@ end
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
 #∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
+
+"""
+    ∧(ω::TensorAlgebra,η::TensorAlgebra)
+
+Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
+"""
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
@@ -223,10 +274,20 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return SBlade{V}(p ? -v : v,Basis{V}(C))
 end
 
+"""
+    ∨(ω::TensorAlgebra,η::TensorAlgebra)
+
+Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(⋆.(ω)...))
+"""
 @inline ∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
+"""
+    ∨(ω::TensorAlgebra,η::TensorAlgebra)
+
+Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(⋆.(ω)...))
+"""
 Base.:&(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∨b
 
 ## interior product: a ∨ ⋆(b)
@@ -234,6 +295,11 @@ Base.:&(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∨b
 import LinearAlgebra: dot, ⋅
 export ⋅
 
+"""
+    contraction(ω::TensorAlgebra,η::TensorAlgebra)
+
+Interior (right) contraction product: ω⋅η = ω∨⋆η
+"""
 @pure function contraction(a::Basis{V},b::Basis{V}) where V
     g,C,t = interior(a,b)
     !t && (return g_zero(V))
@@ -254,6 +320,11 @@ for T ∈ (:TensorTerm,MSC...)
     @eval @inline Base.abs2(t::T) where T<:$T = contraction(t,t)
 end
 
+"""
+    dot(ω::TensorAlgebra,η::TensorAlgebra)
+
+Interior (right) contraction product: ω⋅η = ω∨⋆η
+"""
 @inline dot(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = contraction(a,b)
 
 #=for A ∈ (:TensorTerm,MSC...), B ∈ (:TensorTerm,MSC...)
@@ -265,6 +336,11 @@ end=#
 import LinearAlgebra: cross
 export ×
 
+"""
+    cross(ω::TensorAlgebra,η::TensorAlgebra)
+
+Cross product: ω×η = ⋆(ω∧η)
+"""
 cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
 
 @pure function cross(a::Basis{V},b::Basis{V}) where V
@@ -285,8 +361,18 @@ end
 
 export ⊙, ⊠
 
+"""
+    ⊙(ω::TensorAlgebra,η::TensorAlgebra)
+
+Symmetrization projection: ⊙(ω...) = ∑(∏(σ.(ω)...))/factorial(length(ω))
+"""
 ⊙(x::TensorAlgebra...) = (K=length(x); sum([prod(x[k]) for k ∈ permutations(1:K)])/factorial(K))
 
+"""
+    ⊠(ω::TensorAlgebra,η::TensorAlgebra)
+
+Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(length(ω))
+"""
 function ⊠(x::TensorAlgebra...)
     K,V,out = length(x),∪(vectorspace.(x)...),prod(x)
     P,F = collect(permutations(1:K)),factorial(K)
@@ -297,14 +383,36 @@ function ⊠(x::TensorAlgebra...)
     return out/F
 end
 
+"""
+    ⊙(ω::TensorAlgebra,η::TensorAlgebra)
+
+Symmetrization projection: ⊙(ω...) = ∑(∏(σ.(ω)...))/factorial(length(ω))
+"""
 <<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊙b
+
+"""
+    ⊠(ω::TensorAlgebra,η::TensorAlgebra)
+
+Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(length(ω))
+"""
 >>(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊠b
 
 ## sandwich product
 
 export ⊘
 
+"""
+    ⊘(ω::TensorAlgebra,η::TensorAlgebra)
+
+Sandwich product: ω⊘η = (~ω)⊖η⊖ω
+"""
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (x ∗ y) * x
+
+"""
+    ⊘(ω::TensorAlgebra,η::TensorAlgebra)
+
+Sandwich product: ω>>>η = ω⊖η⊖(~ω)
+"""
 >>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
 
 ### Product Algebra Constructor
