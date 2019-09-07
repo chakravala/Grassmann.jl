@@ -27,14 +27,14 @@ end
 
 const dualindex_cache = Vector{Vector{Int}}[]
 const dualindexC_cache = Vector{Vector{Int}}[]
-@pure function dualindex(V::VectorBundle{N}) where N
+@pure function dualindex(V::Manifold{N}) where N
     C = mixedmode(V)<0
     for n ∈ 2length(C ? dualindexC_cache : dualindex_cache)+2:2:N
         push!(C ? dualindexC_cache : dualindex_cache,Vector{Int}[])
     end
     M = Int(N/2)
     @inbounds if isempty((C ? dualindexC_cache : dualindex_cache)[M])
-        #df = dualform(C ? VectorBundle(M)⊕VectorBundle(M)' : VectorBundle(n))
+        #df = dualform(C ? Manifold(M)⊕Manifold(M)' : Manifold(n))
         di = Array{Vector{Int},1}(undef,M)
         x = M .+cumsum(collect(2(M-1):-1:M-1))
         @inbounds di[1] = [M;x;collect(x[end]+1:x[end]+M-1)]

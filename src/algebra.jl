@@ -8,12 +8,12 @@ import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contra
 import DirectSum: diffcheck, tangent, hasinforigin, hasorigininf
 export tangent
 
-const Field = Number
+const Field = Real
 const ExprField = Union{Expr,Symbol}
 
 @pure g_one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-@pure g_zero(V::VectorBundle) = 0*one(V)
-@pure g_one(V::VectorBundle) = Basis{V}()
+@pure g_zero(V::Manifold) = 0*one(V)
+@pure g_one(V::Manifold) = Basis{V}()
 @pure g_one(::Type{T}) where T = one(T)
 @pure g_zero(::Type{T}) where T = zero(T)
 
@@ -46,19 +46,23 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
         end
         for s ∈ (sm,sb)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorBundle{N,D} where {N,D,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !diffcheck(V,A,B)
+                @inline function $(Symbol(:join,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,a,b)
+                        A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
-                        $s(m,val,A⊻B,Dimension{N}())
+                        diffvars(V)≠0 && !iszero(Z) && (val *= Basis{V}(Z))
+                        $s(m,val,(A⊻B)|Q,Dimension{N}())
                     end
                     return m
                 end
-                @inline function $(Symbol(:geom,s))(V::W,m::$M,A::Bits,B::Bits,v::S) where W<:VectorBundle{N,D} where {N,D,T<:$F,S<:$F,M}
-                    if v ≠ 0 && !diffcheck(V,A,B)
+                @inline function $(Symbol(:geom,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,a,b)
+                        A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
-                        $s(m,val,bas,Dimension{N}())
-                        cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,conformalmask(V)⊻bas,Dimension{N}())
+                        diffvars(V)≠0 && !iszero(Z) && (val *= Basis{V}(Z))
+                        $s(m,val,bas|Q,Dimension{N}())
+                        cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,(conformalmask(V)⊻bas)|Q,Dimension{N}())
                     end
                     return m
                 end
@@ -70,9 +74,11 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
                 @eval begin
-                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,v::T) where W<:VectorBundle{N,D} where {N,D,T,M}
-                        if v ≠ 0
-                            g,C,t = $uct(A,B,V)
+                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,val::T) where W<:Manifold{N} where {N,T,M}
+                        if val ≠ 0
+                            g,C,t,Z = $uct(A,B,V)
+                            v = val
+                            diffvars(V)≠0 && !iszero(Z) && (v *= Basis{V}(Z))
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
                         end
                         return m
@@ -86,9 +92,9 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
     end
 end
 
-@inline exteraddmulti!(V::W,out,α,β,γ) where W<:VectorBundle = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
+@inline exteraddmulti!(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
 
-@inline outeraddblade!(V::W,out,α,β,γ) where W<:VectorBundle = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+@inline outeraddblade!(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
 
 @inline function add!(out::MultiVector{T,V},val::T,a::Int,b::Int) where {T,V}
     A,B = Bits(a), Bits(b)
@@ -112,7 +118,7 @@ for side ∈ (:left,:right)
     c = Symbol(:complement,side)
     p = Symbol(:parity,side)
     @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-        d = getbasis(V,complement(ndims(V),B,diffmode(V)))
+        d = getbasis(V,complement(ndims(V),B,diffvars(V)))
         mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
         typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-value(d),d) : d) : SBlade{V}($p(b)*value(d),d)
     end
@@ -182,11 +188,13 @@ Clifford conjugate of a `MultiVector` element: conj(ω) = involute(~ω)
 Geometric algebraic product: a*b = (-1)ᵖdet(a∩b)⊗(Λ(a⊖b)∪L(a⊕b))
 """
 @pure function *(a::Basis{V},b::Basis{V}) where V
-    A,B = bits(a), bits(b)
-    diffcheck(V,A,B) && (return g_zero(V))
+    ba,bb = bits(a),bits(b)
+    diffcheck(V,ba,bb) && (return g_zero(V))
+    A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
-    d = Basis{V}(bas)
+    d = Basis{V}(bas|Q)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SBlade{V}(-1,d) : d) : SBlade{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
+    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(Basis{V}(Z),out))
     return cc ? (v=value(out);out+SBlade{V}(hasinforigin(V,A,B) ? -(v) : v,Basis{V}(conformalmask(V)⊻bits(d)))) : out
 end
 
@@ -229,18 +237,22 @@ Reversed geometric product: a∗b = (~a)*b
 export ∧, ∨, ⊗
 
 @pure function ∧(a::Basis{V},b::Basis{V}) where V
-    A,B = bits(a), bits(b)
-    (count_ones(A&B)>0) && (return g_zero(V))
-    d = Basis{V}(A⊻B)
+    ba,bb = bits(a),bits(b)
+    A,B,Q,Z = symmetricmask(V,ba,bb)
+    ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
+    d = Basis{V}((A⊻B)|Q)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
     return parity(a,b) ? SBlade{V}(-1,d) : d
 end
 
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     x,y = basis(a), basis(b)
-    A,B = bits(x), bits(y)
-    (count_ones(A&B)>0) && (return g_zero(V))
+    ba,bb = bits(x),bits(y)
+    A,B,Q,Z = symmetricmask(V,ba,bb)
+    ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = value(a)*value(b)
-    return SBlade{V}(parity(x,y) ? -v : v,Basis{V}(A⊻B))
+    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(Basis{V}(Z),v))
+    return SBlade{V}(parity(x,y) ? -v : v,Basis{V}((A⊻B)|Q))
 end
 
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
@@ -261,16 +273,18 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
 @pure function ∨(a::Basis{V},b::Basis{V}) where V
-    p,C,t = regressive(a,b)
+    p,C,t,Z = regressive(a,b)
     !t && (return g_zero(V))
     d = Basis{V}(C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    p,C,t = regressive(bits(basis(a)),bits(basis(b)),V)
+    p,C,t,Z = regressive(bits(basis(a)),bits(basis(b)),V)
     !t && (return g_zero(V))
     v = value(a)*value(b)
+    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(Basis{V}(Z),v))
     return SBlade{V}(p ? -v : v,Basis{V}(C))
 end
 
@@ -301,16 +315,18 @@ export ⋅
 Interior (right) contraction product: ω⋅η = ω∨⋆η
 """
 @pure function contraction(a::Basis{V},b::Basis{V}) where V
-    g,C,t = interior(a,b)
+    g,C,t,Z = interior(a,b)
     !t && (return g_zero(V))
     d = Basis{V}(C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
     return typeof(V) <: Signature ? (g ? SBlade{V}(-1,d) : d) : SBlade{V}(g,d)
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    g,C,t = interior(bits(basis(a)),bits(basis(b)),V)
+    g,C,t,Z = interior(bits(basis(a)),bits(basis(b)),V)
     !t && (return g_zero(V))
     v = value(a)*value(b)
+    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(Basis{V}(Z),v))
     return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
 end
 
@@ -344,16 +360,18 @@ Cross product: ω×η = ⋆(ω∧η)
 cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
 
 @pure function cross(a::Basis{V},b::Basis{V}) where V
-    p,C,t = crossprod(a,b)
+    p,C,t,Z = crossprod(a,b)
     !t && (return zero(V))
     d = Basis{V}(C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
 function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    p,C,t = crossprod(bits(basis(a)),bits(basis(b)),V)
+    p,C,t,Z = crossprod(bits(basis(a)),bits(basis(b)),V)
     !t && (return zero(V))
     v = value(a)*value(b)
+    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(Basis{V}(Z),v))
     return SBlade{V}(p ? -v : v,Basis{V}(C))
 end
 
@@ -419,14 +437,14 @@ Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 
 function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj)
     if Field == Grassmann.Field
-        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Field,Expr,:-,:*)
+        declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Number,Expr,:-,:*)
     elseif Field ∈ (SymField,:(SymPy.Sym))
         declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
     Field == :(SymPy.Sym) && for par ∈ (:parany,:parval,:parsym)
         @eval $par = ($par...,$Field)
     end
-    TF = Field ≠ Number ? :Any : :T
+    TF = Field ∉ Fields ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     @eval begin
         @inline function inneraddvalue!(mv::MBlade{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
@@ -614,7 +632,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                     mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                     $(insert_expr((:N,:ib,:D),VEC)...)
                     out = zeros($VEC(N,G,T))
-                    D = diffmode(V)
+                    D = diffvars(V)
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
@@ -632,7 +650,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                 mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                 $(insert_expr((:N,:bs,:bn),VEC)...)
                 out = zeros($VEC(N,T))
-                D = diffmode(V)
+                D = diffvars(V)
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
@@ -1107,16 +1125,36 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     end
 end
 
+for F ∈ Fields
+    @eval begin
+        *(a::F,b::MultiVector{T,V}) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a,b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a.v,b))
+    end
+    for Blade ∈ MSB
+        @eval begin
+            *(a::F,b::$Blade{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = SBlade{V,G}(*(a,b.v),basis(b))
+            *(a::$Blade{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = SBlade{V,G}(*(a.v,b),basis(a))
+        end
+    end
+    for Chain ∈ MSC
+        @eval begin
+            *(a::F,b::$Chain{T,V,G}) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a,b.v))
+            *(a::$Chain{T,V,G},b::F) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a.v,b))
+        end
+    end
+end
+
 generate_product_algebra()
+generate_product_algebra(Complex)
 generate_product_algebra(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
 
-const NSE = Union{Symbol,Expr,<:Number}
+const NSE = Union{Symbol,Expr,<:Real,<:Complex}
 
 for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     for Term ∈ (:TensorTerm,:TensorMixed)
         @eval begin
-            $op(a::T,b::NSE) where T<:$Term = $op(a,b*one(vectorspace(a)))
-            $op(a::NSE,b::T) where T<:$Term = $op(a*one(vectorspace(b)),b)
+            $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*one(vectorspace(a)))
+            $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*one(vectorspace(b)),b)
         end
     end
     @eval begin
@@ -1297,6 +1335,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
         @pure $nv(b::Basis{V,G}) where {V,G}=$d(parityreverse(G) ? -1 : 1,value(b⋅b))*b
         @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
+        @pure $d(a::N,b::T) where {N<:Number,T<:TensorAlgebra} = a*$nv(b)
         function $nv(m::MultiVector{T,V}) where {T,V}
             rm = ~m
             d = rm*m
@@ -1317,7 +1356,8 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     end
     for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
         @eval begin
-            @pure $d(a::S,b::T) where {S<:$Term,T<:Number} = a*$d(1,b)
+            @pure $d(a::S,b::T) where {S<:$Term,T<:Real} = a*$d(1,b)
+            @pure $d(a::S,b::T) where {S<:$Term,T<:Complex} = a*$d(1,b)
             @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
         end
     end

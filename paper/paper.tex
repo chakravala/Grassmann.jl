@@ -1,6 +1,6 @@
 % JuliaCon proceedings template
-\documentclass[]{article}
-%\documentclass{juliacon}
+%\documentclass[]{article}
+\documentclass{juliacon}
 \setcounter{page}{1}
 
 %\usepackage[utf8]{inputenc}
@@ -11,24 +11,24 @@
 \input{mathsym}
 
 % Theorems and Propositions
-\usepackage{amsthm}
-\newtheorem{theorem}{Theorem}
-\newtheorem{proposition}{Proposition}
+%\usepackage{amsthm}
+%\newtheorem{theorem}{Theorem}
+%\newtheorem{proposition}{Proposition}
 
-\theoremstyle{definition}
-\newtheorem{definition}{Definition}
+%\theoremstyle{definition}
+%\newtheorem{definition}{Definition}
 
-\theoremstyle{remark}
-\newtheorem*{remark}{Remark}
-\newtheorem{example}{Example}
-\newtheorem*{recall}{Recall}
-\newtheorem*{note}{Note}
-\newtheorem*{observe}{Observe}
-\newtheorem*{question}{\underline{Question}}
-\newtheorem*{fact}{Fact}
-\newtheorem{corollary}{Corollary}
-\newtheorem*{lemma}{Lemma}
-\newtheorem{xca}{Exercise}
+%\theoremstyle{remark}
+%\newtheorem*{remark}{Remark}
+%\newtheorem{example}{Example}
+%\newtheorem*{recall}{Recall}
+%\newtheorem*{note}{Note}
+%\newtheorem*{observe}{Observe}
+%\newtheorem*{question}{\underline{Question}}
+%\newtheorem*{fact}{Fact}
+%\newtheorem{corollary}{Corollary}
+%\newtheorem*{lemma}{Lemma}
+%\newtheorem{xca}{Exercise}
 
 \usepackage{unicode-math}
 \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
@@ -105,9 +105,9 @@ Although intended for use with the \textit{Grassmann.jl} package, \verb`DirectSu
 	$$ \bigcup T^{\mu_i}V_i = \plr{|\mb P|+\max\set{n_i-|\mb P_i|}_i,\, \bigcup \mb P_i,\, \cup g_i,\, \max\set{\mu_i}_i} $$
 	$$ \bigoplus T^{\mu_i}V_i = \plr{\mlr{\mb P}+\sum (n_i-|\mb P_i|),\, \bigcup \mb P_i,\, \oplus_i g_i,\,\max\set{\mu_i}_i} $$
 \end{definition}
-\begin{note}
+\begin{remark}
 	Although some of the type operations like $\bigcup$ and $\bigoplus$ are similar and sometimes result in equal values, the union and sum are entirely different operations in general. The \verb`tangent` map is used for specifying $\mu$.
-\end{note}
+\end{remark}
 
 For any \verb+SubManifold{m,V,s} where+ $\set{n\geq m\in\mb N,V\in\text{Vect}_{\mb K},s\in V}$ we can define the orthogonal space $Z$:
 $$T^eV \subset T^\mu W \iff \exists Z\in\text{Vect}_{\mb K}(T^e(V\oplus Z) = T^{e\leq \mu}W,\,V\perp Z),$$

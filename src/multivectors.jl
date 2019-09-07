@@ -8,11 +8,15 @@ abstract type GradedAlgebra{V,G} <: TensorAlgebra{V} end
 abstract type TensorTerm{V,G} <: GradedAlgebra{V,G} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
+# number fields
+
+Fields = (Real,Complex)
+
 # symbolic print types
 
-parany = (Expr,Any)
-parsym = (Expr,Symbol)
-parval = (Expr,)
+parany = (Expr,Complex,Any)
+parsym = (Expr,Complex,Symbol)
+parval = (Expr,Complex)
 
 ## pseudoscalar
 
@@ -28,8 +32,8 @@ end
 
 @pure bits(b::Basis{V,G,B} where {V,G}) where B = B
 Base.one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-Base.zero(V::VectorBundle) = 0*one(V)
-Base.one(V::VectorBundle) = Basis{V}()
+Base.zero(V::Manifold) = 0*one(V)
+Base.one(V::Manifold) = Basis{V}()
 
 function getindex(b::Basis,i::Int)
     d = one(Bits) << (i-1)
@@ -69,8 +73,12 @@ end
 ==(a::Basis{V,G} where V,b::Basis{W,L} where W) where {G,L} = false
 ==(a::Basis{V,G},b::Basis{W,G}) where {V,W,G} = interop(==,a,b)
 
-==(a::Number,b::TensorTerm{V,G} where V) where G = G==0 ? a==value(b) : 0==a==value(b)
-==(a::TensorTerm{V,G} where V,b::Number) where G = G==0 ? value(a)==b : 0==value(a)==b
+for T ∈ Fields
+    @eval begin
+        ==(a::T,b::TensorTerm{V,G} where V) where {T<:$T,G} = G==0 ? a==value(b) : 0==a==value(b)
+        ==(a::TensorTerm{V,G} where V,b::T) where {T<:$T,G} = G==0 ? value(a)==b : 0==value(a)==b
+    end
+end
 
 @inline show(io::IO, e::Basis) = DirectSum.printindices(io,vectorspace(e),bits(e))
 
@@ -97,7 +105,10 @@ for Blade ∈ MSB
         $Blade{V,G}(v,b::MBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
         $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
         $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
-        show(io::IO,m::$Blade) = print(io,(valuetype(m)∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
+        function show(io::IO,m::$Blade)
+            T = valuetype(m)
+            print(io,((!(T<:TensorMixed))&&T∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
+        end
     end
 end
 
@@ -147,10 +158,12 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
             end
             @inbounds DirectSum.printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
-                if T == Any && typeof(m.v[k]) ∈ parsym
-                    @inbounds typeof(m.v[k])∉parval ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
+                @inbounds tmv = typeof(m.v[k])
+                if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
+                    @inbounds (!(tmv<:TensorMixed))&&tmv∉parval ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
                 else
-                    @inbounds print(io,signbit(m.v[k]) ? " - " : " + ",abs(m.v[k]))
+                    @inbounds sbm = signbit(m.v[k])
+                    @inbounds print(io,sbm ? " - " : " + ",sbm ? abs(m.v[k]) : m.v[k])
                 end
                 @inbounds DirectSum.printindices(io,V,ib[k])
             end
@@ -161,8 +174,12 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
         end
         ==(a::T,b::$Chain{S,V} where S) where T<:TensorTerm{V} where V = b==a
         ==(a::$Chain{S,V} where S,b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
-        ==(a::Number,b::$Chain{S,V,G} where {S,V}) where G = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
-        ==(a::$Chain{S,V,G} where {S,V},b::Number) where G = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
+    end
+    for T ∈ Fields
+        @eval begin
+            ==(a::T,b::$Chain{S,V,G} where {S,V}) where {T<:$T,G} = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
+            ==(a::$Chain{S,V,G} where {S,V},b::T) where {T<:$T,G} = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
+        end
     end
     for var ∈ ((:T,:V,:G),(:T,:V),(:T,))
         @eval begin
@@ -278,11 +295,14 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
             @inbounds s = k+bs[i]
-            @inbounds if m.v[s] ≠ 0
-                @inbounds if T == Any && typeof(m.v[s]) ∈ parsym
-                    @inbounds typeof(m.v[s])∉parval ? print(io," + ",m.v[s]) : print(io," + (",m.v[s],")")
+            @inbounds mvs = m.v[s]
+            @inbounds if mvs ≠ 0
+                tmv = typeof(mvs)
+                if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
+                    (!(tmv<:TensorMixed))&&tmv∉parval ? print(io," + ",mvs) : print(io," + (",mvs,")")
                 else
-                    @inbounds print(io,signbit(m.v[s]) ? " - " : " + ",abs(m.v[s]))
+                    sba = signbit(mvs)
+                    print(io,sba ? " - " : " + ",sba ? abs(mvs) : mvs)
                 end
                 @inbounds DirectSum.printindices(io,V,ib[k])
                 basis_count = false
@@ -310,8 +330,12 @@ function ==(a::MultiVector{S,V} where S,b::T) where T<:TensorTerm{V,G} where {V,
     @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
 end
 ==(a::T,b::MultiVector{S,V} where S) where T<:TensorTerm{V} where V = b==a
-==(a::Number,b::MultiVector{S,V,G} where {S,V}) where G = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
-==(a::MultiVector{S,V,G} where {S,V},b::Number) where G = b == a
+for T ∈ Fields
+    @eval begin
+        ==(a::T,b::MultiVector{S,V,G} where {S,V}) where {T<:$T,G} = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
+        ==(a::MultiVector{S,V,G} where {S,V},b::T) where {T<:$T,G} = b == a
+    end
+end
 
 ## SparseChain{V,G}
 
@@ -329,7 +353,7 @@ SparseChain(v::T) where T <: (TensorTerm{V,G}) where {V,G} = v
 
 for (Chain,vec) ∈ ((MSC[1],:MVector),(MSC[2],:SVector))
     for Vec ∈ (:($vec{L,T}),:(SubArray{T,1,$vec{L,T}}))
-        @eval function chainvalues(V::VectorBundle{N},m::$Vec,::Dim{G}) where {N,G,L,T}
+        @eval function chainvalues(V::Manifold{N},m::$Vec,::Dim{G}) where {N,G,L,T}
             bng = binomial(N,G)
             G∉(0,N) && sum(m .== 0)/bng < fill_limit && (return $Chain{T,V,G}(m))
             com = indexbasis(N,G)
@@ -360,6 +384,13 @@ end
 ==(a::SparseChain{V},b::SparseChain{V}) where V = iszero(a) && iszero(b)
 ==(a::SparseChain{V},b::T) where T<:TensorTerm{V} where V = false
 ==(a::T,b::SparseChain{V}) where T<:TensorTerm{V} where V = false
+
+## ParaVector{V,G}
+
+## ComplexTensor{V,G}
+
+
+#struct ComplexTensor{V,G} <:
 
 ## MultiGrade{V,G}
 
@@ -441,7 +472,7 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure grade(m::TensorTerm{V,G} where V) where G = G
 @pure grade(m::Union{MChain{T,V,G},SChain{T,V,G}} where {T,V}) where G = G
 @pure grade(m::SparseChain{V,G} where V) where G = G
-@pure grade(m::Number) = 0
+@pure grade(m::Real) = 0
 @pure bits(m::T) where T<:TensorTerm = bits(basis(m))
 
 @pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
@@ -460,8 +491,12 @@ function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
     return norm(a-b) <= rtol * max(norm(a), norm(b))
 end
 isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
-isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:Number} where V =isapprox(a,SBlade{V}(b))
-isapprox(a::S,b::T) where {S<:Number,T<:TensorAlgebra} = isapprox(b,a)
+for T ∈ Fields
+    @eval begin
+        isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:$T} where V =isapprox(a,SBlade{V}(b))
+        isapprox(a::S,b::T) where {S<:$T,T<:TensorAlgebra} = isapprox(b,a)
+    end
+end
 
 """
     scalar(multivector)
@@ -521,7 +556,7 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
 
 ## conversions
 
-@inline (V::Signature)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffmode(V)))-1))
+@inline (V::Signature)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
@@ -531,7 +566,7 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
     #    return V0
     if WC<0 && VC≥0
         N = ndims(V)
-        dm = diffmode(V)
+        dm = diffvars(V)
         if dm≠0
             D = DirectSum.diffmask(V)
             m = (~D)&bits(b)
@@ -541,7 +576,7 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
             return getbasis(W,VC>0 ? bits(b)<<(N-dm) : bits(b))
         end
     else
-        throw(error("arbitrary VectorBundle intersection not yet implemented."))
+        throw(error("arbitrary Manifold intersection not yet implemented."))
     end
 end
 (W::Signature)(b::SBlade) = SBlade{W}(value(b),W(basis(b)))
@@ -566,7 +601,7 @@ for Chain ∈ MSC
                 end
                 return $Chain{T,W,G}(out)
             else
-                throw(error("arbitrary VectorBundle intersection not yet implemented."))
+                throw(error("arbitrary Manifold intersection not yet implemented."))
             end
         end
 
@@ -594,7 +629,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
         end
         return MultiVector{T,W}(out)
     else
-        throw(error("arbitrary VectorBundle intersection not yet implemented."))
+        throw(error("arbitrary Manifold intersection not yet implemented."))
     end
 end
 

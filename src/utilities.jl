@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffmode, Dim
+import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffvars, Dim, diffmask, symmetricmask
 
 bcast(op,arg) = op ∈ (:(DirectSum.:∑),:(DirectSum.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
@@ -169,7 +169,7 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
     assign_expr!(e,x,:bn,:(binomial_set(N)))
     assign_expr!(e,x,:df,:(dualform(V)))
     assign_expr!(e,x,:di,:(dualindex(V)))
-    assign_expr!(e,x,:D,:(diffmode(V)))
+    assign_expr!(e,x,:D,:(diffvars(V)))
     return x
 end
 

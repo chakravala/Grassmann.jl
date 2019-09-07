@@ -7,7 +7,7 @@ using Combinatorics, StaticArrays, Requires
 using ComputedFieldTypes, AbstractLattices
 using DirectSum, AbstractTensors
 
-export vectorspace, ⊕, ℝ, @V_str, @S_str, @D_str, Signature, DiagonalForm, value
+export vectorspace, ⊕, ℝ, @V_str, @S_str, @D_str, Signature,DiagonalForm,SubManifold, value
 import DirectSum: hasinf, hasorigin, mixedmode, dual, value, vectorspace, V0, ⊕, pre, vsn
 
 include("utilities.jl")
@@ -19,7 +19,7 @@ include("forms.jl")
 
 ## generators
 
-function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],dif::String=pre[4]) where T<:VectorBundle
+function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],dif::String=pre[4]) where T<:Manifold
     N,io,icr = ndims(V),IOBuffer(),1
     els = Array{Symbol,1}(undef,1<<N)
     els[1] = Symbol(vec)
@@ -34,9 +34,9 @@ function labels(V::T,vec::String=pre[1],cov::String=pre[2],duo::String=pre[3],di
     return els
 end
 
-#@pure labels(V::T) where T<:VectorBundle = labels(V,pre[1],pre[2],pre[3],pre[4])
+#@pure labels(V::T) where T<:Manifold = labels(V,pre[1],pre[2],pre[3],pre[4])
 
-@pure function generate(V::VectorBundle{N}) where N
+@pure function generate(V::Manifold{N}) where N
     exp = Basis{V}[Basis{V,0,g_zero(Bits)}()]
     for i ∈ 1:N
         set = combo(N,i)
@@ -49,7 +49,7 @@ end
 
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str
 
-function basis(V::VectorBundle,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
+function basis(V::Manifold,sig=vsn[1],vec=pre[1],cov=pre[2],duo=pre[3],dif=pre[4])
     N = ndims(V)
     if N > algebra_limit
         Λ(V) # fill cache
@@ -97,7 +97,7 @@ macro mixedbasis_str(str)
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
-@inline function lookup_basis(V::VectorBundle,v::Symbol)::Union{SBlade,Basis}
+@inline function lookup_basis(V::Manifold,v::Symbol)::Union{SBlade,Basis}
     p,b,w,z = DirectSum.indexparity(V,v)
     z && return g_zero(V)
     d = Basis{w}(b)
@@ -108,7 +108,7 @@ end
 
 export hyperplanes
 
-@pure hyperplanes(V::VectorBundle{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffmode(V))
+@pure hyperplanes(V::Manifold{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffvars(V))
 
 abstract type SubAlgebra{V} <: TensorAlgebra{V} end
 
@@ -148,12 +148,12 @@ getindex(a::Algebra,i::UnitRange{Int}) = [getindex(a,j) for j ∈ i]
     end
 end
 
-function Base.collect(s::VectorBundle)
+function Base.collect(s::Manifold)
     sym = labels(s)
     @inbounds Algebra{s}(generate(s),Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
 end
 
-@pure Algebra(s::VectorBundle) = getalgebra(s)
+@pure Algebra(s::Manifold) = getalgebra(s)
 @pure Algebra(n::Int,d::Int=0,o::Int=0,s=zero(Bits)) = getalgebra(n,d,o,s)
 Algebra(s::String) = getalgebra(vectorspace(s))
 Algebra(s::String,v::Symbol) = getbasis(vectorspace(s),v)
@@ -192,25 +192,69 @@ for (vs,dat) ∈ ((:Signature,Bits),(:DiagonalForm,Int))
     algebra_cache = Symbol(:algebra_cache_,vs)
     getalg = Symbol(:getalgebra_,vs)
     @eval begin
-        const $algebra_cache = Vector{Vector{Dict{$dat,Λ}}}[]
-        @pure function $getalg(n::Int,m::Int,s::$dat,d::Int=0)
+        const $algebra_cache = Vector{Vector{Vector{Dict{$dat,Λ}}}}[]
+        @pure function $getalg(n::Int,m::Int,s::$dat,f::Int=0,d::Int=0)
             n==0 && (return Λ0)
-            n > sparse_limit && (return $(Symbol(:getextended_,vs))(n,m,s))
-            n > algebra_limit && (return $(Symbol(:getsparse_,vs))(n,m,s))
-            for D ∈ length($algebra_cache)+1:d+1
-                push!($algebra_cache,Vector{Dict{$dat,Λ}}[])
+            n > sparse_limit && (return $(Symbol(:getextended_,vs))(n,m,s,f,d))
+            n > algebra_limit && (return $(Symbol(:getsparse_,vs))(n,m,s,f,d))
+            f1,d1,m1 = f+1,d+1,m+1
+            for F ∈ length($algebra_cache)+1:f1
+                push!($algebra_cache,Vector{Vector{Dict{$dat,Λ}}}[])
             end
-            @inbounds for N ∈ length($algebra_cache[d+1])+1:n
-                @inbounds push!($algebra_cache[d+1],[Dict{$dat,Λ}() for k∈1:12])
+            for D ∈ length($algebra_cache[f1])+1:d1
+                push!($algebra_cache[f1],Vector{Dict{$dat,Λ}}[])
             end
-            @inbounds if !haskey($algebra_cache[d+1][n][m+1],s)
-                @inbounds push!($algebra_cache[d+1][n][m+1],s=>collect($vs{n,m,s,d}()))
+            @inbounds for N ∈ length($algebra_cache[f1][d1])+1:n
+                @inbounds push!($algebra_cache[f1][d1],[Dict{$dat,Λ}() for k∈1:12])
             end
-            @inbounds $algebra_cache[d+1][n][m+1][s]
+            @inbounds if !haskey($algebra_cache[f1][d1][n][m1],s)
+                @inbounds push!($algebra_cache[f1][d1][n][m1],s=>collect($vs{n,m,s,f,d}()))
+            end
+            @inbounds $algebra_cache[f1][d1][n][m1][s]
         end
-        @pure function getalgebra(V::$vs{N,M,S,D}) where {N,M,S,D}
+        @pure function getalgebra(V::$vs{N,M,S,F,D}) where {N,M,S,F,D}
             mixedmode(V)<0 && N>2algebra_limit && (return getextended(V))
-            $(Symbol(:getalgebra_,vs))(N,M,S,D)
+            $getalg(N,M,S,F,D)
+        end
+    end
+end
+for (vs,dat) ∈ ((:SubManifold,Bits),)
+    algebra_cache = Symbol(:algebra_cache_,vs)
+    getalg = Symbol(:getalgebra_,vs)
+    for V ∈ (:Signature,:DiagonalForm)
+        @eval const $(Symbol(algebra_cache,:_,V)) = Vector{Vector{Dict{$dat,Vector{Dict{$dat,Λ}}}}}[]
+    end
+    @eval begin
+        @pure function $getalg(n::Int,m::Int,s::$dat,S::$dat,vs,f::Int=0,d::Int=0)
+            n==0 && (return Λ0)
+            n > sparse_limit && (return $(Symbol(:getextended_,vs))(n,m,s,f,d))
+            n > algebra_limit && (return $(Symbol(:getsparse_,vs))(n,m,s,f,d))
+            f1,d1,m1 = f+1,d+1,m+1
+            alc = if vs <: Signature
+                $(Symbol(algebra_cache,:_Signature))
+            elseif vs <: DiagonalForm
+                $(Symbol(algebra_cache,:_DiagonalForm))
+            end
+            for F ∈ length(alc)+1:f1
+                push!(alc,Vector{Dict{$dat,Vector{Dict{$dat,Λ}}}}[])
+            end
+            for D ∈ length(alc[f1])+1:d1
+                push!(alc[f1],Dict{$dat,Vector{Dict{$dat,Λ}}}[])
+            end
+            for D ∈ length(alc[f1][d1])+1:n
+                push!(alc[f1][d1],Dict{$dat,Vector{Dict{$dat,Λ}}}())
+            end
+            @inbounds if !haskey(alc[f1][d1][n],S)
+                @inbounds push!(alc[f1][d1][n],S=>[Dict{$dat,Λ}() for k∈1:12])
+            end
+            @inbounds if !haskey(alc[f1][d1][n][S][m1],s)
+                @inbounds push!(alc[f1][d1][n][S][m1],s=>collect($vs{count_ones(S),vs(),S}()))
+            end
+            @inbounds alc[f1][d1][n][S][m1][s]
+        end
+        @pure function getalgebra(V::$vs{N,M,S}) where {N,M,S}
+            mixedmode(V)<0 && N>2algebra_limit && (return getextended(V))
+            $getalg(ndims(M),DirectSum.options(M),value(M),S,typeof(M),diffvars(M),DirectSum.diffmode(M))
         end
     end
 end
@@ -218,8 +262,8 @@ end
 @pure getalgebra(n::Int,d::Int,o::Int,s,c::Int=0) = getalgebra_Signature(n,doc2m(d,o,c),s)
 @pure getalgebra(n::Int,m::Int,s) = getalgebra_Signature(n,m,Bits(s))
 
-@pure getbasis(V::VectorBundle,v::Symbol) = getproperty(getalgebra(V),v)
-@pure function getbasis(V::VectorBundle{N},b) where N
+@pure getbasis(V::Manifold,v::Symbol) = getproperty(getalgebra(V),v)
+@pure function getbasis(V::Manifold{N},b) where N
     B = Bits(b)
     if N ≤ algebra_limit
         @inbounds getalgebra(V).b[basisindex(ndims(V),B)]
@@ -235,7 +279,7 @@ struct SparseAlgebra{V} <: SubAlgebra{V}
     g::Dict{Symbol,Int}
 end
 
-@pure function SparseAlgebra(s::VectorBundle)
+@pure function SparseAlgebra(s::Manifold)
     sym = labels(s)
     SparseAlgebra{s}(sym,Dict{Symbol,Int}([sym[i]=>i for i ∈ 1:1<<ndims(s)]))
 end
@@ -274,7 +318,7 @@ end
 
 struct ExtendedAlgebra{V} <: SubAlgebra{V} end
 
-@pure ExtendedAlgebra(s::VectorBundle) = ExtendedAlgebra{s}()
+@pure ExtendedAlgebra(s::Manifold) = ExtendedAlgebra{s}()
 
 @pure function Base.getproperty(a::ExtendedAlgebra{V},v::Symbol) where V
     if v ∈ (:b,:g)
@@ -293,7 +337,7 @@ function show(io::IO,a::ExtendedAlgebra{V}) where V
     print(io,"Grassmann.ExtendedAlgebra{$V,$N}($(getbasis(V,0)), ..., $(getbasis(V,N-1)))")
 end
 
-# Extending (2^n)×Basis{VectorBundle}
+# Extending (2^n)×Basis{Manifold}
 
 for (ExtraAlgebra,extra) ∈ ((SparseAlgebra,:sparse),(ExtendedAlgebra,:extended))
     getextra = Symbol(:get,extra)
@@ -302,22 +346,60 @@ for (ExtraAlgebra,extra) ∈ ((SparseAlgebra,:sparse),(ExtendedAlgebra,:extended
         extra_cache = Symbol(extra,:_cache_,vs)
         getalg = Symbol(:get,extra,:_,vs)
         @eval begin
-            const $extra_cache = Vector{Vector{Dict{$dat,$ExtraAlgebra}}}[]
-            @pure function $getalg(n::Int,m::Int,s::$dat,d::Int=0)
+            const $extra_cache = Vector{Vector{Vector{Dict{$dat,$ExtraAlgebra}}}}[]
+            @pure function $getalg(n::Int,m::Int,s::$dat,f::Int=0,d::Int=0)
                 n==0 && (return $ExtraAlgebra(V0))
-                for D ∈ length($extra_cache)+1:d+1
-                    push!($extra_cache,Vector{Dict{$dat,$ExtraAlgebra}}[])
+                d1,f1,m1 = d+1,f+1,m+1
+                for F ∈ length($extra_cache)+1:f1
+                    push!($extra_cache,Vector{Vector{Dict{$dat,$ExtraAlgebra}}}[])
                 end
-                @inbounds for N ∈ length($extra_cache[d+1])+1:n
-                    @inbounds push!($extra_cache[d+1],[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
+                for D ∈ length($extra_cache[f1])+1:d1
+                    push!($extra_cache[f1],Vector{Dict{$dat,$ExtraAlgebra}}[])
                 end
-                @inbounds if !haskey($extra_cache[d+1][n][m+1],s)
-                    @inbounds push!($extra_cache[d+1][n][m+1],s=>$ExtraAlgebra($vs{n,m,s,d}()))
+                @inbounds for N ∈ length($extra_cache[f1][d1])+1:n
+                    @inbounds push!($extra_cache[f1][d1],[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
                 end
-                @inbounds $extra_cache[d+1][n][m+1][s]
+                @inbounds if !haskey($extra_cache[f1][d1][n][m1],s)
+                    @inbounds push!($extra_cache[f1][d1][n][m1],s=>$ExtraAlgebra($vs{n,m,s,f,d}()))
+                end
+                @inbounds $extra_cache[f1][d1][n][m1][s]
             end
-            @pure $getextra(V::$vs{N,M,S,D}) where {N,M,S,D} = $getalg(N,M,S,D)
+            @pure $getextra(V::$vs{N,M,S,F,D}) where {N,M,S,F,D} = $getalg(N,M,S,F,D)
         end
+    end
+    vs,dat =  (:SubManifold,Bits)
+    extra_cache = Symbol(extra,:_cache_,vs)
+    getalg = Symbol(:get,extra,:_,vs)
+    for V ∈ (:Signature,:DiagonalForm)
+        @eval const $(Symbol(extra_cache,:_,V)) = Vector{Vector{Dict{$dat,Vector{Dict{$dat,$ExtraAlgebra}}}}}[]
+    end
+    @eval begin
+        @pure function $getalg(n::Int,m::Int,s::$dat,S::$dat,vs,f::Int=0,d::Int=0)
+            n==0 && (return $ExtraAlgebra(V0))
+            d1,f1,m1 = d+1,f+1,m+1
+            exc = if vs <: Signature
+                $(Symbol(extra_cache,:_Signature))
+            elseif vs <: DiagonalForm
+                $(Symbol(extra_cache,:_DiagonalForm))
+            end
+            for F ∈ length(exc)+1:f1
+                push!(exc,Vector{Dict{$dat,Vector{Dict{$dat,$ExtraAlgebra}}}}[])
+            end
+            for D ∈ length(exc[f1])+1:d1
+                push!(exc[f1],Dict{$dat,Vector{Dict{$dat,$ExtraAlgebra}}}[])
+            end
+            for D ∈ length(exc[f1][d1])+1:n
+                push!(exc[f1][d1],Dict{$dat,Vector{Dict{$dat,$ExtraAlgebra}}}())
+            end
+            @inbounds if !haskey(exc[f1][d1][n],S)
+                @inbounds push!(exc[f1][d1][n],S=>[Dict{$dat,$ExtraAlgebra}() for k∈1:12])
+            end
+            @inbounds if !haskey(exc[f1][d1][n][S][m1],s)
+                @inbounds push!(exc[f1][d1][n][S][m1],s=>$ExtraAlgebra($vs{count_ones(S),vs(),S}()))
+            end
+            @inbounds exc[f1][d1][n][S][m1][s]
+        end
+        @pure $getextra(V::$vs{N,M,S} where N) where {M,S} = $getalg(ndims(M),DirectSum.options(M),value(M),S,typeof(M),diffvars(M),DirectSum.diffmode(M))
     end
     @eval begin
         @pure $getextra(n::Int,d::Int,o::Int,s,c::Int=0) = $gets(n,doc2m(d,o,c),s)

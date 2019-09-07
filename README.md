@@ -335,7 +335,7 @@ julia> v∞ * v∅, v∅ * v∞
 ```
 The index number `N` of the `VectorBundle` corresponds to the total number of generator elements. However, even though `S"∞∅+++"` is of type `VectorBundle{5,3}` with `5` generator elements, it can be internally recognized in the direct sum algebra as being an embedding of a 3-index `VectorBundle{3,0}` with additional encoding of the null-basis (origin and point at infinity) in the parameter `M` of the `VectorBundle{N,M}` type.
 
-### Differential forms and Taylor's tangent algebra
+### Differential forms and Leibniz tangent algebra
 
 The chain rule is encoded into `Grassmann` algebra when a `tangent` bundle is used, demonstrated here symbolically with `Reduce` by using the dual number definition:
 ```Julia
@@ -349,9 +349,36 @@ julia> a,b = :x*v1 + :dx*ϵ1, :y*v1 + :dy*ϵ1
 (xv₁ + dxϵ₁, yv₁ + dyϵ₁)
 
 julia> a * b
-x * y + (dy * x - dx * y)v₁ϵ₁
+x * y + (dy * x + dx * y)v₁ϵ₁
 ```
-Higher order and multivariable Taylor numbers are also supported, although the implementation in this release is still experimental.
+Higher order and multivariable Taylor numbers are also supported.
+```Julia
+julia> @basis tangent(ℝ,2,2)
+(⟨+₁₂⟩, v, v₁, ∂₁, ∂₂, ∂₁v₁, ∂₂v₁, ∂₁₂, ∂₁₂v₁)
+
+julia> ∂1 * ∂1v1
+∂₁∂₁v₁
+
+julia> ∂1 * ∂2
+∂₁₂
+
+julia> v1*∂12
+∂₁₂v₁
+
+julia> ∂12*∂2
+0v
+```
+Although the implementation in this release is still experimental.
+```Julia
+julia> @mixedbasis tangent(ℝ^2,2,2);
+
+julia> SChain{Any,V,2}([0,1,0,0,1,0])
+0v₁₂ + 1∂₁v₁ + 0∂₂v₁ + 0∂₁v₂ + 1∂₂v₂ + 0∂₁₂
+
+julia> ans^2
+0.0 + 1.0∂₁∂₁ + 1.0∂₂∂₂
+```
+For example, a constructor with explicit `Any` type delcaration must be used to be able to properly work with nested symmetric Leibniz basis elements. If the `StaticArray` type is not set to `Any` currently, the type system is incompatible.
 
 ## Constructing linear transformations from mixed tensor product ⊗
 
