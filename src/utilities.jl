@@ -154,13 +154,13 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
 
 @inline assign_expr!(e,x::Vector{Any},v::Symbol,expr) = v ∈ e && push!(x,Expr(:(=),v,expr))
 
-@pure function insert_expr(e,vec=:mvec,T=:(valuetype(a)),S=:(valuetype(b)),L=:(2^N))
+@pure function insert_expr(e,vec=:mvec,T=:(valuetype(a)),S=:(valuetype(b)),L=:(2^N);mv=0)
     x = Any[] # Any[:(sigcheck(sig(a),sig(b)))]
     assign_expr!(e,x,:N,:(ndims(V)))
     assign_expr!(e,x,:M,:(Int(N/2)))
     assign_expr!(e,x,:t,vec≠:mvec ? :Any : :(promote_type($T,$S)))
-    assign_expr!(e,x,:out,:(zeros($vec(N,t))))
-    assign_expr!(e,x,:mv,:(MBlade{V,0,getbasis(V,0),t}(0)))
+    assign_expr!(e,x,:out,mv≠0 ? :(t=Any;zeros(svec(N,Any)).+out) : :(zeros($vec(N,t))))
+    assign_expr!(e,x,:mv,:(MBlade{V,0,getbasis(V,0),$(mv≠0 ? Any : :t)}($mv)))
     assign_expr!(e,x,:r,:(binomsum(N,G)))
     assign_expr!(e,x,:bng,:(binomial(N,G)))
     assign_expr!(e,x,:bnl,:(binomial(N,L)))
@@ -170,6 +170,7 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
     assign_expr!(e,x,:df,:(dualform(V)))
     assign_expr!(e,x,:di,:(dualindex(V)))
     assign_expr!(e,x,:D,:(diffvars(V)))
+    assign_expr!(e,x,:μ,:(diffvars(V)≠0))
     return x
 end
 

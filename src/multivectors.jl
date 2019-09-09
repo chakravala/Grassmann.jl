@@ -480,6 +480,7 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
+@inline value_diff(m::T) where T<:TensorTerm = (v=value(m);typeof(v)<:TensorAlgebra ? v : m)
 @pure basis(m::Basis) = m
 @pure basis(m::Union{MBlade{V,G,B},SBlade{V,G,B}}) where {V,G,B} = B
 @pure grade(m::TensorTerm{V,G} where V) where G = G

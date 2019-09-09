@@ -50,21 +50,29 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
-                        diffvars(V)≠0 && !iszero(Z) && (val *= Basis{V}(Z); count_ones(Q)+order(val)>diffmode(V) && (return m))
+                        if diffvars(V)≠0 && !iszero(Z)
+                            #T≠Any && (return true)
+                            val *= getbasis(V,Z)
+                            count_ones(Q)+order(val)>diffmode(V) && (return false)
+                        end
                         $s(m,val,(A⊻B)|Q,Dimension{N}())
                     end
-                    return m
+                    return false
                 end
                 @inline function $(Symbol(:geom,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
-                        diffvars(V)≠0 && !iszero(Z) && (val *= Basis{V}(Z); count_ones(Q)+order(val)>diffmode(V) && (return m))
+                        if diffvars(V)≠0 && !iszero(Z)
+                            #T≠Any && (return true)
+                            val *= getbasis(V,Z)
+                            count_ones(Q)+order(val)>diffmode(V) && (return false)
+                        end
                         $s(m,val,bas|Q,Dimension{N}())
                         cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,(conformalmask(V)⊻bas)|Q,Dimension{N}())
                     end
-                    return m
+                    return false
                 end
             end
             for j ∈ (:join,:geom)
@@ -79,13 +87,14 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                             g,C,t,Z = $uct(A,B,V)
                             v = val
                             if diffvars(V)≠0 && !iszero(Z)
+                                #T≠Any && (return true)
                                 _,_,Q,_ = symmetricmask(V,A,B)
-                                v *= Basis{V}(Z)
-                                count_ones(Q)+order(v)>diffmode(V) && (return m)
+                                v *= getbasis(V,Z)
+                                count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
                         end
-                        return m
+                        return false
                     end
                     @inline function $(Symbol(prod,s))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
                         $(Symbol(prod,s))(V,m,bits(A),bits(B),v)
@@ -196,10 +205,10 @@ Geometric algebraic product: a*b = (-1)ᵖdet(a∩b)⊗(Λ(a⊖b)∪L(a⊕b))
     diffcheck(V,ba,bb) && (return g_zero(V))
     A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
-    d = Basis{V}(bas|Q)
+    d = getbasis(V,bas|Q)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SBlade{V}(-1,d) : d) : SBlade{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
-    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(Basis{V}(Z),out))
-    return cc ? (v=value(out);out+SBlade{V}(hasinforigin(V,A,B) ? -(v) : v,Basis{V}(conformalmask(V)⊻bits(d)))) : out
+    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(getbasis(V,Z),out))
+    return cc ? (v=value(out);out+SBlade{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
 
 for Blade ∈ MSB
@@ -250,8 +259,8 @@ export ∧, ∨, ⊗
     ba,bb = bits(a),bits(b)
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
-    d = Basis{V}((A⊻B)|Q)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
+    d = getbasis(V,(A⊻B)|Q)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
     return parity(a,b) ? SBlade{V}(-1,d) : d
 end
 
@@ -261,8 +270,8 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = value(a)*value(b)
-    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(Basis{V}(Z),v); count_ones(Q)+order(v)>diffmode(V) && (return zero(V)))
-    return SBlade{V}(parity(x,y) ? -v : v,Basis{V}((A⊻B)|Q))
+    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(getbasis(V,Z),v); count_ones(Q)+order(v)>diffmode(V) && (return zero(V)))
+    return SBlade{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
@@ -285,8 +294,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @pure function ∨(a::Basis{V},b::Basis{V}) where V
     p,C,t,Z = regressive(a,b)
     !t && (return g_zero(V))
-    d = Basis{V}(C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
+    d = getbasis(V,C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
@@ -296,10 +305,10 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(Basis{V}(Z),v)
+        v = SBlade{V}(getbasis(V,Z),v)
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(p ? -v : v,Basis{V}(C))
+    return SBlade{V}(p ? -v : v,getbasis(V,C))
 end
 
 """
@@ -331,8 +340,8 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 @pure function contraction(a::Basis{V},b::Basis{V}) where V
     g,C,t,Z = interior(a,b)
     !t && (return g_zero(V))
-    d = Basis{V}(C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
+    d = getbasis(V,C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
     return typeof(V) <: Signature ? (g ? SBlade{V}(-1,d) : d) : SBlade{V}(g,d)
 end
 
@@ -342,10 +351,10 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(Basis{V}(Z),v)
+        v = SBlade{V}(getbasis(V,Z),v)
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,Basis{V}(C))
+    return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
 end
 
 export ⨼, ⨽
@@ -380,8 +389,8 @@ cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
 @pure function cross(a::Basis{V},b::Basis{V}) where V
     p,C,t,Z = crossprod(a,b)
     !t && (return zero(V))
-    d = Basis{V}(C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(Basis{V}(Z),d))
+    d = getbasis(V,C)
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
@@ -391,10 +400,10 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(Basis{V}(Z),v)
+        v = SBlade{V}(getbasis(V,Z),v)
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(p ? -v : v,Basis{V}(C))
+    return SBlade{V}(p ? -v : v,getbasis(V,C))
 end
 
 # symmetrization and anti-symmetrization
@@ -471,10 +480,18 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     @eval begin
         @inline function inneraddvalue!(mv::MBlade{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
-                g,C,f = interior(α,β,V)
-                f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,γ) : $ADD(mv.v,γ)) : $ADD(mv.v,$MUL(g,γ)))
+                g,C,f,Z = interior(α,β,V)
+                #!iszero(C) && T≠Any && (return true)
+                v = iszero(C) ? γ : γ*getbasis(V,C)
+                if diffvars(V)≠0 && !iszero(Z)
+                    _,_,Q,_ = symmetricmask(V,α,β)
+                    v *= getbasis(V,Z)
+                    order(v)>diffmode(V) && (return false)
+                end
+                f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,v) : $ADD(mv.v,v)) : $ADD(mv.v,$MUL(g,v)))
+                return false
             end
-            return mv
+            return false
         end
         function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
             if mixedmode(V)<0
@@ -536,38 +553,50 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
             #∧(a::$Field,b::$Chain{T,V,G}) where {T<:$Field,V,G} = SChain{T,V,G}(a.*b.v)
             #∧(a::$Chain{T,V,G},b::$Field) where {T<:$Field,V,G} = SChain{T,V,G}(a.v.*b)
             function contraction(a::$Chain{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
-                $(insert_expr((:N,:t,:mv,:ib),VEC)...)
+                $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                 for i ∈ 1:binomial(N,G)
-                    @inbounds inneraddvalue!(mv,ib[i],bits(b),a[i])
+                    if @inbounds inneraddvalue!(mv,ib[i],bits(b),a[i])&μ
+                        $(insert_expr((:mv,);mv=:(value(mv))))
+                        @inbounds inneraddvalue!(mv,ib[i],bits(b),a[i])
+                    end
                 end
-                return mv
+                return value_diff(mv)
             end
             function contraction(a::Basis{V,G},b::$Chain{T,V,G}) where {V,T<:$Field,G}
-                $(insert_expr((:N,:t,:mv,:ib),VEC)...)
+                $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                 for i ∈ 1:binomial(N,G)
-                    @inbounds inneraddvalue!(mv,bits(a),ib[i],b[i])
+                    if @inbounds inneraddvalue!(mv,bits(a),ib[i],b[i])&μ
+                        $(insert_expr((:mv,);mv=:(value(mv))))
+                        @inbounds inneraddvalue!(mv,bits(a),ib[i],b[i])
+                    end
                 end
-                return mv
+                return value_diff(mv)
             end
             function ∧(a::$Chain{T,w,1},b::Basis{W,1}) where {T<:$Field,w,W}
                 V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
-                $(insert_expr((:N,:t),VEC)...)
+                $(insert_expr((:N,:t,:μ),VEC)...)
                 ib = indexbasis(ndims(w),1)
                 out = zeros($VEC(N,2,t))
                 C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
                 for i ∈ 1:length(a)
-                    @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])
+                    if @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])&μ
+                        out,t = zeros(svec(N,2,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,a[i])
+                    end
                 end
                 return MChain{t,V,2}(out)
             end
             function ∧(a::Basis{w,1},b::$Chain{T,W,1}) where {w,W,T<:$Field}
                 V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
-                $(insert_expr((:N,:t),VEC)...)
+                $(insert_expr((:N,:t,:μ),VEC)...)
                 ib = indexbasis(ndims(W),1)
                 out = zeros($VEC(N,2,t))
                 C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
                 for i ∈ 1:length(b)
-                    @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])
+                    if @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])&μ
+                        out,t = zeros(svec(N,2,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],b[i])
+                    end
                 end
                 return MChain{t,V,2}(out)
             end
@@ -575,38 +604,51 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for Blade ∈ MSB
             @eval begin
                 function contraction(a::$Chain{T,V,G},b::$Blade{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
-                    $(insert_expr((:N,:t,:mv,:ib),VEC)...)
+                    $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds inneraddvalue!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))
+                        if @inbounds inneraddvalue!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))&μ
+                            $(insert_expr((:mv,);mv=:(value(mv))))
+                            @inbounds inneraddvalue!(mv,ib[i],bits(basis(b)),$MUL(a[i],b.v))
+                        end
+
                     end
-                    return mv
+                    return value_diff(mv)
                 end
                 function contraction(a::$Blade{V,G,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
-                    $(insert_expr((:N,:t,:mv,:ib),VEC)...)
+                    $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds inneraddvalue!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
+                        if @inbounds inneraddvalue!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))&μ
+                            $(insert_expr((:mv,);mv=:(value(mv))))
+                            @inbounds inneraddvalue!(mv,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
+                        end
                     end
-                    return mv
+                    return value_diff(mv)
                 end
                 function ∧(a::$Chain{T,w,1},b::$Blade{W,1,B,S}) where {T<:$Field,w,W,B,S<:$Field}
                     V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
-                    $(insert_expr((:N,:t),VEC)...)
+                    $(insert_expr((:N,:t,:μ),VEC)...)
                     ib = indexbasis(ndims(w),1)
                     out = zeros($VEC(N,2,t))
                     C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(basis(b))) : bits(basis(b))
                     for i ∈ 1:length(a)
-                        @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))
+                        if @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))&μ
+                            out,t = zeros(svec(N,2,Any)) .+ out,Any
+                            @inbounds outeraddblade!(V,out,C ? dual(V,ib[i]) : ib[i],y,$MUL(a[i],b.v))
+                        end
                     end
                     return MChain{t,V,2}(out)
                 end
                 function ∧(a::$Blade{w,1,B,S},b::$Chain{T,W,1}) where {T<:$Field,w,W,B,S<:$Field}
                     V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
-                    $(insert_expr((:N,:t),VEC)...)
+                    $(insert_expr((:N,:t,:μ),VEC)...)
                     ib = indexbasis(ndims(W),1)
                     out = zeros($VEC(N,2,t))
                     C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(basis(a))) : bits(basis(a))
                     for i ∈ 1:length(b)
-                        @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))
+                        if @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))&μ
+                            out,t = zeros(svec(N,2,Any)) .+ out,Any
+                            @inbounds outeraddblade!(V,out,x,C ? dual(V,ib[i]) : ib[i],$MUL(a.v,b[i]))
+                        end
                     end
                     return MChain{t,V,2}(out)
                 end
@@ -616,18 +658,21 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     for Chain ∈ MSC, Other ∈ MSC
         @eval begin
             function contraction(a::$Chain{T,V,G},b::$Other{S,V,G}) where {T<:$Field,V,G,S<:$Field}
-                $(insert_expr((:N,:t,:mv,:bng,:ib),VEC)...)
+                $(insert_expr((:N,:t,:mv,:bng,:ib,:μ),VEC)...)
                 for i ∈ 1:bng
                     @inbounds v,ibi = a[i],ib[i]
                     v≠0 && for j ∈ 1:bng
-                        @inbounds inneraddvalue!(mv,ibi,ib[j],$MUL(v,b[j]))
+                        if @inbounds inneraddvalue!(mv,ibi,ib[j],$MUL(v,b[j]))&μ
+                            $(insert_expr((:mv,);mv=:(value(mv))))
+                            @inbounds inneraddvalue!(mv,ibi,ib[j],$MUL(v,b[j]))
+                        end
                     end
                 end
-                return mv
+                return value_diff(mv)
             end
             function ∧(a::$Chain{T,w,1},b::$Other{S,W,1}) where {T<:$Field,w,S<:$Field,W}
                 V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
-                $(insert_expr((:N,:t),VEC)...)
+                $(insert_expr((:N,:t,:μ),VEC)...)
                 ia = indexbasis(ndims(w),1)
                 ib = indexbasis(ndims(W),1)
                 out = zeros($VEC(N,2,t))
@@ -636,7 +681,10 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                     @inbounds v,iai = a[i],ia[i]
                     x = CA ? dual(V,iai) : iai
                     v≠0 && for j ∈ 1:length(b)
-                        @inbounds outeraddblade!(V,out,x,CB ? dual(V,ib[j]) : ib[j],$MUL(v,b[j]))
+                        if @inbounds outeraddblade!(V,out,x,CB ? dual(V,ib[j]) : ib[j],$MUL(v,b[j]))&μ
+                            out,t = zeros(svec(N,2,promote_type,Any)) .+ out,Any
+                            @inbounds outeraddblade!(V,out,x,CB ? dual(V,ib[j]) : ib[j],$MUL(v,b[j]))
+                        end
                     end
                 end
                 return MChain{t,V,2}(out)
@@ -723,27 +771,33 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                          (:cross,:crossaddmulti!))
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
-                $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds $product!(V,out,ib[i],bits(b),a.v[bs[g]+i])
+                        if @inbounds $product!(V,out,ib[i],bits(b),a.v[bs[g]+i])&μ
+                            $(insert_expr((:out,);mv=:out))
+                            @inbounds $product!(V,out,ib[i],bits(b),a.v[bs[g]+i])
+                        end
                     end
                 end
                 return MultiVector{t,V}(out)
             end
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {V,G,T<:$Field}
-                $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds $product!(V,out,bits(a),ib[i],b.v[bs[g]+i])
+                        if @inbounds $product!(V,out,bits(a),ib[i],b.v[bs[g]+i])&μ
+                            $(insert_expr((:out,);mv=:out))
+                            @inbounds $product!(V,out,bits(a),ib[i],b.v[bs[g]+i])
+                        end
                     end
                 end
                 return MultiVector{t,V,2^N}(out)::MultiVector{t,V,2^N}
             end
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                 for g ∈ 1:N+1
                     Y = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
@@ -752,7 +806,10 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                             @inbounds R = bs[G]
                             X = indexbasis(N,G-1)
                             @inbounds for j ∈ 1:bn[G]
-                                @inbounds $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],val))
+                                if @inbounds $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],val))&μ
+                                    $(insert_expr((:out,);mv=:out))
+                                    @inbounds $product!(V,out,X[j],Y[i],$MUL(a.v[R+j],val))
+                                end
                             end
                         end
                     end
@@ -763,21 +820,27 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for Blade ∈ MSB
             @eval begin
                 function $op(a::MultiVector{T,V},b::$Blade{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
-                    $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[bs[g]+i],b.v))
+                            if @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[bs[g]+i],b.v))&μ
+                                $(insert_expr((:out,);mv=:out))
+                                @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a.v[bs[g]+i],b.v))
+                            end
                         end
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::$Blade{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
-                    $(insert_expr((:N,:t,:out,:bs,:bn),VEC)...)
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b.v[bs[g]+i]))
+                            if @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b.v[bs[g]+i]))&μ
+                                $(insert_expr((:out,);mv=:out))
+                                @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b.v[bs[g]+i]))
+                            end
                         end
                     end
                     return MultiVector{t,V,2^N}(out)
@@ -787,40 +850,52 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for Chain ∈ MSC
             @eval begin
                 function $op(a::$Chain{T,V,G},b::Basis{V}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,:t,:out,:ib),VEC)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds $product!(V,out,ib[i],bits(b),a[i])
+                        if @inbounds $product!(V,out,ib[i],bits(b),a[i])&μ
+                            $(insert_expr((:out,);mv=:out))
+                            @inbounds $product!(V,out,ib[i],bits(b),a[i])
+                        end
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::Basis{V},b::$Chain{T,V,G}) where {V,T<:$Field,G}
-                    $(insert_expr((:N,:t,:out,:ib),VEC)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                     for i ∈ 1:binomial(N,G)
-                        @inbounds $product!(V,out,bits(a),ib[i],b[i])
+                        if @inbounds $product!(V,out,bits(a),ib[i],b[i])&μ
+                            $(insert_expr((:out,);mv=:out))
+                            @inbounds $product!(V,out,bits(a),ib[i],b[i])
+                        end
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,S<:$Field,G}
-                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),VEC)...)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),VEC)...)
                     for g ∈ 1:N+1
                         A = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds val = a.v[bs[g]+i]
                             val≠0 && for j ∈ 1:bng
-                                @inbounds $product!(V,out,A[i],ib[j],$MUL(val,b[j]))
+                                if @inbounds $product!(V,out,A[i],ib[j],$MUL(val,b[j]))&μ
+                                    $(insert_expr((:out,);mv=:out))
+                                    @inbounds $product!(V,out,A[i],ib[j],$MUL(val,b[j]))
+                                end
                             end
                         end
                     end
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {V,G,S<:$Field,T<:$Field}
-                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),VEC)...)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),VEC)...)
                     for g ∈ 1:N+1
                         B = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds val = b.v[bs[g]+i]
                             val≠0 && for j ∈ 1:bng
-                                @inbounds $product!(V,out,ib[j],B[i],$MUL(a[j],val))
+                                if @inbounds $product!(V,out,ib[j],B[i],$MUL(a[j],val))&μ
+                                    $(insert_expr((:out,);mv=:out))
+                                    @inbounds $product!(V,out,ib[j],B[i],$MUL(a[j],val))
+                                end
                             end
                         end
                     end
@@ -830,16 +905,22 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
             for Blade ∈ MSB
                 @eval begin
                     function $op(a::$Chain{T,V,G},b::$Blade{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
-                        $(insert_expr((:N,:t,:out,:ib),VEC)...)
+                        $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                         for i ∈ 1:binomial(N,G)
-                            @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a[i],b.v))
+                            if @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a[i],b.v))&μ
+                                $(insert_expr((:out,);mv=:out))
+                                @inbounds $product!(V,out,ib[i],bits(basis(b)),$MUL(a[i],b.v))
+                            end
                         end
                         return MultiVector{t,V}(out)
                     end
                     function $op(a::$Blade{V,L,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
-                        $(insert_expr((:N,:t,:out,:ib),VEC)...)
+                        $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                         for i ∈ 1:binomial(N,G)
-                            @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
+                            if @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b[i]))&μ
+                                $(insert_expr((:out,);mv=:out))
+                                @inbounds $product!(V,out,bits(basis(a)),ib[i],$MUL(a.v,b[i]))
+                            end
                         end
                         return MultiVector{t,V}(out)
                     end
@@ -849,13 +930,16 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for (A,B) ∈ [(A,B) for A ∈ MSC, B ∈ MSC]
             @eval begin
                 function $op(a::$A{T,V,G},b::$B{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
-                    $(insert_expr((:N,:t,:bnl,:ib),VEC)...)
+                    $(insert_expr((:N,:t,:bnl,:ib,:μ),VEC)...)
                     out = zeros($VEC(N,t))
                     B = indexbasis(N,L)
                     for i ∈ 1:binomial(N,G)
                         @inbounds v,ibi = a[i],ib[i]
                         v≠0 && for j ∈ 1:bnl
-                            @inbounds $product!(V,out,ibi,B[j],$MUL(v,b[j]))
+                            if @inbounds $product!(V,out,ibi,B[j],$MUL(v,b[j]))&μ
+                                $(insert_expr((:out,);mv=:out))
+                                @inbounds $product!(V,out,ibi,B[j],$MUL(v,b[j]))
+                            end
                         end
                     end
                     return MultiVector{t,V}(out)
