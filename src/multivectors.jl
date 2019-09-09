@@ -96,18 +96,26 @@ for Blade ∈ MSB
         export $Blade
         @pure $Blade(b::Basis{V,G}) where {V,G} = $Blade{V}(b)
         @pure $Blade{V}(b::Basis{V,G}) where {V,G} = $Blade{V,G,b,Int}(1)
-        $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
-        $Blade{V}(v,b::SBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
-        $Blade{V}(v,b::MBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
-        $Blade{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G,b,T}(v)
-        $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G,b,T}(v)
-        $Blade{V,G}(v,b::SBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
-        $Blade{V,G}(v,b::MBlade{V,G}) where {V,G} = $Blade{V,G,basis(b)}(v*b.v)
-        $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
         $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
+        $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
+        $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
+        $Blade{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G}(v,b)
+        function $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,T}(v)
+        end
+        function $Blade{V,G,B}(b::T) where T<:TensorTerm{V} where {V,G,B}
+            order(B)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,B,Any}(b)
+        end
         function show(io::IO,m::$Blade)
             T = valuetype(m)
-            print(io,((!(T<:TensorMixed))&&T∉parany ? [m.v] : ['(',m.v,')'])...,basis(m))
+            par = (!(T<:TensorMixed)) && T∉parany
+            !par && (par = typeof(value(m)) <: TensorTerm)
+            print(io,(par ? [m.v] : ['(',m.v,')'])...,basis(m))
+        end
+    end
+    for Other ∈ MSB, VG ∈ ((:V,),(:V,:G))
+        @eval function $Blade{$(VG...)}(v,b::$Other{V,G}) where {V,G}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,basis(b)}(v*b.v)
         end
     end
 end
@@ -158,12 +166,15 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
             end
             @inbounds DirectSum.printindices(io,V,ib[1])
             for k ∈ 2:length(ib)
-                @inbounds tmv = typeof(m.v[k])
+                @inbounds mvs = m.v[k]
+                tmv = typeof(mvs)
                 if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
-                    @inbounds (!(tmv<:TensorMixed))&&tmv∉parval ? print(io," + ",m.v[k]) : print(io," + (",m.v[k],")")
+                    par = (!(tmv<:TensorMixed)) && tmv∉parval
+                    !par && (par = typeof(mvs) <: TensorTerm)
+                    par ? print(io," + ",mvs) : print(io," + (",mvs,")")
                 else
-                    @inbounds sbm = signbit(m.v[k])
-                    @inbounds print(io,sbm ? " - " : " + ",sbm ? abs(m.v[k]) : m.v[k])
+                    sbm = signbit(mvs)
+                    print(io,sbm ? " - " : " + ",sbm ? abs(mvs) : mvs)
                 end
                 @inbounds DirectSum.printindices(io,V,ib[k])
             end
@@ -299,7 +310,9 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
             @inbounds if mvs ≠ 0
                 tmv = typeof(mvs)
                 if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
-                    (!(tmv<:TensorMixed))&&tmv∉parval ? print(io," + ",mvs) : print(io," + (",mvs,")")
+                    par = (!(tmv<:TensorMixed)) && tmv∉parval
+                    !par && (par = typeof(mvs) <: TensorTerm)
+                    par ? print(io," + ",mvs) : print(io," + (",mvs,")")
                 else
                     sba = signbit(mvs)
                     print(io,sba ? " - " : " + ",sba ? abs(mvs) : mvs)
@@ -473,6 +486,9 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure grade(m::Union{MChain{T,V,G},SChain{T,V,G}} where {T,V}) where G = G
 @pure grade(m::SparseChain{V,G} where V) where G = G
 @pure grade(m::Real) = 0
+@pure order(m::Basis{V,G,B} where G) where {V,B} = count_ones(symmetricmask(V,B,B)[4])
+@pure order(m::Union{MBlade,SBlade}) = order(basis(m))+order(value(m))
+@pure order(m) = 0
 @pure bits(m::T) where T<:TensorTerm = bits(basis(m))
 
 @pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
