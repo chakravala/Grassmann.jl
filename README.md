@@ -353,7 +353,7 @@ x * y + (dy * x + dx * y)v₁ϵ₁
 ```
 Higher order and multivariable Taylor numbers are also supported.
 ```Julia
-julia> @basis tangent(ℝ,2,2)
+julia> @basis tangent(ℝ,2,2) # 1D Grade, 2nd Order, 2 Variables
 (⟨+₁₂⟩, v, v₁, ∂₁, ∂₂, ∂₁v₁, ∂₂v₁, ∂₁₂, ∂₁₂v₁)
 
 julia> ∂1 * ∂1v1
@@ -365,20 +365,21 @@ julia> ∂1 * ∂2
 julia> v1*∂12
 ∂₁₂v₁
 
-julia> ∂12*∂2
+julia> ∂12*∂2 # 3rd order is zero
 0v
-```
-Although the implementation in this release is still experimental.
-```Julia
-julia> @mixedbasis tangent(ℝ^2,2,2);
 
-julia> SChain{Any,V,2}([0,1,0,0,1,0])
+julia> @mixedbasis tangent(ℝ^2,2,2); # 2D Grade, 2nd Order, 2 Variables
+
+julia> ∇ = ∂1v1 + ∂2v2 # vector field
 0v₁₂ + 1∂₁v₁ + 0∂₂v₁ + 0∂₁v₂ + 1∂₂v₂ + 0∂₁₂
 
-julia> ans^2
-0.0 + 1.0∂₁∂₁ + 1.0∂₂∂₂
+julia> ∇ ⋅ ∇ # Laplacian
+0.0v₁ + 0.0v₂ + 1∂₁∂₁ + 1∂₂∂₂
+
+julia> ans*∂1 # 3rd order is zero
+0.0v⃖
 ```
-For example, a constructor with explicit `Any` type delcaration must be used to be able to properly work with nested symmetric Leibniz basis elements. If the `StaticArray` type is not set to `Any` currently, the type system is incompatible.
+Although fully generalized, the implementation in this release is still experimental.
 
 ## Constructing linear transformations from mixed tensor product ⊗
 

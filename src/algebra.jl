@@ -50,9 +50,8 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
-                        if diffvars(V)≠0 && !iszero(Z)
-                            T≠Any && (return true)
-                            val *= getbasis(V,Z)
+                        if diffvars(V)≠0
+                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(V,Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
                         $s(m,val,(A⊻B)|Q,Dimension{N}())
@@ -64,9 +63,8 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
-                        if diffvars(V)≠0 && !iszero(Z)
-                            T≠Any && (return true)
-                            val *= getbasis(V,Z)
+                        if diffvars(V)≠0
+                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(V,Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
                         $s(m,val,bas|Q,Dimension{N}())
@@ -86,10 +84,12 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                         if val ≠ 0
                             g,C,t,Z = $uct(A,B,V)
                             v = val
-                            if diffvars(V)≠0 && !iszero(Z)
-                                T≠Any && (return true)
-                                _,_,Q,_ = symmetricmask(V,A,B)
-                                v *= getbasis(V,Z)
+                            if diffvars(V)≠0
+                                if !iszero(Z)
+                                    T≠Any && (return true)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v *= getbasis(V,Z)
+                                end
                                 count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
@@ -483,9 +483,11 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
                 g,C,f,Z = interior(α,β,V)
                 !iszero(C) && T≠Any && (return true)
                 v = iszero(C) ? γ : γ*getbasis(V,C)
-                if diffvars(V)≠0 && !iszero(Z)
-                    _,_,Q,_ = symmetricmask(V,α,β)
-                    v *= getbasis(V,Z)
+                if diffvars(V)≠0
+                    if !iszero(Z)
+                        _,_,Q,_ = symmetricmask(V,α,β)
+                        v *= getbasis(V,Z)
+                    end
                     order(v)>diffmode(V) && (return false)
                 end
                 f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,v) : $ADD(mv.v,v)) : $ADD(mv.v,$MUL(g,v)))
