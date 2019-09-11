@@ -197,13 +197,7 @@ for par ∈ (:conformal,:regressive,:interior,:crossprod)
                         @inbounds push!($cache[n][m1][s],$T[])
                     end
                     @inbounds for k ∈ length($cache[n][m1][s][a1]):b
-                        try
                         @inbounds push!($cache[n][m1][s][a1],$calc(V,a,k))
-                        catch err
-                            println(a)
-                            println(k)
-                            throw(err)
-                        end
                     end
                     @inbounds $cache[n][m1][s][a1][b+1]
                 end

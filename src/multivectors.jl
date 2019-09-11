@@ -14,9 +14,9 @@ Fields = (Real,Complex)
 
 # symbolic print types
 
-parany = (Expr,Complex,Any)
-parsym = (Expr,Complex,Symbol)
-parval = (Expr,Complex)
+parany = (Expr,Complex,Rational,TensorMixed)
+parsym = (Expr,Complex,Rational,TensorAlgebra,Symbol)
+parval = (Expr,Complex,Rational,TensorMixed)
 
 ## pseudoscalar
 
@@ -103,14 +103,16 @@ for Blade ∈ MSB
         function $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
             order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,T}(v)
         end
+        function $Blade{V,G}(v::T,b::Basis{V,G}) where T<:TensorTerm{V} where {V,G}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,Any}(v)
+        end
         function $Blade{V,G,B}(b::T) where T<:TensorTerm{V} where {V,G,B}
             order(B)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,B,Any}(b)
         end
         function show(io::IO,m::$Blade)
-            T = valuetype(m)
-            par = (!(T<:TensorMixed)) && T∉parany
-            !par && (par = typeof(value(m)) <: TensorTerm)
-            print(io,(par ? [m.v] : ['(',m.v,')'])...,basis(m))
+            T = typeof(value(m))
+            par = !(T <: TensorTerm) && |(broadcast(<:,T,parany)...)
+            print(io,(par ? ['(',m.v,')'] : [m.v])...,basis(m))
         end
     end
     for Other ∈ MSB, VG ∈ ((:V,),(:V,:G))
@@ -168,10 +170,9 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
             for k ∈ 2:length(ib)
                 @inbounds mvs = m.v[k]
                 tmv = typeof(mvs)
-                if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
-                    par = (!(tmv<:TensorMixed)) && tmv∉parval
-                    !par && (par = typeof(mvs) <: TensorTerm)
-                    par ? print(io," + ",mvs) : print(io," + (",mvs,")")
+                if |(broadcast(<:,tmv,parsym)...)
+                    par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
+                    par ? print(io," + (",mvs,")") : print(io," + ",mvs)
                 else
                     sbm = signbit(mvs)
                     print(io,sbm ? " - " : " + ",sbm ? abs(mvs) : mvs)
@@ -309,10 +310,9 @@ function show(io::IO, m::MultiVector{T,V}) where {T,V}
             @inbounds mvs = m.v[s]
             @inbounds if mvs ≠ 0
                 tmv = typeof(mvs)
-                if T == Any && (tmv ∈ parsym || tmv <: TensorAlgebra)
-                    par = (!(tmv<:TensorMixed)) && tmv∉parval
-                    !par && (par = typeof(mvs) <: TensorTerm)
-                    par ? print(io," + ",mvs) : print(io," + (",mvs,")")
+                if |(broadcast(<:,tmv,parsym)...)
+                    par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
+                    par ? print(io," + (",mvs,")") : print(io," + ",mvs)
                 else
                     sba = signbit(mvs)
                     print(io,sba ? " - " : " + ",sba ? abs(mvs) : mvs)
@@ -478,7 +478,7 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure valuetype(::Basis) = Int
 @pure valuetype(::Union{MBlade{V,G,B,T},SBlade{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
-@inline value(::Basis,T=Int) = one(T)
+@inline value(::Basis,T=Int) = T==Any ? 1 : one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value_diff(m::T) where T<:TensorTerm = (v=value(m);typeof(v)<:TensorAlgebra ? v : m)
 @pure basis(m::Basis) = m

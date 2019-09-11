@@ -157,9 +157,13 @@ Grassmann-Poincare left complement: ⋆'ω = I∗'ω
 import Base: reverse, conj, ~
 export involute
 
+@pure grade(V,B) = count_ones(B&(one(Bits)<<DirectSum.grade(V)-1))
+
 for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
-    @eval @pure $r(b::Basis{V,G,B}) where {V,G,B} =$p(G) ? SBlade{V}(-value(b),b) : b
+    @eval @pure function $r(b::Basis{V,G,B}) where {V,G,B}
+        $p(grade(V,B)) ? SBlade{V}(-value(b),b) : b
+    end
     for Blade ∈ MSB
         @eval $r(b::$Blade) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
     end
@@ -740,12 +744,18 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         for Chain ∈ MSC
             @eval begin
                 function $reverse(b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                    !$p(G) && (return b)
+                    D = diffvars(V)
+                    D==0 && !$p(G) && (return b)
                     $(insert_expr((:N,:ib),VEC)...)
                     out = zeros($VEC(N,G,T))
                     for k ∈ 1:binomial(N,G)
-                        @inbounds val = b.v[k]
-                        @inbounds val≠0 && setblade!(out,$SUB(val),ib[k],Dimension{N}())
+                        @inbounds v = b.v[k]
+                        v≠0 && if D==0
+                            @inbounds setblade!(out,$SUB(v),ib[k],Dimension{N}())
+                        else
+                            @inbounds B = ib[k]
+                            setblade!(out,$p(grade(V,B)) ? $SUB(v) : v,B,Dimension{N}())
+                        end
                     end
                     return $Chain{T,V,G}(out)
                 end
@@ -753,14 +763,19 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         end
         @eval begin
             function $reverse(m::MultiVector{T,V}) where {T<:$Field,V}
-                $(insert_expr((:N,:bs,:bn),VEC)...)
+                $(insert_expr((:N,:bs,:bn,:D),VEC)...)
                 out = zeros($VEC(N,T))
                 for g ∈ 1:N+1
                     pg = $p(g-1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = m.v[bs[g]+i]
-                        @inbounds val≠0 && setmulti!(out,pg ? $SUB(val) : val,ib[i],Dimension{N}())
+                        @inbounds v = m.v[bs[g]+i]
+                        v≠0 && if D==0
+                            @inbounds setmulti!(out,pg ? $SUB(v) : v,ib[i],Dimension{N}())
+                        else
+                            @inbounds B = ib[i]
+                            setmulti!(out,$p(grade(V,B)) ? $SUB(v) : v,B,Dimension{N}())
+                        end
                     end
                 end
                 return MultiVector{T,V}(out)
