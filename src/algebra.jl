@@ -157,7 +157,10 @@ Grassmann-Poincare left complement: ⋆'ω = I∗'ω
 import Base: reverse, conj, ~
 export involute
 
-@pure grade(V,B) = count_ones(B&(one(Bits)<<DirectSum.grade(V)-1))
+@pure grade_basis(V,B) = B&(one(Bits)<<DirectSum.grade(V)-1)
+@pure grade_basis(v,::Basis{V,G,B} where G) where {V,B} = grade_basis(V,B)
+@pure grade(V,B) = count_ones(grade_basis(V,B))
+@pure grade(v,::Basis{V,G,B} where G) where {V,B} = grade(V,B)
 
 for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
@@ -274,7 +277,10 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = value(a)*value(b)
-    diffvars(V)≠0 && !iszero(Z) && (v = SBlade{V}(getbasis(V,Z),v); count_ones(Q)+order(v)>diffmode(V) && (return zero(V)))
+    if diffvars(V)≠0 && !iszero(Z)
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
+        count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
+    end
     return SBlade{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
@@ -309,7 +315,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(getbasis(V,Z),v)
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(p ? -v : v,getbasis(V,C))
@@ -355,7 +361,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(getbasis(V,Z),v)
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
@@ -404,7 +410,7 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = value(a)*value(b)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = SBlade{V}(getbasis(V,Z),v)
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(p ? -v : v,getbasis(V,C))
@@ -1452,9 +1458,13 @@ end
 
 ## division
 
+@pure abs2_inv(::Basis{V,G,B} where G) where {V,B} = abs2(getbasis(V,grade_basis(V,B)))
+
 for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
-        @pure $nv(b::Basis{V,G}) where {V,G}=$d(parityreverse(G) ? -1 : 1,value(b⋅b))*b
+        @pure function $nv(b::Basis{V,G,B}) where {V,G,B}
+            $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
+        end
         @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
         @pure $d(a::N,b::T) where {N<:Number,T<:TensorAlgebra} = a*$nv(b)
         function $nv(m::MultiVector{T,V}) where {T,V}
@@ -1470,10 +1480,20 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         end
     end
     for Blade ∈ MSB
-        @eval $nv(b::$Blade{V,G,B,T}) where {V,G,B,T} = $Blade{V,G,B}($d(parityreverse(G) ? -one(T) : one(T),value(abs2(B))*value(b)))
+        @eval begin
+            function $nv(b::$Blade{V,G,B,T}) where {V,G,B,T}
+                $Blade{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B))*value(b)))
+            end
+            function $nv(b::$Blade{V,G,B,Any}) where {V,G,B}
+                $Blade{V,G,B}($d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(B))*value(b)))
+            end
+        end
     end
     for Chain ∈ MSC
-        @eval $nv(a::$Chain) = $d(~a,value(abs2(a)))
+        @eval function $nv(a::$Chain)
+            r,v,q = ~a,abs2(a),diffvars(vectorspace(a))≠0
+            q&&typeof(v)<:TensorMixed ? Expr(:call,$(QuoteNode(d)),r,v) : $d(r,value(v))
+        end
     end
     for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
         @eval begin
