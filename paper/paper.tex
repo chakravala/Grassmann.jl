@@ -6,7 +6,7 @@
 %\usepackage[utf8]{inputenc}
 
 \usepackage{graphicx}
-\usepackage[left=1.00in, right=1.00in, top=1.00in, bottom=1.00in]{geometry}
+%\usepackage[left=1.00in, right=1.00in, top=1.00in, bottom=1.00in]{geometry}
 
 \input{mathsym}
 
@@ -22,7 +22,7 @@
 %\newtheorem*{remark}{Remark}
 %\newtheorem{example}{Example}
 %\newtheorem*{recall}{Recall}
-%\newtheorem*{note}{Note}
+%\newtheorem*{remark}{Note}
 %\newtheorem*{observe}{Observe}
 %\newtheorem*{question}{\underline{Question}}
 %\newtheorem*{fact}{Fact}
@@ -38,7 +38,7 @@
 \DeclareMathOperator*{\obackslash}{\text{\reflectbox{$\oslash$}}}
 
 \author{Michael Reed (Crucial Flow Research)}
-\title{Differential geometric algebra using Leibniz, Grassmann}
+\title{Differential geometric algebra with Leibniz and Grassmann}
 \date{July 25th, 2019}
 
 \begin{document}
@@ -52,157 +52,170 @@
 	package provides tools for computations based on multi-linear algebra and spin groups using the extended geometric algebra known as Grassmann-Clifford-Hestenes-Leibniz algebra.
 	The primary operations are
 	outer, regressive, inner, geometric, and cross products along with the Hodge star, adjoint, and multivector reversal operations. 
-	The kernelized operations are built on composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices and staged caching / precompilation. Code generation enables making concise and extensible definitions.
+	The kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise and also extensible definitions.
 	The \textit{DirectSum.jl}
-	multivector parametric type polymorphism is based on various tangent vector spaces and conformal projective geometry.
-	Additionally, interoperability between different sub-algebras is enabled by \textit{AbstractTensors.jl},
+	multivector parametric type polymorphism is based on tangent vector spaces and conformal projective geometry.
+	Additionally, universal interoperability between different sub-algebras is enabled by \textit{AbstractTensors.jl},
 	on which the type system is built.
 	%\headingtable
 \end{abstract}
 
-In this paper, the mathematical foundations and some of the nuances in the definitions specific to the \textit{Grassmann.jl} implementation are concisely described.
-The \textit{Grassmann.jl} package and its accompanying support packages provide an extensible platform for computing with geometric algebra at high dimensions. 
-The design is based on the \verb`TensorAlgebra` abstract type system interoperability from \textit{AbstractTensors.jl} with a \verb`VectorBundle` type parameter from \textit{DirectSum.jl}. Abstract vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
+Mathematical foundations and some of the nuances in the definitions specific to the \textit{Grassmann.jl} implementation are concisely described, along with the accompanying support packages that provide an extensible platform for computing with geometric algebra at high dimensions.
+The design is based on the \verb`TensorAlgebra` abstract type interoperability from \textit{AbstractTensors.jl} with a \verb`VectorBundle` type parameter from \textit{DirectSum.jl}. Abstract vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
 
 \begin{itemize}
 	\item \textbf{DirectSum.jl}: Abstract tangent bundle vector space types (unions, intersections, sums, etc.)
 	\item \textbf{AbstractTensors.jl}: Tensor algebra abstract type interoperability with vector bundle parameter	
-	\item \textbf{Grassmann.jl}: $\langle$Grassmann-Clifford-Hestenes-Leibniz$\rangle$ differential conformal geometric algebra
-	\item \textbf{Leibniz.jl}: Operator algebras for mixed-symmetry multivariate differentiable tensor fields
+	\item \textbf{Grassmann.jl}: $\langle$Leibniz+Grassmann-Clifford-Hestenes$\rangle$ differential conformal geometric algebra
+	\item \textbf{Leibniz.jl}: Derivation operator algebras for tensor fields
 	\item \textbf{Reduce.jl}: Symbolic parser generator for Julia expressions using REDUCE algebra term rewriter
 \end{itemize}
 
-The nature of the geometric algebra code generation enables one to easily extend the abstract product operations to any specific number field type (including Leibniz differentials with \textit{Leibniz.jl} or symbolic coefficients with \textit{Reduce.jl}), by taking advantage of Julia's type system. With the type system, it is possible to construct mixed tensor products with their coefficients, e.g. bivector elements of Lie groups \cite{hestenes}\cite{shahshahani}.
+The nature of the geometric algebra code generation enables one to easily extend the abstract product operations to any specific number field type (including Leibniz differentials with \textit{Leibniz.jl} or symbolic coefficients with \textit{Reduce.jl}), by making use of Julia's type system. Mixed tensor products with their coefficients are constructed from these operations to work with bivector elements of Lie groups \cite{hestenes}\cite{shahshahani}.
 
 \section{Direct sum parametric type polymorphism}
 
-The \textit{DirectSum.jl} package is a work in progress providing the necessary tools to work with arbitrary dual \verb`VectorBundle` elements with optional origin. Due to the parametric type system for the generating \verb`VectorBundle`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
+The \textit{DirectSum.jl} package is a work in progress providing the necessary tools to work with an arbitrary \verb`Manifold` specified by an encoding. Due to the parametric type system for the generating \verb`VectorBundle`, the Julia compiler can fully pre-allocate and often cache values efficiently ahead of run-time.
 Although intended for use with the \textit{Grassmann.jl} package, \verb`DirectSum` can be used independently.
 
-\begin{definition}[Vector bundle of submanifold]
-	Let $T^\mu V\in\text{Vect}_{\mb K}$ be a \verb`VectorBundle<:Manifold` of rank $n$,
+\begin{definition}[Vector bundle of submanifolds]
+	Let $M = T^\mu V\in\text{Vect}_{\mb K}$ be a \verb`VectorBundle<:Manifold` of rank $n$,
 	\begin{align*}
-		T^\mu V &= (n,\mb P,g,\mu), & n,\mu &\in\mb N, & \mb P &\subseteq\gen{v_\infty,v_\emptyset}, & g &:V\times V\ra\mb K
+		T^\mu V &= (n,\mb P,g,\nu,\mu), & \mb P &\subseteq\gen{v_\infty,v_\emptyset}, & g &:V\times V\ra\mb K
 	\end{align*}
-	The type \verb+VectorBundle{n,+$\mb P$\verb+,g,+$\mu$\verb+}+ uses \textit{byte-encoded} data available at pre-compilation, where
+	The type \verb+VectorBundle{n,+$\mb P$\verb+,g,+$\nu,\mu$\verb+}+ uses \textit{byte-encoded} data available at pre-compilation, where
 	$\mb P$ specifies the null-basis from the projective split,
 	$g$ is a bilinear form that specifies the metric of the space,
-	and $\mu$ is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials).
-
-	The dual space functor $(\cdot)':\text{Vect}_{\mb K}^\text{op}\ra\text{Vect}_{\mb K}$ 
-	is an involution which toggles a dual vector space with inverted signature with property $V' = \text{Hom}(V,\mb K)$ and having the \verb`Basis` generators
-	$$\gen{v_1,\dots,v_n,\partial_1,\dots,\partial_n}=T^\mu V\leftrightarrow T^\mu V' = \gen{w_1,\dots,w_n,\epsilon_1,\dots,\epsilon_n}.$$
-
+	and $\mu$ is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, $\nu$ is the number of tangent variables.
+\end{definition}
 	The metric signature of the \verb+Basis{V,1}+ elements of a vector space \verb+V+ can be specified with the \verb+V"..."+ constructor by using \verb-+- and \verb+-+ to specify whether the \verb+Basis{V,1}+ element of the corresponding index squares to \verb`+1` or \verb`-1`.
 	For example, \verb`V"+++"` constructs a positive definite 3-dimensional \verb`VectorBundle`.
-	It is possible to specify an arbitrary \verb`DiagonalForm` for the basis elements with \verb`V"0,0,0"` or \verb`V"-1,1,1,1"`, although the $\pm$ format has better performance.
-	Further development of the \textit{DirectSum.jl} will result in more metric types.
+	It is also possible to specify an arbitrary \verb`DiagonalForm` having numerical values for the basis with \verb`V"0,0,0"` or \verb`V"-1,1,1,1"`, although the $\pm$ format provides better performance.
+	Further development will result in more metric types.
+
+	The \verb`tangent(V,`$\mu$\verb`,`$\nu$\verb`)` map can be used to specify $\mu$ and $\nu$.
+
+	The dual space functor $(\cdot)':\text{Vect}_{\mb K}^\text{op}\ra\text{Vect}_{\mb K}$
+	is an involution which toggles a dual vector space with inverted signature with property $V' = \text{Hom}(V,\mb K)$ and having \verb`Basis` generators
+	$$\gen{v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu}=M\leftrightarrow M' = \gen{w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu}$$
 
 	The direct sum operator \verb`⊕` can be used to join spaces (alternatively \verb`+`).
 	The direct sum of a \verb`VectorBundle` and its dual \verb`V⊕V'` represents the full mother space \verb`V*`.
-	Additionally to the direct-sum operation, several other operations are supported, such as $\cup,\cap,\subseteq,\supseteq$ for set operations.
-	Due to the design of the \verb`VectorBundle` type system, these operations make code optimization easier at compile-time by evaluating the bit parameters.
+	In addition to the direct-sum operation, several other operations exist, such as $\cup,\cap,\subseteq,\supseteq$ for set operations.
+	Due to the design of the \verb`VectorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
 	$$ \bigcup T^{\mu_i}V_i = \plr{|\mb P|+\max\set{n_i-|\mb P_i|}_i,\, \bigcup \mb P_i,\, \cup g_i,\, \max\set{\mu_i}_i} $$
 	$$ \bigoplus T^{\mu_i}V_i = \plr{\mlr{\mb P}+\sum (n_i-|\mb P_i|),\, \bigcup \mb P_i,\, \oplus_i g_i,\,\max\set{\mu_i}_i} $$
-\end{definition}
+	These are roughly the formulas used for those operations.
+%\end{definition}
 \begin{remark}
-	Although some of the type operations like $\bigcup$ and $\bigoplus$ are similar and sometimes result in equal values, the union and sum are entirely different operations in general. The \verb`tangent` map is used for specifying $\mu$.
+	Although some type operations like $\bigcup$ and $\bigoplus$ are similar and sometimes result in equal values, the union and sum are entirely different operations in general.
 \end{remark}
 
-For any \verb+SubManifold{m,V,s} where+ $\set{n\geq m\in\mb N,V\in\text{Vect}_{\mb K},s\in V}$ we can define the orthogonal space $Z$:
+Calling manifolds with sets of indices constructs the subspace representations.
+Given \verb`M(s::Int...)` one can encode \verb+SubManifold{+$|s|,M,s$\verb+}+ with induced orthogonal space $Z$:
 $$T^eV \subset T^\mu W \iff \exists Z\in\text{Vect}_{\mb K}(T^e(V\oplus Z) = T^{e\leq \mu}W,\,V\perp Z),$$
-such that computing unions of sub-manifolds is done by inspecting the parameter $s\in V\subseteq W$ and $s\notin Z$.
+such that computing unions of submanifolds is done by inspecting the parameter $s\in V\subseteq W$ and $s\notin Z$.
 
-\section{Tensor basis equivalence classes of Leibniz and Grassmann}
+\section{Tensor basis equivalence classes}% of Leibniz and Grassmann}
 
 The \verb`AbstractTensors` package is intended for universal interoperability of the abstract \verb`TensorAlgebra` type system.
-All \verb`TensorAlgebra{V}` subtypes contain \verb`V` in their type parameters, used to store a \verb`VectorBundle` value obtained from the \textit{DirectSum.jl} package.
-By itself, this package does not impose any structure or specifications on the \verb`TensorAlgebra{V}` subtypes and elements, aside from requiring $V$ to be a \verb`VectorBundle`.
-This means that different packages can create tensor types with a common underlying \verb`VectorBundle` structure.
+All \verb`TensorAlgebra{V}` subtypes have type parameter \verb`V`, used to store a \verb`VectorBundle` value obtained from \textit{DirectSum.jl}.
+By itself, this package does not impose any specifications or structure on the \verb`TensorAlgebra{V}` subtypes and elements, aside from requiring $V$ to be a \verb`VectorBundle`.
+This means that different packages can create tensor types having a common underlying \verb`VectorBundle` structure.
 
 \begin{definition}
 	Let $V\in\text{Vect}_{\mb k}$ be a \verb`VectorBundle` with dual space $V'$ and the basis elements $w_k:V\ra\mb K$, then for all $x\in V,c\in\mb K$ the properties $(w_i+w_j)(x) = w_i(x)+w_j(x)$ and $(cw_k)(x) = cw_k(x)$ hold.
-	An element of a mixed-symmetry \verb`TensorAlgebra{V}` is a multilinear mapping formally constructed by taking the tensor products of linear and multilinear maps,
+	An element of a mixed-symmetry \verb`TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
 	$(\bigotimes_k \omega_k)(v_1,\dots,v_{\sum_k p_k}) = \prod_k \omega_k(v_1,\dots,v_{p_k})$.
 \end{definition}
 \begin{definition}[Mixed-symmetry basis]
-	Combining linear basis generating elements with each other using the multi-linear tensor product yields a graded (decomposable) tensor \verb`Basis` $\langle w_{p_1}\otimes\dots\otimes w_{p_k}\rangle_k$, where the \verb`grade` $k$ is determined by the number of basis elements in the tensor product decomposition.
-	The algebra is partitioned into symmetric and anti-symmetric tensor equivalence classes.
-	For any pair of tensors, either
+	Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor \verb`Basis` $\langle w_{p_1}\otimes\dots\otimes w_{p_k}\rangle_k$, where \verb`grade` $k$ is determined by the number of $w_i$ basis elements in its tensor product decomposition.
+	The algebra partitions into symmetric and anti-symmetric tensor equivalence classes.
+	For any pair, %of tensors, either
 	\begin{align*}
-		&\us{\text{anti-symmetric}}{\omega\otimes\eta = -\eta\otimes\omega}, & &\us{\text{symmetric}}{\omega\otimes\eta = \eta\otimes\omega}.
+		&\us{\text{anti-symmetric}}{\omega\otimes\eta = -\eta\otimes\omega} & \text{or} &  &\us{\text{symmetric}}{\omega\otimes\eta = \eta\otimes\omega}.
 	\end{align*}
-	Typically the $k$ in $\plr{\partial_{p_1}\otimes\cdots\otimes\partial_{p_k}}^{(k)}$ is referred to as the \verb`order` of the element for fully symmetric tensors, which is tracked separately from the \verb`grade` such that $\partial_k\gen{w_j}_r = \gen{\partial_kw_j}_r$ and $(\partial_k)^{(r)}\omega_j = (\partial_kw_j)^{(r)}$.
-	Hence, there is a partitioning into \verb`even` grade components $\omega_+$ and \verb`odd` grade components $\omega_-$ with $\omega_++\omega_-=\omega$.
+	Typically the $k$ in a product $\plr{\partial_{p_1}\otimes\cdots\otimes\partial_{p_k}}^{(k)}$ is referred to as the \verb`order` of the element if it is fully symmetric, which is overall tracked separately from the \verb`grade` such that $\partial_k\gen{w_j}_r = \gen{\partial_kw_j}_r$ and $(\partial_k)^{(r)}\omega_j = (\partial_kw_j)^{(r)}$.
+	Hence, there is a partitioning into \verb`even` grade components $\omega_+$ and \verb`odd` grade components $\omega_-$ such that $\omega_++\omega_-=\omega$.
 \end{definition}
 \begin{remark}
 	Observe that the anti-symmetric property implies that $\omega\otimes\omega=0$, while the symmetric property neither implies nor denies such a property.
-	In 1862, Grassmann remarked \cite{grassmann-2} that the symmetric algebra of functions is by far more complicated than his anti-symmetric exterior algebra.
-	The first part of the book focused on anti-symmetric exterior algebra, while the more complex symmetric function algebra of Leibniz was subject of the second part of the book.
+	Grassmann remarked \cite{grassmann-2} in 1862 that the symmetric algebra of functions is by far more complicated than his anti-symmetric exterior algebra.
+	The first part of the book focused on anti-symmetric exterior algebra, while the more complex symmetric function algebra of Leibniz was subject of the second multivariable part of the book.
 	Elements $\omega_k$ in the space $\Lambda V$ of anti-symmetric algebra are often studied as unit quantum state vectors in a unitary probability space, where $\sum_k\omega_k\neq\bigotimes_k\omega_k$ is entanglement.
 \end{remark}
 \begin{definition}
-	The Grassmann anti-symmetric exterior basis is denoted by $v_{i_1\dots i_g}\in\Lambda_gV$ with its dual basis $w^{i_1\cdots i_g}\in\Lambda^gV$, while the Leibniz symmetric basis will be $\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L_gV$ with $\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV$ dual elements.
+	The Grassmann anti-symmetric exterior basis is denoted by $v_{i_1\dots i_g}\in\Lambda_gV$ with its dual $w^{i_1\cdots i_g}\in\Lambda^gV$, while the Leibniz symmetric basis will be $\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L_gV$ with $\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV$ dual elements.
 \end{definition}
-Higher-order composite tensor elements will be denoted by an oriented-multi-set $X\in\text{OMSet}$ such that $w_X = \bigotimes_k w_{i_k}^{\otimes\mu_k}$ with $X = \plr{(i_1,\mu_1),\dots,(i_g,\mu_g)}$ and $|X|=\sum_k\mu_k$ is \verb`grade`+\verb`order`.
+Higher-order composite tensor elements will be denoted by an oriented-multi-set $X$ %\in\text{OMSet}$
+such that $w_X = \bigotimes_k w_{i_k}^{\otimes\mu_k}$ with $X = \plr{(i_1,\mu_1),\dots,(i_g,\mu_g)}$ and $|X|=\sum_k\mu_k$ is \verb`grade`,$\,$ \verb`order`.
 %There are two orientations and higher multiplicities result in zero for anti-symmetric tensors denoted by indices $\Lambda X\subseteq\Lambda V$, so the only interesting multiplicity is $\mu_k\equiv 1$.
-Indices $\Lambda X\subseteq\Lambda V$ that are anti-symmetric have two orientations and higher multiplicities of those result in zero values, so the only interesting multiplicity is $\mu_k\equiv 1$.
-Symmetric tensors have an ambiguous multiplicity of nilpotence; decide that $\epsilon_k^{\mu+1}=0$, so $\mu_k\leq\mu$ can be non-trivial, negative, or possibly unbounded.
+Anti-symmetric ndices $\Lambda X\subseteq\Lambda V$ have two orientations and higher multiplicities of them result in zero values, so the only interesting multiplicity is $\mu_k\equiv 1$.
+Symmetric tensors have an ambiguous multiplicity of nilpotence; decide that $\epsilon_k^{\mu+1}=0$, so $\mu_k\leq\mu$ can be non-trivial, negative, or unbounded.
+
 Grassmann's exterior algebra is fundamentally simpler in structure than the symmetric generated algebra, as it doesn't invoke the properties of multi-sets.
-The exterior Grassmann index algebra is related to the algebra of oriented sets and the Leibniz symmetric algebra is that of unoriented multi-sets. 
+The exterior Grassmann algebra is related to the algebra of oriented sets and the Leibniz symmetric algebra is that of unoriented multi-sets.
 Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal \verb`grade` elements is an oriented \verb`Chain` and with mixed \verb`grade` it is a \verb`MultiVector`.
-Thus, various standard operations on the oriented multi-sets are possible including $\cup,\cap,\oplus$ and most importantly the $X\ominus Y=(X\cup Y)\bs(X\cap Y)$ symmetric difference operation $\veebar$.
+Thus, various standard operations on the oriented multi-sets are possible including $\cup,\cap,\oplus$ and most importantly the index operation $X\ominus Y=(X\cup Y)\bs(X\cap Y)$, which is symmetric difference operation $\veebar$.
 
 In order to work with a \verb`TensorAlgebra{V}`, it is necessary for some computations to be cached. This is usually done automatically when accessed.
-The staging of the precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
-The parametric type formalism in \verb`Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups.
-It is possible to reach \verb`Basis` elements having up to $n=62$ indices, % with \verb`TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
+The parametric type formalism in \verb`Grassmann` is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.
+
+It is possible to reach \verb`Basis` elements with up to $n=62$ indices, % with \verb`TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 requiring full alpha-numeric labeling with lower-case and capital letters. 
-However, Julia is only able to allocate full \verb`MultiVector` for $n\leq22$, with only sparse operations available at higher dimension form there.
+Full \verb`MultiVector` allocations are only possible for $n\leq22$, but sparse operations are also available at higher dimensions.
 While \verb`Grassmann.Algebra{V}` is a container for the \verb`TensorAlgebra` generators of $V$, the \verb`Grassmann.Algebra` is only cached for $n\leq8$.
-For a \verb`VectorBundle{n}` of dimension $8<n\leq22$, the \verb`Grassmann.SparseAlgebra` type is used.
-To reach higher dimensions, for $n>22$ the \verb`Grassmann.ExtendedAlgebra` type is used.
+For the range of dimensions $8<n\leq22$, the \verb`Grassmann.SparseAlgebra` type is used.
+To reach higher dimensions with $n>22$, the \verb`Grassmann.ExtendedAlgebra` type is used.
 
 \section{Geometric algebraic product structure}
 
-While oriented sets of the Grassmann exterior algebra are simpler, the parity \cite{artin} of $(-1)^\Pi$ is factored into transposition compositions when interchanging the ordering of the tensor product argument permutation.
-Alternatively, symmetric algebra does not need to track the parity but does have multiplicity in its indices.
-Symmetric differential function algebra of Leibniz trivializes the orientation property of index multi-sets, while Grassmann's exterior algebra is partitioned into two oriented equivalence classes by anti-symmetry.
-The full tensor algebra can be sub-partitioned into equivalence classes in multiple ways based on the composite symmetry, grade, and metric signature properties.
+While oriented sets of the Grassmann exterior algebra are simpler, the parity of $(-1)^\Pi$ is factored into transposition compositions when interchanging ordering of the tensor product argument permutations \cite{artin}.
+However, symmetrical algebra does not need to track this parity but has higher multiplicities in its indices.
+Symmetric differential function algebra of Leibniz trivializes the orientation into a single class of index multi-sets, while Grassmann's exterior algebra is partitioned into two oriented equivalence classes by anti-symmetry.
+The full tensor algebra can be sub-partitioned into equivalence classes in multiple ways based on element symmetry, grade, and metric signature composite properties.
 %It can be said that the Leibniz symmetry class has a neutral orientation, while Grassmann's anti-symmetric class is partitinoned into positive and negative orientation.
-Both of the symmetry classes can be characterized by the same geometric product, which is written as multiplication but explicitly denoted by $\ominus$ for clarity here.
+Both of the symmetry classes can be characterized by the same geometric product, which is typically written as multiplication but explicitly denoted by $\ominus$ for clarity here.
 %It is possible to express this universal product in terms of ordered-multi-set operations.
 
 \begin{definition}
 	The \textit{geometric algebraic product} is the $\Pi$ oriented symmetric difference operator $\ominus$ (weighted by the bilinear form $g$) and multi-set sum $\oplus$ applied to multilinear tensor products $\otimes$ in a single operation:
-	$$ \omega_X\ominus \eta_Y = \ub{\text{$\Lambda^1$-anti-symmetric, $\Lambda^g$-mixed-symmetry}}{(-1)^{\Pi(\Lambda X,\Lambda Y)}\det\mat{g_{\Lambda(X\cap Y)}} (\bigotimes_{k\in \Lambda(X\ominus Y)} w^{i_k})}\otimes \ub{\text{$L^g$-symmetric}}{(\bigotimes_{k\in L(X\oplus Y)} \epsilon_{i_k}^{\otimes\mu_k})}$$
+	$ \omega_X\ominus \eta_Y = $
+	%$$\ub{\text{$\Lambda^1$-anti-symmetric, $\Lambda^g$-mixed-symmetry}}{(-1)^{\Pi(X,Y)}\det\mat{g_{\Lambda(X\cap Y)}} (\bigotimes_{k\in \Lambda(X\ominus Y)} w^{i_k})} \otimes \ub{\text{$L^g$-symmetric}}{(\bigotimes_{k\in L(X\oplus Y)} \epsilon_{i_k}^{\otimes\mu_k})}$$
+	$$\ub{\text{$\Lambda^1$-anti-symmetric, $\Lambda^g$-mixed-symmetry}}{\ob{\text{orient parity}}{(-1)^{\Pi(X,Y)}}\ob{\text{intersect metric}}{\det\mat{g_{\Lambda(X\cap Y)}}} (\ob{(X\cup Y)\bs(X\cap Y)}{\bigotimes_{k\in \Lambda(X\ominus Y)} w^{i_k}}})\otimes (\ub{\text{$L^g$-symmetric}}{\ob{\text{multi-set sum}}{\bigotimes_{k\in L(X\oplus Y)} \epsilon_{i_k}^{\otimes\mu_k}}})$$
 \end{definition}
 
-\begin{note}
-	The product symbol $\ominus$ will be used to expliclity denote usage of the geometric algebraic product, altough the standard number product \verb`*` notation could also be used. This choice is to help emphasize that the geometric algebraic product is characterized by symmetric differencing of anti-symmetric indices.
-\end{note}
+\begin{remark}
+	The product symbol $\ominus$ will be used to denote explicitly usage of the geometric algebraic product, altough the standard number product \verb`*` notation could also be used.
+	The $\ominus$ choice helps emphasize that the geometric algebraic product is characterized by symmetric differencing of anti-symmetric indices.
+\end{remark}
 
 \begin{definition}
-	The symmetry properties of the tensor algebra can be characterized in terms of the geometric product by two averaging operations, which are the symmetrization $\odot$ and anti-symmetrization $\boxtimes$ operators:
+	Symmetry properties of the tensor algebra can be characterized in terms of the geometric product by two averaging operations, which are the symmetrization $\odot$ and anti-symmetrization $\boxtimes$ operators:
 	\begin{align*}
 		\bigodot_{k=1}^j \omega_k &= \frac1{j!}\sum_{\sigma\in S_P}\bigominus_k\omega_{\sigma(k)}, &
-		\bigboxtimes_{k=1}^j \omega_k &= \frac1{j!}\sum_{\sigma\in S_P}(-1)^{\Pi(\sigma)}\bigominus_k\omega_{\sigma(k)}
+		\bigboxtimes_{k=1}^j \omega_k &= \sum_{\sigma\in S_P}\frac{(-1)^{\Pi(\sigma)}}{j!}\bigominus_k\omega_{\sigma(k)}
 	\end{align*}
 \end{definition}
 These products satisfy various \verb`MultiVector` properties, including the associative and distributive laws.
 
 \begin{definition}[Exterior product]
-	Let $w_k:V^{p_k}\times V'^{q_k}\ra\mb K$ such that $k\in\Lambda^{p_k}V$, then for all $\sigma\in S_{\sum p_k}$
-	$$ (-1)^{\Pi(\sigma)}(\bigotimes_k \omega_k)(v_{\sigma(1)},\dots,v_{\sigma(\sum p_k)}) \sim \bigwedge_k \omega_k(v_{1},\dots,v_{p_k}) \iff \bigominus_k\omega_k = \bigboxtimes_k\omega_k $$
-	there is an equivalence relation $\sim$ which holds. It has become typical to use the $\wedge$ product symbol to denote products of such elements as $\bigwedge\Lambda V \equiv \bigotimes\Lambda V/\sim$ modulo anti-symmetrization.
+	%Let $w_k:V^{p_k}\times V'^{q_k}\ra\mb K$ such that
+	Let $w_k\in\Lambda^{p_k}V$, then for all $\sigma\in S_{\sum p_k}$ define an equivalence relation $\sim$ such that
+	$$ (-1)^{\Pi(\sigma)}(\bigotimes_k \omega_k)(v_{\sigma(1)},\dots,v_{\sigma(\sum p_k)}) \sim \bigwedge_k \omega_k(v_{1},\dots,v_{p_k}) $$
+	if and only if $ \bigominus_k\omega_k = \bigboxtimes_k\omega_k$ holds.
+	%there is an equivalence relation $\sim$ which holds.
+	It has become typical to use the $\wedge$ product symbol to denote products of such elements as $\bigwedge\Lambda V \equiv \bigotimes\Lambda V/\sim$ modulo anti-symmetrization.
 \end{definition}
 
-\begin{definition}[Symmetric tensor of Leibniz differentials]
-	Let $\partial_k = \frac\partial{\partial x_k}\in L_gV\,$ Leibnizian symmetric tensors, then there is an equivalence relation $\asymp$ which holds for each $\sigma\in S_p$ along with each derivation property,
+\begin{definition}[Symmetric Leibniz differentials]
+	Let $\partial_k = \frac\partial{\partial x_k}\in L_gV\,$ be Leibnizian symmetric tensors, then there is an equivalence relation $\asymp$ which holds for each $\sigma\in S_p$
 	\begin{align*}
-		(\bigotimes_k \partial_{\sigma(k)})\omega &\asymp (\partial_p \circ \dots\circ  \partial_1)\omega \iff \bigominus_k\partial_k = \bigodot_k\partial_k, & \partial_k(\omega\eta) &= \partial_k(\omega)\eta + \omega\partial_k(\eta).
+		(\bigotimes_k \partial_{\sigma(k)})\omega &\asymp (\partial_p \circ \dots\circ  \partial_1)\omega \iff \bigominus_k\partial_k = \bigodot_k\partial_k,
 	\end{align*}
+	along with each derivation $\partial_k(\omega\eta) = \partial_k(\omega)\eta + \omega\partial_k(\eta)$.
 \end{definition}
 
 %\subsubsection{Interoperability for TensorAlgebra}
@@ -212,7 +225,7 @@ These products satisfy various \verb`MultiVector` properties, including the asso
 %The key to making the whole interoperability work is that each \verb`TensorAlgebra` subtype shares a \verb`VectorBundle` parameter (with all \verb`isbitstype` parameters), which contains all the info needed at compile time to make decisions about conversions. So other packages need only use the vector space information to decide on how to convert based on the implementation of a type. If external methods are needed, they can be loaded by \verb`Requires` when making a separate package with \verb`TensorAlgebra` interoperability.
 
 Since \verb`VectorBundle` choices are fundamental to \verb`TensorAlgebra` operations, the universal interoperability between \verb`TensorAlgebra{V}` elements with different associated \verb`VectorBundle` choices is naturally realized by applying the \verb`union` morphism to type operations.
-For example, $\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra \Lambda^{\sum_kp_k}\bigcup_k V_k$. 
+For example, $$\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra \Lambda^{\sum_kp_k}\bigcup_k V_k.$$
 % where $\bigwedge \Lambda V \equiv \bigotimes \Lambda V/\sim$ is made interoperable by $\cup$.
 
 \begin{definition}[Reverse, involute, conjugate]
@@ -220,26 +233,31 @@ For example, $\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra \
 \end{definition}
 
 \begin{definition}[Reversed product]
-	The \textit{reversed geometric product} $\ast$ yields a Hilbert space structure:
+	Define the index reversed product $\ast$ which yields a Hilbert space structure:
 	\begin{align*}
-		\omega\ast\eta &= \tilde\omega\ominus\eta, & \omega\ast'\eta &= \omega\ominus\tilde\eta, & |\omega|^2 &= \omega\ast\omega, & |\omega| &= \sqrt{\omega\ast\omega}, & ||\omega|| = \text{Euclidean }|\omega|
+		\omega\ast\eta &= \tilde\omega\ominus\eta, & \text{or} & & \omega\ast'\eta &= \omega\ominus\tilde\eta,
+	\end{align*}
+	\begin{align*}
+		|\omega|^2 &= \omega\ast\omega, & |\omega| &= \sqrt{\omega\ast\omega}, & ||\omega|| = \text{Euclidean }|\omega|.
 	\end{align*}
 \end{definition}
 \begin{definition}[Sandwich product]
-	The sandwich product is defined as $\eta\oslash\omega = (\eta\ast\omega)\ominus\eta$. Alternatively, the reversed definition is $\eta\obackslash\omega = \eta\ominus(\omega\ast'\eta)$ or in Julia $\eta\,$\verb`>>>`$\,\omega$, which is often found in literature.
+	This product can be defined as $\eta\oslash\omega = (\eta\ast\omega)\ominus\eta$. Alternatively, the reversed definition is $\eta\obackslash\omega = \eta\ominus(\omega\ast'\eta)$ or in Julia $\eta\,$\verb`>>>`$\,\omega$, which is often found in literature.
 \end{definition}
-\begin{note}
-	Observe that $\ast$ and $\ast'$ could both be used in \verb`abs`, \verb`abs2`, and \verb`norm`; however they are different products.
+\begin{remark}
+	Observe that $\ast$ and $\ast'$ could both be exchanged in \verb`abs`, \verb`abs2`, and \verb`norm`; however, these are different products.
 	The \textit{scalar product} $\circledast$ is the scalar part of the reversed product $\eta\circledast\omega = \gen{\eta\ast\omega}$.
 	In general $\sqrt\omega = e^{(\log\omega)/2}$ is valid for \verb`inv`ertible multivectors $\omega\inv = \omega\ast|\omega|^{-2} = \tilde\omega/|\omega|^2$, where $\eta/\omega = \eta\ominus\omega\inv = \eta\ominus(\tilde\omega/(\omega\oslash1))$.
-\end{note}
-\begin{remark}
-	It is overall more simple to use the $\ast$ and $\oslash$ operations instead of the $\ast'$ and $\obackslash$ variations.
+	Observe that it is overall more simple and consistent to use the $\ast$ and $\oslash$ operations instead of the $\ast'$ and $\obackslash$ variations.
 \end{remark}
-The \verb`real` part $\Re\omega = (\omega+\tilde\omega)/2$ is defined by the property $|\Re\omega|^2 = (\Re\omega)^{\ominus2}$ and the \verb`imag` part $\Im\omega = (\omega-\tilde\omega)/2$ by $|\Im\omega|^2 = -(\Im\omega)^{\ominus2}$, such that for any multivector $\omega = \Re\omega+\Im\omega$ has real and imaginary partitioned by 
-$$\gen{\tilde\omega}_r/\mlr{\gen{\omega}_r} = \sqrt{\gen{\tilde\omega}_r^2/\big|\gen{\omega}_r\big|^2} = \sqrt{\gen{\omega}_r\ast\gen{\omega}_r\inv} = \sqrt{\gen{\tilde\omega}_r/\gen{\omega}_r}=\sqrt{(-1)^{(r-1)r/2}} \in\set{1,\sqrt{-1}},$$
+The \verb`real` part $\Re\omega = (\omega+\tilde\omega)/2$ is defined by $|\Re\omega|^2 = (\Re\omega)^{\ominus2}$ and the \verb`imag` part $\Im\omega = (\omega-\tilde\omega)/2$ by $|\Im\omega|^2 = -(\Im\omega)^{\ominus2}$, such that for any multivector $\omega = \Re\omega+\Im\omega$ has real and imaginary partitioned by
+\begin{align*}
+	\gen{\tilde\omega}_r/\mlr{\gen{\omega}_r} &= \sqrt{\gen{\tilde\omega}_r^2/\big|\gen{\omega}_r\big|^2} = \sqrt{\gen{\omega}_r\ast\gen{\omega}_r\inv} \\
+	&= \sqrt{\gen{\tilde\omega}_r/\gen{\omega}_r}=\sqrt{(-1)^{(r-1)r/2}} \in\set{1,\sqrt{-1}},
+\end{align*}
 which is a unique partitioning completely independent of the metric space and manifold of the algebra \cite{chappell-iqbal-gunn-abbott}.
-$$ \omega\ast\omega = |\omega|^2 = |\Re\omega+\Im\omega|^2 = |\Re\omega|^2 + |\Im\omega|^2 + \Re\omega\ast\Im\omega + \Im\omega\ast\Re\omega = |\Re\omega|^2+|\Im\omega|^2 + 2\Re(\Re\omega\ast\Im\omega) $$
+$$ \omega\ast\omega = |\omega|^2 = |\Re\omega+\Im\omega|^2 = %|\Re\omega|^2 + |\Im\omega|^2 + \Re\omega\ast\Im\omega + \Im\omega\ast\Re\omega =
+|\Re\omega|^2+|\Im\omega|^2 + 2\Re(\Re\omega\ast\Im\omega) $$
 The \verb`radial` and \verb`angular` components in a multivector exponential are partitioned by the parity of their metric.
 
 The Grassmann \verb`Basis` elements $v_k\in\Lambda_1V$ and $w^k\in\Lambda^1V$ are linearly independent vector and covector elements of $V$, while the Leibniz \verb`Operator` elements $\partial_k\in L_1V$ are partial tangent derivations and $\epsilon_k(x)\in L^1V$ are dependent functions of the \verb`tangent` manifold. 
@@ -248,11 +266,11 @@ Higher \verb`grade` elements of $\Lambda V$ correspond to \verb`SubManifold` sub
 %\subsection{Grassmann's duality via Hodge complement}
 
 A universal unit volume element can be specified in terms of \verb`LinearAlgebra.UniformScaling`, which is independent of $V$ and has its interpretation only instantiated by the context of the \verb`TensorAlgebra{V}` element being operated on.
-The universal interoperability of \verb`LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the \verb`VectorBundle` form of any other \verb`TensorAlgebra` element is handled globally. 
-This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseudoscalar element defined at every point $x$ of the manifold, which is mathematically denoted by $I=I(x)$ and specified by the $g(x)$ bilinear tensor field of $TM$.
+Universal interoperability of \verb`LinearAlgebra.UniformScaling` as the pseudoscalar element which takes on the \verb`VectorBundle` form of any other \verb`TensorAlgebra` element is handled globally.
+This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseudoscalar element defined at every point $x$ of a \verb`Manifold`, which is mathematically denoted by $I=I(x)$ and specified by the $g(x)$ bilinear tensor field of $TM$.
 
-\begin{definition}[Grassmann-Poincare-Hodge complement]
-	Let $\star\gen{\omega}_p = \gen{\omega}_p\ast I$, %= (-1)^{\frac{p(p+1)}2+\us k\sum i_k}\det\mat{ g_{i_ki_k}}\bigwedge_{m\in J(\omega)} w_m
+\begin{definition}[Poincare-Hodge dual complement]
+	Let $\star\gen{\omega}_p = \gen{\omega}_p\ast I = \gen{\tilde\omega}_p\ominus I$, %= (-1)^{\frac{p(p+1)}2+\us k\sum i_k}\det\mat{ g_{i_ki_k}}\bigwedge_{m\in J(\omega)} w_m
 	 then $\star : \Lambda^pV\ra\Lambda^{n-p}V$.
 \end{definition}
 \begin{remark}
@@ -262,35 +280,36 @@ This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseu
 \section{Leibniz operators and Grassmann's Hodge-DeRahm theory}
 
 John Browne has discussed the Grassmann duality principle in book \cite{browne}, stating that every theorem (involving exterior and regressive products) can be translated into its dual theorem by replacing the $\wedge$ and $\vee$ operations and applying \textit{Poincare duality} (homology).
-First applying this Grassmann duality principle to the $\wedge$ product alone, let $\set{\omega_k}_k\in\Lambda^{p_k}V, P=\sum_kp_k$, then the co-product
-$\bigvee :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra \Lambda^{P-(g-1)\#V}\bigcup_k V_k$ is obtained.
-in Grassmann's original notation $\wedge,\vee,\star$ operations were combined.
+First applying this Grassmann duality principle to the $\wedge$ product alone, let $\set{\omega_k}_k\in\Lambda^{p_k}V, P=\sum_kp_k$, then it is possible to obtain the co-product
+$\bigvee :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra \Lambda^{P-(g-1)\#V}\bigcup_k V_k$.
+Grassmann's original notation implicitly combined $\wedge,\vee,\star$.
 The join $\wedge$ product is analogous to union $\cup$, the meet $\vee$ product is analogous to intersection $\cap$, and the orthogonal complement $\star\mapsto^\perp$ is negation.
-Together, $(\wedge,\vee,\star)$ yield an orthocomplementary propositional lattice (quantum logic) by
+Together, $(\wedge,\vee,\star)$ yield an orthocomplementary propositional lattice (quantum logic):
 \begin{align*}
-	(\star\bigvee_k &\omega_k)(v_1,\dots,v_P) = (\bigwedge_k\star\omega_k)(v_1,\dots,v_P) \quad \textit{DeMorgan's Law}.
+	(\star\bigvee_k &\omega_k)(v_1,\dots,v_P) = (\bigwedge_k\star\omega_k)(v_1,\dots,v_P) \quad \textit{DeMorgan's Law},
 \end{align*}
+where DeMorgan's law is used to derive tensor contractions.
 \begin{definition}
-	The left $\lrcorner$ and right $\llcorner$ contraction symmetrically define
+	The left $\lrcorner$ and right $\llcorner$ contraction are symmetrically defined
 	$ \gen{\omega}_r\cdot\gen{\eta}_s = \begin{cases} \omega\llcorner\eta=\omega\vee\star\eta & r\geq s \\ \omega\lrcorner\eta=\eta\vee\star\omega & r\leq s \end{cases} $.
-	Note that for $\omega,\eta$ of equal grade, the operations $\omega\circledast\eta = \omega\odot\eta = \omega\cdot\eta = \omega\llcorner\eta = \omega\lrcorner\eta$ are symmetric.
+	Note for $\omega,\eta$ of equal grade, $\omega\circledast\eta = \omega\odot\eta = \omega\cdot\eta = \omega\llcorner\eta = \omega\lrcorner\eta$ are all symmetric operations.
 \end{definition}
 
 \begin{definition}
-	Let $\nabla = \sum_k\partial_kv_k$ and $\epsilon = \sum_k\epsilon_k(x)w_k \in \Omega^1V$ be unit sums of the mixed-symmetry basis.
+	Let $\nabla = \sum_k\partial_kv_k$ be a vector field and $\epsilon = \sum_k\epsilon_k(x)w_k \in \Omega^1V$ be unit sums of the mixed-symmetry basis.
 	Elements of $\Omega^pV$ are known as \textit{differential} $p$-\textit{forms} and both $\nabla$ and $\epsilon$ are \textit{tensor fields} dependent on $x\in W$.
 	Another notation for a differential form is $dx_k = \epsilon_k(x)w_k$, such that $\epsilon_k = dx_k/w_k$ and $\partial_k\omega(x) = \omega'(x)$.
 \end{definition}
-\begin{note}
+\begin{remark}
 	The space $W$ does not have to equal $V\in\text{Vect}_{\mb K}$ above, as $\Omega^pV$ could have coefficients from $\mb K = LW$.
-\end{note}
+\end{remark}
 \begin{definition}
-	Define \cite{bishop-goldberg} the differential $d:\Omega^p V\ra\Omega^{p+1}V$ and co-differential $\delta:\Omega^pV\ra\Omega^{p-1}V$ such that
+	Define differential $d:\Omega^p V\ra\Omega^{p+1}V$ and co-differential $\delta:\Omega^pV\ra\Omega^{p-1}V$ such that \cite{bishop-goldberg}
 	\begin{align*}
-		\star d\omega &= \star(\nabla\wedge\omega) = \nabla\times\omega, & \omega\cdot\nabla &= \omega\vee\star\nabla = \partial\omega =-\delta\omega, 
+		\star d\omega &= \star(\nabla\wedge\omega) = \nabla\times\omega, & \omega\cdot\nabla &= \omega\vee\star\nabla = \partial\omega =-\delta\omega.
 	\end{align*}
 	These two maps have the special properties $d\circ d=0$ and $\partial\circ\partial = 0$ for any form $\omega$ and vector field $\nabla$. 
-	In topology there is \textit{boundary} operator $\partial$ that can be defined by $\partial\epsilon = \epsilon\cdot\nabla = \sum_k\partial_k\epsilon_k$ and is commonly discussed in terms the limit $\epsilon(x)\cdot\nabla\omega(x) = \lim_{h\ra0} \frac{\omega(x+h\epsilon)-\omega(x)}{h}$, which is the directional derivative \cite{sobczyk}.
+	In topology there is \textit{boundary} operator $\partial$ defined by $\partial\epsilon = \epsilon\cdot\nabla = \sum_k\partial_k\epsilon_k$ and is commonly discussed in terms the limit $\epsilon(x)\cdot\nabla\omega(x) = \lim_{h\ra0} \frac{\omega(x+h\epsilon)-\omega(x)}{h}$, which is the directional derivative \cite{sobczyk}.
 \end{definition}
 \begin{example}
 	[Vorticity of vector-field]
@@ -298,39 +317,43 @@ Together, $(\wedge,\vee,\star)$ yield an orthocomplementary propositional lattic
 \end{example}
 \begin{example}
 	[Boundary of 3-simplex]
-	Faces as oriented \verb`Chain`: $\partial(w_{1234}) = -\partial_4w_{123}+\partial_3w_{124}-\partial_2w_{134}+\partial_1w_{234}$.
+	Faces of $n$-\verb`Chain` (oriented): $\partial(w_{1234}) = -\partial_4w_{123}+\partial_3w_{124}-\partial_2w_{134}+\partial_1w_{234}$.
 \end{example}
 \begin{theorem}[Leibniz-Taylor series]
-	Let $\partial_X=\bigominus_k\partial_k^{\mu_k}$ be defined so that $|X|=\sum_k\mu_k$, then $e^{\partial\epsilon}\omega(x)$ is
+	$\partial_X=\bigominus_k\partial_k^{\mu_k}$ is defined so that $|X|=\sum_k\mu_k$, then $e^{\partial\epsilon}\omega(x)$ is
 	\begin{align*}
+		e^{\partial\epsilon}\omega(x) =
 		\sum_{j=0}^\mu \frac{(\partial\epsilon)^{\ominus j}}{j!}\omega(x)
-		= \sum_{j=0}^\mu\sum_{|X|=j} \bigominus_k \frac{(\partial_{k}\epsilon_k(x))^{\mu_{k}}}{\mu_k!}\omega(x)
-		+ (\mu+1)\sum_{|X|=\mu+1}\int_0^1(1-t)^\mu\bigominus_k\frac{(\partial_k\epsilon_k(x))^{\mu_k}}{\mu_k!}\omega(x+t\epsilon)\,dt.
+		= \sum_{j=0}^\mu\sum_{|X|=j} \bigominus_k \frac{(\partial_{k}\epsilon_k(x))^{\mu_{k}}}{\mu_k!}\omega(x).
+		%+ (\mu+1)\sum_{|X|=\mu+1}\int_0^1(1-t)^\mu\bigominus_k\frac{(\partial_k\epsilon_k(x))^{\mu_k}}{\mu_k!}\omega(x+t\epsilon)\,dt.
 	\end{align*}
 \end{theorem}
 The multivariate \textit{chain rule} is encoded into the geometric algebraic product when using mixed-symmetry.
 
-\begin{theorem}[Hilbert adjoint Hodge-DeRahm operators]
+\begin{theorem}[Integration by parts \& Stokes]
 	Let $ \nabla \in\Omega_1 V $ be a Leibnizian vector field operator, then $d,-\partial$ are Hilbert adjoint Hodge-DeRahm operators with $\gen{\,\ast\,}$
 	\begin{align*}
-		\int_M d\omega\wedge\star\eta +\int_M \omega\wedge\star\partial\eta &= 0, & \gen{d\omega\ast\eta} &=\gen{\omega\ast-\partial\eta}
+		\int_M d\omega\wedge\star\eta +\int_M \omega\wedge\star\partial\eta &= 0, & \gen{d\omega\ast\eta} &=\gen{\omega\ast-\partial\eta}.
 	\end{align*}
 \end{theorem}
 \begin{proof}
-	Observe that $\partial\omega = \omega\cdot\nabla = \star(\star\omega\wedge\star^2\nabla) = (-1)^n(-1)^{nk}\star d\star\omega$.
-	Then  substitute this into the integral $\int_M \omega\wedge(-1)^{mk+m+1}\star\star d\star\eta = (-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}\int_M\omega\wedge d\star\eta$,
-	with $(-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}=(-1)^k$ and also
+	$\partial\omega = \omega\cdot\nabla = \star(\star\omega\wedge\star^2\nabla) = (-1)^n(-1)^{nk}\star d\star\omega$.
+
+
+	Then  substitute this into $\int_M \omega\wedge(-1)^{mk+m+1}\star\star d\star\eta = (-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}\int_M\omega\wedge d\star\eta$,
+	with identity $(-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}=(-1)^k$ and
 	$ (-1)^k\int_M\omega\wedge d\star\eta = \int_M d(\omega\wedge\star\eta) - (-1)^{k-1}\omega\wedge d\star\eta = \int_M d\omega\wedge\star\eta$.
-	The other identity can be proved by relying on a variant of the \textit{common factor theorem} by Browne \cite{browne}.
+	Stokes identity can be proved by relying on a variant of the \textit{common factor theorem} by Browne \cite{browne}.
 \end{proof}
 \begin{theorem}[Clifford-Dirac-Laplacian]
-	Dirac operator $ \Delta^\frac12\omega = \mp\omega\ominus\nabla = \pm\nabla\wedge\omega \mp \omega\llcorner\nabla  = \pm d\omega\mp\partial\omega$ \cite{garling}.
+	The Dirac operator is $ \Delta^\frac12\omega = \mp\omega\ominus\nabla = \pm\nabla\wedge\omega \mp \omega\llcorner\nabla  = \pm d\omega\mp\partial\omega$ \cite{garling}.
 	\begin{align*}
-		\Delta\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \pm(\pm\omega\ominus\nabla)\ominus\nabla), & \mc H^p M = \setc{\Delta\omega = 0}{\omega\in \Omega^pM}
+		\Delta\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \pm(\pm\omega\ominus\nabla)\ominus\nabla).
 	\end{align*}
-	Elements $\omega$ are \textit{harmonic} if $\Delta\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, Hodge decomposition \cite{ivancevic}:
+	Elements $\omega$ are \textit{harmonic} if $\Delta\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, such that $\mc H^p M = \setc{\Delta\omega = 0}{\omega\in \Omega^pM}$.
+	Hodge \cite{ivancevic}:
 	$\Omega^pM=\mc H^pM\oplus\im{d\Omega^{p-1}M}\oplus\im{\delta\Omega^{p+1}M}$.
-	Warning $\nabla\omega\neq\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
+	Note: $\nabla\omega\neq\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
 \end{theorem}
 
 %\subsection{Projective null-cones of Dirac-Clifford-Hestenes}
@@ -344,7 +367,7 @@ $v_\infty^2 =0$, $v_\emptyset^2 =0$,
 $v_\infty \cdot v_\emptyset = 1$,  and $v_{\infty\emptyset}^2 = 1$ with
 Minkowski plane $v_{\infty\emptyset}$ having the Hestenes-Dirac-Clifford product properties
 \begin{align*}
-	v_{\infty\emptyset}\ominus v_\infty &= -v_\infty, &  v_{\infty\emptyset}\ominus v_\emptyset &= v_\emptyset, &
+	v_{\infty\emptyset}\ominus v_\infty &= -v_\infty, &  v_{\infty\emptyset}\ominus v_\emptyset &= v_\emptyset, \\
 	v_\infty\ominus v_\emptyset &= -1 + v_{\infty\emptyset}, & v_\emptyset\ominus v_\infty &=  -1 - v_{\infty\emptyset}
 \end{align*}
 Declaring an additional \textit{null-basis} is done by specifying it in the string constructor with \verb`∞` at the first index (i.e. \verb`S"∞+++"`). Likewise, an optional \textit{origin} can be declared by \verb`∅` subsequently (i.e. \verb`S"∅+++"` or \verb`S"∞∅+++"`). These two basis elements will be interpreted in the type system such that they propagate under transformations when combining a mixed index sets (provided the \verb`Signature` is compatible).
@@ -365,7 +388,10 @@ Conformal geometric algebra is possible with the Minkowski plane $v_{\infty\empt
 In general, multivalued quantum logic is enabled by the $\wedge,\vee,\star$ Grassmann-Hodge dual lattice.
 Mixed-symmetry algebra with \textit{Leibniz.jl} and \textit{Grassmann.jl}, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
 \begin{align*}
-	0 &\os d{\us\partial\rightleftarrows} \Omega^0(M) \os d{\us\partial\rightleftarrows} \Omega^1(M) \os d{\us\partial\leftrightarrows} \cdots \os d{\us\partial\rightleftarrows} \Omega^n(M) \os d{\us\partial\rightleftarrows} 0, & \mc H^pM &\cong \frac{\ker(d\Omega^pM)}{\im{d\Omega^{p-1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\delta\Omega^pM)}{\im{\delta\Omega^{p+1}M}}
+	0 &\os d{\us\partial\rightleftarrows} \Omega^0(M) \os d{\us\partial\rightleftarrows} \Omega^1(M) \os d{\us\partial\leftrightarrows} \cdots \os d{\us\partial\rightleftarrows} \Omega^n(M) \os d{\us\partial\rightleftarrows} 0,
+\end{align*}
+\begin{align*}
+	\mc H^pM &\cong \frac{\ker(d\Omega^pM)}{\im{d\Omega^{p-1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\delta\Omega^pM)}{\im{\delta\Omega^{p+1}M}}
 \end{align*}
 In conclusion, the Dirac-Clifford product yields generalized Hodge-Laplacian and $b_p=\dim\mc H^pM$ are the Betti numbers with Euler characteristic $\chi = \sum_p (-1)^pb_p$.
 There will be a more detailed follow-up paper.

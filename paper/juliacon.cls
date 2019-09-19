@@ -391,14 +391,12 @@ minus 2pt\itemsep 2pt plus 1pt minus .5pt}
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
 \newtheorem{exam}{Example}
-\newenvironment{example}{%
-\italicenvfalse
-\begin{exam}}{\end{exam}\italicenvtrue}
-%
+%\newenvironment{example}{\italicenvfalse\begin{exam}}{\end{exam}\italicenvtrue}
+\newenvironment{example}{\begin{exam}}{\end{exam}}
 \newtheorem{defi}[theorem]{Definition}
-\newenvironment{definition}{%
-\italicenvfalse
-\begin{defi}}{\end{defi}\italicenvtrue}
+\newenvironment{definition}{\begin{defi}}{\end{defi}}
+\newtheorem{rem}{Remark}
+\newenvironment{remark}{\begin{rem}}{\end{rem}}
 %
 \def\@begintheorem#1#2{\trivlist \item[\hskip 10pt\hskip 
    \labelsep{\sc{#1}\hskip 5pt\relax #2.}] \itshape}

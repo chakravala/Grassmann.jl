@@ -522,8 +522,8 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
         end
         *(a::F,b::Basis{V}) where {F<:$EF,V} = SBlade{V}(a,b)
         *(a::Basis{V},b::F) where {F<:$EF,V} = SBlade{V}(b,a)
-        *(a::F,b::MultiVector{T,V}) where {F<:$Field,T<:$Field,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a,b.v))
-        *(a::MultiVector{T,V},b::F) where {F<:$Field,T<:$Field,V} = MultiVector{promote_type(T,F),V}(broadcast($MUL,a.v,b))
+        *(a::F,b::MultiVector{T,V}) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a,b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a.v,b))
         *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
         *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
         ∧(a::$Field,b::$Field) = $MUL(a,b)

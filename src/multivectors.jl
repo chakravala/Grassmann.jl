@@ -8,6 +8,16 @@ abstract type GradedAlgebra{V,G} <: TensorAlgebra{V} end
 abstract type TensorTerm{V,G} <: GradedAlgebra{V,G} end
 abstract type TensorMixed{T,V} <: TensorAlgebra{V} end
 
+function Base.show_unquoted(io::IO, z::T, ::Int, prec::Int) where T<:TensorAlgebra
+    if T<:TensorMixed && Base.operator_precedence(:+) <= prec
+        print(io, "(")
+        show(io, z)
+        print(io, ")")
+    else
+        show(io, z)
+    end
+end
+
 # number fields
 
 Fields = (Real,Complex)
@@ -89,6 +99,8 @@ const MSB = (:MBlade,:SBlade)
 for Blade ∈ MSB
     eval(Expr(:struct,Blade ≠ :SBlade,:($Blade{V,G,B,T} <: TensorTerm{V,G}),quote
         v::T
+        $Blade{A,B,C,D}(t::E) where E<:D where {A,B,C,D} = new{A,B,C,D}(t)
+        $Blade{A,B,C,D}(t::E) where E<:TensorAlgebra{A} where {A,B,C,D} = new{A,B,C,D}(t)
     end))
 end
 for Blade ∈ MSB
@@ -229,8 +241,9 @@ end
 struct MultiVector{T,V,E} <: TensorMixed{T,V}
     v::Union{MArray{Tuple{E},T,1,E},SArray{Tuple{E},T,1,E}}
 end
-MultiVector{T,V}(v::MArray{Tuple{E},T,1,E}) where {T,V,E} = MultiVector{T,V,E}(v)
-MultiVector{T,V}(v::SArray{Tuple{E},T,1,E}) where {T,V,E} = MultiVector{T,V,E}(v)
+MultiVector{T,V}(v::MArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
+MultiVector{T,V}(v::SArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
+
 
 function getindex(m::MultiVector{T,V},i::Int) where {T,V}
     N = ndims(V)
