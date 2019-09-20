@@ -482,7 +482,7 @@ function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CON
     elseif Field ∈ (SymField,:(SymPy.Sym))
         declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
-    Field == :(SymPy.Sym) && for par ∈ (:parany,:parval,:parsym)
+    Field ∈ (:(SymPy.Sym),:(SymEngine.Basic)) && for par ∈ (:parany,:parval,:parsym)
         @eval $par = ($par...,$Field)
     end
     TF = Field ∉ Fields ? :Any : :T
@@ -1273,6 +1273,11 @@ end
 
 generate_product_algebra()
 generate_product_algebra(Complex)
+generate_product_algebra(Rational{BigInt},:svec)
+for Big ∈ (BigFloat,BigInt)
+    generate_product_algebra(Big,:svec)
+    generate_product_algebra(Complex{Big},:svec)
+end
 generate_product_algebra(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}

@@ -439,6 +439,7 @@ function __init__()
         parsym = (parsym...,RExpr)
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:svec,:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:(SymPy.conj))
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra(:(SymEngine.Basic),:svec,:(SymEngine.:*),:(SymEngine.:+),:(SymEngine.:-),:(SymEngine.conj))
 end
 
 end # module
