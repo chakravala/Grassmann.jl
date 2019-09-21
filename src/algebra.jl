@@ -476,13 +476,13 @@ Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 
 ### Product Algebra Constructor
 
-function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj)
+function generate_product_algebra(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
     if Field == Grassmann.Field
         declare_mutating_operations(:(MArray{Tuple{M},T,1,M}),Number,Expr,:-,:*)
     elseif Field ∈ (SymField,:(SymPy.Sym))
         declare_mutating_operations(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
-    Field ∈ (:(SymPy.Sym),:(SymEngine.Basic)) && for par ∈ (:parany,:parval,:parsym)
+    PAR && for par ∈ (:parany,:parval,:parsym)
         @eval $par = ($par...,$Field)
     end
     TF = Field ∉ Fields ? :Any : :T
@@ -1279,6 +1279,7 @@ for Big ∈ (BigFloat,BigInt)
     generate_product_algebra(Complex{Big},:svec)
 end
 generate_product_algebra(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
+generate_product_algebra_svec(m,t) = generate_product_algebra(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}
 

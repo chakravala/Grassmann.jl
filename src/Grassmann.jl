@@ -438,8 +438,10 @@ function __init__()
         parval = (parval...,RExpr)
         parsym = (parsym...,RExpr)
     end
-    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra(:(SymPy.Sym),:svec,:(SymPy.:*),:(SymPy.:+),:(SymPy.:-),:(SymPy.conj))
-    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra(:(SymEngine.Basic),:svec,:(SymEngine.:*),:(SymEngine.:+),:(SymEngine.:-),:(SymEngine.conj))
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra_svec(:SymPy,:Sym)
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra_svec(:SymEngine,:Basic)
+    @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_product_algebra_svec(:AbstractAlgebra,:SetElem)
+    @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_product_algebra_svec(:GaloisFields,:AbstractGaloisField)
 end
 
 end # module
