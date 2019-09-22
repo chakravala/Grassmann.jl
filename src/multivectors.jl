@@ -481,6 +481,7 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)..
 ## Generic
 
 import Base: isinf, isapprox
+import DirectSum: grade
 import AbstractTensors: scalar, involute, unit, even, odd
 export basis, grade, hasinf, hasorigin, isorigin, scalar, norm
 

@@ -89,8 +89,8 @@ function declare_mutating_operations(M,F,set_val,SUB,MUL)
                                     T≠Any && (return true)
                                     _,_,Q,_ = symmetricmask(V,A,B)
                                     v *= getbasis(V,Z)
+                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
                                 end
-                                count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
                             t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Dimension{N}())
                         end
@@ -1441,6 +1441,7 @@ function ^(v::T,i::Integer) where T<:TensorTerm
 end
 
 function Base.:^(v::T,i::S) where {T<:TensorAlgebra{V},S<:Integer} where V
+    isone(i) && (return v)
     out = one(V)
     if i < 8 # optimal choice ?
         for k ∈ 1:i

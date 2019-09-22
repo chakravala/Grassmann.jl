@@ -53,7 +53,8 @@ end
 end
 
 @pure function parityregressive(V::Signature{N,M,S},a,b,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
-    (A,B,Q,Z),NG,D = symmetricmask(V,a,b),N-diffvars(V),diffvars(V)
+    dv = diffvars(V)
+    (A,B,Q,Z),NG,D = symmetricmask(V,a,b),N-dv,dv
     α,β = complement(N,A,D),complement(N,B,D)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
     if ((count_ones(α&β)==0) && !diffcheck(V,α,β)) || cc
@@ -66,7 +67,7 @@ end
             false, A+B≠0 ? complement(N,C,D) : g_zero(UInt)
         end
         par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
-        return (isodd(L*(L-N))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
+        return (isodd(L*(L-grade(V)))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
         return false, g_zero(UInt), false, Z
     end

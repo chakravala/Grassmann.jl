@@ -414,9 +414,15 @@ import Leibniz: ∂, d
 
 generate_product_algebra(:(Leibniz.Operator),:svec)
 
-function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
-    x=sum([(∂(V,k)^2) for k ∈ 1:N])^div(isodd(O) ? O-1 : O,2)
-    isodd(O) ? sum([(x*∂(V,k))*getbasis(V,1<<(k-1)) for k ∈ 1:N]) : x*getbasis(V,0)
+@pure function (W::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
+    C = mixedmode(W)<0
+    V = diffvars(W)≠0 ? W : tangent(W,O<2 ? 2 : O,C ? Int(ndims(W)/2) : ndims(W))
+    G = grade(V)
+    G2 = (C ? Int(G/2) : G)-1
+    ∇ = sum([getbasis(V,1<<(k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
+    isone(O) && (return ∇)
+    x = (∇⋅∇)^div(isodd(O) ? O-1 : O,2)
+    isodd(O) ? sum([x*(getbasis(V,1<<(k+G))*getbasis(V,1<<k)) for k ∈ 0:G2]) : x
 end
 
 ∂(ω::T) where T<:TensorAlgebra{V} where V = ω⋅V(∇)
