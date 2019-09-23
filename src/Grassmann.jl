@@ -417,9 +417,9 @@ generate_product_algebra(:(Leibniz.Operator),:svec)
 @pure function (W::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
     C = mixedmode(W)<0
     V = diffvars(W)≠0 ? W : tangent(W,O<2 ? 2 : O,C ? Int(ndims(W)/2) : ndims(W))
-    G = grade(V)
+    G,D = grade(V),diffvars(V)==1
     G2 = (C ? Int(G/2) : G)-1
-    ∇ = sum([getbasis(V,1<<(k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
+    ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
     isone(O) && (return ∇)
     x = (∇⋅∇)^div(isodd(O) ? O-1 : O,2)
     isodd(O) ? sum([x*(getbasis(V,1<<(k+G))*getbasis(V,1<<k)) for k ∈ 0:G2]) : x
@@ -448,6 +448,41 @@ function __init__()
     @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra_svec(:SymEngine,:Basic)
     @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_product_algebra_svec(:AbstractAlgebra,:SetElem)
     @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_product_algebra_svec(:GaloisFields,:AbstractGaloisField)
+    @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
+        function LightGraphs.SimpleDiGraph(x::T,g=LightGraphs.SimpleDiGraph(grade(V))) where T<:TensorTerm{V} where V
+           ind = (signbit(value(x)) ? reverse : identity)(Grassmann.indices(basis(x)))
+           grade(x) == 2 ? LightGraphs.add_edge!(g,ind...) : graph(∂(x),g)
+           return g
+        end
+        function LightGraphs.SimpleDiGraph(x::S,g=LightGraphs.SimpleDiGraph(grade(V))) where {S<:TensorMixed{T,V} where T} where V
+            graph(∂(x),g)
+        end
+        function graph(x::S,g=LightGraphs.SimpleDiGraph(grade(V))) where {S<:TensorMixed{T,V} where T} where V
+            N,G = ndims(V),grade(x)
+            ib = Grassmann.indexbasis(N,G)
+            for k ∈ 1:Grassmann.binomial(N,G)
+                if !iszero(x.v[k])
+                    B = Grassmann.symmetricmask(V,ib[k],ib[k])[1]
+                    count_ones(B) ≠1 && LightGraphs.SimpleDiGraph(x.v[k]*getbasis(V,B),g)
+                end
+            end
+            return g
+        end
+        function graph(x::MultiVector{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
+           N = ndims(V)
+           for i ∈ 2:N
+                R = Grassmann.binomsum(N,i)
+                ib = Grassmann.indexbasis(N,i)
+                for k ∈ 1:Grassmann.binomial(N,i)
+                    if !iszero(x.v[k+R])
+                        B = Grassmann.symmetricmask(V,ib[k],ib[k])[1]
+                        count_ones(B) ≠ 1 && LightGraphs.SimpleDiGraph(x.v[k+R]*getbasis(V,B),g)
+                    end
+                end
+            end
+            return g
+        end
+    end
 end
 
 end # module
