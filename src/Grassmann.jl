@@ -410,9 +410,10 @@ end
 # ParaAlgebra
 
 using Leibniz
-import Leibniz: ∂, d
+import Leibniz: ∂, d, ∇
+export ∇, ∂, d
 
-generate_product_algebra(:(Leibniz.Operator),:svec)
+generate_products(:(Leibniz.Operator),:svec)
 
 @pure function (W::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
     C = mixedmode(W)<0
@@ -430,24 +431,26 @@ d(ω::T) where T<:TensorAlgebra{V} where V = V(∇)∧ω
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
-        import Reduce: RExpr
-        *(a::RExpr,b::Basis{V}) where V = SBlade{V}(a,b)
-        *(a::Basis{V},b::RExpr) where V = SBlade{V}(b,a)
-        *(a::RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a,b.v))
-        *(a::MultiVector{T,V},b::RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,b))
-        *(a::RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a,b.v))
-        *(a::MultiGrade{V},b::RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,b))
-        ∧(a::RExpr,b::RExpr) = Reduce.Algebra.:*(a,b)
-        ∧(a::RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(a,b)
-        ∧(a::A,b::RExpr) where A<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(b,a)
-        parany = (parany...,RExpr)
-        parval = (parval...,RExpr)
-        parsym = (parsym...,RExpr)
+        *(a::Reduce.RExpr,b::Basis{V}) where V = SBlade{V}(a,b)
+        *(a::Basis{V},b::Reduce.RExpr) where V = SBlade{V}(b,a)
+        *(a::Reduce.RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a,b.v))
+        *(a::MultiVector{T,V},b::Reduce.RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,b))
+        *(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a,b.v))
+        *(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,b))
+        ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
+        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(a,b)
+        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(b,a)
+        parany = (parany...,Reduce.RExpr)
+        parval = (parval...,Reduce.RExpr)
+        parsym = (parsym...,Reduce.RExpr)
+        generate_derivation(:(Reduce.Algebra),:RExpr,:df,:RExpr)
+        generate_derivation(:(Reduce.Algebra),:Symbol,:df,:RExpr)
+        generate_derivation(:(Reduce.Algebra),:Expr,:df,:RExpr)
     end
-    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_product_algebra_svec(:SymPy,:Sym)
-    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra_svec(:SymEngine,:Basic)
-    @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_product_algebra_svec(:AbstractAlgebra,:SetElem)
-    @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_product_algebra_svec(:GaloisFields,:AbstractGaloisField)
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_algebra(:SymPy,:Sym,:diff,:symbols)
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra_svec(:SymEngine,:Basic,:diff,:symbols)
+    @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_algebra(:AbstractAlgebra,:SetElem)
+    @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_algebra(:GaloisFields,:AbstractGaloisField)
     @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
         function LightGraphs.SimpleDiGraph(x::T,g=LightGraphs.SimpleDiGraph(grade(V))) where T<:TensorTerm{V} where V
            ind = (signbit(value(x)) ? reverse : identity)(Grassmann.indices(basis(x)))

@@ -606,6 +606,8 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
         else
             return getbasis(W,VC>0 ? bits(b)<<(N-dm) : bits(b))
         end
+    elseif WC≥0 && VC≥0
+        getbasis(W,bits(b))
     else
         throw(error("arbitrary Manifold intersection not yet implemented."))
     end
@@ -621,19 +623,21 @@ for Chain ∈ MSC
             WC,VC = mixedmode(W),mixedmode(V)
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
-            if WC<0 && VC≥0
-                N,M = ndims(V),ndims(W)
-                out = zeros(mvec(M,G,T))
-                ib = indexbasis(N,G)
-                for k ∈ 1:length(ib)
-                    @inbounds if b[k] ≠ 0
+            N,M = ndims(V),ndims(W)
+            out = zeros(mvec(M,G,T))
+            ib = indexbasis(N,G)
+            for k ∈ 1:length(ib)
+                @inbounds if b[k] ≠ 0
+                    if WC<0 && VC≥0
                         @inbounds setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                    elseif WC≥0 && VC≥0
+                        @inbounds setblade!(out,b[k],ib[k],Dimension{M}())
+                    else
+                        throw(error("arbitrary Manifold intersection not yet implemented."))
                     end
                 end
-                return $Chain{T,W,G}(out)
-            else
-                throw(error("arbitrary Manifold intersection not yet implemented."))
             end
+            return $Chain{T,W,G}(out)
         end
 
     end
@@ -645,23 +649,25 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
-    if WC<0 && VC≥0
-        N,M = ndims(V),ndims(W)
-        out = zeros(mvec(M,T))
-        bs = binomsum_set(N)
-        for i ∈ 1:N+1
-            ib = indexbasis(N,i-1)
-            for k ∈ 1:length(ib)
-                @inbounds s = k+bs[i]
-                @inbounds if m.v[s] ≠ 0
+    N,M = ndims(V),ndims(W)
+    out = zeros(mvec(M,T))
+    bs = binomsum_set(N)
+    for i ∈ 1:N+1
+        ib = indexbasis(N,i-1)
+        for k ∈ 1:length(ib)
+            @inbounds s = k+bs[i]
+            @inbounds if m.v[s] ≠ 0
+                if WC<0 && VC≥0
                     @inbounds setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                elseif WC≥0 && VC≥0
+                    @inbounds setmulti!(out,m.v[s],ib[k],Dimension{M}())
+                else
+                    throw(error("arbitrary Manifold intersection not yet implemented."))
                 end
             end
         end
-        return MultiVector{T,W}(out)
-    else
-        throw(error("arbitrary Manifold intersection not yet implemented."))
     end
+    return MultiVector{T,W}(out)
 end
 
 

@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffvars, Dim, diffmask, symmetricmask
+import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffvars, Dim, diffmask, symmetricmask, indexstring, indexsymbol
 
 bcast(op,arg) = op ∈ (:(DirectSum.:∑),:(DirectSum.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
