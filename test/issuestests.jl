@@ -64,11 +64,11 @@ end
     @basis S"∞∅+"
     
     @test v∅*v∞ == -1 - v∞∅
-    @test_broken v∅*(-v∞) == 1 + v∞∅
+    @test v∅*(-v∞) == 1 + v∞∅
     
     a = v∅*basis(-v∞)
     @test a == -1 - v∞∅
-    @test_broken SBlade{V}(-1, a)
+    @test SBlade{V}(-1, a) == -a
 end
 
 @testset "Issue #22: Error in MultiVector constructor for Chains" begin

@@ -111,6 +111,7 @@ for Blade ∈ MSB
         $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
         $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
         $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
+        $Blade{V}(v,b::S) where S<:TensorMixed where V = v*b
         $Blade{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G}(v,b)
         function $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
             order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,T}(v)

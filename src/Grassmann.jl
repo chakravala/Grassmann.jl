@@ -448,7 +448,7 @@ function __init__()
         generate_derivation(:(Reduce.Algebra),:Expr,:df,:RExpr)
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_algebra(:SymPy,:Sym,:diff,:symbols)
-    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_product_algebra_svec(:SymEngine,:Basic,:diff,:symbols)
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_algebra(:SymEngine,:Basic,:diff,:symbols)
     @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_algebra(:AbstractAlgebra,:SetElem)
     @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_algebra(:GaloisFields,:AbstractGaloisField)
     @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
