@@ -22,7 +22,10 @@ for side ∈ (:left,:right)
     p = Symbol(:parity,side)
     @eval begin
         @pure $p(V::Bits,B::Bits,N::Int) = $p(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
-        @pure $p(V::Signature,B,G=count_ones(B)) = $p(count_ones(value(V)&B),sum(indices(B,ndims(V))),G,ndims(V)-diffvars(V))
+        @pure function $p(V::Signature,B,G=count_ones(B))
+            o = hasorigin(V) && (hasinf(V) ? iszero(B&UInt(1))&(!iszero(B&UInt(2))) : isodd(B))
+            $p(count_ones(value(V)&B),sum(indices(B,ndims(V))),G,ndims(V)-diffvars(V))⊻o
+        end
         @pure function $p(V::DiagonalForm,B,G=count_ones(B))
             ind = indices(B,ndims(V))
             g = prod(V[ind])
@@ -32,7 +35,11 @@ for side ∈ (:left,:right)
     end
 end
 
-@pure complement(N::Int,B::UInt,D::Int=0)::UInt = ((~B)&(one(UInt)<<(N-D)-1))|(B&((one(UInt)<<D-1)<<(N-D)))
+@pure function complement(N::Int,B::UInt,D::Int=0,P::Int=0)::UInt
+    UP,ND = UInt(1)<<P-1, N-D
+    C = ((~B)&(UP⊻(UInt(1)<<ND-1)))|(B&(UP⊻((UInt(1)<<D-1)<<ND)))
+    count_ones(C&UP)>1 ? C⊻UP : C
+end
 
 ## product parities
 

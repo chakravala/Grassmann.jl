@@ -171,6 +171,7 @@ Base.@pure promote_type(t...) = Base.promote_type(t...)
     assign_expr!(e,x,:di,:(dualindex(V)))
     assign_expr!(e,x,:D,:(diffvars(V)))
     assign_expr!(e,x,:μ,:(diffvars(V)≠0))
+    assign_expr!(e,x,:P,:(hasinf(V)+hasorigin(V)))
     return x
 end
 
