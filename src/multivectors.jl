@@ -578,6 +578,12 @@ end
 @inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
 @inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
 
+for Blade ∈ MSB
+    for T ∈ (Expr,Symbol)
+        @eval @inline Base.iszero(t::$Blade{V,G,B,$T} where {V,G,B}) = false
+    end
+end
+
 ## Adjoint
 
 import Base: adjoint # conj

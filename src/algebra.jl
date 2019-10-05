@@ -38,14 +38,14 @@ symmetricsplit(V::M,b::Basis) where M<:Manifold = symmetricsplit(V,bits(b))
     else
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
         ca,cb = count_ones(sa[2]),count_ones(sb[2])
-        return if ca == cb == 0
+        return if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
             v
-        elseif ca == 0
-            derive(x ? one(typeof(v)) : v,getbasis(V,sa[1]))
-        elseif cb == 0
-            derive(x ? v : one(typeof(v)),getbasis(V,sb[1]))
         else
-            v
+            prev = ca == 0 ? (x ? one(typeof(v)) : v) : (x ? v : one(typeof(v)))
+            for k ∈ DirectSum.indexsplit((ca==0 ? sa : sb)[1],ndims(V))
+                prev = derive(prev,getbasis(V,k))
+            end
+            prev
         end
     end
 end
@@ -56,14 +56,25 @@ end
     else
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
         ca,cb = count_ones(sa[2]),count_ones(sb[2])
-        α,β = if ca == cb == 0
+        α,β = if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
             a,b
-        elseif ca == 0
-            derive(b,getbasis(V,sa[1]),a,true)
-        elseif cb == 0
-            derive(a,getbasis(V,sb[1]),b,false)
         else
-            a,b
+            prev = ca == 0 ? (a,b) : (b,a)
+            for k ∈ DirectSum.indexsplit((ca==0 ? sa : sb)[1],ndims(V))
+                prev = derive(prev[2],getbasis(V,k),prev[1],true)
+            end
+            #base = getbasis(V,0)
+            while typeof(prev[1]) <: TensorTerm
+                basi = basis(prev[1])
+                #base *= basi
+                inds = DirectSum.indexsplit(bits(basi),ndims(V))
+                prev = (value(prev[1]),prev[2])
+                for k ∈ inds
+                    prev = derive(prev[2],getbasis(V,k),prev[1],true)
+                end
+            end
+            #base ≠ getbasis(V,0) && (prev = (base*prev[1],prev[2]))
+            ca == 0 ? prev : (prev[2],prev[1])
         end
         return α*β
     end
