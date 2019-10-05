@@ -1102,7 +1102,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 function $op(a::$Blade{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
-                    out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                    out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
@@ -1118,7 +1118,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             $op(a::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{$TF,V}($(bcast(bop,:(value(a),))))
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
-                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                 return MultiVector{t,V}(out)
             end
@@ -1138,7 +1138,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,),VEC)...)
                 at = terms(a)
                 t = promote_type(T,valuetype.(at)...)
-                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 for A ∈ at
                     addmulti!(out,value(A,t),bits(A),Dimension{N}())
                 end
@@ -1158,7 +1158,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,),VEC)...)
                 at = terms(a)
                 t = promote_type(T,valuetype.(at)...)
-                out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 for A ∈ at
                     TA = typeof(A)
                     if TA <: TensorTerm
@@ -1224,7 +1224,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     function $op(a::$Blade{V,G,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,S<:$Field}
                         $(insert_expr((:N,:t),VEC)...)
-                        out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
+                        out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                         addblade!(out,value(a,t),basis(a),Dimension{N}())
                         return MChain{t,V,G}(out)
                     end
@@ -1252,7 +1252,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 function $op(a::Basis{V,G},b::$Chain{T,V,G}) where {T<:$Field,V,G}
                     $(insert_expr((:N,:t),VEC)...)
-                    out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
+                    out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                     addblade!(out,value(a,t),basis(a),Dimension{N}())
                     return MChain{t,V,G}(out)
                 end
@@ -1264,7 +1264,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 function $op(a::Basis{V,L},b::$Chain{T,V,G}) where {T<:$Field,V,G,L}
                     $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
+                    @inbounds out[r+1:r+bng] = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
@@ -1282,7 +1282,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     $(insert_expr((:N,),VEC)...)
                     at = terms(a)
                     t = promote_type(T,valuetype.(at)...)
-                    out = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
+                    out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                     for A ∈ at
                         addblade!(out,value(A,t),basis(A),Dimension{N}())
                     end
@@ -1290,7 +1290,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                    out = $(bcast(bop,:(copy(value(b,$VEC(N,t))),)))
+                    out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                     @inbounds out[r+1:r+bng] += value(a,$VEC(N,G,t))
                     return MultiVector{t,V}(out)
                 end
@@ -1302,6 +1302,23 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
             end
         end
+    end
+end
+
+@eval begin
+    *(a::F,b::MultiVector{T,V}) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a,b.v))
+    *(a::MultiVector{T,V},b::F) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a.v,b))
+end
+for Blade ∈ MSB
+    @eval begin
+        *(a::F,b::$Blade{V,G,B,T} where B) where {F<:Number,V,G,T} = SBlade{V,G}($Sym.:∏(a,b.v),basis(b))
+        *(a::$Blade{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = SBlade{V,G}($Sym.:∏(a.v,b),basis(a))
+    end
+end
+for Chain ∈ MSC
+    @eval begin
+        *(a::F,b::$Chain{T,V,G}) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a,b.v))
+        *(a::$Chain{T,V,G},b::F) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a.v,b))
     end
 end
 

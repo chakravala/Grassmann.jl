@@ -38,7 +38,7 @@ end
 @pure function complement(N::Int,B::UInt,D::Int=0,P::Int=0)::UInt
     UP,ND = UInt(1)<<P-1, N-D
     C = ((~B)&(UP⊻(UInt(1)<<ND-1)))|(B&(UP⊻((UInt(1)<<D-1)<<ND)))
-    count_ones(C&UP)>1 ? C⊻UP : C
+    count_ones(C&UP)≠1 ? C⊻UP : C
 end
 
 ## product parities
