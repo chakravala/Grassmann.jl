@@ -24,10 +24,11 @@ for side ∈ (:left,:right)
         @pure $p(V::Bits,B::Bits,N::Int) = $p(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
         @pure function $p(V::Signature,B,G=count_ones(B))
             o = hasorigin(V) && (hasinf(V) ? iszero(B&UInt(1))&(!iszero(B&UInt(2))) : isodd(B))
-            $p(count_ones(value(V)&B),sum(indices(B,ndims(V))),G,ndims(V)-diffvars(V))⊻o
+            b = B&(UInt(1)<<(ndims(V)-diffvars(V))-1)
+            $p(count_ones(value(V)&b),sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
         end
         @pure function $p(V::DiagonalForm,B,G=count_ones(B))
-            ind = indices(B,ndims(V))
+            ind = indices(B&(UInt(1)<<(ndims(V)-diffvars(V))-1),ndims(V))
             g = prod(V[ind])
             $p(0,sum(ind),G,ndims(V)-diffvars(V)) ? -(g) : g
         end
