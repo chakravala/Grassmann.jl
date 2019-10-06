@@ -80,6 +80,11 @@ end
     end
 end
 
+for M ∈ (:Signature,:DiagonalForm)
+    @eval @pure loworder(V::$M{N,M,S,D,O}) where {N,M,S,D,O} = O≠0 ? $M{N,M,S,D,O-1}() : V
+end
+@pure loworder(::SubManifold{N,M,S}) where {N,M,S} = SubManifold{N,loworder(M),S}()
+
 function generate_mutators(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
@@ -105,7 +110,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
                         if diffvars(V)≠0
-                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(V,Z)))
+                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
                         $s(m,val,(A⊻B)|Q,Dimension{N}())
@@ -118,7 +123,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
                         if diffvars(V)≠0
-                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(V,Z)))
+                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
                         $s(m,val,bas|Q,Dimension{N}())
@@ -142,7 +147,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                                 if !iszero(Z)
                                     T≠Any && (return true)
                                     _,_,Q,_ = symmetricmask(V,A,B)
-                                    v *= getbasis(V,Z)
+                                    v *= getbasis(loworder(V),Z)
                                     count_ones(Q)+order(v)>diffmode(V) && (return false)
                                 end
                             end
@@ -260,7 +265,7 @@ function mul(a::Basis{V},b::Basis{V},der=derive_mul(V,bits(a),bits(b),1,true)) w
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SBlade{V}(-1,d) : d) : SBlade{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
-    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(getbasis(V,Z),out))
+    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(getbasis(loworder(V),Z),out))
     return cc ? (v=value(out);out+SBlade{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
 
@@ -315,7 +320,7 @@ export ∧, ∨, ⊗
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb) || iszero(derive_mul(V,ba,bb,1,true))) && (return g_zero(V))
     d = getbasis(V,(A⊻B)|Q)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
     return parity(a,b) ? SBlade{V}(-1,d) : d
 end
 
@@ -326,7 +331,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
@@ -353,7 +358,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
     p,C,t,Z = regressive(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
@@ -364,7 +369,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(p ? -v : v,getbasis(V,C))
@@ -400,7 +405,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     g,C,t,Z = interior(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
     return typeof(V) <: Signature ? (g ? SBlade{V}(-1,d) : d) : SBlade{V}(g,d)
 end
 
@@ -411,7 +416,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
@@ -450,7 +455,7 @@ cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
     p,C,t,Z = crossprod(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(V,Z),d))
+    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
     return p ? SBlade{V}(-1,d) : d
 end
 
@@ -461,7 +466,7 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(V,Z))
+        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return SBlade{V}(p ? -v : v,getbasis(V,C))
@@ -877,7 +882,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                     end
                 end
-                return MultiVector{t,V,2^N}(out)::MultiVector{t,V,2^N}
+                return MultiVector{t,V}(out)
             end
             function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
