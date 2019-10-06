@@ -573,10 +573,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         end
         *(a::F,b::Basis{V}) where {F<:$EF,V} = SBlade{V}(a,b)
         *(a::Basis{V},b::F) where {F<:$EF,V} = SBlade{V}(b,a)
-        *(a::F,b::MultiVector{T,V}) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a,b.v))
-        *(a::MultiVector{T,V},b::F) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a.v,b))
-        *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a,b.v))
-        *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,b))
+        *(a::F,b::MultiVector{T,V}) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,Ref(a),b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a.v,Ref(b)))
+        *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,Ref(a),b.v))
+        *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,Ref(b)))
         ∧(a::$Field,b::$Field) = $MUL(a,b)
         ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = SBlade{V,G}(a,b)
         ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = SBlade{V,G}(b,a)
@@ -613,8 +613,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 $Chain{$TF,dual(V),G}(out)
             end
-            *(a::F,b::$Chain{T,V,G}) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,a,b.v))
-            *(a::$Chain{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,a.v,b))
+            *(a::F,b::$Chain{T,V,G}) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,Ref(a),b.v))
+            *(a::$Chain{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,a.v,Ref(b)))
             #∧(a::$Field,b::$Chain{T,V,G}) where {T<:$Field,V,G} = SChain{T,V,G}(a.*b.v)
             #∧(a::$Chain{T,V,G},b::$Field) where {T<:$Field,V,G} = SChain{T,V,G}(a.v.*b)
             function contraction(a::$Chain{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
@@ -1317,8 +1317,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
 end
 
 @eval begin
-    *(a::F,b::MultiVector{T,V}) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a,b.v))
-    *(a::MultiVector{T,V},b::F) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a.v,b))
+    *(a::F,b::MultiVector{T,V}) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,Ref(a),b.v))
+    *(a::MultiVector{T,V},b::F) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a.v,Ref(b)))
 end
 for Blade ∈ MSB
     @eval begin
@@ -1328,15 +1328,15 @@ for Blade ∈ MSB
 end
 for Chain ∈ MSC
     @eval begin
-        *(a::F,b::$Chain{T,V,G}) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a,b.v))
-        *(a::$Chain{T,V,G},b::F) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a.v,b))
+        *(a::F,b::$Chain{T,V,G}) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,Ref(a),b.v))
+        *(a::$Chain{T,V,G},b::F) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a.v,Ref(b)))
     end
 end
 
 for F ∈ Fields
     @eval begin
-        *(a::F,b::MultiVector{T,V}) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a,b.v))
-        *(a::MultiVector{T,V},b::F) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a.v,b))
+        *(a::F,b::MultiVector{T,V}) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,Ref(a),b.v))
+        *(a::MultiVector{T,V},b::F) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a.v,Ref(b)))
     end
     for Blade ∈ MSB
         @eval begin
@@ -1346,8 +1346,8 @@ for F ∈ Fields
     end
     for Chain ∈ MSC
         @eval begin
-            *(a::F,b::$Chain{T,V,G}) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a,b.v))
-            *(a::$Chain{T,V,G},b::F) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a.v,b))
+            *(a::F,b::$Chain{T,V,G}) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,Ref(a),b.v))
+            *(a::$Chain{T,V,G},b::F) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a.v,Ref(b)))
         end
     end
 end
@@ -1373,6 +1373,7 @@ function generate_derivation(m,t,d,c)
 end
 function generate_algebra(m,t,d=nothing,c=nothing)
     generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
+    generate_inverses(m,t)
     !isnothing(d) && generate_derivation(m,t,d,c)
 end
 
@@ -1598,12 +1599,20 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         end
     end
     for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
-        @eval begin
-            @pure $d(a::S,b::T) where {S<:$Term,T<:Real} = a*$d(1,b)
-            @pure $d(a::S,b::T) where {S<:$Term,T<:Complex} = a*$d(1,b)
-            @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
+        @eval @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
+    end
+end
+
+function generate_inverses(Sym,T)
+    for (nv,d,ds) ∈ ((:inv,:/,:($Sym.:/)),(:inv_rat,://,:($Sym.://)))
+        for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
+            @eval $d(a::S,b::T) where {S<:$Term,T<:$Sym.$T} = a*$ds(1,b)
         end
     end
+end
+
+for T ∈ (:Real,:Complex)
+    generate_inverses(Base,T)
 end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
