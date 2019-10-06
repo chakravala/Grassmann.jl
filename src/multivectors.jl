@@ -595,6 +595,7 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
 ## conversions
 
 @inline (V::Signature)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
+@inline (V::DiagonalForm)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
