@@ -170,22 +170,25 @@ end
 
 # Hodge star ★
 
-const complementright = ⋆
+const complementrighthodge = ⋆
+const complementright = !
 
 ## complement
 
-export complementleft, complementright, ⋆
+export complementleft, complementright, ⋆, complementlefthodge, complementrighthodge
 
 for side ∈ (:left,:right)
-    c = Symbol(:complement,side)
-    p = Symbol(:parity,side)
-    @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-        d = getbasis(V,complement(ndims(V),B,diffvars(V),hasinf(V)+hasorigin(V)))
-        mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-        typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-value(d),d) : d) : SBlade{V}($p(b)*value(d),d)
-    end
-    for Blade ∈ MSB
-        @eval $c(b::$Blade) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
+    c,p = Symbol(:complement,side),Symbol(:parity,side)
+    h,pg = Symbol(c,:hodge),Symbol(p,:hodge)
+    for (c,p) ∈ ((c,p),(h,pg))
+        @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
+            d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
+            mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+            typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-value(d),d) : d) : SBlade{V}($p(b)*value(d),d)
+        end
+        for B ∈ MSB
+            @eval $c(b::$B) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
+        end
     end
 end
 
@@ -193,13 +196,13 @@ end
     complementright(ω::TensorAlgebra)
 
 Grassmann-Poincare-Hodge complement: ⋆ω = ω∗I
-""" complementright
+""" complementrighthodge
 
 @doc """
     complementleft(ω::TensorAlgebra)
 
 Grassmann-Poincare left complement: ⋆'ω = I∗'ω
-""" complementleft
+""" complementlefthodge
 
 ## reverse
 
@@ -769,44 +772,46 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         end
     end
     for side ∈ (:left,:right)
-        c = Symbol(:complement,side)
-        p = Symbol(:parity,side)
-        for Chain ∈ MSC
-            @eval begin
-                function $c(b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-                    $(insert_expr((:N,:ib,:D,:P),VEC)...)
-                    out = zeros($VEC(N,G,T))
-                    D = diffvars(V)
-                    for k ∈ 1:binomial(N,G)
-                        @inbounds val = b.v[k]
-                        if val≠0
-                            @inbounds p = $p(V,ib[k])
-                            v = typeof(V)<:Signature ? (p ? $SUB(val) : val) : p*val
-                            @inbounds setblade!(out,v,complement(N,ib[k],D,P),Dimension{N}())
+        c,p = Symbol(:complement,side),Symbol(:parity,side)
+        h,pg = Symbol(c,:hodge), Symbol(p,:hodge)
+        for (c,p) ∈ ((c,p),(h,pg))
+            for Chain ∈ MSC
+                @eval begin
+                    function $c(b::$Chain{T,V,G}) where {T<:$Field,V,G}
+                        mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                        $(insert_expr((:N,:ib,:D,:P),VEC)...)
+                        out = zeros($VEC(N,G,T))
+                        D = diffvars(V)
+                        for k ∈ 1:binomial(N,G)
+                            @inbounds val = b.v[k]
+                            if val≠0
+                                @inbounds p = $p(V,ib[k])
+                                v = typeof(V)<:Signature ? (p ? $SUB(val) : val) : p*val
+                                @inbounds setblade!(out,v,complement(N,ib[k],D,P),Dimension{N}())
+                            end
                         end
+                        return $Chain{T,V,N-G}(out)
                     end
-                    return $Chain{T,V,N-G}(out)
                 end
             end
-        end
-        @eval begin
-            function $c(m::MultiVector{T,V}) where {T<:$Field,V}
-                mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-                $(insert_expr((:N,:bs,:bn,:P),VEC)...)
-                out = zeros($VEC(N,T))
-                D = diffvars(V)
-                for g ∈ 1:N+1
-                    ib = indexbasis(N,g-1)
-                    @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = m.v[bs[g]+i]
-                        if val≠0
-                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])*val
-                            @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Dimension{N}())
+            @eval begin
+                function $c(m::MultiVector{T,V}) where {T<:$Field,V}
+                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    $(insert_expr((:N,:bs,:bn,:P),VEC)...)
+                    out = zeros($VEC(N,T))
+                    D = diffvars(V)
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = m.v[bs[g]+i]
+                            if val≠0
+                                v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])*val
+                                @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Dimension{N}())
+                            end
                         end
                     end
+                    return MultiVector{T,V}(out)
                 end
-                return MultiVector{T,V}(out)
             end
         end
     end

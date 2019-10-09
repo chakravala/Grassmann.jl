@@ -15,24 +15,41 @@ end
 
 ## complement parity
 
-@pure parityright(V::Int,B,G,N=nothing) = isodd(V)⊻isodd(B+Int((G+1)*G/2))
+@pure parityrighthodge(V::Int,B,G,N=nothing) = isodd(V)⊻parityright(V,B,G,N)
+@pure paritylefthodge(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityrightgrade(V,B,G,N)
+@pure parityright(V::Int,B,G,N=nothing) = isodd(B+Int((G+1)*G/2))
 @pure parityleft(V::Int,B,G,N) = (isodd(G) && iseven(N)) ⊻ parityright(V,B,G,N)
 
 for side ∈ (:left,:right)
     p = Symbol(:parity,side)
+    pg = Symbol(p,:hodge)
     @eval begin
-        @pure $p(V::Bits,B::Bits,N::Int) = $p(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
+        @pure $p(V::Bits,B::Bits,N::Int) = $p(0,sum(indices(B,N)),count_ones(B),N)
+        @pure $pg(V::Bits,B::Bits,N::Int) = $pg(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
         @pure function $p(V::Signature,B,G=count_ones(B))
+            o = hasinf(V) && (hasorigin(V) ? iszero(B&UInt(2))&(!iszero(B&UInt(1))) : isodd(B))
+            b = B&(UInt(1)<<(ndims(V)-diffvars(V))-1)
+            $p(0,sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
+        end
+        @pure function $pg(V::Signature,B,G=count_ones(B))
             o = hasorigin(V) && (hasinf(V) ? iszero(B&UInt(1))&(!iszero(B&UInt(2))) : isodd(B))
             b = B&(UInt(1)<<(ndims(V)-diffvars(V))-1)
-            $p(count_ones(value(V)&b),sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
+            $pg(count_ones(value(V)&b),sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
         end
         @pure function $p(V::DiagonalForm,B,G=count_ones(B))
+            ind = indices(B&(UInt(1)<<(ndims(V)-diffvars(V))-1),ndims(V))
+            $p(0,sum(ind),G,ndims(V)-diffvars(V)) ? -1 : 1
+        end
+        @pure function $pg(V::DiagonalForm,B,G=count_ones(B))
             ind = indices(B&(UInt(1)<<(ndims(V)-diffvars(V))-1),ndims(V))
             g = prod(V[ind])
             $p(0,sum(ind),G,ndims(V)-diffvars(V)) ? -(g) : g
         end
-        @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
+    end
+    for p ∈ (p,pg)
+        @eval begin
+            @pure $p(b::Basis{V,G,B}) where {V,G,B} = $p(V,B,G)
+        end
     end
 end
 
@@ -74,7 +91,7 @@ end
         else
             false, A+B≠0 ? complement(N,C,D) : g_zero(UInt)
         end
-        par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
+        par = parityrighthodge(S,A,N)⊻parityrighthodge(S,B,N)⊻parityrighthodge(S,C,N)
         return (isodd(L*(L-grade(V)))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
         return false, g_zero(UInt), false, Z
@@ -91,7 +108,7 @@ end
     diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
     γ = complement(N,B,diffvars(V))
     p,C,t = parityregressive(V,A,γ,Grade{true}())
-    return t ? p⊻parityright(S,B,N) : p, C|Q, t, Z
+    return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
 end
 
 @pure function parityinterior(V::M,a,b) where M<:Manifold{N} where N
@@ -114,7 +131,7 @@ end
     A,B,Q,Z = symmetricmask(V,a,b)
     if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
         C = A ⊻ B
-        return (parity(N,S,A,B)⊻parityright(S,C,N)), complement(N,C,diffvars(V))|Q, true, Z
+        return (parity(N,S,A,B)⊻parityrighthodge(S,C,N)), complement(N,C,diffvars(V))|Q, true, Z
     else
         return false, zero(Bits), false, Z
     end
@@ -124,7 +141,7 @@ end
     A,B,Q,Z = symmetricmask(V,a,b)
     if (count_ones(A&B)==0) && !(hasinf(V) && isodd(A) && isodd(B))
         C = A ⊻ B
-        g = parityright(V,C,N)
+        g = parityrighthodge(V,C,N)
         return parity(A,B,V) ? -(g) : g, complement(N,C,diffvars(V))|Q, true, Z
     else
         return 1, zero(Bits), false, Z
