@@ -23,13 +23,22 @@ end
 for side ∈ (:left,:right)
     p = Symbol(:parity,side)
     pg = Symbol(p,:hodge)
+    pn = Symbol(p,:null)
     @eval begin
         @pure $p(V::Bits,B::Bits,N::Int) = $p(0,sum(indices(B,N)),count_ones(B),N)
         @pure $pg(V::Bits,B::Bits,N::Int) = $pg(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
+        @inline $pn(V,B,v) = v
+        @inline function $pn(V::Signature,B,v)
+            hi,ho = hasinf(V),hasorigin(V)
+            if (hi||ho) && (hi+ho==2 ? count_ones(B&UInt(3))==1 : isodd(B))
+                (hi+ho==2 ? isodd(B) : hi) ? (2v) : (v/2)
+            else
+                v
+            end
+        end
         @pure function $p(V::Signature,B,G=count_ones(B))
-            o = hasinf(V) && (hasorigin(V) ? iszero(B&UInt(2))&(!iszero(B&UInt(1))) : isodd(B))
             b = B&(UInt(1)<<(ndims(V)-diffvars(V))-1)
-            $p(0,sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
+            $p(0,sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))
         end
         @pure function $pg(V::Signature,B,G=count_ones(B))
             o = hasorigin(V) && (hasinf(V) ? iszero(B&UInt(1))&(!iszero(B&UInt(2))) : isodd(B))

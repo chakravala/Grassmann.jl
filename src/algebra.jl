@@ -179,12 +179,13 @@ export complementleft, complementright, ⋆, complementlefthodge, complementrigh
 
 for side ∈ (:left,:right)
     c,p = Symbol(:complement,side),Symbol(:parity,side)
-    h,pg = Symbol(c,:hodge),Symbol(p,:hodge)
+    h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
     for (c,p) ∈ ((c,p),(h,pg))
         @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
             d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
             mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-            typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-value(d),d) : d) : SBlade{V}($p(b)*value(d),d)
+            v = $(c≠h ? :($pn(V,B,value(d))) : :(value(d)))
+            typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-v,d) : isone(v) ? d : SBlade{V}(v,d)) : SBlade{V}($p(b)*v,d)
         end
         for B ∈ MSB
             @eval $c(b::$B) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
@@ -773,7 +774,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end
     for side ∈ (:left,:right)
         c,p = Symbol(:complement,side),Symbol(:parity,side)
-        h,pg = Symbol(c,:hodge), Symbol(p,:hodge)
+        h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
         for (c,p) ∈ ((c,p),(h,pg))
             for Chain ∈ MSC
                 @eval begin
@@ -786,7 +787,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds val = b.v[k]
                             if val≠0
                                 @inbounds p = $p(V,ib[k])
-                                v = typeof(V)<:Signature ? (p ? $SUB(val) : val) : p*val
+                                v = $(c≠h ? :($pn(V,ib[k],val)) : :val)
+                                v = typeof(V)<:Signature ? (p ? $SUB(v) : v) : p*v
                                 @inbounds setblade!(out,v,complement(N,ib[k],D,P),Dimension{N}())
                             end
                         end
@@ -805,7 +807,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds val = m.v[bs[g]+i]
                             if val≠0
-                                v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(val) : val) : $p(V,ib[i])*val
+                                v = $(c≠h ? :($pn(V,ib[i],val)) : :val)
+                                v = typeof(V)<:Signature ? ($p(V,ib[i]) ? $SUB(v) : v) : $p(V,ib[i])*v
                                 @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Dimension{N}())
                             end
                         end
