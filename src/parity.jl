@@ -87,8 +87,8 @@ end
 end
 
 @pure function parityregressive(V::Signature{N,M,S},a,b,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
-    dv = diffvars(V)
-    (A,B,Q,Z),NG,D = symmetricmask(V,a,b),N-dv,dv
+    D = diffvars(V)
+    (A,B,Q,Z),NG = symmetricmask(V,a,b),N-D
     α,β = complement(N,A,D),complement(N,B,D)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
     if ((count_ones(α&β)==0) && !diffcheck(V,α,β)) || cc

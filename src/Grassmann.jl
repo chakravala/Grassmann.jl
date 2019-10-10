@@ -411,7 +411,7 @@ end
 
 using Leibniz
 import Leibniz: ∂, d, ∇
-export ∇, ∂, d
+export ∇, ∂, d, ↑, ↓
 
 generate_products(:(Leibniz.Operator),:svec)
 
@@ -428,6 +428,11 @@ end
 
 ∂(ω::T) where T<:TensorAlgebra{V} where V = ω⋅V(∇)
 d(ω::T) where T<:TensorAlgebra{V} where V = V(∇)∧ω
+
+@pure ℙ(V) = ((i,o)=(hasinf(V),hasorigin(V));i+o==2 ? V : (i+o==0 ? S"∞∅"⊕V : V))
+
+↑(ω::T) where T<:TensorAlgebra{V} where V = (G=Λ(ℙ(V));ω+ω^2*G.v∞/2 + G.v∅)
+↓(ω::T) where T<:TensorAlgebra{V} where V = (G=Λ(ℙ(V));inv(G.v∞∅)*(G.v∞∅∧ω)/(-ω⋅G.v∞))
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin

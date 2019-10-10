@@ -26,7 +26,7 @@ const SymField = Any
 
 set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
 
-derive(n::N,b) where N<:Number = zero(typeof(n))
+@pure derive(n::N,b) where N<:Number = zero(typeof(n))
 derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
 #derive(n,b,a::T,t) where T<:TensorAlgebra = t ? (a,derive(n,b)) : (derive(n,b),a)
 

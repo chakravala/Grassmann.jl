@@ -633,7 +633,7 @@ for Chain ∈ MSC
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
             N,M = ndims(V),ndims(W)
-            out = zeros(mvec(M,G,T))
+            out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,G,T))
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
@@ -659,7 +659,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     N,M = ndims(V),ndims(W)
-    out = zeros(mvec(M,T))
+    out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,T))
     bs = binomsum_set(N)
     for i ∈ 1:N+1
         ib = indexbasis(N,i-1)
