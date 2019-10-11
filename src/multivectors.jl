@@ -632,13 +632,20 @@ for Chain ∈ MSC
             WC,VC = mixedmode(W),mixedmode(V)
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
-            N,M = ndims(V),ndims(W)
+            N,M,D = ndims(V),ndims(W),diffvars(V)
             out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,G,T))
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     if WC<0 && VC≥0
-                        @inbounds setblade!(out,b[k],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                        ibk = ib[k]
+                        if D≠0
+                            A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
+                            ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
+                        else
+                            ibk = VC>0 ? ibk<<N : ibk
+                        end
+                        @inbounds setblade!(out,b[k],ibk,Dimension{M}())
                     elseif WC≥0 && VC≥0
                         @inbounds setblade!(out,b[k],ib[k],Dimension{M}())
                     else
@@ -658,7 +665,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
-    N,M = ndims(V),ndims(W)
+    N,M,D = ndims(V),ndims(W),diffvars(V)
     out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,T))
     bs = binomsum_set(N)
     for i ∈ 1:N+1
@@ -667,7 +674,14 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
             @inbounds s = k+bs[i]
             @inbounds if m.v[s] ≠ 0
                 if WC<0 && VC≥0
-                    @inbounds setmulti!(out,m.v[s],VC>0 ? ib[k]<<N : ib[k],Dimension{M}())
+                    ibk = ib[k]
+                    if D≠0
+                        A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
+                        ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
+                    else
+                        ibk = VC>0 ? ibk<<N : ibk
+                    end
+                    @inbounds setmulti!(out,m.v[s],ibk,Dimension{M}())
                 elseif WC≥0 && VC≥0
                     @inbounds setmulti!(out,m.v[s],ib[k],Dimension{M}())
                 else

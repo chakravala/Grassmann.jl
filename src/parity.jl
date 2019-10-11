@@ -30,8 +30,8 @@ for side ∈ (:left,:right)
         @inline $pn(V,B,v) = v
         @inline function $pn(V::Signature,B,v)
             hi,ho = hasinf(V),hasorigin(V)
-            if (hi||ho) && (hi+ho==2 ? count_ones(B&UInt(3))==1 : isodd(B))
-                (hi+ho==2 ? isodd(B) : hi) ? (2v) : (v/2)
+            if hi && ho && count_ones(B&UInt(3)) ==1
+                isodd(B) ? (2v) : (v/2)
             else
                 v
             end
@@ -41,7 +41,7 @@ for side ∈ (:left,:right)
             $p(0,sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))
         end
         @pure function $pg(V::Signature,B,G=count_ones(B))
-            o = hasorigin(V) && (hasinf(V) ? iszero(B&UInt(1))&(!iszero(B&UInt(2))) : isodd(B))
+            o = hasorigin(V) && hasinf(V) && (iszero(B&UInt(1))&(!iszero(B&UInt(2))))
             b = B&(UInt(1)<<(ndims(V)-diffvars(V))-1)
             $pg(count_ones(value(V)&b),sum(indices(b,ndims(V))),count_ones(b),ndims(V)-diffvars(V))⊻o
         end
@@ -63,14 +63,14 @@ for side ∈ (:left,:right)
 end
 
 @pure function complement(N::Int,B::UInt,D::Int=0,P::Int=0)::UInt
-    UP,ND = UInt(1)<<P-1, N-D
+    UP,ND = UInt(1)<<(P==1 ? 0 : P)-1, N-D
     C = ((~B)&(UP⊻(UInt(1)<<ND-1)))|(B&(UP⊻((UInt(1)<<D-1)<<ND)))
     count_ones(C&UP)≠1 ? C⊻UP : C
 end
 
 ## product parities
 
-@pure conformalmask(V::M) where M<:Manifold = UInt(2)^(hasinf(V)+hasorigin(V))-1
+@pure conformalmask(V::M) where M<:Manifold = UInt(2)^(hasinf(V)&&hasorigin(V) ? 2 : 0)-1
 
 @pure function conformalcheck(V::M,A,B) where M<:Manifold
     bt = conformalmask(V)
