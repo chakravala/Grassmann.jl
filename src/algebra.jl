@@ -941,7 +941,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{t,V,2^N}(out)
+                    return MultiVector{t,V}(out)
                 end
             end
         end
@@ -1194,7 +1194,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     elseif TA <: TensorMixed
                         g = grade(A)
                         r = binomsum(N,g)
-                        @inbounds out[r+1:r+binomial(N,g)] += value(A,$VEC(N,g,t))
+                        @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(A,$VEC(N,g,t))),bop))
                     end
                 end
                 return MultiVector{t,V}(out)
@@ -1215,7 +1215,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     elseif TB <: TensorMixed
                         g = grade(B)
                         r = binomsum(N,g)
-                        @inbounds $(Expr(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t)))))
+                        @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t))),bop))
                     end
                 end
                 return MultiVector{t,V}(out)
@@ -1315,13 +1315,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
-                    @inbounds out[r+1:r+bng] += value(a,$VEC(N,G,t))
+                    @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),bop))
                     return MultiVector{t,V}(out)
                 end
                 function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,G,S}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
-                    @inbounds $(Expr(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t)))))
+                    @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
                     return MultiVector{t,V}(out)
                 end
             end
