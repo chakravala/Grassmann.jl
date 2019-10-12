@@ -602,10 +602,8 @@ for M ∈ (:Signature,:DiagonalForm,:SubManifold)
     end
 end
 
-@pure supbits(N,S,B) = bit2int(indexbits(N,indices(S,N)[indices(B,N)]))
-@pure supblade(N,S,B) = bladeindex(N,supbits(N,S,B))
-@pure supmulti(N,S,B) = basisindex(N,supbits(N,S,B))
-@pure subbits(N,S,B) = (k=indices(S,N);bit2int(indexbits(N,findall(x->x∈k,indices(B,N)))))
+#@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
+#@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
@@ -632,8 +630,13 @@ end
 end
 @pure function (W::SubManifold{M,V,S})(b::Basis{V}) where {M,V,S}
     B,N = bits(b),ndims(V)
-    iszero(B⊻(B&S)) ? getbasis(W,subbits(N,S,B)) : g_zero(W)
+    iszero(B⊻(B&S)) ? getbasis(W,lowerbits(N,S,B)) : g_zero(W)
 end
+
+@pure choicevec(M,G,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,G,T) : mvec(M,G,T)
+@pure choicevec(M,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,T) : mvec(M,T)
+
+@pure subindex(::SubManifold{M,V,S} where {M,V}) where S = S::UInt
 
 for Chain ∈ MSC
     @eval begin
@@ -644,12 +647,12 @@ for Chain ∈ MSC
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
             N,M,D = ndims(V),ndims(W),diffvars(V)
-            out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,G,T))
+            out = zeros(choicevec(M,G,valuetype(b)))
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     if WC<0 && VC≥0
-                        ibk = ib[k]
+                        @inbounds ibk = ib[k]
                         if D≠0
                             A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
                             ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
@@ -666,13 +669,15 @@ for Chain ∈ MSC
             end
             return $Chain{T,W,G}(out)
         end
+        function (W::SubManifold{M,V,S})(b::$Chain{T,V,1}) where {M,V,S,T}
+            $Chain{T,W,1}(b.v[indices(subindex(W),ndims(V))])
+        end
         function (W::SubManifold{M,V,S})(b::$Chain{T,V,G}) where {M,V,S,T,G}
-            out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,G,T))
-            ib = indexbasis(M,G)
+            out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
+            ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
-                val = b[supblade(ndims(V),S,ib[k])]
-                @inbounds if val ≠ 0
-                    @inbounds setblade!(out,val,ib[k],Dimension{M}())
+                if b[k] ≠ 0
+                    @inbounds setblade!(out,b[k],lowerbits(N,S,ib[k]),Dimension{M}())
                 end
             end
             return $Chain{T,W,G}(out)
@@ -687,7 +692,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     N,M,D = ndims(V),ndims(W),diffvars(V)
-    out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,T))
+    out = zeros(choicevec(M,valuetype(m)))
     bs = binomsum_set(N)
     for i ∈ 1:N+1
         ib = indexbasis(N,i-1)
@@ -695,7 +700,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
             @inbounds s = k+bs[i]
             @inbounds if m.v[s] ≠ 0
                 if WC<0 && VC≥0
-                    ibk = ib[k]
+                    @inbounds ibk = ib[k]
                     if D≠0
                         A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
                         ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
@@ -715,13 +720,12 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
 end
 
 function (W::SubManifold{M,V,S})(m::MultiVector{T,V}) where {M,V,S,T}
-    out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,T))
+    out,N = zeros(choicevec(M,valuetype(m))),ndims(V)
     for i ∈ 1:M+1
-        ib = indexbasis(M,i-1)
+        ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
-            val = m.v[supmulti(ndims(V),S,ib[k])]
-            @inbounds if val ≠ 0
-                @inbounds setmulti!(out,val,ib[k],Dimension{M}())
+            @inbounds if m.v[k] ≠ 0
+                @inbounds setmulti!(out,m.v[k],lowerbits(N,S,ib[k]),Dimension{M}())
             end
         end
     end

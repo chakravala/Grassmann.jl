@@ -19,12 +19,9 @@ const ExprField = Union{Expr,Symbol}
 
 ## mutating operations
 
-add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
 
 const Sym = :DirectSum
 const SymField = Any
-
-set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
 
 @pure derive(n::N,b) where N<:Number = zero(typeof(n))
 derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
@@ -85,6 +82,10 @@ for M ∈ (:Signature,:DiagonalForm)
 end
 @pure loworder(::SubManifold{N,M,S}) where {N,M,S} = SubManifold{N,loworder(M),S}()
 
+add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
+
+set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
+
 function generate_mutators(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
@@ -102,6 +103,10 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                 end
             end
+        end
+        @eval @inline function $sb(out::Q,val::S,i::Int) where Q<:$M where {M,T<:$F,S<:$F}
+            @inbounds $(set_val(set,:(out[i]),:val))
+            return out
         end
         for s ∈ (sm,sb)
             @eval begin

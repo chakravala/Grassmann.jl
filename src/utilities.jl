@@ -217,3 +217,42 @@ end
 struct Dimension{N}
     @pure Dimension{N}() where N = new{N}()
 end
+
+# SubManifold
+
+const lowerbits_cache = Vector{Vector{UInt}}[]
+const lowerbits_extra = Dict{UInt,Dict{UInt,UInt}}[]
+@pure lowerbits_calc(N,S,B,k=indices(S,N)) = bit2int(indexbits(N,findall(x->x∈k,indices(B,N))))
+@pure function lowerbits(N,S,B)
+    if N>cache_limit
+        n = N-cache_limit
+        for k ∈ length(lowerbits_cache)+1:n
+            push!(lowerbits_cache,Dict{UInt,Dict{UInt,UInt}}())
+        end
+        @inbounds !haskey(lowerbits_extra[n],S) && push!(lowerbits_extra[n],S=>Dict{UInt,UInt}())
+        @inbounds !haskey(lowerbits_extra[n][S],B) && push!(lowerbits_extra[n][S],B=>lowerbits_calc(N,S,B))
+        @inbounds lowerbits_extra[n][S][B]
+    else
+        for k ∈ length(lowerbits_cache)+1:min(N,cache_limit)
+            push!(lowerbits_cache,Vector{Int}[])
+        end
+        for s ∈ length(lowerbits_cache[N])+1:S
+            k = indices(S,N)
+            push!(lowerbits_cache[N],[lowerbits_calc(N,s,d,k) for d ∈ UInt(0):UInt(1)<<(N+1)-1])
+        end
+        @inbounds lowerbits_cache[N][S][B+1]
+    end
+end
+
+#=const expandbits_cache = Dict{UInt,Dict{UInt,UInt}}[]
+@pure expandbits_calc(N,S,B) = bit2int(indexbits(N,indices(S,N)[indices(B,N)]))
+@pure function expandbits(N,S,B)
+    for k ∈ length(expandbits_cache)+1:N
+        push!(expandbits_cache,Dict{UInt,Dict{UInt,UInt}}())
+    end
+    @inbounds !haskey(expandbits_cache[N],S) && push!(expandbits_cache[N],S=>Dict{UInt,UInt}())
+    @inbounds !haskey(expandbits_cache[N][S],B) && push!(expandbits_cache[N][S],B=>expandbits_calc(N,S,B))
+    @inbounds expandbits_cache[N][S][B]
+end=#
+
+
