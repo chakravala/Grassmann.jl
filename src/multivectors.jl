@@ -594,9 +594,18 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
 
 ## conversions
 
-for M ∈ (:Signature,:DiagonalForm)
-    @eval @inline (V::$M)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
+for M ∈ (:Signature,:DiagonalForm,:SubManifold)
+    @eval begin
+        @inline (V::$M)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
+        (W::$M)(b::SBlade) = SBlade{W}(value(b),W(basis(b)))
+        (W::$M)(b::MBlade) = MBlade{W}(value(b),W(basis(b)))
+    end
 end
+
+@pure supbits(N,S,B) = bit2int(indexbits(N,indices(S,N)[indices(B,N)]))
+@pure supblade(N,S,B) = bladeindex(N,supbits(N,S,B))
+@pure supmulti(N,S,B) = basisindex(N,supbits(N,S,B))
+@pure subbits(N,S,B) = (k=indices(S,N);bit2int(indexbits(N,findall(x->x∈k,indices(B,N)))))
 
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
@@ -621,8 +630,10 @@ end
         throw(error("arbitrary Manifold intersection not yet implemented."))
     end
 end
-(W::Signature)(b::SBlade) = SBlade{W}(value(b),W(basis(b)))
-(W::Signature)(b::MBlade) = MBlade{W}(value(b),W(basis(b)))
+@pure function (W::SubManifold{M,V,S})(b::Basis{V}) where {M,V,S}
+    B,N = bits(b),ndims(V)
+    iszero(B⊻(B&S)) ? getbasis(W,subbits(N,S,B)) : g_zero(W)
+end
 
 for Chain ∈ MSC
     @eval begin
@@ -655,7 +666,17 @@ for Chain ∈ MSC
             end
             return $Chain{T,W,G}(out)
         end
-
+        function (W::SubManifold{M,V,S})(b::$Chain{T,V,G}) where {M,V,S,T,G}
+            out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,G,T))
+            ib = indexbasis(M,G)
+            for k ∈ 1:length(ib)
+                val = b[supblade(ndims(V),S,ib[k])]
+                @inbounds if val ≠ 0
+                    @inbounds setblade!(out,val,ib[k],Dimension{M}())
+                end
+            end
+            return $Chain{T,W,G}(out)
+        end
     end
 end
 
@@ -693,6 +714,19 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     return MultiVector{T,W}(out)
 end
 
+function (W::SubManifold{M,V,S})(m::MultiVector{T,V}) where {M,V,S,T}
+    out = zeros((T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec : mvec)(M,T))
+    for i ∈ 1:M+1
+        ib = indexbasis(M,i-1)
+        for k ∈ 1:length(ib)
+            val = m.v[supmulti(ndims(V),S,ib[k])]
+            @inbounds if val ≠ 0
+                @inbounds setmulti!(out,val,ib[k],Dimension{M}())
+            end
+        end
+    end
+    return MultiVector{T,W}(out)
+end
 
 # QR compatibility
 

@@ -512,6 +512,13 @@ function __init__()
             return g
         end
     end
+    @require GeometryTypes="4d00f742-c7ba-57c2-abde-4428a4b178cb" begin
+        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(SChain{valuetype(t),V}(vector(t))))
+        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorAlgebra{V} where V = GeometryTypes.Point(value(vector(t)))
+        GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
+    end
+    #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
+    #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
 end
 
 end # module
