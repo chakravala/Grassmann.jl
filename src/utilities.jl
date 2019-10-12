@@ -226,8 +226,8 @@ const lowerbits_extra = Dict{UInt,Dict{UInt,UInt}}[]
 @pure function lowerbits(N,S,B)
     if N>cache_limit
         n = N-cache_limit
-        for k ∈ length(lowerbits_cache)+1:n
-            push!(lowerbits_cache,Dict{UInt,Dict{UInt,UInt}}())
+        for k ∈ length(lowerbits_extra)+1:n
+            push!(lowerbits_extra,Dict{UInt,Dict{UInt,UInt}}())
         end
         @inbounds !haskey(lowerbits_extra[n],S) && push!(lowerbits_extra[n],S=>Dict{UInt,UInt}())
         @inbounds !haskey(lowerbits_extra[n][S],B) && push!(lowerbits_extra[n][S],B=>lowerbits_calc(N,S,B))

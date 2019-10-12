@@ -628,9 +628,8 @@ end
         throw(error("arbitrary Manifold intersection not yet implemented."))
     end
 end
-@pure function (W::SubManifold{M,V,S})(b::Basis{V}) where {M,V,S}
-    B,N = bits(b),ndims(V)
-    iszero(B⊻(B&S)) ? getbasis(W,lowerbits(N,S,B)) : g_zero(W)
+@pure function (W::SubManifold{M,V,S})(b::Basis{V,G,B}) where {M,V,S,G,B}
+    count_ones(B&S)==G ? getbasis(W,lowerbits(ndims(V),S,B)) : g_zero(W)
 end
 
 @pure choicevec(M,G,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,G,T) : mvec(M,G,T)
@@ -676,8 +675,10 @@ for Chain ∈ MSC
             out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
-                if b[k] ≠ 0
-                    @inbounds setblade!(out,b[k],lowerbits(N,S,ib[k]),Dimension{M}())
+                @inbounds if b[k] ≠ 0
+                    @inbounds if count_ones(ib[k]&S) == G
+                        @inbounds setblade!(out,b[k],lowerbits(N,S,ib[k]),Dimension{M}())
+                    end
                 end
             end
             return $Chain{T,W,G}(out)
@@ -721,11 +722,15 @@ end
 
 function (W::SubManifold{M,V,S})(m::MultiVector{T,V}) where {M,V,S,T}
     out,N = zeros(choicevec(M,valuetype(m))),ndims(V)
-    for i ∈ 1:M+1
+    bs = binomsum_set(N)
+    for i ∈ 1:N+1
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
-            @inbounds if m.v[k] ≠ 0
-                @inbounds setmulti!(out,m.v[k],lowerbits(N,S,ib[k]),Dimension{M}())
+            @inbounds s = k+bs[i]
+            @inbounds if m.v[s] ≠ 0
+                @inbounds if count_ones(ib[k]&S) == i-1
+                    @inbounds setmulti!(out,m.v[s],lowerbits(N,S,ib[k]),Dimension{M}())
+                end
             end
         end
     end

@@ -104,10 +104,6 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 end
             end
         end
-        @eval @inline function $sb(out::Q,val::S,i::Int) where Q<:$M where {M,T<:$F,S<:$F}
-            @inbounds $(set_val(set,:(out[i]),:val))
-            return out
-        end
         for s ∈ (sm,sb)
             @eval begin
                 @inline function $(Symbol(:join,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
