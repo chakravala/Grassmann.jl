@@ -439,7 +439,7 @@ function ↑(ω::T) where T<:TensorAlgebra{V} where V
     else
         ω2 = ω^2
         iω2 = inv(ω2+1)
-        (i ? G.v∞ : G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
+        (hasinf(PV) ? G.v∞ : G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
     end
 end
 
@@ -449,7 +449,7 @@ function ↓(ω::T) where T<:TensorAlgebra{V} where V
     return if hasinf(PV) && hasorigin(PV)
         inv(G.v∞∅)*(G.v∞∅∧ω)/(-ω⋅G.v∞)
     else
-        b = i ? G.v∞ : G.v∅
+        b = hasinf(PV) ? G.v∞ : G.v∅
         ((ω∧b)*b)/(1-b⋅ω)
     end
 end

@@ -109,6 +109,7 @@ for Blade ∈ MSB
         @pure $Blade(b::Basis{V,G}) where {V,G} = $Blade{V}(b)
         @pure $Blade{V}(b::Basis{V,G}) where {V,G} = $Blade{V,G,b,Int}(1)
         $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
+        $Blade{V}(v::TensorTerm{V}) where V = v
         $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
         $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
         $Blade{V}(v,b::S) where S<:TensorMixed where V = v*b
