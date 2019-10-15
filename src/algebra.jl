@@ -535,6 +535,12 @@ Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """
 >>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
 
+## linear algebra
+
+export ⟂, ∥
+
+∥(a,b) = iszero(a∧b)
+
 ### Product Algebra Constructor
 
 function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
@@ -1313,13 +1319,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     return MChain{t,V,G}(out)
                 end
-                function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S}
+                function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                     @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),bop))
                     return MultiVector{t,V}(out)
                 end
-                function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,G,S}
+                function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t,:r,:bng),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
                     @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))

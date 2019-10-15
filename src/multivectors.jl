@@ -109,15 +109,19 @@ for Blade ∈ MSB
         @pure $Blade(b::Basis{V,G}) where {V,G} = $Blade{V}(b)
         @pure $Blade{V}(b::Basis{V,G}) where {V,G} = $Blade{V,G,b,Int}(1)
         $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
-        $Blade{V}(v::TensorTerm{V}) where V = v
+        $Blade{V}(v::S) where S<:TensorTerm where V = v
         $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
-        $Blade(v,b::TensorTerm{V}) where V = $Blade{V}(v,b)
-        $Blade{V}(v,b::S) where S<:TensorMixed where V = v*b
-        $Blade{V}(v::T,b::Basis{V,G}) where {V,G,T} = $Blade{V,G}(v,b)
+        $Blade(v,b::S) where S<:TensorTerm{V} where V = $Blade{V}(v,b)
+        $Blade{V}(v,b::S) where S<:TensorAlgebra where V = v*b
+        $Blade{V}(v,b::Basis{V,G}) where {V,G} = $Blade{V,G}(v,b)
+        $Blade{V}(v,b::Basis{W,G}) where {V,W,G} = $Blade{V,G}(v,b)
         function $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
             order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,T}(v)
         end
-        function $Blade{V,G}(v::T,b::Basis{V,G}) where T<:TensorTerm{V} where {V,G}
+        function $Blade{V,G}(v::T,b::Basis{W,G}) where {V,W,G,T}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,V(b),T}(v)
+        end
+        function $Blade{V,G}(v::T,b::Basis{V,G}) where T<:TensorTerm where {V,G}
             order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,Any}(v)
         end
         function $Blade{V,G,B}(b::T) where T<:TensorTerm{V} where {V,G,B}
@@ -485,7 +489,7 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)..
 import Base: isinf, isapprox
 import DirectSum: grade
 import AbstractTensors: scalar, involute, unit, even, odd
-export basis, grade, hasinf, hasorigin, isorigin, scalar, norm
+export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, betti, χ
 
 const VBV = Union{MBlade,SBlade,MChain,SChain,MultiVector}
 
@@ -515,6 +519,37 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasinf(V) ? e[2] : isodd(bits(e)))
 @pure hasorigin(t::Union{MBlade,SBlade}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
+
+@inline χ(V,b::UInt,t) = iszero(t) ? 0 : isodd(count_ones(symmetricmask(V,b,b)[1])) ? 1 : -1
+χ(t::T) where T<:TensorTerm{V,G} where {V,G} = χ(V,bits(basis(t)),t)
+χ(t::T) where T<:TensorAlgebra{V} where V = (B=betti(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+
+function betti(t::T) where T<:TensorTerm{V} where V
+    B,N = bits(basis(t)),ndims(V)
+    g = count_ones(symmetricmask(V,B,B)[1])
+    MVector{N+1,Int}([g==G ? abs(χ(t)) : 0 for G ∈ 0:N])
+end
+function betti(t::T) where T<:TensorAlgebra{V} where V
+    N = ndims(V)
+    out = zeros(MVector{N+1,Int})
+    ib = indexbasis(N,grade(t))
+    for k ∈ 1:length(ib)
+        @inbounds t.v[k] ≠ 0 && (out[count_ones(symmetricmask(V,ib[k],ib[k])[1])+1] += 1)
+    end
+    return out
+end
+function betti(t::MultiVector{T,V} where T) where V
+    N = ndims(V)
+    out = zeros(MVector{N+1,Int})
+    bs = binomsum_set(N)
+    for G ∈ 0:N
+        ib = indexbasis(N,G)
+        for k ∈ 1:length(ib)
+            @inbounds t.v[k+bs[G+1]] ≠ 0 && (out[count_ones(symmetricmask(V,ib[k],ib[k])[1])+1] += 1)
+        end
+    end
+    return out
+end
 
 for A ∈ (:TensorTerm,MSC...), B ∈ (:TensorTerm,MSC...)
     @eval isapprox(a::S,b::T) where {S<:$A,T<:$B} = vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? norm(a)≈norm(b) : (iszero(a) && iszero(b)))
@@ -606,6 +641,16 @@ end
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
+@pure function mixed(V::M,ibk::UInt) where M<:Manifold
+    N,D,VC = ndims(V),diffvars(V),mixedmode(V)
+    return if D≠0
+        A,B = ibk&(UInt(1)<<(N-D)-1),ibk&DirectSum.diffmask(V)
+        VC>0 ? (A<<(N-D))|(B<<N) : A|(B<<(N-D))
+    else
+        VC>0 ? ibk<<N : ibk
+    end
+end
+
 @pure function (W::Signature)(b::Basis{V}) where V
     V==W && (return b)
     !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
@@ -613,16 +658,7 @@ end
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
     if WC<0 && VC≥0
-        N = ndims(V)
-        dm = diffvars(V)
-        if dm≠0
-            D = DirectSum.diffmask(V)
-            m = (~D)&bits(b)
-            d = (D&bits(b))<<(N-dm+(VC>0 ? dm : 0))
-            return getbasis(W,(VC>0 ? m<<(N-dm) : m)⊻d)
-        else
-            return getbasis(W,VC>0 ? bits(b)<<(N-dm) : bits(b))
-        end
+        getbasis(W,mixed(V,bits(b)))
     elseif WC≥0 && VC≥0
         getbasis(W,bits(b))
     else
@@ -646,20 +682,13 @@ for Chain ∈ MSC
             WC,VC = mixedmode(W),mixedmode(V)
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
-            N,M,D = ndims(V),ndims(W),diffvars(V)
+            N,M = ndims(V),ndims(W)
             out = zeros(choicevec(M,G,valuetype(b)))
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     if WC<0 && VC≥0
-                        @inbounds ibk = ib[k]
-                        if D≠0
-                            A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
-                            ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
-                        else
-                            ibk = VC>0 ? ibk<<N : ibk
-                        end
-                        @inbounds setblade!(out,b[k],ibk,Dimension{M}())
+                        @inbounds setblade!(out,b[k],mixed(V,ib[k]),Dimension{M}())
                     elseif WC≥0 && VC≥0
                         @inbounds setblade!(out,b[k],ib[k],Dimension{M}())
                     else
@@ -693,7 +722,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
     WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
-    N,M,D = ndims(V),ndims(W),diffvars(V)
+    N,M = ndims(V),ndims(W)
     out = zeros(choicevec(M,valuetype(m)))
     bs = binomsum_set(N)
     for i ∈ 1:N+1
@@ -702,14 +731,7 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
             @inbounds s = k+bs[i]
             @inbounds if m.v[s] ≠ 0
                 if WC<0 && VC≥0
-                    @inbounds ibk = ib[k]
-                    if D≠0
-                        A,B = ibk&(UInt(1)<<(N-D)-1),ibk&((UInt(1)<<D-1)<<(N-D))
-                        ibk = VC>0 ? (A<<D)|(B<<N) : A|(B<<(N-D))
-                    else
-                        ibk = VC>0 ? ibk<<N : ibk
-                    end
-                    @inbounds setmulti!(out,m.v[s],ibk,Dimension{M}())
+                    @inbounds setmulti!(out,m.v[s],mixed(V,ib[k]),Dimension{M}())
                 elseif WC≥0 && VC≥0
                     @inbounds setmulti!(out,m.v[s],ib[k],Dimension{M}())
                 else
