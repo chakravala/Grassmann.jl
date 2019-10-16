@@ -12,22 +12,22 @@ using LinearAlgebra
 #       since they are no general mathematical properties of an GA
 @testset "Test isapprox" begin
     basis"2"
-    
+
     # basis
-    @test v ≈ v 
-    @test v1 ≈ v1 
+    @test v ≈ v
+    @test v1 ≈ v1
     @test v2 ≈ v2
     @test v12 ≈ v12
     # S/MBlade
-    @test 2v ≈ 2v 
-    @test 2v1 ≈ 2v1 
+    @test 2v ≈ 2v
+    @test 2v1 ≈ 2v1
     # chain
     @test v1 + v2 ≈ v1 + v2
     # multivector
     @test v + v2 ≈ v + v2
     @test v + v12 ≈ v + v12
     @test v + v2 + v12 ≈ v + v2 + v12
-    
+
     # basis and others
     @test !(v ≈ v1)
     @test !(v ≈ v12)
@@ -35,7 +35,7 @@ using LinearAlgebra
     @test !(v ≈ v1+v)
     @test !(v ≈ v1+v12)
     @test !(v ≈ v+v1+v12)
-    
+
     # S/MBlade and others
     @test !(2v ≈ v1)
     @test !(2v ≈ v12)
@@ -43,14 +43,14 @@ using LinearAlgebra
     @test !(2v ≈ v1+v)
     @test !(2v ≈ v1+v12)
     @test !(2v ≈ v+v1+v12)
-    
+
     # Chain and others
     @test !(v1 + v2 ≈ v1)
     @test !(v1 + v2 ≈ v12)
     @test !(v1 + v2 ≈ v1+v)
     @test !(v1 + v2 ≈ v1+v12)
     @test !(v1 + v2 ≈ v+v1+v12)
-    
+
     # multivector and others
     @test !(v+v1+v12 ≈ v1)
     @test !(v+v1+v12 ≈ v12)
@@ -72,10 +72,8 @@ for 𝔽 in [Float64]
     e = one(𝔽)
     α = rand(𝔽)
     @test α*e == α
-    @testset "Field: $(𝔽)" begin 
-        for G in [V"+++", S"∞+", S"∅+", V"-+++",
-                  S"∞∅+" # is currently broken for associativity
-                  ]
+    @testset "Field: $(𝔽)" begin
+        for G in [V"+++", S"∞+", S"∅+", V"-+++", S"∞∅+"]
             @testset "Algebra: $(G)" begin
                 dims = ndims(G)
 
@@ -91,7 +89,7 @@ for 𝔽 in [Float64]
                 vectors = Any[basisvecs...]
                 push!(vectors, B)
 
-                # test set of multivectors        
+                # test set of multivectors
                 a = rand(𝔽, 2^dims)
                 A = sum(a.*basis)
                 multivectors = Any[basis...]
@@ -102,33 +100,29 @@ for 𝔽 in [Float64]
                     for A in multivectors
                         @test e*A == A == A*e
                     end
-                end                
-                
+                end
+
                 @testset "a² ∈  𝔽" begin
                     for a in vectors
                         @test a^2 ≈ scalar(a^2)*basis[1]
                     end
-                end                
+                end
 
-                # currently fails for S"∞∅+"
-                if G != S"∞∅+"
-                    @testset "Associativity" begin
-                        for A in multivectors, 
-                            B in multivectors, 
-                            C in multivectors
-                            
-                            @test (A*(B*C)) ≈ ((A*B)*C)
-                        end
+                @testset "Associativity" begin
+                    for A in multivectors,
+                        B in multivectors,
+                        C in multivectors
+
+                        @test (A*(B*C)) ≈ ((A*B)*C)
                     end
+                end
 
-                    # currently fails for S"∞∅+"
-                    @testset "Distributivity" begin
-                        for A in multivectors, 
-                            B in multivectors, 
-                            C in multivectors
-                            
-                            @test A*(B + C) ≈ (A*B) + (A*C)
-                        end
+                @testset "Distributivity" begin
+                    for A in multivectors,
+                        B in multivectors,
+                        C in multivectors
+
+                        @test A*(B + C) ≈ (A*B) + (A*C)
                     end
                 end
 
