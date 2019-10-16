@@ -455,9 +455,9 @@ function ↓(ω::T) where T<:TensorAlgebra{V} where V
     end
 end
 
-## skeleton
+## skeleton / subcomplex
 
-export skeleton
+export skeleton, 𝒫, collapse, subcomplex, chain
 
 absym(t) = abs(t)
 absym(t::Basis) = t
@@ -466,30 +466,45 @@ absym(t::SChain{T,V,G}) where {T,V,G} = SChain{T,V,G}(absym.(value(t)))
 absym(t::MChain{T,V,G}) where {T,V,G} = MChain{T,V,G}(absym.(value(t)))
 absym(t::MultiVector{T,V}) where {T,V} = MultiVector{T,V}(absym.(value(t)))
 
-function skeleton(x::T) where T<:TensorTerm{V} where V
-    X,B = absym(x),bits(basis(x))
-    count_ones(symmetricmask(V,B,B)[1])>1 ? X + subcomplex(absym(∂(X))) : X
+collapse(a,b) = a⋅absym(∂(b))
+
+function chain(t::T) where T<:TensorTerm{V} where V
+    N,B = ndims(V),bits(basis(t))
+    C = symmetricmask(V,B,B)[1]
+    G = count_ones(C)
+    G < 2 && (return t)
+    out,ind = zeros(mvec(N,2,Int)), indices(C,N)
+    setblade!(out,G==2 ? 1 : -1,bit2int(indexbits(N,[ind[1],ind[end]])),Dimension{N}())
+    for k ∈ 2:G
+        setblade!(out,1,bit2int(indexbits(N,ind[[k-1,k]])),Dimension{N}())
+    end
+    return MChain{Int,V,2}(out)
 end
-skeleton(x::S) where {S<:TensorMixed{T,V} where T} where V = absym(x) + subcomplex(absym(∂(x)))
-function subcomplex(x::S) where {S<:TensorMixed{T,V} where T} where V
+
+𝒫(t::T) where T<:TensorAlgebra = skeleton(t,Val{false}())
+skeleton(x::S,v=Val{true}()) where S<:TensorAlgebra = absym(x) + subcomplex(absym(∂(x)),v)
+function subcomplex(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
+    B = bits(basis(x))
+    count_ones(symmetricmask(V,B,B)[1])>0 ? subcomplex(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
+end
+function subcomplex(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where Q} where {V,T}
     N,G,g = ndims(V),grade(x),0
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
-        if !iszero(x.v[k]) && count_ones(symmetricmask(V,ib[k],ib[k])[1]) > 0
-            g += skeleton(SBlade{V,G}(x.v[k],getbasis(V,ib[k])))
+        if !iszero(x.v[k]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
+            g += skeleton(SBlade{V,G}(x.v[k],getbasis(V,ib[k])),v)
         end
     end
     return g
 end
-function subcomplex(x::MultiVector{T,V} where T) where V
-   N,g = ndims(V),0
-   for i ∈ 2:N
+function subcomplex(x::MultiVector{S,V} where S,v::Val{T}=Val{true}()) where {V,T}
+    N,g = ndims(V),0
+    for i ∈ 0:N
         R = binomsum(N,i)
         ib = indexbasis(N,i)
         for k ∈ 1:binomial(N,i)
-            if !iszero(x.v[k+R])
-                G = count_ones(symmetricmask(V,ib[k],ib[k])[1])
-                G>0 && (g += skeleton(SBlade{V,i}(x.v[k+R],getbasis(V,ib[k]))))
+            if !iszero(x.v[k+R]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
+                g += skeleton(SBlade{V,i}(x.v[k+R],getbasis(V,ib[k])),v)
             end
         end
     end
