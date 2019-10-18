@@ -415,11 +415,9 @@ export ∇, Δ, ∂, d, ↑, ↓
 
 generate_products(:(Leibniz.Operator),:svec)
 
-@pure function (W::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
-    O < 1 && (return SChain{Int,W,1}(ones(Int,grade(W))))
-    C = mixedmode(W)<0
-    V = diffvars(W)≠0 ? W : tangent(W,O,C ? Int(ndims(W)/2) : ndims(W))
-    G,D = grade(V),diffvars(V)==1
+@pure function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
+    (O<1||diffvars(V)==0) && (return SChain{Int,V,1}(ones(Int,ndims(V))))
+    G,D,C = grade(V),diffvars(V)==1,mixedmode(V)<0
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
     isone(O) && (return ∇)
@@ -443,6 +441,16 @@ function ↑(ω::T) where T<:TensorAlgebra{V} where V
         (hasinf(PV) ? G.v∞ : G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
     end
 end
+function ↑(ω,b)
+    ω2 = ω^2
+    iω2 = inv(ω2+1)
+    2*iω2*ω + (ω2-1)*iω2*b
+end
+function ↑(ω,p,m)
+    ω2 = ω^2
+    iω2 = inv(ω2+1)
+    2*iω2*ω + (ω2-1)*iω2*p + (ω2+1)*iω2*m
+end
 
 function ↓(ω::T) where T<:TensorAlgebra{V} where V
     PV = ℙ(V)
@@ -454,10 +462,12 @@ function ↓(ω::T) where T<:TensorAlgebra{V} where V
         ((ω∧b)*b)/(1-b⋅ω)
     end
 end
+↓(ω,b) = ((b∧ω)*b)/(1-ω⋅b)
+↓(ω,∞,∅) = (m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
 ## skeleton / subcomplex
 
-export skeleton, 𝒫, collapse, subcomplex, chain
+export skeleton, 𝒫, collapse, subcomplex, chain, path
 
 absym(t) = abs(t)
 absym(t::Basis) = t
@@ -468,18 +478,21 @@ absym(t::MultiVector{T,V}) where {T,V} = MultiVector{T,V}(absym.(value(t)))
 
 collapse(a,b) = a⋅absym(∂(b))
 
-function chain(t::T) where T<:TensorTerm{V} where V
-    N,B = ndims(V),bits(basis(t))
+function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
+    N,B,v = ndims(V),bits(basis(t)),value(t)
     C = symmetricmask(V,B,B)[1]
     G = count_ones(C)
     G < 2 && (return t)
     out,ind = zeros(mvec(N,2,Int)), indices(C,N)
-    setblade!(out,G==2 ? 1 : -1,bit2int(indexbits(N,[ind[1],ind[end]])),Dimension{N}())
+    if T || G == 2
+        setblade!(out,G==2 ? v : -v,bit2int(indexbits(N,[ind[1],ind[end]])),Dimension{N}())
+    end
     for k ∈ 2:G
-        setblade!(out,1,bit2int(indexbits(N,ind[[k-1,k]])),Dimension{N}())
+        setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Dimension{N}())
     end
     return MChain{Int,V,2}(out)
 end
+path(t) = chain(t,Val{false}())
 
 𝒫(t::T) where T<:TensorAlgebra = skeleton(t,Val{false}())
 skeleton(x::S,v=Val{true}()) where S<:TensorAlgebra = absym(x) + subcomplex(absym(∂(x)),v)
@@ -537,13 +550,10 @@ function __init__()
     @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
         function LightGraphs.SimpleDiGraph(x::T,g=LightGraphs.SimpleDiGraph(grade(V))) where T<:TensorTerm{V} where V
            ind = (signbit(value(x)) ? reverse : identity)(indices(basis(x)))
-           grade(x) == 2 ? LightGraphs.add_edge!(g,ind...) : graph(∂(x),g)
+           grade(x) == 2 ? LightGraphs.add_edge!(g,ind...) : LightGraphs.SimpleDiGraph(∂(x),g)
            return g
         end
         function LightGraphs.SimpleDiGraph(x::S,g=LightGraphs.SimpleDiGraph(grade(V))) where {S<:TensorMixed{T,V} where T} where V
-            graph(∂(x),g)
-        end
-        function graph(x::S,g=LightGraphs.SimpleDiGraph(grade(V))) where {S<:TensorMixed{T,V} where T} where V
             N,G = ndims(V),grade(x)
             ib = indexbasis(N,G)
             for k ∈ 1:binomial(N,G)
@@ -554,7 +564,7 @@ function __init__()
             end
             return g
         end
-        function graph(x::MultiVector{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
+        function LightGraphs.SimpleDiGraph(x::MultiVector{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
            N = ndims(V)
            for i ∈ 2:N
                 R = binomsum(N,i)
@@ -567,6 +577,21 @@ function __init__()
                 end
             end
             return g
+        end
+    end
+    #@require GraphPlot="a2cc645c-3eea-5389-862e-a155d0052231"
+    @require Compose="a81c6b42-2e10-5240-aca2-a61377ecd94b" begin
+        import LightGraphs, GraphPlot, Cairo
+        viewer = Base.Process(`$(haskey(ENV,"VIEWER") ? ENV["VIEWER"] : "xdg-open") simplex.pdf`,Ptr{Nothing}())
+        function Compose.draw(img,x::T,l=layout=GraphPlot.circular_layout) where T<:TensorAlgebra
+            Compose.draw(img,GraphPlot.gplot(LightGraphs.SimpleDiGraph(x),layout=l,nodelabel=collect(1:grade(vectorspace(x)))))
+        end
+        function graph(x,n="simplex.pdf",l=GraphPlot.circular_layout)
+            cmd = `$(haskey(ENV,"VIEWER") ? ENV["VIEWER"] : "xdg-open") $n`
+            global viewer
+            viewer.cmd == cmd && kill(viewer)
+            Compose.draw(Compose.PDF(n,16Compose.cm,16Compose.cm),x,l)
+            viewer = run(cmd,(devnull,stdout,stderr),wait=false)
         end
     end
     @require GeometryTypes="4d00f742-c7ba-57c2-abde-4428a4b178cb" begin
