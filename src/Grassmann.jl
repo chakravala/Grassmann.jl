@@ -495,12 +495,12 @@ end
 path(t) = chain(t,Val{false}())
 
 𝒫(t::T) where T<:TensorAlgebra = skeleton(t,Val{false}())
-skeleton(x::S,v=Val{true}()) where S<:TensorAlgebra = absym(x) + subcomplex(absym(∂(x)),v)
-function subcomplex(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
+subcomplex(x::S,v=Val{true}()) where S<:TensorAlgebra = skeleton(absym(∂(x)),v)
+function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     B = bits(basis(x))
-    count_ones(symmetricmask(V,B,B)[1])>0 ? subcomplex(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
+    count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
 end
-function subcomplex(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where Q} where {V,T}
+function skeleton(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where Q} where {V,T}
     N,G,g = ndims(V),grade(x),0
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
@@ -510,7 +510,7 @@ function subcomplex(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where
     end
     return g
 end
-function subcomplex(x::MultiVector{S,V} where S,v::Val{T}=Val{true}()) where {V,T}
+function skeleton(x::MultiVector{S,V} where S,v::Val{T}=Val{true}()) where {V,T}
     N,g = ndims(V),0
     for i ∈ 0:N
         R = binomsum(N,i)
@@ -602,7 +602,7 @@ function __init__()
         Base.convert(::Type{GeometryTypes.Point},t::SChain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         export points
-        points(f;V=identity,r=-2π:0.0001:2π) = [Point(V(Grassmann.vector(f(t)))) for t ∈ r]
+        points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(Grassmann.vector(f(t)))) for t ∈ r]
     end
     #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
