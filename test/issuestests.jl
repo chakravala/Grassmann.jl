@@ -68,7 +68,7 @@ end
     
     a = v∅*basis(-v∞)
     @test a == -1 - v∞∅
-    @test SBlade{V}(-1, a) == -a
+    @test Simplex{V}(-1, a) == -a
 end
 
 @testset "Issue #22: Error in MultiVector constructor for Chains" begin

@@ -97,11 +97,11 @@ macro mixedbasis_str(str)
     Expr(:block,bases,basis(V',vsn[2]),basis(V),bases.args[end])
 end
 
-@inline function lookup_basis(V::Manifold,v::Symbol)::Union{SBlade,Basis}
+@inline function lookup_basis(V::Manifold,v::Symbol)::Union{Simplex,Basis}
     p,b,w,z = DirectSum.indexparity(V,v)
     z && return g_zero(V)
     d = Basis{w}(b)
-    return p ? SBlade(-1,d) : d
+    return p ? Simplex(-1,d) : d
 end
 
 ## fundamentals
@@ -471,7 +471,7 @@ export skeleton, 𝒫, collapse, subcomplex, chain, path
 
 absym(t) = abs(t)
 absym(t::Basis) = t
-absym(t::T) where T<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(absym(value(t)),basis(t))
+absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
 absym(t::SChain{T,V,G}) where {T,V,G} = SChain{T,V,G}(absym.(value(t)))
 absym(t::MChain{T,V,G}) where {T,V,G} = MChain{T,V,G}(absym.(value(t)))
 absym(t::MultiVector{T,V}) where {T,V} = MultiVector{T,V}(absym.(value(t)))
@@ -505,7 +505,7 @@ function skeleton(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where Q
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
         if !iszero(x.v[k]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
-            g += skeleton(SBlade{V,G}(x.v[k],getbasis(V,ib[k])),v)
+            g += skeleton(Simplex{V,G}(x.v[k],getbasis(V,ib[k])),v)
         end
     end
     return g
@@ -517,7 +517,7 @@ function skeleton(x::MultiVector{S,V} where S,v::Val{T}=Val{true}()) where {V,T}
         ib = indexbasis(N,i)
         for k ∈ 1:binomial(N,i)
             if !iszero(x.v[k+R]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
-                g += skeleton(SBlade{V,i}(x.v[k+R],getbasis(V,ib[k])),v)
+                g += skeleton(Simplex{V,i}(x.v[k+R],getbasis(V,ib[k])),v)
             end
         end
     end
@@ -526,15 +526,15 @@ end
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
-        *(a::Reduce.RExpr,b::Basis{V}) where V = SBlade{V}(a,b)
-        *(a::Basis{V},b::Reduce.RExpr) where V = SBlade{V}(b,a)
+        *(a::Reduce.RExpr,b::Basis{V}) where V = Simplex{V}(a,b)
+        *(a::Basis{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
         *(a::Reduce.RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::MultiVector{T,V},b::Reduce.RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         *(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
-        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(a,b)
-        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = SBlade{V,G}(b,a)
+        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(a,b)
+        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(b,a)
         parany = (parany...,Reduce.RExpr)
         parval = (parval...,Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)

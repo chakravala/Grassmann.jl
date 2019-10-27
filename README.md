@@ -152,7 +152,7 @@ Additionally, the `VectorBundle` interoperability also enables more arbitrary in
 
 ## Generating elements and geometric algebra Λ(V)
 
-By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the `Dimension{N}` and `Grade{G}` and `VectorBundle{N,D,O}` via the `TensorAlgebra` subtypes, such as `Basis{V,G}`, `SBlade{V,G,B,T}`, `MBlade{V,G,B,T}`, `SChain{T,V,G}`, `MChain{T,V,G}`, `MultiVector{T,V}`, and `MultiGrade{V}` types.
+By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the `Dimension{N}` and `Grade{G}` and `VectorBundle{N,D,O}` via the `TensorAlgebra` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `MSimplex{V,G,B,T}`, `SChain{T,V,G}`, `MChain{T,V,G}`, `MultiVector{T,V}`, and `MultiGrade{V}` types.
 
 The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
 ```Julia
@@ -215,7 +215,7 @@ v₂₃
 It is possible to assign the **quaternion** generators `i,j,k` with
 ```Julia
 julia> i,j,k = hyperplanes(ℝ^3)
-3-element Array{SBlade{⟨+++⟩,2,B,Int64} where B,1}:
+3-element Array{Simplex{⟨+++⟩,2,B,Int64} where B,1}:
  -1v₂₃
  1v₁₃
  -1v₁₂

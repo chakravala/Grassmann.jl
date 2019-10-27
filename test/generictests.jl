@@ -18,7 +18,7 @@ using LinearAlgebra
     @test v1 ≈ v1
     @test v2 ≈ v2
     @test v12 ≈ v12
-    # S/MBlade
+    # simplex
     @test 2v ≈ 2v
     @test 2v1 ≈ 2v1
     # chain
@@ -36,7 +36,7 @@ using LinearAlgebra
     @test !(v ≈ v1+v12)
     @test !(v ≈ v+v1+v12)
 
-    # S/MBlade and others
+    # simplex and others
     @test !(2v ≈ v1)
     @test !(2v ≈ v12)
     @test !(2v ≈ v1+v2)
@@ -44,7 +44,7 @@ using LinearAlgebra
     @test !(2v ≈ v1+v12)
     @test !(2v ≈ v+v1+v12)
 
-    # Chain and others
+    # chain and others
     @test !(v1 + v2 ≈ v1)
     @test !(v1 + v2 ≈ v12)
     @test !(v1 + v2 ≈ v1+v)

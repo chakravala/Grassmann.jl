@@ -48,16 +48,10 @@
 
 \maketitle
 \begin{figure}[ht]
-\centerline{\includegraphics[width=4cm]{grassmann.png}}
+%\centerline{\includegraphics[width=4cm]{grassmann.png}}
+\centerline{\includegraphics[width=4cm]{../docs/src/assets/logo.png}}
 \caption*{github.com/chakravala/Grassmann.jl}
 \end{figure}
-\begin{itemize}
-	\item \textbf{DirectSum.jl}: Abstract tangent bundle vector space types (unions, intersections, sums, etc.)
-	\item \textbf{AbstractTensors.jl}: Tensor algebra abstract type interoperability with vector bundle parameter	
-	\item \textbf{Grassmann.jl}: $\langle$Leibniz+Grassmann-Clifford-Hestenes$\rangle$ differential geometric algebra of multivector forms
-	\item \textbf{Leibniz.jl}: Derivation operator algebras for tensor fields
-	\item \textbf{Reduce.jl}: Symbolic parser generator for Julia expressions using REDUCE algebra term rewriter
-\end{itemize}
 \begin{abstract}
 	The \textit{Grassmann.jl}
 	package provides tools for computations based on multi-linear algebra and spin groups using the extended geometric algebra known as Leibniz-Grassmann-Clifford-Hestenes algebra.
@@ -70,6 +64,13 @@
 	on which the type system is built.
 	%\headingtable
 \end{abstract}
+\begin{itemize}
+	\item \textbf{DirectSum.jl}: Abstract tangent bundle vector space types (unions, intersections, sums, etc.)
+	\item \textbf{AbstractTensors.jl}: Tensor algebra abstract type interoperability with vector bundle parameter
+	\item \textbf{Grassmann.jl}: $\langle$Leibniz+Grassmann-Clifford-Hestenes$\rangle$ differential geometric algebra of multivector forms
+	\item \textbf{Leibniz.jl}: Derivation operator algebras for tensor fields
+	\item \textbf{Reduce.jl}: Symbolic parser generator for Julia expressions using REDUCE algebra term rewriter
+\end{itemize}
 Mathematical foundations and some of the nuances in the definitions specific to the \textit{Grassmann.jl} implementation are concisely described, along with the accompanying support packages that provide an extensible platform for computing with geometric algebra at high dimensions.
 The design is based on the \verb`TensorAlgebra` abstract type interoperability from \textit{AbstractTensors.jl} with a \verb`VectorBundle` type parameter from \textit{DirectSum.jl}. Abstract vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
 
@@ -173,7 +174,7 @@ In order to work with a \verb`TensorAlgebra{V}`, it is necessary for some comput
 Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
 The parametric type formalism in \verb`Grassmann` is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.
 
-It is possible to reach \verb`Basis` elements with up to $n=62$ indices, % with \verb`TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+It is possible to reach \verb`Simplex` elements with up to $n=62$ vertices, % with \verb`TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 requiring full alpha-numeric labeling with lower-case and capital letters. 
 Full \verb`MultiVector` allocations are only possible for $n\leq22$, but sparse operations are also available at higher dimensions.
 While \verb`Grassmann.Algebra{V}` is a container for the \verb`TensorAlgebra` generators of $V$, the \verb`Grassmann.Algebra` is only cached for $n\leq8$.
@@ -205,8 +206,7 @@ Both symmetry classes can be characterized by the same geometric product, which 
 \begin{definition}
 	[Null-basis of projective split]
 	Let $v_\pm^2 = \pm1$ be a basis with $v_\infty = v_++v_-$ and $v_\emptyset = (v_--v_+)/2$
-\end{definition}
-An embedding space $\mb R^{n+1,1}$ carrying the action from the group $SO(n+1,1)$ then has
+An embedding space $\mb R^{p+1,q+1}$ carrying the action from the group $O(p+1,q+1)$ then has
 $v_\infty^2 =0$, $v_\emptyset^2 =0$,
 $v_\infty \cdot v_\emptyset = 1$,  and $v_{\infty\emptyset}^2 = 1$ with
 Minkowski plane $v_{\infty\emptyset}$ having the Hestenes-Dirac-Clifford product properties
@@ -214,7 +214,7 @@ Minkowski plane $v_{\infty\emptyset}$ having the Hestenes-Dirac-Clifford product
 	v_{\infty\emptyset}\ominus v_\infty &= -v_\infty, &  v_{\infty\emptyset}\ominus v_\emptyset &= v_\emptyset, \\
 	v_\infty\ominus v_\emptyset &= -1 + v_{\infty\emptyset}, & v_\emptyset\ominus v_\infty &=  -1 - v_{\infty\emptyset}
 \end{align*}
-
+\end{definition}
 \begin{definition}
 	Symmetry properties of the tensor algebra can be characterized in terms of the geometric product by two averaging operations, which are the symmetrization $\odot$ and anti-symmetrization $\boxtimes$ operators:
 	\begin{align*}
@@ -261,7 +261,7 @@ For example, $$\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra 
 % where $\bigwedge \Lambda V \equiv \bigotimes \Lambda V/\sim$ is made interoperable by $\cup$.
 
 \begin{definition}[Reverse, involute, conjugate]
-	The \verb`reverse` of $\gen{\omega}_r$ is defined as $\gen{\tilde\omega}_r = (-1)^{(r-1)r/2}\gen{\omega}_r$, while the \verb`involute` is $(-1)^r\gen{\omega}_r$ and Clifford \verb`conj`  $\gen{\omega}_r^\ddagger$ is the composition of \verb`involute` and \verb`reverse`.
+	The \verb`reverse` of $\gen{\omega}_r$ is defined as $\gen{\tilde\omega}_r = (-1)^{(r-1)r/2}\gen{\omega}_r$, while the \verb`involute` is $\gen{\omega}_r^\times=(-1)^r\gen{\omega}_r$ and Clifford \verb`conj`  $\gen{\omega}_r^\ddagger$ is the composition of \verb`involute` and \verb`reverse`.
 \end{definition}
 
 \begin{definition}[Reversed product]
@@ -273,16 +273,22 @@ For example, $$\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra 
 		|\omega|^2 &= \omega\ast\omega, & |\omega| &= \sqrt{\omega\ast\omega}, & ||\omega|| = \text{Euclidean }|\omega|.
 	\end{align*}
 \end{definition}
-\begin{definition}[Sandwich product]
-	This product can be defined as $\eta\oslash\omega = (\eta\ast\omega)\ominus\eta$. Alternatively, the reversed definition is $\eta\obackslash\omega = \eta\ominus(\omega\ast'\eta)$ or in Julia $\eta\,$\verb`>>>`$\,\omega$, which is often found in literature.
-\end{definition}
 \begin{remark}
 	Observe that $\ast$ and $\ast'$ could both be exchanged in \verb`abs`, \verb`abs2`, and \verb`norm`; however, these are different products.
-	The \textit{scalar product} $\circledast$ is the scalar part of the reversed product $\eta\circledast\omega = \gen{\eta\ast\omega}$.
-	In general $\sqrt\omega = e^{(\log\omega)/2}$ is valid for \verb`inv`ertible multivectors $\omega\inv = \omega\ast|\omega|^{-2} = \tilde\omega/|\omega|^2$, where $\eta/\omega = \eta\ominus\omega\inv = \eta\ominus(\tilde\omega/(\omega\oslash1))$.
-	Observe that it is overall more simple and consistent to use the $\ast$ and $\oslash$ operations instead of the $\ast'$ and $\obackslash$ variations.
+	The \textit{scalar product} $\circledast$ is the scalar part, so $\eta\circledast\omega = \gen{\eta\ast\omega}$.
+	In general $\sqrt\omega = e^{(\log\omega)/2}$ is valid for invertible $\omega$.
 \end{remark}
-The \verb`real` part $\Re\omega = (\omega+\tilde\omega)/2$ is defined by $|\Re\omega|^2 = (\Re\omega)^{\ominus2}$ and the \verb`imag` part $\Im\omega = (\omega-\tilde\omega)/2$ by $|\Im\omega|^2 = -(\Im\omega)^{\ominus2}$, such that for any multivector $\omega = \Re\omega+\Im\omega$ has real and imaginary partitioned by
+\begin{definition}[Inverse]
+	$\omega\inv = \omega\ast(\omega\ast\omega)\inv = \tilde\omega/|\omega|^2$, with $\eta/\omega = \eta\ominus\omega\inv$ and % = \eta\ominus(\tilde\omega/(1\oslash\omega))$.
+	$\eta\bs\omega = \eta\inv\ominus\omega$.
+\end{definition}
+\begin{definition}[Sandwich product]
+	This product can be defined as $\eta\oslash\omega = \omega\bs\eta\ominus\omega^\times$. Alternatively, the reversed definition is $\eta\obackslash\omega = \eta^\times\ominus\omega/\eta$ or in Julia $\eta\,$\verb`>>>`$\,\omega$, which is often found in literature.
+\end{definition}
+\begin{remark}
+	Observe that it is overall more simple and consistent to use $\set{\ast,\oslash}$ operations instead of $\set{\ast',\obackslash}$.
+\end{remark}
+The \verb`real` part $\Re\omega = (\omega+\tilde\omega)/2$ is defined by $|\Re\omega|^2 = (\Re\omega)^{\ominus2}$ and the \verb`imag` part $\Im\omega = (\omega-\tilde\omega)/2$ by $|\Im\omega|^2 = -(\Im\omega)^{\ominus2}$, such that $\omega = \Re\omega+\Im\omega$ has real and imaginary partitioned by
 \begin{align*}
 	\gen{\tilde\omega}_r/\mlr{\gen{\omega}_r} &= \sqrt{\gen{\tilde\omega}_r^2/\big|\gen{\omega}_r\big|^2} = \sqrt{\gen{\omega}_r\ast\gen{\omega}_r\inv} \\
 	&= \sqrt{\gen{\tilde\omega}_r/\gen{\omega}_r}=\sqrt{(-1)^{(r-1)r/2}} \in\set{1,\sqrt{-1}},
@@ -312,12 +318,12 @@ This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseu
 \begin{lstlisting}[language = Julia]
 using Grassmann, Compose
 x = Grassmann.Algebra(ℝ^7).v123
-Grassmann.graph(⋆(x)+x)
-draw(PDF("simplex.pdf",16cm,16cm),⋆(x)+x)
+Grassmann.graph(x+!x)
+draw(PDF("simplex.pdf",16cm,16cm),x+!x)
 \end{lstlisting}
 \begin{figure}[ht]
 \centerline{\includegraphics[width=0.42\textwidth]{triangle-tetrahedron.png}}
-\caption*{Triangle with its tetrahedron complement $\star v_{123} + v_{123}$ in $\mb R^7$}
+\caption*{Triangle with its tetrahedron complement $v_{123} + \star v_{123}$ in $\mb R^7$}
 \end{figure}
 John Browne has discussed Grassmann duality principle in book \cite{browne}, stating that every theorem (involving either of the exterior and regressive products) can be translated into its dual theorem by replacing the $\wedge$ and $\vee$ operations and applying \textit{Poincare duality} (homology).
 First applying this Grassmann duality principle to the $\wedge$ product alone, let $\set{\omega_k}_k\in\Lambda^{p_k}V, P=\sum_kp_k$, then it is possible to obtain the co-product
@@ -330,9 +336,9 @@ Together, $(\wedge,\vee,\star)$ yield an orthocomplementary propositional lattic
 \end{align*}
 where DeMorgan's law is used to derive tensor contractions.
 \begin{definition}
-	The left $\lrcorner$ and right $\llcorner$ contraction are symmetrically defined
+	Skew left $\lrcorner$ and right $\llcorner$ contractions are symmetrically defined
 	$ \gen{\omega}_r\cdot\gen{\eta}_s = \begin{cases} \omega\llcorner\eta=\omega\vee\star\eta & r\geq s \\ \omega\lrcorner\eta=\eta\vee\star\omega & r\leq s \end{cases} $.
-	Note for $\omega,\eta$ of equal grade, $\omega\circledast\eta = \omega\odot\eta = \omega\cdot\eta = \omega\llcorner\eta = \omega\lrcorner\eta$ are all symmetric operations.
+	Note for $\omega,\eta$ of equal grade, $\omega\circledast\eta = \omega\odot\eta = \omega\cdot\eta = \omega\llcorner\eta = \omega\lrcorner\eta$ are all symmetric operations. In Julia, $\lrcorner$ is $<$ and $\llcorner$ is $>$.
 \end{definition}
 
 \begin{definition}
@@ -377,14 +383,14 @@ where DeMorgan's law is used to derive tensor contractions.
 	Stokes identity can be proved by relying on a variant of the \textit{common factor theorem} by Browne \cite{browne}.
 \end{proof}
 \begin{theorem}[Clifford-Dirac-Laplacian]
-	The Dirac operator is $ \Delta^\frac12\omega = \mp\omega\ominus\nabla = \pm\nabla\wedge\omega \mp \omega\llcorner\nabla  = \pm d\omega\mp\partial\omega$ \cite{garling}.
+	The Dirac operator \cite{garling} is $ \Delta^\frac12\omega = \pm\nabla\ominus\omega = \pm\nabla\wedge\omega \pm \nabla\cdot\omega  = \pm d\omega\pm\partial\omega$.
 	\begin{align*}
 		\Delta\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \pm(\pm\omega\ominus\nabla)\ominus\nabla).
 	\end{align*}
 	Elements $\omega$ are \textit{harmonic} if $\Delta\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, such that $\mc H^p M = \setc{\Delta\omega = 0}{\omega\in \Omega^pM}$.
 	Hodge \cite{ivancevic}:
 	$\Omega^pM=\mc H^pM\oplus\im{d\Omega^{p-1}M}\oplus\im{\partial\Omega^{p+1}M}$.
-	Note: $\nabla\omega\neq\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
+	Note: $\nabla\omega=-\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
 \end{theorem}
 
 \begin{lstlisting}[language = Julia]

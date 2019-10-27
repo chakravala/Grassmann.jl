@@ -92,50 +92,50 @@ end
 
 @inline show(io::IO, e::Basis) = DirectSum.printindices(io,vectorspace(e),bits(e))
 
-## S/MBlade{N}
+## S/MSimplex{N}
 
-const MSB = (:MBlade,:SBlade)
+const MSB = (:MSimplex,:Simplex)
 
-for Blade ∈ MSB
-    eval(Expr(:struct,Blade ≠ :SBlade,:($Blade{V,G,B,T} <: TensorTerm{V,G}),quote
+for implex ∈ MSB
+    eval(Expr(:struct,implex ≠ :Simplex,:($implex{V,G,B,T} <: TensorTerm{V,G}),quote
         v::T
-        $Blade{A,B,C,D}(t::E) where E<:D where {A,B,C,D} = new{A,B,C,D}(t)
-        $Blade{A,B,C,D}(t::E) where E<:TensorAlgebra{A} where {A,B,C,D} = new{A,B,C,D}(t)
+        $implex{A,B,C,D}(t::E) where E<:D where {A,B,C,D} = new{A,B,C,D}(t)
+        $implex{A,B,C,D}(t::E) where E<:TensorAlgebra{A} where {A,B,C,D} = new{A,B,C,D}(t)
     end))
 end
-for Blade ∈ MSB
+for implex ∈ MSB
     @eval begin
-        export $Blade
-        @pure $Blade(b::Basis{V,G}) where {V,G} = $Blade{V}(b)
-        @pure $Blade{V}(b::Basis{V,G}) where {V,G} = $Blade{V,G,b,Int}(1)
-        $Blade{V}(v::T) where {V,T} = $Blade{V,0,Basis{V}(),T}(v)
-        $Blade{V}(v::S) where S<:TensorTerm where V = v
-        $Blade{V,G,B}(v::T) where {V,G,B,T} = $Blade{V,G,B,T}(v)
-        $Blade(v,b::S) where S<:TensorTerm{V} where V = $Blade{V}(v,b)
-        $Blade{V}(v,b::S) where S<:TensorAlgebra where V = v*b
-        $Blade{V}(v,b::Basis{V,G}) where {V,G} = $Blade{V,G}(v,b)
-        $Blade{V}(v,b::Basis{W,G}) where {V,W,G} = $Blade{V,G}(v,b)
-        function $Blade{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
-            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,T}(v)
+        export $implex
+        @pure $implex(b::Basis{V,G}) where {V,G} = $implex{V}(b)
+        @pure $implex{V}(b::Basis{V,G}) where {V,G} = $implex{V,G,b,Int}(1)
+        $implex{V}(v::T) where {V,T} = $implex{V,0,Basis{V}(),T}(v)
+        $implex{V}(v::S) where S<:TensorTerm where V = v
+        $implex{V,G,B}(v::T) where {V,G,B,T} = $implex{V,G,B,T}(v)
+        $implex(v,b::S) where S<:TensorTerm{V} where V = $implex{V}(v,b)
+        $implex{V}(v,b::S) where S<:TensorAlgebra where V = v*b
+        $implex{V}(v,b::Basis{V,G}) where {V,G} = $implex{V,G}(v,b)
+        $implex{V}(v,b::Basis{W,G}) where {V,W,G} = $implex{V,G}(v,b)
+        function $implex{V,G}(v::T,b::Basis{V,G}) where {V,G,T}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $implex{V,G,b,T}(v)
         end
-        function $Blade{V,G}(v::T,b::Basis{W,G}) where {V,W,G,T}
-            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,V(b),T}(v)
+        function $implex{V,G}(v::T,b::Basis{W,G}) where {V,W,G,T}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $implex{V,G,V(b),T}(v)
         end
-        function $Blade{V,G}(v::T,b::Basis{V,G}) where T<:TensorTerm where {V,G}
-            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,b,Any}(v)
+        function $implex{V,G}(v::T,b::Basis{V,G}) where T<:TensorTerm where {V,G}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $implex{V,G,b,Any}(v)
         end
-        function $Blade{V,G,B}(b::T) where T<:TensorTerm{V} where {V,G,B}
-            order(B)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,B,Any}(b)
+        function $implex{V,G,B}(b::T) where T<:TensorTerm{V} where {V,G,B}
+            order(B)+order(b)>diffmode(V) ? zero(V) : $implex{V,G,B,Any}(b)
         end
-        function show(io::IO,m::$Blade)
+        function show(io::IO,m::$implex)
             T = typeof(value(m))
             par = !(T <: TensorTerm) && |(broadcast(<:,T,parany)...)
             print(io,(par ? ['(',m.v,')'] : [m.v])...,basis(m))
         end
     end
     for Other ∈ MSB, VG ∈ ((:V,),(:V,:G))
-        @eval function $Blade{$(VG...)}(v,b::$Other{V,G}) where {V,G}
-            order(v)+order(b)>diffmode(V) ? zero(V) : $Blade{V,G,basis(b)}(v*b.v)
+        @eval function $implex{$(VG...)}(v,b::$Other{V,G}) where {V,G}
+            order(v)+order(b)>diffmode(V) ? zero(V) : $implex{V,G,basis(b)}(v*b.v)
         end
     end
 end
@@ -147,7 +147,7 @@ end
 
 const MSC = (:MChain,:SChain)
 
-for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
+for (Chain,vector,implex) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
     @eval begin
         @computed struct $Chain{T,V,G} <: TensorMixed{T,V}
             v::$vector{binomial(ndims(V),G),T}
@@ -162,11 +162,11 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
         @pure Base.length(m::$Chain{T,V,G}) where {T,V,G} = binomial(ndims(V),G)
     end
     @eval begin
-        function (m::$Chain{T,V,G})(i::Integer,B::Type=SBlade) where {T,V,G}
-            if B ≠ SBlade
-                MBlade{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
+        function (m::$Chain{T,V,G})(i::Integer,B::Type=Simplex) where {T,V,G}
+            if B ≠ Simplex
+                MSimplex{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             else
-                SBlade{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
+                Simplex{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
             end
         end
 
@@ -218,8 +218,8 @@ for (Chain,vector,Blade) ∈ ((MSC[1],:MVector,MSB[1]),(MSC[2],:SVector,MSB[2]))
     end
     for var ∈ [[:T,:V,:G],[:T,:V],[:T],[]]
         @eval begin
-            $Chain{$(var...)}(v::SBlade{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
-            $Chain{$(var...)}(v::MBlade{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
+            $Chain{$(var...)}(v::Simplex{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
+            $Chain{$(var...)}(v::MSimplex{V,G,B,T}) where {T,V,G,B} = $Chain{T,V,G}(v.v,basis(v))
         end
     end
 end
@@ -266,11 +266,11 @@ Base.lastindex(m::MultiVector{T,V} where T) where V = ndims(V)
 function (m::MultiVector{T,V})(::Dim{g},::Type{B}=SChain) where {T,V,g,B}
     B ≠ SChain ? MChain{T,V,g}(m[g]) : SChain{T,V,g}(m[g])
 end
-function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=SBlade) where {T,V,B}
-    if B ≠ SBlade
-        MBlade{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
+function (m::MultiVector{T,V})(g::Int,i::Int,::Type{B}=Simplex) where {T,V,B}
+    if B ≠ Simplex
+        MSimplex{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     else
-        SBlade{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
+        Simplex{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
     end
 end
 
@@ -301,9 +301,9 @@ for var ∈ ((:T,:V),(:T,))
     end
 end
 for var ∈ ((:T,:V),(:T,),())
-    for (Blade,Chain) ∈ ((MSB[1],MSC[1]),(MSB[2],MSC[2]))
+    for (implex,Chain) ∈ ((MSB[1],MSC[1]),(MSB[2],MSC[2]))
         @eval begin
-            function MultiVector{$(var...)}(v::$Blade{V,G,B,T}) where {V,G,B,T}
+            function MultiVector{$(var...)}(v::$implex{V,G,B,T}) where {V,G,B,T}
                 return MultiVector{T,V}(v.v,basis(v))
             end
             function MultiVector{$(var...)}(v::$Chain{T,V,G}) where {T,V,G}
@@ -389,11 +389,11 @@ for (Chain,vec) ∈ ((MSC[1],:MVector),(MSC[2],:SVector))
             bng = binomial(N,G)
             G∉(0,N) && sum(m .== 0)/bng < fill_limit && (return $Chain{T,V,G}(m))
             com = indexbasis(N,G)
-            out = (SBlade{V,G,B,T} where B)[]
+            out = (Simplex{V,G,B,T} where B)[]
             for i ∈ 1:bng
-                @inbounds m[i] ≠ 0 && push!(out,SBlade{V,G,getbasis(V,com[i]),T}(m[i]))
+                @inbounds m[i] ≠ 0 && push!(out,Simplex{V,G,getbasis(V,com[i]),T}(m[i]))
             end
-            length(out)≠1 ? SparseChain{V,G}(out) : out[1]::SBlade{V,G,B,T} where B
+            length(out)≠1 ? SparseChain{V,G}(out) : out[1]::Simplex{V,G,B,T} where B
         end
     end
     @eval begin
@@ -489,26 +489,27 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{promote_type(typeval.(v.v)..
 import Base: isinf, isapprox
 import DirectSum: grade
 import AbstractTensors: scalar, involute, unit, even, odd
-export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, betti, χ
+import LinearAlgebra: rank
+export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, gdims, betti, χ
 
-const VBV = Union{MBlade,SBlade,MChain,SChain,MultiVector}
+const VBV = Union{MSimplex,Simplex,MChain,SChain,MultiVector}
 
 valuetype(t::SparseChain) = promote_type(valuetype.(terms(t))...)
 valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure valuetype(::Basis) = Int
-@pure valuetype(::Union{MBlade{V,G,B,T},SBlade{V,G,B,T}} where {V,G,B}) where T = T
+@pure valuetype(::Union{MSimplex{V,G,B,T},Simplex{V,G,B,T}} where {V,G,B}) where T = T
 @pure valuetype(::TensorMixed{T}) where T = T
 @inline value(::Basis,T=Int) = T==Any ? 1 : one(T)
 @inline value(m::VBV,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value_diff(m::T) where T<:TensorTerm = (v=value(m);typeof(v)<:TensorAlgebra ? v : m)
 @pure basis(m::Basis) = m
-@pure basis(m::Union{MBlade{V,G,B},SBlade{V,G,B}}) where {V,G,B} = B
+@pure basis(m::Union{MSimplex{V,G,B},Simplex{V,G,B}}) where {V,G,B} = B
 @pure grade(m::TensorTerm{V,G} where V) where G = G
 @pure grade(m::Union{MChain{T,V,G},SChain{T,V,G}} where {T,V}) where G = G
 @pure grade(m::SparseChain{V,G} where V) where G = G
 @pure grade(m::Real) = 0
 @pure order(m::Basis{V,G,B} where G) where {V,B} = count_ones(symmetricmask(V,B,B)[4])
-@pure order(m::Union{MBlade,SBlade}) = order(basis(m))+order(value(m))
+@pure order(m::Union{MSimplex,Simplex}) = order(basis(m))+order(value(m))
 @pure order(m) = 0
 @pure bits(m::T) where T<:TensorTerm = bits(basis(m))
 
@@ -517,19 +518,19 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 
 @pure isorigin(e::Basis{V}) where V = hasorigin(V) && count_ones(bits(e))==1 && e[hasinf(V)+1]
 @pure hasorigin(e::Basis{V}) where V = hasorigin(V) && (hasinf(V) ? e[2] : isodd(bits(e)))
-@pure hasorigin(t::Union{MBlade,SBlade}) = hasorigin(basis(t))
+@pure hasorigin(t::Union{MSimplex,Simplex}) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
 @inline χ(V,b::UInt,t) = iszero(t) ? 0 : isodd(count_ones(symmetricmask(V,b,b)[1])) ? 1 : -1
 χ(t::T) where T<:TensorTerm{V,G} where {V,G} = χ(V,bits(basis(t)),t)
-χ(t::T) where T<:TensorAlgebra{V} where V = (B=betti(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+χ(t::T) where T<:TensorAlgebra{V} where V = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
 
-function betti(t::T) where T<:TensorTerm{V} where V
+function gdims(t::T) where T<:TensorTerm{V} where V
     B,N = bits(basis(t)),ndims(V)
     g = count_ones(symmetricmask(V,B,B)[1])
     MVector{N+1,Int}([g==G ? abs(χ(t)) : 0 for G ∈ 0:N])
 end
-function betti(t::T) where T<:TensorAlgebra{V} where V
+function gdims(t::T) where T<:TensorAlgebra{V} where V
     N = ndims(V)
     out = zeros(MVector{N+1,Int})
     ib = indexbasis(N,grade(t))
@@ -538,7 +539,7 @@ function betti(t::T) where T<:TensorAlgebra{V} where V
     end
     return out
 end
-function betti(t::MultiVector{T,V} where T) where V
+function gdims(t::MultiVector{T,V} where T) where V
     N = ndims(V)
     out = zeros(MVector{N+1,Int})
     bs = binomsum_set(N)
@@ -547,6 +548,35 @@ function betti(t::MultiVector{T,V} where T) where V
         for k ∈ 1:length(ib)
             @inbounds t.v[k+bs[G+1]] ≠ 0 && (out[count_ones(symmetricmask(V,ib[k],ib[k])[1])+1] += 1)
         end
+    end
+    return out
+end
+
+function rank(t::T,d=gdims(t)) where T<:TensorAlgebra{V} where V
+    out = gdims(∂(t))
+    out[1] = 0
+    for k ∈ 2:ndims(V)
+        @inbounds out[k] = min(out[k],d[k+1])
+    end
+    return out
+end
+
+function null(t::T) where T<:TensorAlgebra{V} where V
+    d = gdims(t)
+    r = rank(t,d)
+    out = zeros(MVector{ndims(V)+1,Int})
+    for k ∈ 1:ndims(V)
+        @inbounds out[k] = d[k+1] - r[k]
+    end
+    return out
+end
+
+function betti(t::T) where T<:TensorAlgebra{V} where V
+    d = gdims(t)
+    r = rank(t,d)
+    out = zeros(MVector{ndims(V),Int})
+    for k ∈ 1:ndims(V)
+        @inbounds out[k] = d[k+1] - r[k] - r[k+1]
     end
     return out
 end
@@ -561,7 +591,7 @@ end
 isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
 for T ∈ Fields
     @eval begin
-        isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:$T} where V =isapprox(a,SBlade{V}(b))
+        isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:$T} where V =isapprox(a,Simplex{V}(b))
         isapprox(a::S,b::T) where {S<:$T,T<:TensorAlgebra} = isapprox(b,a)
     end
 end
@@ -575,11 +605,11 @@ Return the scalar (grade 0) part of any multivector.
 @inline scalar(t::T) where T<:TensorTerm{V} where V = zero(V)
 @inline scalar(t::SparseChain{V,0}) where V = t
 @inline scalar(t::SparseChain{V}) where V = zero(V)
-@inline scalar(t::MultiVector{T,V}) where {T,V} = @inbounds SBlade{V}(t.v[1])
+@inline scalar(t::MultiVector{T,V}) where {T,V} = @inbounds Simplex{V}(t.v[1])
 @inline scalar(t::MultiGrade{V,G}) where {V,G} = @inbounds 1 ∈ indices(G) ? terms(t)[1] : zero(V)
 for Chain ∈ MSC
     @eval begin
-        @inline scalar(t::$Chain{T,V,0}) where {T,V} = @inbounds SBlade{V}(t.v[1])
+        @inline scalar(t::$Chain{T,V,0}) where {T,V} = @inbounds Simplex{V}(t.v[1])
         @inline scalar(t::$Chain{T,V} where T) where V = zero(V)
     end
 end
@@ -599,7 +629,7 @@ end
 
 @inline volume(t::T) where T<:TensorTerm{V,G} where {V,G} = G == ndims(V) ? t : zero(V)
 @inline volume(t::SparseChain{V,G}) where {V,G} = G == ndims(V) ? t : zero(V)
-@inline volume(t::MultiVector{T,V}) where {T,V} = @inbounds SBlade{V}(t.v[end])
+@inline volume(t::MultiVector{T,V}) where {T,V} = @inbounds Simplex{V}(t.v[end])
 @inline volume(t::MultiGrade{V,G}) where {V,G} = @inbounds ndims(V)+1∈indices(G) ? terms(t)[end] : zero(V)
 for Chain ∈ MSC
     @eval begin
@@ -614,9 +644,9 @@ end
 @inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
 @inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
 
-for Blade ∈ MSB
+for implex ∈ MSB
     for T ∈ (Expr,Symbol)
-        @eval @inline Base.iszero(t::$Blade{V,G,B,$T} where {V,G,B}) = false
+        @eval @inline Base.iszero(t::$implex{V,G,B,$T} where {V,G,B}) = false
     end
 end
 
@@ -632,9 +662,9 @@ adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b
 
 for M ∈ (:Signature,:DiagonalForm,:SubManifold)
     @eval begin
-        @inline (V::$M)(s::UniformScaling{T}) where T = SBlade{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
-        (W::$M)(b::SBlade) = SBlade{W}(value(b),W(basis(b)))
-        (W::$M)(b::MBlade) = MBlade{W}(value(b),W(basis(b)))
+        @inline (V::$M)(s::UniformScaling{T}) where T = Simplex{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
+        (W::$M)(b::Simplex) = Simplex{W}(value(b),W(basis(b)))
+        (W::$M)(b::MSimplex) = MSimplex{W}(value(b),W(basis(b)))
     end
 end
 
@@ -762,10 +792,10 @@ end
 
 # QR compatibility
 
-convert(a::Type{SBlade{V,G,B,A}},b::SBlade{V,G,B,T}) where {V,G,A,B,T} = SBlade{V,G,B,A}(convert(A,value(b)))
-convert(::Type{SBlade{V,G,B,X}},t::Y) where {V,G,B,X,Y} = SBlade{V,G,B,X}(convert(X,t))
+convert(a::Type{Simplex{V,G,B,A}},b::Simplex{V,G,B,T}) where {V,G,A,B,T} = Simplex{V,G,B,A}(convert(A,value(b)))
+convert(::Type{Simplex{V,G,B,X}},t::Y) where {V,G,B,X,Y} = Simplex{V,G,B,X}(convert(X,t))
 
-Base.copysign(x::SBlade{V,G,B,T},y::SBlade{V,G,B,T}) where {V,G,B,T} = SBlade{V,G,B,T}(copysign(value(x),value(y)))
+Base.copysign(x::Simplex{V,G,B,T},y::Simplex{V,G,B,T}) where {V,G,B,T} = Simplex{V,G,B,T}(copysign(value(x),value(y)))
 
 @inline function LinearAlgebra.reflectorApply!(x::AbstractVector, τ::TensorAlgebra, A::StridedMatrix)
     @assert !LinearAlgebra.has_offset_axes(x)

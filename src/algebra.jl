@@ -186,7 +186,7 @@ for side ∈ (:left,:right)
             d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
             mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
             v = $(c≠h ? :($pn(V,B,value(d))) : :(value(d)))
-            typeof(V)<:Signature ? ($p(b) ? SBlade{V}(-v,d) : isone(v) ? d : SBlade{V}(v,d)) : SBlade{V}($p(b)*v,d)
+            typeof(V)<:Signature ? ($p(b) ? Simplex{V}(-v,d) : isone(v) ? d : Simplex{V}(v,d)) : Simplex{V}($p(b)*v,d)
         end
         for B ∈ MSB
             @eval $c(b::$B) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
@@ -219,10 +219,10 @@ export involute
 for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
     @eval @pure function $r(b::Basis{V,G,B}) where {V,G,B}
-        $p(grade(V,B)) ? SBlade{V}(-value(b),b) : b
+        $p(grade(V,B)) ? Simplex{V}(-value(b),b) : b
     end
-    for Blade ∈ MSB
-        @eval $r(b::$Blade) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
+    for implex ∈ MSB
+        @eval $r(b::$implex) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
     end
 end
 
@@ -269,22 +269,22 @@ function mul(a::Basis{V},b::Basis{V},der=derive_mul(V,bits(a),bits(b),1,true)) w
     A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
-    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? SBlade{V}(-1,d) : d) : SBlade{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
-    diffvars(V)≠0 && !iszero(Z) && (out = SBlade{V}(getbasis(loworder(V),Z),out))
-    return cc ? (v=value(out);out+SBlade{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
+    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
+    diffvars(V)≠0 && !iszero(Z) && (out = Simplex{V}(getbasis(loworder(V),Z),out))
+    return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
 
-for Blade ∈ MSB
+for implex ∈ MSB
     @eval begin
-        function *(a::$Blade{V},b::Basis{V}) where V
+        function *(a::$implex{V},b::Basis{V}) where V
             v = derive_mul(V,bits(basis(a)),bits(b),a.v,true)
             bas = mul(basis(a),b,v)
-            order(a.v)+order(bas)>diffmode(V) ? zero(V) : SBlade{V}(v,bas)
+            order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
         end
-        function *(a::Basis{V},b::$Blade{V}) where V
+        function *(a::Basis{V},b::$implex{V}) where V
             v = derive_mul(V,bits(a),bits(basis(b)),b.v,false)
             bas = mul(a,basis(b),v)
-            order(b.v)+order(bas)>diffmode(V) ? zero(V) : SBlade{V}(v,bas)
+            order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
         end
     end
 end
@@ -293,10 +293,10 @@ end
 #*(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #*(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
-for Blade ∈ MSB
+for implex ∈ MSB
     @eval begin
-        *(a::UniformScaling,b::$Blade{V}) where V = V(a)*b
-        *(a::$Blade{V},b::UniformScaling) where V = a*V(b)
+        *(a::UniformScaling,b::$implex{V}) where V = V(a)*b
+        *(a::$implex{V},b::UniformScaling) where V = a*V(b)
     end
 end
 for Chain ∈ MSC
@@ -325,8 +325,8 @@ export ∧, ∨, ⊗
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb) || iszero(derive_mul(V,ba,bb,1,true))) && (return g_zero(V))
     d = getbasis(V,(A⊻B)|Q)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
-    return parity(a,b) ? SBlade{V}(-1,d) : d
+    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    return parity(a,b) ? Simplex{V}(-1,d) : d
 end
 
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -336,10 +336,10 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
+        v=typeof(v)<:TensorMixed ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
+    return Simplex{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
 #∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
@@ -363,8 +363,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
     p,C,t,Z = regressive(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
-    return p ? SBlade{V}(-1,d) : d
+    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    return p ? Simplex{V}(-1,d) : d
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -374,10 +374,10 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
+        v=typeof(v)<:TensorMixed ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(p ? -v : v,getbasis(V,C))
+    return Simplex{V}(p ? -v : v,getbasis(V,C))
 end
 
 """
@@ -410,8 +410,8 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     g,C,t,Z = interior(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
-    return typeof(V) <: Signature ? (g ? SBlade{V}(-1,d) : d) : SBlade{V}(g,d)
+    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    return typeof(V) <: Signature ? (g ? Simplex{V}(-1,d) : d) : Simplex{V}(g,d)
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -421,10 +421,10 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
+        v=typeof(v)<:TensorMixed ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
+    return Simplex{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
 end
 
 export ⨼, ⨽
@@ -460,8 +460,8 @@ cross(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = ⋆(a∧b)
     p,C,t,Z = crossprod(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = SBlade{V}(getbasis(loworder(V),Z),d))
-    return p ? SBlade{V}(-1,d) : d
+    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    return p ? Simplex{V}(-1,d) : d
 end
 
 function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -471,10 +471,10 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),*)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v=typeof(v)<:TensorMixed ? SBlade{V}(getbasis(V,Z),v) : SBlade{V}(v,getbasis(loworder(V),Z))
+        v=typeof(v)<:TensorMixed ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return SBlade{V}(p ? -v : v,getbasis(V,C))
+    return Simplex{V}(p ? -v : v,getbasis(V,C))
 end
 
 # symmetrization and anti-symmetrization
@@ -526,14 +526,14 @@ export ⊘
 
 Sandwich product: ω⊘η = (~ω)⊖η⊖ω
 """
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (x ∗ y) * x
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (y)ˣ \ x * y
 
 """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """
->>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
+>>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y / (x)ˣ
 
 ## linear algebra
 
@@ -555,7 +555,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     TF = Field ∉ Fields ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     @eval begin
-        @inline function inneraddvalue!(mv::MBlade{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
+        @inline function inneraddvalue!(mv::MSimplex{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
             if γ≠0
                 g,C,f,Z = interior(α,β,V)
                 !iszero(C) && T≠Any && (return true)
@@ -587,32 +587,32 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
             MultiVector{$TF,dual(V)}(out)
         end
-        *(a::F,b::Basis{V}) where {F<:$EF,V} = SBlade{V}(a,b)
-        *(a::Basis{V},b::F) where {F<:$EF,V} = SBlade{V}(b,a)
+        *(a::F,b::Basis{V}) where {F<:$EF,V} = Simplex{V}(a,b)
+        *(a::Basis{V},b::F) where {F<:$EF,V} = Simplex{V}(b,a)
         *(a::F,b::MultiVector{T,V}) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,Ref(a),b.v))
         *(a::MultiVector{T,V},b::F) where {F<:$Field,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.∏,a.v,Ref(b)))
         *(a::F,b::MultiGrade{V}) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,Ref(a),b.v))
         *(a::MultiGrade{V},b::F) where {F<:$EF,V} = MultiGrade{V}(broadcast($MUL,a.v,Ref(b)))
         ∧(a::$Field,b::$Field) = $MUL(a,b)
-        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = SBlade{V,G}(a,b)
-        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = SBlade{V,G}(b,a)
+        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
+        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
         #=∧(a::$Field,b::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{T,V}(a.*b.v)
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
         ∧(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
         ∧(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)=#
     end
-    for Blade ∈ MSB
+    for implex ∈ MSB
         @eval begin
-            adjoint(b::$Blade{V,G,B,T}) where {V,G,B,T<:$Field} = $Blade{dual(V),G,B',$TF}($CONJ(value(b)))
-            *(a::F,b::$Blade{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = SBlade{V,G}($MUL(a,b.v),basis(b))
-            *(a::$Blade{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = SBlade{V,G}($MUL(a.v,b),basis(a))
+            adjoint(b::$implex{V,G,B,T}) where {V,G,B,T<:$Field} = $implex{dual(V),G,B',$TF}($CONJ(value(b)))
+            *(a::F,b::$implex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
+            *(a::$implex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
         end
     end
     for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
         @eval function *(a::$A{V,G,A,T} where {G,A},b::$B{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
-            SBlade(v,mul(ba,bb,v))
+            Simplex(v,mul(ba,bb,v))
         end
     end
     for Chain ∈ MSC
@@ -684,9 +684,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return MChain{t,V,2}(out)
             end
         end
-        for Blade ∈ MSB
+        for implex ∈ MSB
             @eval begin
-                function contraction(a::$Chain{T,V,G},b::$Blade{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
+                function contraction(a::$Chain{T,V,G},b::$implex{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                     X = bits(basis(b))
                     for i ∈ 1:binomial(N,G)
@@ -698,7 +698,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     return value_diff(mv)
                 end
-                function contraction(a::$Blade{V,G,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
+                function contraction(a::$implex{V,G,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:mv,:ib,:μ),VEC)...)
                     A = bits(basis(a))
                     for i ∈ 1:binomial(N,G)
@@ -709,7 +709,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     return value_diff(mv)
                 end
-                function ∧(a::$Chain{T,w,1},b::$Blade{W,1,B,S}) where {T<:$Field,w,W,B,S<:$Field}
+                function ∧(a::$Chain{T,w,1},b::$implex{W,1,B,S}) where {T<:$Field,w,W,B,S<:$Field}
                     V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                     $(insert_expr((:N,:t,:μ),VEC)...)
                     ib = indexbasis(ndims(w),1)
@@ -724,7 +724,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     return MChain{t,V,2}(out)
                 end
-                function ∧(a::$Blade{w,1,B,S},b::$Chain{T,W,1}) where {T<:$Field,w,W,B,S<:$Field}
+                function ∧(a::$implex{w,1,B,S},b::$Chain{T,W,1}) where {T<:$Field,w,W,B,S<:$Field}
                     V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return interop(∧,a,b)))
                     $(insert_expr((:N,:t,:μ),VEC)...)
                     ib = indexbasis(ndims(W),1)
@@ -920,9 +920,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return MultiVector{t,V}(out)
             end
         end
-        for Blade ∈ MSB
+        for implex ∈ MSB
             @eval begin
-                function $op(a::MultiVector{T,V},b::$Blade{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
+                function $op(a::MultiVector{T,V},b::$implex{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                     X = bits(basis(b))
                     for g ∈ 1:N+1
@@ -936,7 +936,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                     return MultiVector{t,V}(out)
                 end
-                function $op(a::$Blade{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
+                function $op(a::$implex{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                     A = bits(basis(a))
                     for g ∈ 1:N+1
@@ -1007,9 +1007,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return MultiVector{t,V}(out)
                 end
             end
-            for Blade ∈ MSB
+            for implex ∈ MSB
                 @eval begin
-                    function $op(a::$Chain{T,V,G},b::$Blade{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
+                    function $op(a::$Chain{T,V,G},b::$implex{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
                         $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                         X = bits(basis(b))
                         for i ∈ 1:binomial(N,G)
@@ -1020,7 +1020,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                         return MultiVector{t,V}(out)
                     end
-                    function $op(a::$Blade{V,L,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
+                    function $op(a::$implex{V,L,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
                         $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
                         A = bits(basis(a))
                         for i ∈ 1:binomial(N,G)
@@ -1070,11 +1070,11 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     ## term addition
 
     for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
-        for (Blade,Other) ∈ [(a,b) for a ∈ MSB, b ∈ MSB]
+        for (implex,Other) ∈ [(a,b) for a ∈ MSB, b ∈ MSB]
             @eval begin
-                function $op(a::$Blade{V,A,X,T},b::$Other{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
+                function $op(a::$implex{V,A,X,T},b::$Other{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
                     if X == Y
-                        return SBlade{V,A}($bop(value(a),value(b)),X)
+                        return Simplex{V,A}($bop(value(a),value(b)),X)
                     elseif A == B
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
@@ -1092,12 +1092,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
             end
         end
-        for Blade ∈ MSB
+        for implex ∈ MSB
             @eval begin
-                $op(a::$Blade{V,G,B,T}) where {V,G,B,T<:$Field} = $Blade{V,G,B,$TF}($bop(value(a)))
-                function $op(a::$Blade{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
+                $op(a::$implex{V,G,B,T}) where {V,G,B,T<:$Field} = $implex{V,G,B,$TF}($bop(value(a)))
+                function $op(a::$implex{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
                     if X == b
-                        return SBlade{V,A}($bop(value(a),value(b)),b)
+                        return Simplex{V,A}($bop(value(a),value(b)),b)
                     elseif A == B
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
@@ -1113,9 +1113,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         return MultiVector{t,V}(out)
                     end
                 end
-                function $op(a::Basis{V,A,X},b::$Blade{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
+                function $op(a::Basis{V,A,X},b::$implex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
                     if a == Y
-                        return SBlade{V,A}($bop(value(a),value(b)),a)
+                        return Simplex{V,A}($bop(value(a),value(b)),a)
                     elseif A == B
                         $(insert_expr((:N,:t),VEC)...)
                         out = zeros($VEC(N,A,t))
@@ -1131,13 +1131,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         return MultiVector{t,V}(out)
                     end
                 end
-                function $op(a::$Blade{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
+                function $op(a::$implex{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                     addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
                     return MultiVector{t,V}(out)
                 end
-                function $op(a::MultiVector{T,V},b::$Blade{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                function $op(a::MultiVector{T,V},b::$implex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
                     $(insert_expr((:N,:t),VEC)...)
                     out = copy(value(a,$VEC(N,t)))
                     addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
@@ -1245,27 +1245,27 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
         end
         for Chain ∈ MSC
-            for Blade ∈ MSB
+            for implex ∈ MSB
                 @eval begin
-                    function $op(a::$Chain{T,V,G},b::$Blade{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                    function $op(a::$Chain{T,V,G},b::$implex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
                         $(insert_expr((:N,:t),VEC)...)
                         out = copy(value(a,$VEC(N,G,t)))
                         addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                         return MChain{t,V,G}(out)
                     end
-                    function $op(a::$Blade{V,G,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,S<:$Field}
+                    function $op(a::$implex{V,G,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,S<:$Field}
                         $(insert_expr((:N,:t),VEC)...)
                         out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                         addblade!(out,value(a,t),basis(a),Dimension{N}())
                         return MChain{t,V,G}(out)
                     end
-                    function $op(a::$Chain{T,V,G},b::$Blade{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
+                    function $op(a::$Chain{T,V,G},b::$implex{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
                         $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                         @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                         addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
                         return MultiVector{t,V}(out)
                     end
-                    function $op(a::$Blade{V,L,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
+                    function $op(a::$implex{V,L,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
                         $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                         @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
                         addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
@@ -1340,10 +1340,10 @@ end
     *(a::F,b::MultiVector{T,V}) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,Ref(a),b.v))
     *(a::MultiVector{T,V},b::F) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a.v,Ref(b)))
 end
-for Blade ∈ MSB
+for implex ∈ MSB
     @eval begin
-        *(a::F,b::$Blade{V,G,B,T} where B) where {F<:Number,V,G,T} = SBlade{V,G}($Sym.:∏(a,b.v),basis(b))
-        *(a::$Blade{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = SBlade{V,G}($Sym.:∏(a.v,b),basis(a))
+        *(a::F,b::$implex{V,G,B,T} where B) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
+        *(a::$implex{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
     end
 end
 for Chain ∈ MSC
@@ -1358,10 +1358,10 @@ for F ∈ Fields
         *(a::F,b::MultiVector{T,V}) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,Ref(a),b.v))
         *(a::MultiVector{T,V},b::F) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a.v,Ref(b)))
     end
-    for Blade ∈ MSB
+    for implex ∈ MSB
         @eval begin
-            *(a::F,b::$Blade{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = SBlade{V,G}(*(a,b.v),basis(b))
-            *(a::$Blade{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = SBlade{V,G}(*(a.v,b),basis(a))
+            *(a::F,b::$implex{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a,b.v),basis(b))
+            *(a::$implex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a.v,b),basis(a))
         end
     end
     for Chain ∈ MSC
@@ -1407,10 +1407,10 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
         end
     end
     @eval begin
-        $op(a::Basis{V,G,B} where G) where {V,B} = SBlade($op(value(a)),a)
+        $op(a::Basis{V,G,B} where G) where {V,B} = Simplex($op(value(a)),a)
         function $op(a::Basis{V,A},b::Basis{V,B}) where {V,A,B}
             if a == b
-                return SBlade{V,A}($op(value(a),value(b)),basis(a))
+                return Simplex{V,A}($op(value(a),value(b)),basis(a))
             elseif A == B
                 $(insert_expr((:N,:t))...)
                 out = zeros(mvec(N,A,t))
@@ -1613,13 +1613,13 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             throw(error("inv($m) is undefined"))
         end
     end
-    for Blade ∈ MSB
+    for implex ∈ MSB
         @eval begin
-            function $nv(b::$Blade{V,G,B,T}) where {V,G,B,T}
-                $Blade{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
+            function $nv(b::$implex{V,G,B,T}) where {V,G,B,T}
+                $implex{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
             end
-            function $nv(b::$Blade{V,G,B,Any}) where {V,G,B}
-                $Blade{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+            function $nv(b::$implex{V,G,B,Any}) where {V,G,B}
+                $implex{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
             end
         end
     end
@@ -1639,9 +1639,9 @@ function generate_inverses(Mod,T)
         for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
             @eval $d(a::S,b::T) where {S<:$Term,T<:$Mod.$T} = a*$ds(1,b)
         end
-        for Blade ∈ MSB
-            @eval function $nv(b::$Blade{V,G,B,$Mod.$T}) where {V,G,B}
-                $Blade{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+        for implex ∈ MSB
+            @eval function $nv(b::$implex{V,G,B,$Mod.$T}) where {V,G,B}
+                $implex{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
             end
         end
     end
@@ -1652,8 +1652,8 @@ for T ∈ (:Real,:Complex)
 end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
-    for Blade ∈ MSB
-        @eval Base.$op(b::$Blade{V,G,B,T},m) where {V,G,B,T} = $Blade{V,G,B}($op(value(b),m))
+    for implex ∈ MSB
+        @eval Base.$op(b::$implex{V,G,B,T},m) where {V,G,B,T} = $implex{V,G,B}($op(value(b),m))
     end
     for Chain ∈ MSC
         @eval Base.$op(a::$Chain{T,V,G},m::S) where {T,V,G,S} = $Chain{promote_type(T,S),V,G}($op.(value(a),m))
@@ -1664,8 +1664,8 @@ for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
-    for Blade ∈ MSB
-        @eval Base.$op(b::$Blade{V,G,B,T}) where {V,G,B,T} = $Blade{V,G,B}($op(value(b)))
+    for implex ∈ MSB
+        @eval Base.$op(b::$implex{V,G,B,T}) where {V,G,B,T} = $implex{V,G,B}($op(value(b)))
     end
     for Chain ∈ MSC
         @eval Base.$op(a::$Chain{T,V,G}) where {T,V,G} = $Chain{promote_type(T,Float64),V,G}($op.(value(a)))
@@ -1675,8 +1675,8 @@ for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
         Base.$op(a::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,Float64),V}($op.(value(a)))
     end
 end
-for Blade ∈ MSB
-    @eval Base.rationalize(t::Type,b::$Blade{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = $Blade{V,G,B}(rationalize(t,value(b),tol))
+for implex ∈ MSB
+    @eval Base.rationalize(t::Type,b::$implex{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = $implex{V,G,B}(rationalize(t,value(b),tol))
 end
 for Chain ∈ MSC
     @eval Base.rationalize(t::Type,a::$Chain{T,V,G};tol::Real=eps(T)) where {T,V,G} = $Chain{T,V,G}(rationalize.(t,value(a),tol))

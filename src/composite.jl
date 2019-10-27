@@ -6,8 +6,8 @@ export exph, log_fast, logh_fast
 
 ## exponential & logarithm function
 
-@inline Base.expm1(t::Basis{V,0}) where V = SBlade{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorTerm{V,0} where V = SBlade{V}(expm1(value(t)))
+@inline Base.expm1(t::Basis{V,0}) where V = Simplex{V}(ℯ-1)
+@inline Base.expm1(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(expm1(value(t)))
 
 function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     S,term,f = t,(t^2)/2,norm(t)
@@ -27,7 +27,7 @@ end
 @eval function Base.expm1(b::MultiVector{T,V}) where {T,V}
     B = value(b)
     sb,nb = scalar(b),norm(B)
-    sb ≈ nb && (return SBlade{V}(expm1(sb)))
+    sb ≈ nb && (return Simplex{V}(expm1(sb)))
     $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
     S = zeros(mvec(N,t))
     term = zeros(mvec(N,t))
@@ -126,7 +126,7 @@ end
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
         @inline Base.$qrt(t::Basis{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorTerm{V,0} where V = SBlade{V}($qrt(value(t)))
+        @inline Base.$qrt(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}($qrt(value(t)))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
@@ -135,7 +135,7 @@ end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorTerm{V,0} where V = SBlade{V}(cosh(value(t)))
+@inline Base.cosh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(cosh(value(t)))
 
 function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
@@ -156,7 +156,7 @@ end
 
 @eval function Base.cosh(b::MultiVector{T,V,E}) where {T,V,E}
     sb,nb = scalar(b),norm(b)
-    sb ≈ nb && (return SBlade{V}(cosh(sb)))
+    sb ≈ nb && (return Simplex{V}(cosh(sb)))
     $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
     τ::MultiVector{T,V,E} = b^2
     B = value(τ)
@@ -193,7 +193,7 @@ end
     return MultiVector{t,V}(S)
 end
 
-@inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = SBlade{V}(sinh(value(t)))
+@inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(sinh(value(t)))
 
 function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     τ,f = t^2,norm(t)
@@ -213,7 +213,7 @@ end
 
 @eval function Base.sinh(b::MultiVector{T,V,E}) where {T,V,E}
     sb,nb = scalar(b),norm(b)
-    sb ≈ nb && (return SBlade{V}(sinh(sb)))
+    sb ≈ nb && (return Simplex{V}(sinh(sb)))
     $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
     τ::MultiVector{T,V,E} = b^2
     B = value(τ)
