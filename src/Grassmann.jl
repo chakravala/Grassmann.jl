@@ -601,8 +601,10 @@ function __init__()
         Base.convert(::Type{GeometryTypes.Point},t::MChain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         Base.convert(::Type{GeometryTypes.Point},t::SChain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
-        export points
-        points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(Grassmann.vector(f(t)))) for t ∈ r]
+        @pure ptype(::Point{N,T} where N) where T = T
+        export points, vectorfield
+        points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
+        vectorfield(t,V=vectorspace(t)) = p->GeometryTypes.Point(V(vector(SChain{ptype(p),V,1}(p.data)⊘t)))
     end
     #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing

@@ -526,14 +526,15 @@ export ⊘
 
 Sandwich product: ω⊘η = (~ω)⊖η⊖ω
 """
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = (y)ˣ \ x * y
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = inv(y) * x * involute(y)
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{W}) where {V,W} = interop(⊘,x,y)
 
 """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """
->>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y / (x)ˣ
+>>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
 
 ## linear algebra
 
