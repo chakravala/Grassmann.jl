@@ -244,7 +244,7 @@ const lowerbits_extra = Dict{UInt,Dict{UInt,UInt}}[]
     end
 end
 
-#=const expandbits_cache = Dict{UInt,Dict{UInt,UInt}}[]
+const expandbits_cache = Dict{UInt,Dict{UInt,UInt}}[]
 @pure expandbits_calc(N,S,B) = bit2int(indexbits(N,indices(S,N)[indices(B,N)]))
 @pure function expandbits(N,S,B)
     for k ∈ length(expandbits_cache)+1:N
@@ -253,6 +253,30 @@ end
     @inbounds !haskey(expandbits_cache[N],S) && push!(expandbits_cache[N],S=>Dict{UInt,UInt}())
     @inbounds !haskey(expandbits_cache[N][S],B) && push!(expandbits_cache[N][S],B=>expandbits_calc(N,S,B))
     @inbounds expandbits_cache[N][S][B]
+end
+
+#=const expandbits_cache = Vector{Vector{UInt}}[]
+const expandbits_extra = Dict{UInt,Dict{UInt,UInt}}[]
+@pure expandbits_calc(N,S,B,k=indices(S,N)) = bit2int(indexbits(N,k[indices(B,N)]))
+@pure function expandbits(N,S,B)
+    if N>cache_limit
+        n = N-cache_limit
+        for k ∈ length(expandbits_extra)+1:n
+            push!(expandbits_extra,Dict{UInt,Dict{UInt,UInt}}())
+        end
+        @inbounds !haskey(expandbits_extra[n],S) && push!(expandbits_extra[n],S=>Dict{UInt,UInt}())
+        @inbounds !haskey(expandbits_extra[n][S],B) && push!(expandbits_extra[n][S],B=>expandbits_calc(N,S,B))
+        @inbounds expandbits_extra[n][S][B]
+    else
+        for k ∈ length(expandbits_cache)+1:min(N,cache_limit)
+            push!(expandbits_cache,Vector{Int}[])
+        end
+        for s ∈ length(expandbits_cache[N])+1:S
+            k = indices(S,N)
+            push!(expandbits_cache[N],[expandbits_calc(N,s,d,k) for d ∈ UInt(0):UInt(1)<<(N+1)-1])
+        end
+        @inbounds expandbits_cache[N][S][B+1]
+    end
 end=#
 
 

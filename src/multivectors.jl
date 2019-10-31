@@ -671,6 +671,8 @@ end
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
+@pure subvert(::SubManifold{M,V,S} where {M,V}) where S = S
+
 @pure function mixed(V::M,ibk::UInt) where M<:Manifold
     N,D,VC = ndims(V),diffvars(V),mixedmode(V)
     return if D≠0
@@ -687,10 +689,11 @@ end
     WC,VC = mixedmode(W),mixedmode(V)
     #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
     #    return V0
+    B = typeof(V)<:SubManifold ? expandbits(ndims(W),subvert(V),bits(b)) : bits(b)
     if WC<0 && VC≥0
-        getbasis(W,mixed(V,bits(b)))
+        getbasis(W,mixed(V,B))
     elseif WC≥0 && VC≥0
-        getbasis(W,bits(b))
+        getbasis(W,B)
     else
         throw(error("arbitrary Manifold intersection not yet implemented."))
     end
@@ -717,10 +720,11 @@ for Chain ∈ MSC
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
+                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,subvert(V),ib[k]) : ib[k]
                     if WC<0 && VC≥0
-                        @inbounds setblade!(out,b[k],mixed(V,ib[k]),Dimension{M}())
+                        @inbounds setblade!(out,b[k],mixed(V,B),Dimension{M}())
                     elseif WC≥0 && VC≥0
-                        @inbounds setblade!(out,b[k],ib[k],Dimension{M}())
+                        @inbounds setblade!(out,b[k],B,Dimension{M}())
                     else
                         throw(error("arbitrary Manifold intersection not yet implemented."))
                     end
@@ -737,7 +741,7 @@ for Chain ∈ MSC
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     @inbounds if count_ones(ib[k]&S) == G
-                        @inbounds setblade!(out,b[k],lowerbits(N,S,ib[k]),Dimension{M}())
+                        @inbounds setblade!(out,b[k],lowerbits(M,S,ib[k]),Dimension{M}())
                     end
                 end
             end
@@ -760,10 +764,11 @@ function (W::Signature)(m::MultiVector{T,V}) where {T,V}
         for k ∈ 1:length(ib)
             @inbounds s = k+bs[i]
             @inbounds if m.v[s] ≠ 0
+                @inbounds B = typeof(V)<:SubManifold ? expandbits(M,subvert(V),ib[k]) : ib[k]
                 if WC<0 && VC≥0
-                    @inbounds setmulti!(out,m.v[s],mixed(V,ib[k]),Dimension{M}())
+                    @inbounds setmulti!(out,m.v[s],mixed(V,B),Dimension{M}())
                 elseif WC≥0 && VC≥0
-                    @inbounds setmulti!(out,m.v[s],ib[k],Dimension{M}())
+                    @inbounds setmulti!(out,m.v[s],B,Dimension{M}())
                 else
                     throw(error("arbitrary Manifold intersection not yet implemented."))
                 end
@@ -822,3 +827,7 @@ Base.copysign(x::Simplex{V,G,B,T},y::Simplex{V,G,B,T}) where {V,G,B,T} = Simplex
     end
     return A
 end
+
+# genfun
+
+

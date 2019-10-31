@@ -74,7 +74,7 @@
 Mathematical foundations and some of the nuances in the definitions specific to the \textit{Grassmann.jl} implementation are concisely described, along with the accompanying support packages that provide an extensible platform for computing with geometric algebra at high dimensions.
 The design is based on the \verb`TensorAlgebra` abstract type interoperability from \textit{AbstractTensors.jl} with a \verb`VectorBundle` type parameter from \textit{DirectSum.jl}. Abstract vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
 
-The nature of the geometric algebra code generation enables one to easily extend the abstract product operations to any specific number field type (including Leibniz differentials with \textit{Leibniz.jl} or symbolic coefficients with \textit{Reduce.jl}), by making use of Julia's type system. Mixed tensor products with their coefficients are constructed from these operations to work with bivector elements of Lie groups \cite{hestenes}\cite{shahshahani}.
+The nature of the geometric algebra code generation enables one to easily extend the abstract product operations to any specific number field type (including differential operators with \textit{Leibniz.jl} or symbolic coefficients with \textit{Reduce.jl}), by making use of Julia's type system. Mixed tensor products with their coefficients are constructed from these operations to work with bivector elements of Lie groups \cite{hestenes}\cite{shahshahani}.
 
 \section{Direct sum parametric type polymorphism}
 
@@ -115,7 +115,7 @@ such that computing unions of submanifolds is done by inspecting the parameter $
 
 The metric signature of the \verb+Basis{V,1}+ elements of a vector space \verb+V+ can be specified with the \verb+V"..."+ constructor by using \verb-+- and \verb+-+ to specify whether the \verb+Basis{V,1}+ element of the corresponding index squares to \verb`+1` or \verb`-1`.
 For example, \verb`S"+++"` constructs a positive definite 3-dimensional \verb`VectorBundle`.
-It is also possible to specify an arbitrary \verb`DiagonalForm` having numerical values for the basis with \verb`D"0,0,0"` or \verb`D"-1,1,1,1"`, although the $\pm$ format provides better performance.
+It is also possible to specify an arbitrary \verb`DiagonalForm` having numerical values for the basis with degenracy \verb`D"1,1,1,0"`, although the $\pm$ format has a more compact representation.
 Further development will result in more metric types.
 
 Declaring an additional plane at infinity is done by specifying it in the string constructor with \verb`∞` at the first index (i.e. Riemann sphere \verb`S"∞+++"`). The hyperbolic geometry can be declared by \verb`∅` subsequently (i.e. Minkowski spacetime \verb`S"∅+++"`). 
@@ -129,7 +129,8 @@ The \verb`tangent(V,`$\mu$\verb`,`$\nu$\verb`)` map can be used to specify $\mu$
 The \verb`AbstractTensors` package is intended for universal interoperability of the abstract \verb`TensorAlgebra` type system.
 All \verb`TensorAlgebra{V}` subtypes have type parameter \verb`V`, used to store a \verb`VectorBundle` value obtained from \textit{DirectSum.jl}.
 By itself, this package does not impose any specifications or structure on the \verb`TensorAlgebra{V}` subtypes and elements, aside from requiring $V$ to be a \verb`VectorBundle`.
-This means that different packages can create tensor types having a common underlying \verb`VectorBundle` structure.
+Hence all tensor types share a common underlying \verb`VectorBundle` structure.
+The macro \verb`@basis V` declares a local basis in Julia.
 
 \begin{definition}
 	Let $V\in\text{Vect}_{\mb k}$ be a \verb`VectorBundle` with dual space $V'$ and the basis elements $w_k:V\ra\mb K$, then for all $x\in V,c\in\mb K$ the properties $(w_i+w_j)(x) = w_i(x)+w_j(x)$ and $(cw_k)(x) = cw_k(x)$ hold.
@@ -153,16 +154,17 @@ This means that different packages can create tensor types having a common under
 	Elements $\omega_k$ in the space $\Lambda V$ of anti-symmetric algebra are often studied as unit quantum state vectors in a unitary probability space, where $\sum_k\omega_k\neq\bigotimes_k\omega_k$ is entanglement.
 \end{remark}
 \begin{definition}
-	The Grassmann anti-symmetric exterior basis is denoted by $v_{i_1\dots i_g}\in\Lambda_gV$ with its dual $w^{i_1\cdots i_g}\in\Lambda^gV$, while the Leibniz symmetric basis will be $\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L_gV$ with $\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV$ dual elements.
+	The Grassmann anti-symmetric exterior basis is denoted by $v_{i_1\dots i_g}\in\Lambda_gV$ with its dual $w^{i_1\cdots i_g}\in\Lambda^gV$, while the Leibniz symmetric basis will be $\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L_gV$ with $\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV$ dual elements. Let $\Lambda V = \bigoplus \Lambda^g V$.
 \end{definition}
-Higher-order composite tensor elements will be denoted by an oriented-multi-set $X$ %\in\text{OMSet}$
+A higher-order tensor element is an oriented-multi-set $X$ %\in\text{OMSet}$
 such that $w_X = \bigotimes_k w_{i_k}^{\otimes\mu_k}$ with $X = \plr{(i_1,\mu_1),\dots,(i_g,\mu_g)}$ and $|X|=\sum_k\mu_k$ is \verb`grade`,$\,$ \verb`order`.
 %There are two orientations and higher multiplicities result in zero for anti-symmetric tensors denoted by indices $\Lambda X\subseteq\Lambda V$, so the only interesting multiplicity is $\mu_k\equiv 1$.
-Anti-symmetric ndices $\Lambda X\subseteq\Lambda V$ have two orientations and higher multiplicities of them result in zero values, so the only interesting multiplicity is $\mu_k\equiv 1$.
-Symmetric tensors have an ambiguous multiplicity of nilpotence; decide that $\epsilon_k^{\mu+1}=0$, so $\mu_k\leq\mu$ can be non-trivial, negative, or unbounded.
+Anti-symmetric indices $\Lambda X\subseteq\Lambda V$ have two orientations and higher multiplicities are degenerate, hence the only relevant multiplicity is $\mu_k\equiv 1$.
+%Symmetric tensors have an ambiguous multiplicity of nilpotence; decide that $\epsilon_k^{\mu+1}=0$, so $\mu_k\leq\mu$ can be non-trivial, negative, or unbounded.
+The Leibniz-Taylor algebra \cite{taylor-algebra} is a quotient polynomial ring $LV\cong R[x_1,\dots,x_n]/\{\prod_{k=1}^{\mu+1} x_{p_k}\}$, so that $\epsilon_k^{\mu+1}=0$. % is $\mu$ truncated % (e.g. Jacobian and Hessian).
 
 The Grassmann \verb`Basis` elements $v_k\in\Lambda_1V$ and $w^k\in\Lambda^1V$ are linearly independent vector and covector elements of $V$, while the Leibniz \verb`Operator` elements $\partial_k\in L_1V$ are partial tangent derivations and $\epsilon_k(x)\in L^1V$ are dependent functions of the \verb`tangent` manifold. 
-Higher \verb`grade` elements of $\Lambda V$ correspond to \verb`SubManifold` subspaces, while higher \verb`order` function elements of $LV$ become homogenous polynomials and Taylor series.
+Higher \verb`grade` elements of $\Lambda V$ correspond to \verb`SubManifold` spaces, while higher \verb`order` function elements of $LV$ become homogenous polynomials and Taylor series.
 
 %Grassmann's exterior algebra is fundamentally simpler in structure than the symmetric generated algebra,
 Grassmann's exterior algebra doesn't invoke the properties of multi-sets, as it is related to the algebra of oriented sets; while the Leibniz symmetric algebra is that of unoriented multi-sets.
@@ -322,7 +324,7 @@ Grassmann.graph(x+!x)
 draw(PDF("simplex.pdf",16cm,16cm),x+!x)
 \end{lstlisting}
 \begin{figure}[ht]
-\centerline{\includegraphics[width=0.42\textwidth]{triangle-tetrahedron.png}}
+\centerline{\includegraphics[width=0.42\textwidth]{img/triangle-tetrahedron.png}}
 \caption*{Triangle with its tetrahedron complement $v_{123} + \star v_{123}$ in $\mb R^7$}
 \end{figure}
 John Browne has discussed Grassmann duality principle in book \cite{browne}, stating that every theorem (involving either of the exterior and regressive products) can be translated into its dual theorem by replacing the $\wedge$ and $\vee$ operations and applying \textit{Poincare duality} (homology).
@@ -383,16 +385,17 @@ where DeMorgan's law is used to derive tensor contractions.
 	Stokes identity can be proved by relying on a variant of the \textit{common factor theorem} by Browne \cite{browne}.
 \end{proof}
 \begin{theorem}[Clifford-Dirac-Laplacian]
-	The Dirac operator \cite{garling} is $ \Delta^\frac12\omega = \pm\nabla\ominus\omega = \pm\nabla\wedge\omega \pm \nabla\cdot\omega  = \pm d\omega\pm\partial\omega$.
+	The Dirac operator \cite{garling} is $ (\nabla^2)^\frac12\omega = \pm\nabla\ominus\omega = \pm\nabla\wedge\omega \pm \nabla\cdot\omega  = \pm d\omega\pm\partial\omega$.
 	\begin{align*}
-		\Delta\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \pm(\pm\omega\ominus\nabla)\ominus\nabla).
+		\nabla^2\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \mp(\mp\omega\ominus\nabla)\ominus\nabla).
 	\end{align*}
-	Elements $\omega$ are \textit{harmonic} if $\Delta\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, such that $\mc H^p M = \setc{\Delta\omega = 0}{\omega\in \Omega^pM}$.
+	Elements $\omega$ are \textit{harmonic} if $\nabla\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, such that $\mc H^p M = \setc{\nabla\omega = 0}{\omega\in \Omega^pM}$.
 	Hodge \cite{ivancevic}:
 	$\Omega^pM=\mc H^pM\oplus\im{d\Omega^{p-1}M}\oplus\im{\partial\Omega^{p+1}M}$.
 	Note: $\nabla\omega=-\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
 \end{theorem}
 
+\iffalse
 \begin{lstlisting}[language = Julia]
 julia> using Reduce, Grassmann; @basis tangent(ℝ^2,3,2);
 
@@ -402,12 +405,10 @@ julia> x = :x*v1 + ∂1v1 + ∂1*∂1v1 + ∂1*∂1*∂1v1
 julia> x^8
 x ^ 8 + (8 * x ^ 7 + (4 * (2x + 7) * x ^ 6 + (8 * (x ^ 2 + 7x + 7) * x ^ 5)∂₁)∂₁)∂₁
 \end{lstlisting}
+\fi
 
 %\subsection{Projective null-cones of Dirac-Clifford-Hestenes}
 
-\begin{example}[\textit{using Leibniz $\bigoplus\,$Grassmann}]
-	\textbf{julia>} S"$\infty\emptyset\text{+++"}(\nabla)$\verb`^`$2 \,\,  \mapsto\, \, \Delta = (-2\partial_{\infty\emptyset} + \partial_1^2 + \partial_2^2 + \partial_3^2)\vec v $
-\end{example}
 For the null-basis, complement operations are different:
 \begin{align*}
 	\star v_\infty &= \star(v_++v_-) = (v_- + v_+)v_{1...n} = v_{\infty1...n} \\
@@ -420,7 +421,28 @@ An additional metric independent version of the complement operation is availabl
  	!2v_\emptyset &= !(v_--v_+) = (v_+ + v_-)v_{1...n} = -v_{\infty1...n}
 \end{align*}
 That variation of complement satisfies $\lambda I = \omega\,\wedge\,!\omega$ instead.
+\begin{example}%[\textit{using Leibniz $\bigoplus\,$Grassmann}]
+	S"$\infty\emptyset\text{+++"}(\nabla$\verb`^`$2) \,\,  \mapsto\, \, -2\partial_{\infty\emptyset} + \partial_1^2 + \partial_2^2 + \partial_3^2 $
+\end{example}
+Let $\nabla\in\Lambda^1V$, then $\omega = (\nabla\bs\nabla)\ominus\omega = \nabla\bs(d\omega + \partial\omega)$ where $\nabla\parallel\partial\omega$ and $\nabla\perp d\omega$.
+Let's reflect across the hyperplane $\star\nabla$,
+\begin{align*}
+	\nabla\bs (d\omega-\partial\omega) &= \nabla\bs(d\omega-\partial\omega)\ominus(\nabla\bs\nabla) \\
+									   &= -\nabla^2\bs(d\omega+\partial\omega)\ominus\nabla = -\nabla\bs\omega\ominus\nabla. %= \omega\oslash\nabla
+\end{align*}
+Hence, reflection by hyperplane $\star\nabla$ has isometry $\omega\oslash\nabla$ which for $\nabla = v_j$ is the map $\mb R^n \ra \mb R_1\times\cdots\times\conj{\mb R}_j\cdots\times\mb R_n$.
 
+\begin{theorem}[Cartan-Dieudonne]
+	Every isometry of $V\ra V$ is the composite of at most $k$ reflections across non-singular hyperplanes. Hence there exist vectors $\nabla_j$ such that
+	$$ (((\omega\oslash\nabla_1)\oslash\nabla_2)\oslash\cdots)\oslash\nabla_k = \omega\oslash(\nabla_1\ominus\nabla_2\ominus\dots\ominus\nabla_k) $$
+	for any isometry element of the orthogonal group $O(p,q)$.
+\end{theorem}
+Note that elements under transformations of this group preserve inner product relations.
+The even grade operators make up the rotational group, where each bivector isometry is a composition of two reflections \cite{artin} \cite{doran-hestenes-sommen-acker}.
+
+Consider the differential equation $ \partial_i\epsilon_j = \epsilon_j\oslash\omega$ with the solution $\epsilon_j(x) = \epsilon_j(0)\oslash e^{x_i\omega} $ where $\theta =2 x_i$ is the parameter of the Lie group. Then for a normalized $\omega$,
+$$ e^{\theta\omega} = \sum_k \frac{(\theta\omega)^{\ominus k}}{k!} = \begin{cases} \cosh\theta+\omega\sinh\theta, & \text{if } \omega^2 = 1, \\ \cos\theta + \omega\sin\theta, & \text{if } \omega^2=-1, \\ 1+\theta\omega, & \text{if } \omega^2=0. \end{cases} $$
+Note that $\nabla\oslash e^{\theta\omega/2} = \nabla \ominus e^{\theta\omega}$ is a double covering when using the complex numbers in the Euclidean plane.
 \begin{theorem}[Leibniz-Taylor series]
 	$\partial_X=\bigominus_k\partial_k^{\mu_k}$ is defined so that $|X|=\sum_k\mu_k$, then $e^{\partial\epsilon}\omega(x)$ is
 	\begin{align*}
@@ -430,106 +452,169 @@ That variation of complement satisfies $\lambda I = \omega\,\wedge\,!\omega$ ins
 		%+ (\mu+1)\sum_{|X|=\mu+1}\int_0^1(1-t)^\mu\bigominus_k\frac{(\partial_k\epsilon_k(x))^{\mu_k}}{\mu_k!}\omega(x+t\epsilon)\,dt.
 	\end{align*}
 \end{theorem}
-The multivariate \textit{chain rule} is encoded into the geometric algebraic product when using mixed-symmetry.
-
-
-In the following examples, different possible discrete bivector topologies in a projective Riemann sphere setting are examined. 
-The figure below is based on the product topology of two rotation bivectors. When the standard $\mb R^4$ basis is used with projective geometric algebra, the one parameter Lie group can be visualized in the form of a torus in $\mb R^3$. When the fourth $v_\infty$ basis direction is rotated into the Minkowski plane, the double rotation becomes a helix with translational single rotation.
+The multivariate \textit{product rule} is encoded into the geometric algebraic product when using mixed-symmetry.
 
 \begin{lstlisting}[language = Julia]
-using Grassmann, Makie; @basis S"∞+++"
-f(t) = (↓(exp(π*t*((3/7)*v12+v∞3))>>>↑(v1+v2+v3)))
-lines(points(f,V(2,3,4)))
+using Grassmann, Makie
+basis"2" # Euclidean
+streamplot(vectorfield(v1*exp(π*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(exp((π/2)*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(v1*exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
+@basis S"+-" # Hyperbolic
+streamplot(vectorfield(exp((π/8)*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(v1*exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
 \end{lstlisting}
 \begin{figure}[ht]
 	\centering
-	\begin{subfigure}[b]{0.3\textwidth}
-		\includegraphics[width=\textwidth]{torus.png}
-		\caption{Projective double rotation orbit}
+	%\caption{Euclidean vector fields based on exponential operator:}
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-1.png}
+		\caption{$x\oslash e^{\pi v_{12}/2}$, $\mb R^2$}
 		%\label{fig:sample_figure}
 	\end{subfigure}
 	~
-	\begin{subfigure}[b]{0.15\textwidth}
-		\includegraphics[width=\textwidth]{helix.png}
-		\caption{Period translation}
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-2.png}
+		\caption{$ x\oslash e^{\frac\pi2 v_{12}/2}$, $\mb R^2$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-3.png}
+		\caption{$x\oslash e^{\frac\pi4 v_{12}/2}$, $\mb R^2$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-4.png}
+		\caption{$x\oslash(v_1\ominus e^{\frac\pi4 v_{12}/2})$, $\conj{\mb R}\oplus\mb R$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-5.png}
+		\caption{$x\oslash e^{\frac\pi8 v_{12}/2}$, $\mb R\oplus\mb R'$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/plane-6.png}
+		\caption{$x\oslash(v_1\ominus e^{\frac\pi4 v_{12}/2})$, $\conj{\mb R}\oplus\mb R'$}
 		%\label{fig:sample_figure}
 	\end{subfigure}
 \end{figure}
+
+As a result of Grassmann's exterior \& interior products, the Hodge-DeRahm chain complex from cohomology theory is
+\begin{align*}
+	0 &\os d{\us\partial\rightleftarrows} \Omega^0(M) \os d{\us\partial\rightleftarrows} \Omega^1(M) \os d{\us\partial\leftrightarrows} \cdots \os d{\us\partial\rightleftarrows} \Omega^n(M) \os d{\us\partial\rightleftarrows} 0,
+\end{align*}
+having dimensional equivalence brought by the Grassmann-Poincare-Hodge complement duality,
+\begin{align*}
+	\mc H^{n-p}M &\cong \frac{\ker(d\Omega^{n-p}M)}{\im{d\Omega^{n-p-1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\partial\Omega^pM)}{\im{\partial\Omega^{p+1}M}}
+\end{align*}
+The rank of the grade $p$ boundary incidence operator is
+$$ \text{rank}\gen{\partial\gen{M}_{p+1}}_p = \min\set{\dim\gen{\partial\gen{M}_{p+1}}_p,\dim\gen{M}_{p+1}} $$
+Invariant topological information can be computed using the rank of homology groups, where $b_p(M)=\dim\mc H^pM$ are
+$$ b_p(M) = \dim\gen{M}_{p+1} - \text{rank}\gen{\partial\gen{M}_{p+1}}_p - \text{rank}\gen{\partial\gen{M}_{p+2}}_{p+1} $$
+Betti numbers with Euler characteristic $\chi(M) = \sum_p (-1)^pb_p$.
+
+Let's obtain the full \verb`skeleton` of a simplical complex $\Delta(\omega)=\mc P(\omega)\bs\Lambda^0(V)$ from the power set $\mc P(\omega)$ of all vertices with each \verb`subcomplex` $\Delta(\partial(\omega))$ contained in the edge graph:
+$$ \Delta(\omega) =  \sum_{g=1}^n\sum_{k=1}^{n\choose g}\plr{\text{abs}\gen{\omega}_{g,k} + \Delta\plr{\text{abs}\,\partial\gen{\omega}_{g,k}}}. $$
+\begin{example}
+	[Topology] Compute the value $\chi(\Delta(\omega))=1$ and $\chi(\Delta(\partial(\omega))) = \, ?$ for any \verb`Simplex` $\omega$. As an exercise, also compute the corresponding \verb`betti` numbers..
+\end{example}
+
+In Fig. 4, different possible discrete bivector topologies in a projective Riemann sphere setting are examined. 
+The figures are based on the product topology of two rotation bivectors.
+When the Euclidean $\mb R^4$ basis is combined with projective geometric algebra, resulting one parameter Lie groups can be visualized in the form of a torus in $\mb R^3$. 
+When the fourth $v_\infty$ basis direction is rotated into the Minkowski plane, the double rotation becomes a helix with translational single rotation. In examples (b)$\sim$(c) the bivector is modulated.
 
 \begin{figure}[t]
 	\centering
-	\caption{Different variations of bivectors in $\mb R^4$ discrete topology.}
-	\begin{subfigure}[b]{0.14\textwidth}
-		\includegraphics[width=\textwidth]{product.png}
-		\caption{v_{12}+v_{34}}
+	\caption{Variations of sub-manifold vector field mappings in $\mb R^4$.}
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/orb.png}
+		\caption{$x\oslash e^{\frac\pi4(v_{12}+v_{\infty3})}$}
 		%\label{fig:sample_figure}
 	\end{subfigure}
 	~
-	\begin{subfigure}[b]{0.14\textwidth}
-		\includegraphics[width=\textwidth]{strange.png}
-		\caption{v_{14}+v_{24}+v_{34}}
+	\begin{subfigure}[b]{0.23\textwidth}
+		\includegraphics[width=\textwidth]{img/wave.png}
+		\caption{$V_{\infty12}\ra V_{123}$}
 		%\label{fig:sample_figure}
 	\end{subfigure}
-	~
-	\begin{subfigure}[b]{0.14\textwidth}
-		\includegraphics[width=\textwidth]{toroid-modulation.png}
-		\caption{v_{124}+v_{34}}
-		%\label{fig:sample_figure}
-	\end{subfigure}
-\end{figure}
-
-\begin{figure}[t]
-\centerline{\includegraphics[width=0.45\textwidth]{orbit-3.png}}
-%\caption*{$\downarrow(e^{t(v_{12}+v_\infty(sin(3t)3v_1+cos(2t)7v_2-sin(5t)4v_3)/2)}\obackslash\uparrow(v_1+v_2-v_3))$}
-\caption{Modulated bivector group on Riemann sphere S"∞+++"}
 \end{figure}
 
 \section{Conclusion}
 
 \textit{Grassmann.jl} and its accompanying support packages provide an extensible platform for fully generalized computing with geometric algebra at high dimensions.
 %This will enable the usage of many different types of \verb`TensorAlgebra` along with various \verb`VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
-All of the types and operations in this paper are implemented using only a few thousand lines of code with Julia's type polymorphism code generation, although the mixed-symmetry interaction of \verb`Leibniz` and \verb`Grassmann` is still a work in progress.
-The goal is to algebraically define operator actions on groups of \textit{Leibniz.jl} differential function elements. 
-One way is to use \textit{Reduce.jl} for differentiation and \textit{SyntaxTree.jl} to obtain optimal symbolic polynomial forms \cite{optim-poly}.
-
-Thus, these packages provide general rotational algebras and Lie bivector groups with a full trigonometric suite enabled by $ e^{A} = \sum_n \frac{A^n}{n!} $.
+All of the types and operations in this paper are implemented using only a few thousand lines of code with Julia's type polymorphism code generation, with the mixed-symmetry interaction of \verb`Leibniz` and \verb`Grassmann` available for research.
+%The goal is to algebraically define operator actions on groups of \textit{Leibniz.jl} differential function elements. 
+%One way is to use \textit{Reduce.jl} for differentiation and \textit{SyntaxTree.jl} to obtain optimal symbolic polynomial forms \cite{optim-poly}.
+Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite. % enabled by $ e^{A} = \sum_n \frac{A^n}{n!} $.
 Conformal geometric algebra is possible with the Minkowski plane $v_{\infty\emptyset}$, based on the null-basis.
-In general, multivalued quantum logic is enabled by the $\wedge,\vee,\star$ Grassmann-Hodge dual lattice.
+In general, multivalued quantum logic is enabled by the $\wedge,\vee,\star$ Grassmann lattice.
 Mixed-symmetry algebra with \textit{Leibniz.jl} and \textit{Grassmann.jl}, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
-\begin{align*}
-	0 &\os d{\us\partial\rightleftarrows} \Omega^0(M) \os d{\us\partial\rightleftarrows} \Omega^1(M) \os d{\us\partial\leftrightarrows} \cdots \os d{\us\partial\rightleftarrows} \Omega^n(M) \os d{\us\partial\rightleftarrows} 0,
-\end{align*}
-\begin{align*}
-	\mc H^pM &\cong \frac{\ker(d\Omega^pM)}{\im{d\Omega^{p-1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\delta\Omega^pM)}{\im{\delta\Omega^{p+1}M}}
-\end{align*}
-In conclusion, the Dirac-Clifford product yields generalized Hodge-Laplacian and $b_p=\dim\mc H^pM$ are the Betti numbers with Euler characteristic $\chi = \sum_p (-1)^pb_p$.
-There will be a more detailed follow-up paper.
+Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic \verb`χ`.
 
 \textbf{Acknowledgements}: Many thanks for discussions with Steven De Keninck, Utensil Song, Alexander Arsenovic, Hugo Hadfield, Karl Wessel; the helpful Julia community (e.g. Jameson Nash, Stefan Karpinski, Jeff Bezanson, Kristoffer Carlsson, Petr Krysl, Nathan Smith, etc); and thanks for support from my family.
 
 %\cite{bezanson2017julia}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=0.42\textwidth]{orbit-2.png}}
-\caption*{$\downarrow(e^{tv_\infty(sin(3t)3v_1+cos(2t)7v_2-sin(5t)4v_3)/2}\obackslash\uparrow(v_1+v_2-v_3))$}
+	\centering
+	\caption{Different variations of bivectors in $\mb R^4$ discrete topology.}
+	\begin{subfigure}[b]{0.14\textwidth}
+		\includegraphics[width=\textwidth]{img/graph-1.png}
+		\caption{$v_{12}+v_{34}$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.14\textwidth}
+		\includegraphics[width=\textwidth]{img/graph-2.png}
+		\caption{$v_{14}+v_{24}+v_{34}$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.14\textwidth}
+		\includegraphics[width=\textwidth]{img/graph-3.png}
+		\caption{$\partial v_{124}+v_{34}$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
 \end{figure}
 
-
-
-\iffalse
-\begin{figure}[t]
-\centerline{\includegraphics[width=0.42\textwidth]{orbit-1.png}}
-\caption{Modulated bivector group on Riemann sphere S"∞+++"}
+\begin{figure}[ht]
+	\centering
+	%\caption{Doubly-periodic flow from independent bivectors:}
+	\begin{subfigure}[b]{0.3\textwidth}
+		\includegraphics[width=\textwidth]{img/torus.png}
+		\caption{Doubly periodic flow (independent)}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.15\textwidth}
+		\includegraphics[width=\textwidth]{img/helix.png}
+		\caption*{(a) Period translation}
+		%\label{fig:sample_figure}
+	\end{subfigure}
 \end{figure}
-\fi
 
-
-\begin{lstlisting}[language = Julia]
-skeleton(v123)
-betti(ans)
-subcomplex(v123)
-\end{lstlisting}
-
+\begin{figure}[ht]
+	\begin{subfigure}[b]{0.16\textwidth}
+		\includegraphics[width=\textwidth]{img/orbit-2.png}
+		%\caption{$x\oslash e^{\pi v_{12}/2}$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	~
+	\begin{subfigure}[b]{0.28\textwidth}
+		\includegraphics[width=\textwidth]{img/orbit-4.png}
+		%\caption{$ x\oslash e^{\frac\pi2 v_{12}/2}$}
+		%\label{fig:sample_figure}
+	\end{subfigure}
+	\caption*{(b)$\sim$(c) $\downarrow(e^{tv_\infty(sin(3t)3v_1+cos(2t)7v_2-sin(5t)4v_3)/2}\obackslash\uparrow(v_1+v_2-v_3))$}
+\end{figure}
 
 \input{bib.tex}
 

@@ -526,7 +526,7 @@ export ⊘
 
 Sandwich product: ω⊘η = (~ω)⊖η⊖ω
 """
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = inv(y) * x * involute(y)
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = diffvars(V)≠0 ? (~y)*x*involute(y) : inv(y)*x*involute(y)
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{W}) where {V,W} = interop(⊘,x,y)
 
 """

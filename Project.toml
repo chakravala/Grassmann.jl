@@ -23,6 +23,9 @@ AbstractTensors = "0.3"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
+LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
+GraphPlot = "a2cc645c-3eea-5389-862e-a155d0052231"
 
 [targets]
 test = ["Test"]
