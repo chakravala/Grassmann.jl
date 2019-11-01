@@ -14,15 +14,15 @@
 [![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 
 The [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) package provides tools for doing computations based on multi-linear algebra, differential geometry, and spin groups using the extended tensor algebra known as Leibniz-Grassmann-Clifford-Hestenes geometric algebra.
-Combinatorial products include `∧, ∨, ⋅, *, ×, ⋆, ', ~, ∂` (which are the exterior, regressive, inner, and geometric products; along with the Hodge star, adjoint, reversal, and boundary operators).
-The kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise with highly extensible definitions.
+Combinatorial products include `∧, ∨, ⋅, *, ⋆, ', ~, ∂` (which are the exterior, regressive, inner, and geometric products; along with the Hodge star, adjoint, reversal, and boundary operators).
+The kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise yet highly extensible definitions.
 The [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) multivector parametric type polymorphism is based on tangent bundle vector spaces and conformal projective geometry to make the dispatch highly extensible for many applications.
 Additionally, the universal interoperability between different sub-algebras is enabled by [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl), on which the type system is built.
 
 [![YouTube](https://img.shields.io/badge/JuliaCon%202019-YouTube-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
 [![DropBox](https://img.shields.io/badge/download_PDF-DropBox-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
 [![DOI](https://zenodo.org/badge/101519786.svg)](https://zenodo.org/badge/latestdoi/101519786)
-[![BiVector](https://img.shields.io/badge/bivector.net-discuss-blueviolet)](https://bivector.net)
+[![BiVector](https://img.shields.io/badge/bivector.net-Discourse-blueviolet)](https://bivector.net)
 
   * [Design, code generation](#design-code-generation)
 	 * [Requirements](#requirements)
@@ -76,6 +76,18 @@ Availability of this package and its subpackages can be automatically handled wi
 This requires a merged version of `ComputedFieldTypes` at https://github.com/vtjnash/ComputedFieldTypes.jl
 
 Interoperability of `TensorAlgebra` with other packages is automatically enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
+
+The package is compatible via [Requires.jl](https://github.com/MikeInnes/Requires.jl) with 
+[Reduce.jl](https://github.com/chakravala/Reduce.jl)
+[SymPy.jl](https://github.com/JuliaPy/SymPy.jl),
+[SymEngine.jl](https://github.com/symengine/SymEngine.jl),
+[AbstractAlgebra.jl](https://github.com/wbhart/AbstractAlgebra.jl),
+[Nemo.jl](https://github.com/wbhart/Nemo.jl),
+[GaloisFields.jl](https://github.com/tkluck/GaloisFields.jl),
+[LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl),
+[Compose.jl](https://github.com/GiovineItalia/Compose.jl),
+[GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
+[Makie.jl](https://github.com/JuliaPlots/Makie.jl).
 
 ## Direct-sum yields `VectorBundle` parametric type polymorphism ⨁
 
@@ -301,7 +313,7 @@ julia> log(i)
 ```
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 
-Together with the `LightGraphs`, `GraphPlot`, and `Compose` packages it is possible to convert `Grassmann` numbers into graphs.
+Together with [LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
 ```Julia
 using Grassmann, Compose # environment: LightGraphs, GraphPlot
 x = Grassmann.Algebra(ℝ^7).v123
@@ -310,7 +322,7 @@ draw(PDF("simplex.pdf",16cm,16cm),x+!x)
 ```
 ![paper/img/triangle-tetrahedron.png](paper/img/triangle-tetrahedron.png)
 
-Due to `GeometryTypes.Point` interoperability, plotting and visualizing with `Makie` is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
+Due to [GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Point` interoperability, plotting and visualizing with [Makie.jl](https://github.com/JuliaPlots/Makie.jl) is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
 ```Julia
 using Grassmann, Makie
 basis"2" # Euclidean

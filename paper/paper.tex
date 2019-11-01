@@ -48,8 +48,8 @@
 
 \maketitle
 \begin{figure}[ht]
-%\centerline{\includegraphics[width=4cm]{grassmann.png}}
-\centerline{\includegraphics[width=4cm]{../docs/src/assets/logo.png}}
+\centerline{\includegraphics[width=4cm]{img/grassmann.png}}
+%\centerline{\includegraphics[width=4cm]{../docs/src/assets/logo.png}}
 \caption*{github.com/chakravala/Grassmann.jl}
 \end{figure}
 \begin{abstract}
@@ -57,7 +57,7 @@
 	package provides tools for computations based on multi-linear algebra and spin groups using the extended geometric algebra known as Leibniz-Grassmann-Clifford-Hestenes algebra.
 	Combinatorial products include
 	exterior, regressive, inner, and geometric; along with the Hodge star, adjoint, reversal, and boundary operators.
-	The kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise with highly extensible definitions.
+	The kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise yet highly extensible definitions.
 	\textit{DirectSum.jl}
 	multivector parametric type polymorphism is based on tangent vector spaces and conformal projective geometry.
 	Additionally, the universal interoperability between different sub-algebras is enabled by \textit{AbstractTensors.jl},
@@ -361,7 +361,7 @@ where DeMorgan's law is used to derive tensor contractions.
 	In topology there is \textit{boundary} operator $\partial$ defined by $\partial\epsilon = \epsilon\cdot\nabla = \sum_k\partial_k\epsilon_k$ and is commonly discussed in terms the limit $\epsilon(x)\cdot\nabla\omega(x) = \lim_{h\ra0} \frac{\omega(x+h\epsilon)-\omega(x)}{h}$, which is the directional derivative \cite{sobczyk}.
 \end{definition}
 \begin{example}
-	[Vorticity of vector-field]
+	[Vorticity curl of vector-field]
 	$\star d(dx_1+dx_2+dx_3) = (∂_2 -∂_3)dx_1 + (∂_3 -∂_1)dx_2 + (∂_1 -∂_2)dx_3$.
 \end{example}
 \begin{example}
@@ -420,7 +420,7 @@ An additional metric independent version of the complement operation is availabl
 	!v_\infty &= !(v_++v_-) = (v_- - v_+)v_{1...n} = 2v_{\emptyset1...n} \\
  	!2v_\emptyset &= !(v_--v_+) = (v_+ + v_-)v_{1...n} = -v_{\infty1...n}
 \end{align*}
-That variation of complement satisfies $\lambda I = \omega\,\wedge\,!\omega$ instead.
+For that variation of complement, $||\omega||^2 I = \omega\,\wedge\,!\omega$ holds.
 \begin{example}%[\textit{using Leibniz $\bigoplus\,$Grassmann}]
 	S"$\infty\emptyset\text{+++"}(\nabla$\verb`^`$2) \,\,  \mapsto\, \, -2\partial_{\infty\emptyset} + \partial_1^2 + \partial_2^2 + \partial_3^2 $
 \end{example}
@@ -559,7 +559,7 @@ In general, multivalued quantum logic is enabled by the $\wedge,\vee,\star$ Gras
 Mixed-symmetry algebra with \textit{Leibniz.jl} and \textit{Grassmann.jl}, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
 Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic \verb`χ`.
 
-\textbf{Acknowledgements}: Many thanks for discussions with Steven De Keninck, Utensil Song, Alexander Arsenovic, Hugo Hadfield, Karl Wessel; the helpful Julia community (e.g. Jameson Nash, Stefan Karpinski, Jeff Bezanson, Kristoffer Carlsson, Petr Krysl, Nathan Smith, etc); and thanks for support from my family.
+\textbf{Acknowledgements}: Many thanks for discussions with Steven De Keninck, Utensil Song, Alexander Arsenovic, Hugo Hadfield, Karl Wessel; the helpful Julia community (e.g. Jameson Nash, Stefan Karpinski, Jeff Bezanson, Kristoffer Carlsson, Petr Krysl, Nathan Smith, Hongying Li, etc); and thanks for support from my family.
 
 %\cite{bezanson2017julia}
 
