@@ -26,6 +26,7 @@ Additionally, the universal interoperability between different sub-algebras is e
 
   * [Design, code generation](#design-code-generation)
 	 * [Requirements](#requirements)
+	 * [Grassmann for enterprise](#grassmann-for-enterprise)
   * [Direct-sum yields VectorBundle parametric type polymorphism ⨁](#direct-sum-yields-vectorspace-parametric-type-polymorphism-)
 	 * [Interoperability for TensorAlgebra{V}](#interoperability-for-tensoralgebrav)
   * [Generating elements and geometric algebra Λ(V)](#generating-elements-and-geometric-algebra-λv)
@@ -57,7 +58,7 @@ It can be used to work with automatic differentiation and differential geometry,
 
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
-streamplot(vectorfield(exp((π/4)*(v12+v∞3),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
+streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
 ```
 ![paper/img/wave.png](paper/img/wave.png)
 
@@ -88,6 +89,12 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [Compose.jl](https://github.com/GiovineItalia/Compose.jl),
 [GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl).
+
+## Grassmann for enterprise
+
+Available as part of the Tidelift Subscription
+
+The maintainers of Grassmann and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source dependencies you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use. [Learn more.](https://tidelift.com/subscription/pkg/julia-grassmann?utm_source=julia-grassmann&utm_medium=referral&utm_campaign=enterprise&utm_term=repo)
 
 ## Direct-sum yields `VectorBundle` parametric type polymorphism ⨁
 
@@ -326,7 +333,7 @@ Due to [GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Po
 ```Julia
 using Grassmann, Makie
 basis"2" # Euclidean
-streamplot(vectorfield(v1*exp(π*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(exp(π*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(exp((π/2)*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(v1*exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
@@ -351,7 +358,7 @@ lines(points(f,V(3,4,5)))
 
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
-streamplot(vectorfield(exp((π/4)*(v12+v∞3),V(2,3,4)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
+streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
 ```
 ![paper/img/orb.png](paper/img/orb.png)
 

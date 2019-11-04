@@ -376,11 +376,11 @@ where DeMorgan's law is used to derive tensor contractions.
 	\end{align*}
 \end{theorem}
 \begin{proof}
-	$\partial\omega = \omega\cdot\nabla = \star(\star\omega\wedge\star^2\nabla) = (-1)^n(-1)^{nk}\star d\star\omega$.
+	$\partial\omega = \omega\cdot\nabla = \star\inv(\star\omega\wedge\star^2\nabla) = (-1)^n(-1)^{nk}\star d\star\omega$.
 
 
 	Then  substitute this into $\int_M \omega\wedge(-1)^{mk+m+1}\star\star d\star\eta = (-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}\int_M\omega\wedge d\star\eta$,
-	with identity $(-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}=(-1)^k$ and
+	apply the identity $(-1)^{km+m+1}(-1)^{(m-k+1)(k-1)}=(-1)^k$ and
 	$ (-1)^k\int_M\omega\wedge d\star\eta = \int_M d(\omega\wedge\star\eta) - (-1)^{k-1}\omega\wedge d\star\eta = \int_M d\omega\wedge\star\eta$.
 	Stokes identity can be proved by relying on a variant of the \textit{common factor theorem} by Browne \cite{browne}.
 \end{proof}
@@ -457,7 +457,7 @@ The multivariate \textit{product rule} is encoded into the geometric algebraic p
 \begin{lstlisting}[language = Julia]
 using Grassmann, Makie
 basis"2" # Euclidean
-streamplot(vectorfield(v1*exp(π*v12/2)),-1.5..1.5,-1.5..1.5)
+streamplot(vectorfield(exp(π*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(exp((π/2)*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
 streamplot(vectorfield(v1*exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
@@ -511,7 +511,7 @@ As a result of Grassmann's exterior \& interior products, the Hodge-DeRahm chain
 \end{align*}
 having dimensional equivalence brought by the Grassmann-Poincare-Hodge complement duality,
 \begin{align*}
-	\mc H^{n-p}M &\cong \frac{\ker(d\Omega^{n-p}M)}{\im{d\Omega^{n-p-1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\partial\Omega^pM)}{\im{\partial\Omega^{p+1}M}}
+	\mc H^{n-p}M &\cong \frac{\ker(d\Omega^{n-p}M)}{\im{d\Omega^{n-p+1}M}}, & \dim\mc H^pM &= \dim\frac{\ker(\partial\Omega^pM)}{\im{\partial\Omega^{p+1}M}}
 \end{align*}
 The rank of the grade $p$ boundary incidence operator is
 $$ \text{rank}\gen{\partial\gen{M}_{p+1}}_p = \min\set{\dim\gen{\partial\gen{M}_{p+1}}_p,\dim\gen{M}_{p+1}} $$
@@ -527,7 +527,7 @@ $$ \Delta(\omega) =  \sum_{g=1}^n\sum_{k=1}^{n\choose g}\plr{\text{abs}\gen{\ome
 
 In Fig. 4, different possible discrete bivector topologies in a projective Riemann sphere setting are examined. 
 The figures are based on the product topology of two rotation bivectors.
-When the Euclidean $\mb R^4$ basis is combined with projective geometric algebra, resulting one parameter Lie groups can be visualized in the form of a torus in $\mb R^3$. 
+When the Euclidean $\mb R^4$ basis is combined with projective geometric algebra, resulting one parameter Lie groups can be visualized as a fibration of a torus in $\mb R^3$. 
 When the fourth $v_\infty$ basis direction is rotated into the Minkowski plane, the double rotation becomes a helix with translational single rotation. In examples (b)$\sim$(c) the bivector is modulated.
 
 \begin{figure}[t]

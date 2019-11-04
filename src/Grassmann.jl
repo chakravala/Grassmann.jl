@@ -3,9 +3,9 @@ module Grassmann
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using Combinatorics, StaticArrays, Requires
+using Combinatorics, StaticArrays, SparseArrays
 using ComputedFieldTypes, AbstractLattices
-using DirectSum, AbstractTensors
+using DirectSum, AbstractTensors, Requires
 
 export vectorspace, ⊕, ℝ, @V_str, @S_str, @D_str, Signature,DiagonalForm,SubManifold, value
 import DirectSum: hasinf, hasorigin, mixedmode, dual, value, vectorspace, V0, ⊕, pre, vsn

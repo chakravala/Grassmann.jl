@@ -828,6 +828,61 @@ Base.copysign(x::Simplex{V,G,B,T},y::Simplex{V,G,B,T}) where {V,G,B,T} = Simplex
     return A
 end
 
+# Euclidean norm (unsplitter)
+
+unsplitstart(g) = 1|((UInt(1)<<(g-1)-1)<<2)
+unsplitend(g) = (UInt(1)<<g-1)<<2
+
+const unsplitter_cache = SparseMatrixCSC{Float64,Int64}[]
+@pure unsplitter_calc(n) = (n2=Int(n/2);sparse(1:n2,1:n2,1,n,n)+sparse(1:n2,(n2+1):n,-1/2,n,n)+sparse((n2+1):n,(n2+1):n,1/2,n,n)+sparse((n2+1):n,1:n2,1,n,n))
+@pure function unsplitter(n::Int)
+    n2 = Int(n/2)
+    for k ∈ length(unsplitter_cache)+1:n2
+        push!(unsplitter_cache,unsplitter_calc(2k))
+    end
+    @inbounds unsplitter_cache[n2]
+end
+@pure unsplitter(n,g) = unsplitter(bladeindex(n,unsplitend(g))-bladeindex(n,unsplitstart(g)))
+
+for implex ∈ (MSB...,Basis)
+    @eval begin
+        #norm(t::$implex) = norm(unsplitval(t))
+        function unsplitvalue(a::$implex{V,G}) where {V,G}
+            !(hasinf(V) && hasorigin(V)) && (return value(a))
+            #T = valuetype(a)
+            #$(insert_expr((:N,:t,:out),:mvec,:T,:(typeof((one(T)/(2one(T))))))...)
+            #out = copy(value(a,t))
+            return unsplitvalue(MChain(a))
+        end
+    end
+end
+
+for Chain ∈ MSC
+    @eval begin
+        #norm(t::$Chain) = norm(unsplitval(t))
+        function unsplitvalue(a::$Chain{T,V,G}) where {T,V,G}
+            !(hasinf(V) && hasorigin(V)) && (return value(a))
+            $(insert_expr((:N,:t,:out),:mvec,:T,:(typeof((one(T)/(2one(T))))))...)
+            out = copy(value(a,mvec(N,G,t)))
+            bi = bladeindex(N,unsplitstart(G)):bladeindex(N,unsplitend(G))-1
+            out[bi] = unsplitter(N,G)*out[bi]
+            return out
+        end
+    end
+end
+
+@eval begin
+    #norm(t::MultiVector) = norm(unsplitval(t))
+    function unsplitvalue(a::MultiVector{T,V}) where {T,V}
+        !(hasinf(V) && hasorigin(V)) && (return value(a))
+        $(insert_expr((:N,:t,:out),:mvec,:T,:(typeof((one(T)/(2one(T))))))...)
+        out = copy(value(a,mvec(N,t)))
+        for G ∈ 1:N-1
+            bi = basisindex(N,unsplitstart(G)):basisindex(N,unsplitend(G))-1
+            out[bi] = unsplitter(N,G)*out[bi]
+        end
+        return out
+    end
+end
+
 # genfun
-
-
