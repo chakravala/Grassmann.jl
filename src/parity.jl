@@ -308,7 +308,7 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            MChain{T,V,G}(out)
+            SChain{T,V,G}(out)
         end
     end
     @eval function $op(t::MultiVector{T,V}) where {T,V}

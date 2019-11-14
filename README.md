@@ -79,7 +79,7 @@ This requires a merged version of `ComputedFieldTypes` at https://github.com/vtj
 Interoperability of `TensorAlgebra` with other packages is automatically enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
 
 The package is compatible via [Requires.jl](https://github.com/MikeInnes/Requires.jl) with 
-[Reduce.jl](https://github.com/chakravala/Reduce.jl)
+[Reduce.jl](https://github.com/chakravala/Reduce.jl),
 [SymPy.jl](https://github.com/JuliaPy/SymPy.jl),
 [SymEngine.jl](https://github.com/symengine/SymEngine.jl),
 [AbstractAlgebra.jl](https://github.com/wbhart/AbstractAlgebra.jl),
@@ -365,14 +365,14 @@ streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4)),-1.5..1.5,-1.5..1.5,-1.
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
 f(t) = ↓(exp(t*v∞*(sin(3t)*3v1+cos(2t)*7v2-sin(5t)*4v3)/2)>>>↑(v1+v2-v3))
-lines(points(f,V(2,3,4))
+lines(points(f,V(2,3,4)))
 ```
 ![paper/img/orb.png](paper/img/orbit-2.png)
 
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
 f(t) = ↓(exp(t*(v12+0.07v∞*(sin(3t)*3v1+cos(2t)*7v2-sin(5t)*4v3)/2))>>>↑(v1+v2-v3))
-lines(points(f,V(2,3,4))
+lines(points(f,V(2,3,4)))
 ```
 ![paper/img/orb.png](paper/img/orbit-4.png)
 

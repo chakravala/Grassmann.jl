@@ -511,6 +511,7 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure order(m::Union{MSimplex,Simplex}) = order(basis(m))+order(value(m))
 @pure order(m) = 0
 @pure bits(m::T) where T<:TensorTerm = bits(basis(m))
+@pure bits(::Type{Basis{V,G,B}}) where {V,G,B} = B
 
 @pure isinf(e::Basis{V}) where V = hasinf(e) && count_ones(bits(e)) == 1
 @pure hasinf(e::Basis{V}) where V = hasinf(V) && isodd(bits(e))
@@ -557,7 +558,7 @@ function rank(t::T,d=gdims(t)) where T<:TensorAlgebra{V} where V
     for k ∈ 2:ndims(V)
         @inbounds out[k] = min(out[k],d[k+1])
     end
-    return out
+    return SVector(out)
 end
 
 function null(t::T) where T<:TensorAlgebra{V} where V
@@ -567,7 +568,7 @@ function null(t::T) where T<:TensorAlgebra{V} where V
     for k ∈ 1:ndims(V)
         @inbounds out[k] = d[k+1] - r[k]
     end
-    return out
+    return SVector(out)
 end
 
 function betti(t::T) where T<:TensorAlgebra{V} where V
@@ -577,7 +578,7 @@ function betti(t::T) where T<:TensorAlgebra{V} where V
     for k ∈ 1:ndims(V)
         @inbounds out[k] = d[k+1] - r[k] - r[k+1]
     end
-    return out
+    return SVector(out)
 end
 
 for A ∈ (:TensorTerm,MSC...), B ∈ (:TensorTerm,MSC...)
@@ -663,7 +664,7 @@ for M ∈ (:Signature,:DiagonalForm,:SubManifold)
     @eval begin
         @inline (V::$M)(s::UniformScaling{T}) where T = Simplex{V}(T<:Bool ? (s.λ ? one(Int) : -(one(Int))) : s.λ,getbasis(V,(one(T)<<(ndims(V)-diffvars(V)))-1))
         (W::$M)(b::Simplex) = Simplex{W}(value(b),W(basis(b)))
-        (W::$M)(b::MSimplex) = MSimplex{W}(value(b),W(basis(b)))
+        (W::$M)(b::MSimplex) = Simplex{W}(value(b),W(basis(b)))
     end
 end
 
@@ -729,10 +730,10 @@ for Chain ∈ MSC
                     end
                 end
             end
-            return $Chain{T,W,G}(out)
+            return SChain{T,W,G}(out)
         end
         function (W::SubManifold{M,V,S})(b::$Chain{T,V,1}) where {M,V,S,T}
-            $Chain{T,W,1}(b.v[indices(subindex(W),ndims(V))])
+            SChain{T,W,1}(b.v[indices(subindex(W),ndims(V))])
         end
         function (W::SubManifold{M,V,S})(b::$Chain{T,V,G}) where {M,V,S,T,G}
             out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
@@ -744,7 +745,7 @@ for Chain ∈ MSC
                     end
                 end
             end
-            return $Chain{T,W,G}(out)
+            return SChain{T,W,G}(out)
         end
     end
 end
@@ -851,7 +852,7 @@ for implex ∈ (MSB...,Basis)
             #T = valuetype(a)
             #$(insert_expr((:N,:t,:out),:mvec,:T,:(typeof((one(T)/(2one(T))))))...)
             #out = copy(value(a,t))
-            return unsplitvalue(MChain(a))
+            return unsplitvalue(SChain(a))
         end
     end
 end

@@ -174,7 +174,7 @@ for Chain ∈ MSC
             for i ∈ 1:N
                 i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
             end
-            return $Chain{T,V,1}(out)
+            return SChain{T,V,1}(out)
         end
     end
     for implex ∈ MSB
@@ -214,12 +214,11 @@ for Chain ∈ MSC
                 for i ∈ 1:N
                     i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
                 end
-                return $Chain{t,V,1}(out)
+                return SChain{t,V,1}(out)
             end
         end
     end
     for Other ∈ MSC
-        Final = ((Chain == MSC[1]) && (Other == MSC[1])) ? MSB[1] : MSB[2]
         @eval begin
             function (a::$Chain{T,V,1})(b::$Other{S,V,1}) where {V,T,S}
                 $(insert_expr((:N,:M,:t,:df))...)
@@ -227,7 +226,7 @@ for Chain ∈ MSC
                 for Q ∈ 1:M
                     @inbounds out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
                 end
-                return $Final{V}(out::t,Basis{V}())
+                return Simplex{V}(out::t,Basis{V}())
             end
             function (a::$Chain{T,V,2})(b::$Other{S,V,1}) where {V,T,S}
                 C = mixedmode(V)
@@ -240,7 +239,7 @@ for Chain ∈ MSC
                         @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
                     end
                 end
-                return $Chain{t,V,1}(out)
+                return SChain{t,V,1}(out)
             end
         end
     end
@@ -260,7 +259,7 @@ for Chain ∈ MSC
                     @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
                 end
             end
-            return $Chain{T,V,2}(out)
+            return SChain{T,V,2}(out)
         end
     end
 end
