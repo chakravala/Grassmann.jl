@@ -250,7 +250,6 @@ end
 MultiVector{T,V}(v::MArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
 MultiVector{T,V}(v::SArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
 
-
 function getindex(m::MultiVector{T,V},i::Int) where {T,V}
     N = ndims(V)
     0 <= i <= N || throw(BoundsError(m, i))

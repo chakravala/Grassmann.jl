@@ -19,7 +19,6 @@ const ExprField = Union{Expr,Symbol}
 
 ## mutating operations
 
-
 const Sym = :DirectSum
 const SymField = Any
 
@@ -77,6 +76,66 @@ end
     end
 end
 
+function derive_pre(V,A,B,a,b,p)
+    if !(diffvars(V)≠0 && mixedmode(V)<0)
+        return Expr(:call,p,a,b)
+    else
+        return :(derive_post($V,$(Val{A}()),$(Val{B}()),a,b,$p))
+    end
+end
+
+function derive_post(V,::Val{A},::Val{B},v,x::Bool) where {A,B}
+    if !(diffvars(V)≠0 && mixedmode(V)<0)
+        return v
+    else
+        sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
+        ca,cb = count_ones(sa[2]),count_ones(sb[2])
+        return if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
+            v
+        else
+            prev = ca == 0 ? (x ? one(typeof(v)) : v) : (x ? v : one(typeof(v)))
+            for k ∈ DirectSum.indexsplit((ca==0 ? sa : sb)[1],ndims(V))
+                prev = derive(prev,getbasis(V,k))
+            end
+            prev
+        end
+    end
+end
+
+function derive_post(V,::Val{A},::Val{B},a,b,*) where {A,B}
+    if !(diffvars(V)≠0 && mixedmode(V)<0)
+        return a*b
+    else
+        sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
+        ca,cb = count_ones(sa[2]),count_ones(sb[2])
+        α,β = if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
+            a,b
+        else
+            prev = ca == 0 ? (a,b) : (b,a)
+            for k ∈ DirectSum.indexsplit((ca==0 ? sa : sb)[1],ndims(V))
+                prev = derive(prev[2],getbasis(V,k),prev[1],true)
+            end
+            #base = getbasis(V,0)
+            while typeof(prev[1]) <: TensorTerm
+                basi = basis(prev[1])
+                #base *= basi
+                inds = DirectSum.indexsplit(bits(basi),ndims(V))
+                prev = (value(prev[1]),prev[2])
+                for k ∈ inds
+                    prev = derive(prev[2],getbasis(V,k),prev[1],true)
+                end
+            end
+            #base ≠ getbasis(V,0) && (prev = (base*prev[1],prev[2]))
+            ca == 0 ? prev : (prev[2],prev[1])
+        end
+        return α*β
+    end
+end
+
+@pure isnull(::Expr) = false
+@pure isnull(::Symbol) = false
+isnull(n) = iszero(n)
+
 for M ∈ (:Signature,:DiagonalForm)
     @eval @pure loworder(V::$M{N,M,S,D,O}) where {N,M,S,D,O} = O≠0 ? $M{N,M,S,D,O-1}() : V
 end
@@ -86,11 +145,14 @@ add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Exp
 
 set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
 
+pre_val(set,expr,val) = set≠:(=) ? :(isnull($expr) ? ($expr=Expr(:call,:($Sym.:∑),$val)) : push!($expr.args,$val)) : Expr(:(=),expr,val)
+
 function generate_mutators(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
         sb = Symbol(op,:blade!)
         for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
+            spre = Symbol(s,:_pre)
             for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
                 @eval begin
                     @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
@@ -103,8 +165,23 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                 end
             end
+            for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
+                @eval begin
+                    @inline function $spre(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
+                        ind = $index(intlog(M),$i)
+                        @inbounds $(pre_val(set,:(out[ind]),:val))
+                        return out
+                    end
+                    @inline function $spre(out::Q,val::S,i::$B,::Dimension{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
+                        ind = $index(N,$i)
+                        @inbounds $(pre_val(set,:(out[ind]),:val))
+                        return out
+                    end
+                end
+            end
         end
         for s ∈ (sm,sb)
+            spre = Symbol(s,:_pre)
             @eval begin
                 @inline function $(Symbol(:join,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
@@ -115,6 +192,18 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
                         $s(m,val,(A⊻B)|Q,Dimension{N}())
+                    end
+                    return false
+                end
+                @inline function $(Symbol(:join,spre))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,a,b)
+                        A,B,Q,Z = symmetricmask(V,a,b)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$v))
+                        if diffvars(V)≠0
+                            !iszero(Z) && (val = Expr(:call,:*,getbasis(loworder(V),Z)))
+                            val = :(h=$val;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                        end
+                        $spre(m,val,(A⊻B)|Q,Dimension{N}())
                     end
                     return false
                 end
@@ -132,10 +221,26 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
+                @inline function $(Symbol(:geom,spre))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                    if v ≠ 0 && !diffcheck(V,a,b)
+                        A,B,Q,Z = symmetricmask(V,a,b)
+                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$(pcc ? :($$SUB($v)) : v)))
+                        if diffvars(V)≠0
+                            !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
+                            val = :(h=$val;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                        end
+                        $spre(m,val,bas|Q,Dimension{N}())
+                        cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Dimension{N}())
+                    end
+                    return false
+                end
             end
             for j ∈ (:join,:geom)
-                @eval @inline function $(Symbol(j,s))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
-                    $(Symbol(j,s))(V,m,bits(A),bits(B),v)
+                for S ∈ (s,spre)
+                    @eval @inline function $(Symbol(j,S))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
+                        $(Symbol(j,S))(V,m,bits(A),bits(B),v)
+                    end
                 end
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
@@ -156,8 +261,26 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         end
                         return false
                     end
-                    @inline function $(Symbol(prod,s))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
-                        $(Symbol(prod,s))(V,m,bits(A),bits(B),v)
+                    @inline function $(Symbol(prod,spre))(V::W,m::$M,A::Bits,B::Bits,val::T) where W<:Manifold{N} where {N,T,M}
+                        if val ≠ 0
+                            g,C,t,Z = $uct(A,B,V)
+                            v = val
+                            if diffvars(V)≠0
+                                if !iszero(Z)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                    v = :(h=$v;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                                end
+                            end
+                            t && $spre(m,typeof(V) <: Signature ? g ? :($$SUB($v)) : v : Expr(:call,$(QuoteNode(MUL)),g,v),C,Dimension{N}())
+                        end
+                        return false
+                    end
+
+                end
+                for S ∈ (s,spre)
+                    @eval @inline function $(Symbol(prod,S))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
+                        $(Symbol(prod,S))(V,m,bits(A),bits(B),v)
                     end
                 end
             end
@@ -168,6 +291,11 @@ end
 @inline exteraddmulti!(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddmulti!(V,out,α,β,γ)
 
 @inline outeraddblade!(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddblade!(V,out,α,β,γ)
+
+@inline exteraddmulti!_pre(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddmulti!_pre(V,out,α,β,γ)
+
+@inline outeraddblade!_pre(V::W,out,α,β,γ) where W<:Manifold = (count_ones(α&β)==0) && joinaddblade!_pre(V,out,α,β,γ)
+
 
 # Hodge star ★
 
@@ -573,6 +701,22 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
             return false
         end
+        @inline function inneraddvalue!_pre(mv::MSimplex{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
+            if γ≠0
+                g,C,f,Z = interior(α,β,V)
+                v = iszero(C) ? γ : γ*getbasis(V,C)
+                if diffvars(V)≠0
+                    if !iszero(Z)
+                        _,_,Q,_ = symmetricmask(V,α,β)
+                        v = Expr(:call,:*,v,getbasis(V,Z))
+                    end
+                    v = :(h=$v;order(v)>$(diffmode(V)) ? 0 : h)
+                end
+                f && (mv.v = typeof(V)<:Signature ? (g ? :($$SUB($(mv.v),$v)) : :($$ADD(:(mv.v),$v))) : :($$ADD(:(mv.v),$$MUL($g,$v))))
+                return false
+            end
+            return false
+        end
         function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
             if mixedmode(V)<0
                 $(insert_expr((:N,:M,:bs,:bn),VEC)...)
@@ -873,6 +1017,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                          (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!),
                          (:cross,:crossaddmulti!))
+        preproduct! = Symbol(product!,:_pre)
         @eval begin
             function $op(a::MultiVector{T,V},b::Basis{V,G}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
@@ -900,25 +1045,45 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 return MultiVector{t,V}(out)
             end
-            function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
-                for g ∈ 1:N+1
-                    Y = indexbasis(N,g-1)
-                    @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = b.v[bs[g]+i]
-                        val≠0 && for G ∈ 1:N+1
-                            @inbounds R = bs[G]
-                            X = indexbasis(N,G-1)
-                            @inbounds for j ∈ 1:bn[G]
-                                if @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$MUL))
+            @generated function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
+                if ndims(V)>4
+                    return quote
+                        $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
+                        for g ∈ 1:N+1
+                            Y = indexbasis(N,g-1)
+                            @inbounds for i ∈ 1:bn[g]
+                                @inbounds val = b.v[bs[g]+i]
+                                val≠0 && for G ∈ 1:N+1
+                                    @inbounds R = bs[G]
+                                    X = indexbasis(N,G-1)
+                                    @inbounds for j ∈ 1:bn[G]
+                                        if @inbounds $$product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$$MUL))&μ
+                                            $(insert_expr((:out,);mv=:out)...)
+                                            @inbounds $$product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$$MUL))
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        return MultiVector{t,V}(out)
+                    end
+                else
+                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    for g ∈ 1:N+1
+                        Y = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = :(b.v[$(bs[g]+i)])
+                            for G ∈ 1:N+1
+                                @inbounds R = bs[G]
+                                X = indexbasis(N,G-1)
+                                @inbounds for j ∈ 1:bn[G]
+                                    @inbounds $preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:(a.v[$(R+j)]),val,$(QuoteNode(MUL))))
                                 end
                             end
                         end
                     end
+                    return :(MultiVector{V}($(Expr(:vect,out...))))
                 end
-                return MultiVector{t,V}(out)
             end
         end
         for implex ∈ MSB
