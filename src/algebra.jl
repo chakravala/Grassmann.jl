@@ -1046,7 +1046,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return MultiVector{t,V}(out)
             end
             @generated function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
-                if ndims(V)>4
+                if ndims(V)>5
                     return quote
                         $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                         for g ∈ 1:N+1
@@ -1072,17 +1072,17 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     for g ∈ 1:N+1
                         Y = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds val = :(b.v[$(bs[g]+i)])
+                            @inbounds val = :(@inbounds b.v[$(bs[g]+i)])
                             for G ∈ 1:N+1
                                 @inbounds R = bs[G]
                                 X = indexbasis(N,G-1)
                                 @inbounds for j ∈ 1:bn[G]
-                                    @inbounds $preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:(a.v[$(R+j)]),val,$(QuoteNode(MUL))))
+                                    @inbounds $preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:(@inbounds a.v[$(R+j)]),val,$(QuoteNode(MUL))))
                                 end
                             end
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:vect,out...))))
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
                 end
             end
         end

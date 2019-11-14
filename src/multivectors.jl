@@ -245,9 +245,9 @@ end
 ## MultiVector{T,N}
 
 struct MultiVector{T,V,E} <: TensorMixed{T,V}
-    v::Union{MArray{Tuple{E},T,1,E},SArray{Tuple{E},T,1,E}}
+    v::SArray{Tuple{E},T,1,E}
 end
-MultiVector{T,V}(v::MArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
+MultiVector{T,V}(v::MArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(SVector(v))
 MultiVector{T,V}(v::SArray{Tuple{E},S,1,E}) where S<:T where {T,V,E} = MultiVector{S,V,E}(v)
 
 function getindex(m::MultiVector{T,V},i::Int) where {T,V}
