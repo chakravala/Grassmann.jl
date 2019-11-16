@@ -24,6 +24,7 @@ for side ∈ (:left,:right)
     p = Symbol(:parity,side)
     pg = Symbol(p,:hodge)
     pn = Symbol(p,:null)
+    pnp = Symbol(pn,:pre)
     @eval begin
         @pure $p(V::Bits,B::Bits,N::Int) = $p(0,sum(indices(B,N)),count_ones(B),N)
         @pure $pg(V::Bits,B::Bits,N::Int) = $pg(count_ones(V&B),sum(indices(B,N)),count_ones(B),N)
@@ -32,6 +33,15 @@ for side ∈ (:left,:right)
             hi,ho = hasinf(V),hasorigin(V)
             if hi && ho && count_ones(B&UInt(3)) ==1
                 isodd(B) ? (2v) : (v/2)
+            else
+                v
+            end
+        end
+        @inline $pnp(V,B,v) = v
+        @inline function $pnp(V::Signature,B,v)
+            hi,ho = hasinf(V),hasorigin(V)
+            if hi && ho && count_ones(B&UInt(3)) ==1
+                isodd(B) ? Expr(:call,:*,2,v) : Expr(:call,:/,v,2)
             else
                 v
             end
