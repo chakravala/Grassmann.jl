@@ -672,6 +672,45 @@ export ⟂, ∥
 
 ### Product Algebra Constructor
 
+@eval function generate_loop_multivector(V,term,b,MUL,product!,preproduct!,d=nothing)
+    if ndims(V)<cache_limit/2
+        $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+        for g ∈ 1:N+1
+            Y = indexbasis(N,g-1)
+            @inbounds for i ∈ 1:bn[g]
+                @inbounds val = isnothing(d) ? :($b[$(bs[g]+i)]) : :($b[$(bs[g]+i)]/$d)
+                for G ∈ 1:N+1
+                    @inbounds R = bs[G]
+                    X = indexbasis(N,G-1)
+                    @inbounds for j ∈ 1:bn[G]
+                        @inbounds preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:($term[$(R+j)]),val,MUL))
+                    end
+                end
+            end
+        end
+        (:N,:t,:out), :(out .= $(Expr(:call,:SVector,out...)))
+    else
+        (:N,:t,:out,:bs,:bn,:μ), quote
+            for g ∈ 1:N+1
+                Y = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    @inbounds val = $(isnothing(d) ? :($b[bs[g]+i]) : :($b[bs[g]+i]/$d))
+                    val≠0 && for G ∈ 1:N+1
+                        @inbounds R = bs[G]
+                        X = indexbasis(N,G-1)
+                        @inbounds for j ∈ 1:bn[G]
+                            if @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],$term[R+j],val,$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],$term[R+j],val,$MUL))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
     if Field == Grassmann.Field
         generate_mutators(:(MArray{Tuple{M},T,1,M}),Number,Expr,:-,:*)
@@ -1281,40 +1320,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end end
             end
             @generated function $op(a::MultiVector{T,V},b::MultiVector{S,V}) where {V,T<:$Field,S<:$Field}
+                loop = generate_loop_multivector(V,:(a.v),:(b.v),$(QuoteNode(MUL)),$product!,$preproduct!)
                 if ndims(V)<cache_limit/2
-                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
-                    for g ∈ 1:N+1
-                        Y = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds val = :(b.v[$(bs[g]+i)])
-                            for G ∈ 1:N+1
-                                @inbounds R = bs[G]
-                                X = indexbasis(N,G-1)
-                                @inbounds for j ∈ 1:bn[G]
-                                    @inbounds $preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:(a.v[$(R+j)]),val,$(QuoteNode(MUL))))
-                                end
-                            end
-                        end
-                    end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return :(MultiVector{V}($(loop[2].args[2])))
                 else return quote
-                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
-                    for g ∈ 1:N+1
-                        Y = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds val = b.v[bs[g]+i]
-                            val≠0 && for G ∈ 1:N+1
-                                @inbounds R = bs[G]
-                                X = indexbasis(N,G-1)
-                                @inbounds for j ∈ 1:bn[G]
-                                    if @inbounds $$product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$$MUL))&μ
-                                        $(insert_expr((:out,);mv=:out)...)
-                                        @inbounds $$product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],a.v[R+j],val,$$MUL))
-                                    end
-                                end
-                            end
-                        end
-                    end
+                    $(insert_expr(loop[1],$(QuoteNode(VEC)))...)
+                    $(loop[2])
                     return MultiVector{t,V}(out)
                 end end
             end

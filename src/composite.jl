@@ -24,41 +24,32 @@ function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     return S
 end
 
-@eval function Base.expm1(b::MultiVector{T,V}) where {T,V}
-    B = value(b)
-    sb,nb = scalar(b),norm(B)
-    sb ≈ nb && (return Simplex{V}(expm1(sb)))
-    $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
-    S = zeros(mvec(N,t))
-    term = zeros(mvec(N,t))
-    S .= B
-    out .= value(b^2)/2
-    norms = MVector(nb,norm(out),norm(term))
-    k::Int = 3
-    @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-        S += out
-        ns = norm(S)
-        @inbounds ns ≈ norms[3] && break
-        term .= out
-        out .= 0
-        # term *= b/k
-        for g ∈ 1:N+1
-            Y = indexbasis(N,g-1)
-            @inbounds for i ∈ 1:bn[g]
-                @inbounds val = B[bs[g]+i]/k
-                val≠0 && for G ∈ 1:N+1
-                    @inbounds R = bs[G]
-                    X = indexbasis(N,G-1)
-                    @inbounds for j ∈ 1:bn[G]
-                        @inbounds geomaddmulti!(V,out,X[j],Y[i],*(term[R+j],val))
-                    end
-                end
-            end
+@eval @generated function Base.expm1(b::MultiVector{T,V}) where {T,V}
+    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
+    return quote
+        B = value(b)
+        sb,nb = scalar(b),norm(B)
+        sb ≈ nb && (return Simplex{V}(expm1(sb)))
+        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        S = zeros(mvec(N,t))
+        term = zeros(mvec(N,t))
+        S .= B
+        out .= value(b^2)/2
+        norms = MVector(nb,norm(out),norm(term))
+        k::Int = 3
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= b/k 
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 1
         end
-        @inbounds norms .= (norms[2],norm(out),ns)
-        k += 1
+        return MultiVector{t,V}(S)
     end
-    return MultiVector{t,V}(S)
 end
 
 function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
@@ -79,45 +70,36 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-@eval function qlog_fast(b::MultiVector{T,V,E},x::Int=10000) where {T,V,E}
-    $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
-    f = norm(b)
-    w2::MultiVector{T,V,E} = b^2
-    B = value(w2)
-    S = zeros(mvec(N,t))
-    prod = zeros(mvec(N,t))
-    term = zeros(mvec(N,t))
-    S .= value(b)
-    out .= value(b*w2)
-    term .= out/3
-    norms = MVector(f,norm(term),f)
-    k::Int = 5
-    @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
-        S += term
-        ns = norm(S)
-        @inbounds ns ≈ norms[3] && break
-        prod .= out
-        out .= 0
-        # prod *= w2
-        for g ∈ 1:N+1
-            Y = indexbasis(N,g-1)
-            @inbounds for i ∈ 1:bn[g]
-                @inbounds val = B[bs[g]+i]
-                val≠0 && for G ∈ 1:N+1
-                    @inbounds R = bs[G]
-                    X = indexbasis(N,G-1)
-                    @inbounds for j ∈ 1:bn[G]
-                        @inbounds geomaddmulti!(V,out,X[j],Y[i],*(prod[R+j],val))
-                    end
-                end
-            end
+@eval @generated function qlog_fast(b::MultiVector{T,V,E},x::Int=10000) where {T,V,E} 
+    loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
+    return quote
+        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        f = norm(b)
+        w2::MultiVector{T,V,E} = b^2
+        B = value(w2)
+        S = zeros(mvec(N,t))
+        prod = zeros(mvec(N,t))
+        term = zeros(mvec(N,t))
+        S .= value(b)
+        out .= value(b*w2)
+        term .= out/3
+        norms = MVector(f,norm(term),f)
+        k::Int = 5
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
+            S += term
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            prod .= out
+            out .= 0
+            # prod *= w2
+            $(loop[2])
+            term .= out/k
+            @inbounds norms .= (norms[2],norm(term),ns)
+            k += 2
         end
-        term .= out/k
-        @inbounds norms .= (norms[2],norm(term),ns)
-        k += 2
+        S *= 2
+        return MultiVector{t,V}(S)
     end
-    S *= 2
-    return MultiVector{t,V}(S)
 end
 
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
@@ -154,43 +136,34 @@ function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     return 1+S
 end
 
-@eval function Base.cosh(b::MultiVector{T,V,E}) where {T,V,E}
-    sb,nb = scalar(b),norm(b)
-    sb ≈ nb && (return Simplex{V}(cosh(sb)))
-    $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
-    τ::MultiVector{T,V,E} = b^2
-    B = value(τ)
-    S = zeros(mvec(N,t))
-    term = zeros(mvec(N,t))
-    S .= value(τ)/2
-    out .= value((τ^2))/24
-    norms = MVector(norm(S),norm(out),norm(term))
-    k::Int = 6
-    @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-        S += out
-        ns = norm(S)
-        @inbounds ns ≈ norms[3] && break
-        term .= out
-        out .= 0
-        # term *= τ/(k*(k-1))
-        for g ∈ 1:N+1
-            Y = indexbasis(N,g-1)
-            @inbounds for i ∈ 1:bn[g]
-                @inbounds val = B[bs[g]+i]/(k*(k-1))
-                val≠0 && for G ∈ 1:N+1
-                    @inbounds R = bs[G]
-                    X = indexbasis(N,G-1)
-                    @inbounds for j ∈ 1:bn[G]
-                        @inbounds geomaddmulti!(V,out,X[j],Y[i],*(term[R+j],val))
-                    end
-                end
-            end
+@eval @generated function Base.cosh(b::MultiVector{T,V,E}) where {T,V,E}
+    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    return quote
+        sb,nb = scalar(b),norm(b)
+        sb ≈ nb && (return Simplex{V}(cosh(sb)))
+        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        τ::MultiVector{T,V,E} = b^2
+        B = value(τ)
+        S = zeros(mvec(N,t))
+        term = zeros(mvec(N,t))
+        S .= value(τ)/2
+        out .= value((τ^2))/24
+        norms = MVector(norm(S),norm(out),norm(term))
+        k::Int = 6
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= τ/(k*(k-1))
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 2
         end
-        @inbounds norms .= (norms[2],norm(out),ns)
-        k += 2
+        @inbounds S[1] += 1
+        return MultiVector{t,V}(S)
     end
-    @inbounds S[1] += 1
-    return MultiVector{t,V}(S)
 end
 
 @inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(sinh(value(t)))
@@ -211,42 +184,33 @@ function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     return S
 end
 
-@eval function Base.sinh(b::MultiVector{T,V,E}) where {T,V,E}
-    sb,nb = scalar(b),norm(b)
-    sb ≈ nb && (return Simplex{V}(sinh(sb)))
-    $(insert_expr((:N,:t,:out,:bs,:bn),:mvec,:T,Float64)...)
-    τ::MultiVector{T,V,E} = b^2
-    B = value(τ)
-    S = zeros(mvec(N,t))
-    term = zeros(mvec(N,t))
-    S .= value(b)
-    out .= value(b*τ)/6
-    norms = MVector(norm(S),norm(out),norm(term))
-    k::Int = 5
-    @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-        S += out
-        ns = norm(S)
-        @inbounds ns ≈ norms[3] && break
-        term .= out
-        out .= 0
-        # term *= τ/(k*(k-1))
-        for g ∈ 1:N+1
-            Y = indexbasis(N,g-1)
-            @inbounds for i ∈ 1:bn[g]
-                @inbounds val = B[bs[g]+i]/(k*(k-1))
-                val≠0 && for G ∈ 1:N+1
-                    @inbounds R = bs[G]
-                    X = indexbasis(N,G-1)
-                    @inbounds for j ∈ 1:bn[G]
-                        @inbounds geomaddmulti!(V,out,X[j],Y[i],*(term[R+j],val))
-                    end
-                end
-            end
+@eval @generated function Base.sinh(b::MultiVector{T,V,E}) where {T,V,E}
+    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    return quote
+        sb,nb = scalar(b),norm(b)
+        sb ≈ nb && (return Simplex{V}(sinh(sb)))
+        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        τ::MultiVector{T,V,E} = b^2
+        B = value(τ)
+        S = zeros(mvec(N,t))
+        term = zeros(mvec(N,t))
+        S .= value(b)
+        out .= value(b*τ)/6
+        norms = MVector(norm(S),norm(out),norm(term))
+        k::Int = 5
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= τ/(k*(k-1))
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 2
         end
-        @inbounds norms .= (norms[2],norm(out),ns)
-        k += 2
+        return MultiVector{t,V}(S)
     end
-    return MultiVector{t,V}(S)
 end
 
 exph(t) = cosh(t)+sinh(t)
