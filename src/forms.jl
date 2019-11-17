@@ -74,192 +74,175 @@ end
 
 # implex forms
 
-for implex ∈ MSB
-    @eval begin
-        (a::$implex)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-        function (a::Basis{V,1,A})(b::$implex{V,1,X,T} where X) where {V,A,T}
-            x = bits(a)
-            X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-            Y = bits(basis(b))
-            Y∉(x,X) && (return zero(V))
-            (V[intlog(Y)+1] ? -(b.v) : b.v) * Basis{V}()
-        end
-        function (a::$implex{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
-            x = bits(basis(a))
-            X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-            Y = bits(b)
-            Y∉(x,X) && (return zero(V))
-            (V[intlog(Y)+1] ? -(a.v) : a.v) * Basis{V}()
-        end
-        function (a::$implex{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
-            C = mixedmode(V)
-            (C ≥ 0) && throw(error("wrong basis"))
-            $(insert_expr((:N,:M))...)
-            bi = indices(basis(a),N)
-            ib = indexbasis(N,1)
-            @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-            t = bits(b)≠v
-            @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
-        end
-        function (a::$Basis{V,2,A})(b::$implex{V,1,B,T}) where {V,A,B,T}
-            C = mixedmode(V)
-            (C ≥ 0) && throw(error("wrong basis"))
-            $(insert_expr((:N,:M))...)
-            bi = indices(a,N)
-            ib = indexbasis(N,1)
-            @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-            t = bits(basis(b))≠v
-            @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
-        end
+(a::Simplex)(b::T) where {T<:TensorAlgebra} = interform(a,b)
+function (a::Basis{V,1,A})(b::Simplex{V,1,X,T} where X) where {V,A,T}
+    x = bits(a)
+    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
+    Y = bits(basis(b))
+    Y∉(x,X) && (return zero(V))
+    (V[intlog(Y)+1] ? -(b.v) : b.v) * Basis{V}()
+end
+function (a::Simplex{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
+    x = bits(basis(a))
+    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
+    Y = bits(b)
+    Y∉(x,X) && (return zero(V))
+    (V[intlog(Y)+1] ? -(a.v) : a.v) * Basis{V}()
+end
+@eval begin
+    function (a::Simplex{V,1,X,T} where X)(b::Simplex{V,1,Y,S} where Y) where {V,T,S}
+        $(insert_expr((:t,))...)
+        x = bits(basis(a))
+        X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
+        Y = bits(basis(b))
+        Y∉(x,X) && (return zero(V))
+        Simplex{V}((a.v*(V[intlog(Y)+1] ? -(b.v) : b.v))::t,Basis{V}())
     end
-    for Other ∈ MSB
-        @eval begin
-            function (a::$implex{V,1,X,T} where X)(b::$Other{V,1,Y,S} where Y) where {V,T,S}
-                $(insert_expr((:t,))...)
-                x = bits(basis(a))
-                X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-                Y = bits(basis(b))
-                Y∉(x,X) && (return zero(V))
-                Simplex{V}((a.v*(V[intlog(Y)+1] ? -(b.v) : b.v))::t,Basis{V}())
-            end
-            function (a::$implex{V,2,A,T})(b::$Other{V,1,B,S}) where {V,A,T,B,S}
-                C = mixedmode(V)
-                (C ≥ 0) && throw(error("wrong basis"))
-                $(insert_expr((:N,:M,:t))...)
-                bi = indices(basis(a),N)
-                ib = indexbasis(N,1)
-                @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-                j = bits(basis(b))≠v
-                @inbounds j ? zero(V) : (a.v*(V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
-            end
-        end
+    function (a::Simplex{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:M))...)
+        bi = indices(basis(a),N)
+        ib = indexbasis(N,1)
+        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+        t = bits(b)≠v
+        @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
+    end
+    function (a::Basis{V,2,A})(b::Simplex{V,1,B,T}) where {V,A,B,T}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:M))...)
+        bi = indices(a,N)
+        ib = indexbasis(N,1)
+        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+        t = bits(basis(b))≠v
+        @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
+    end
+    function (a::Simplex{V,2,A,T})(b::Simplex{V,1,B,S}) where {V,A,T,B,S}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:M,:t))...)
+        bi = indices(basis(a),N)
+        ib = indexbasis(N,1)
+        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
+        j = bits(basis(b))≠v
+        @inbounds j ? zero(V) : (a.v*(V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
     end
 end
 
 ## Chain forms
 
-for Chain ∈ MSC
-    @eval begin
-        (a::$Chain)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-        function (a::Basis{V,1,A})(b::$Chain{T,V,1}) where {V,A,T}
-            x = bits(a)
-            X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-            Y = 0≠X ? X : x
-            @inbounds out = b.v[bladeindex(ndims(V),Y)]
-            Simplex{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
-        end
-        function (a::$Chain{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
-            x = bits(b)
-            X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
-            Y = X>2^ndims(V) ? x : X
-            @inbounds out = a.v[bladeindex(ndims(V),Y)]
-            Simplex{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
-        end
-        function (a::Basis{V,2,A})(b::$Chain{T,V,1}) where {V,A,T}
-            C = mixedmode(V)
-            (C ≥ 0) && throw(error("wrong basis"))
-            $(insert_expr((:N,:M))...)
-            bi = indices(basis(a),N)
-            ib = indexbasis(N,1)
-            @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
-            @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
-        end
-        function (a::$Chain{T,V,2})(b::Basis{V,1,B}) where {T,V,B}
-            C = mixedmode(V)
-            (C ≥ 0) && throw(error("wrong basis"))
-            $(insert_expr((:N,:df,:di))...)
-            Q = bladeindex(N,bits(b))
-            @inbounds m,val = df[Q][1],df[Q][2] ? -(value(b)) : value(b)
-            out = zero(mvec(N,1,T))
-            for i ∈ 1:N
-                i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
-            end
-            return SChain{T,V,1}(out)
-        end
+(a::Chain)(b::T) where {T<:TensorAlgebra} = interform(a,b)
+function (a::Basis{V,1,A})(b::Chain{T,V,1}) where {V,A,T}
+    x = bits(a)
+    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
+    Y = 0≠X ? X : x
+    @inbounds out = b.v[bladeindex(ndims(V),Y)]
+    Simplex{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
+end
+function (a::Chain{T,V,1})(b::Basis{V,1,B}) where {T,V,B}
+    x = bits(b)
+    X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
+    Y = X>2^ndims(V) ? x : X
+    @inbounds out = a.v[bladeindex(ndims(V),Y)]
+    Simplex{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
+end
+@eval begin
+    function (a::Basis{V,2,A})(b::Chain{T,V,1}) where {V,A,T}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:M))...)
+        bi = indices(basis(a),N)
+        ib = indexbasis(N,1)
+        @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
+        @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
     end
-    for implex ∈ MSB
-        @eval begin
-            function (a::$Chain{T,V,1})(b::$implex{V,1,X,S} where X) where {V,A,T,S}
-                $(insert_expr((:t,))...)
-                x = bits(basis(b))
-                X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
-                Y = X>2^ndims(V) ? x : X
-                @inbounds out = a.v[bladeindex(ndims(V),Y)]
-                Simplex{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
-            end
-            function (a::$implex{V,1,X,T} where X)(b::$Chain{S,V,1}) where {V,T,S}
-                $(insert_expr((:t,))...)
-                x = bits(basis(a))
-                X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-                Y = 0≠X ? X : x
-                @inbounds out = b.v[bladeindex(ndims(V),Y)]
-                Simplex{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
-            end
-            function (a::$implex{V,2,A,T})(b::$Chain{S,V,1}) where {V,A,T,S}
-                C = mixedmode(V)
-                (C ≥ 0) && throw(error("wrong basis"))
-                $(insert_expr((:N,:M,:t))...)
-                bi = indices(basis(a),N)
-                ib = indexbasis(N,1)
-                @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
-                @inbounds (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])
-            end
-            function (a::$Chain{T,V,2})(b::$implex{V,1,B,S}) where {V,T,S,B}
-                C = mixedmode(V)
-                (C ≥ 0) && throw(error("wrong basis"))
-                $(insert_expr((:N,:t,:df,:di))...)
-                Q = bladeindex(N,bits(basis(b)))
-                out = zero(mvec(N,1,T))
-                @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v) : b.v
-                for i ∈ 1:N
-                    i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
-                end
-                return SChain{t,V,1}(out)
-            end
+    function (a::Chain{T,V,2})(b::Basis{V,1,B}) where {T,V,B}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:df,:di))...)
+        Q = bladeindex(N,bits(b))
+        @inbounds m,val = df[Q][1],df[Q][2] ? -(value(b)) : value(b)
+        out = zero(mvec(N,1,T))
+        for i ∈ 1:N
+            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
         end
+        return Chain{T,V,1}(out)
     end
-    for Other ∈ MSC
-        @eval begin
-            function (a::$Chain{T,V,1})(b::$Other{S,V,1}) where {V,T,S}
-                $(insert_expr((:N,:M,:t,:df))...)
-                out = zero(t)
-                for Q ∈ 1:M
-                    @inbounds out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
-                end
-                return Simplex{V}(out::t,Basis{V}())
-            end
-            function (a::$Chain{T,V,2})(b::$Other{S,V,1}) where {V,T,S}
-                C = mixedmode(V)
-                (C ≥ 0) && throw(error("wrong basis"))
-                $(insert_expr((:N,:t,:df,:di))...)
-                out = zero(mvec(N,1,t))
-                for Q ∈ 1:Int(N/2)
-                    @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v[Q]) : b.v[Q]
-                    val≠0 && for i ∈ 1:N
-                        @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
-                    end
-                end
-                return SChain{t,V,1}(out)
+end
+@eval begin
+    function (a::Chain{T,V,1})(b::Simplex{V,1,X,S} where X) where {V,A,T,S}
+        $(insert_expr((:t,))...)
+        x = bits(basis(b))
+        X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
+        Y = X>2^ndims(V) ? x : X
+        @inbounds out = a.v[bladeindex(ndims(V),Y)]
+        Simplex{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
+    end
+    function (a::Simplex{V,1,X,T} where X)(b::Chain{S,V,1}) where {V,T,S}
+        $(insert_expr((:t,))...)
+        x = bits(basis(a))
+        X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
+        Y = 0≠X ? X : x
+        @inbounds out = b.v[bladeindex(ndims(V),Y)]
+        Simplex{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
+    end
+    function (a::Simplex{V,2,A,T})(b::Chain{S,V,1}) where {V,A,T,S}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:M,:t))...)
+        bi = indices(basis(a),N)
+        ib = indexbasis(N,1)
+        @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
+        @inbounds (((V[m] ? -(a.v) : a.v)*b.v[m])::t)*getbasis(V,ib[bi[1]])
+    end
+    function (a::Chain{T,V,2})(b::Simplex{V,1,B,S}) where {V,T,S,B}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:t,:df,:di))...)
+        Q = bladeindex(N,bits(basis(b)))
+        out = zero(mvec(N,1,T))
+        @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v) : b.v
+        for i ∈ 1:N
+            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
+        end
+        return Chain{t,V,1}(out)
+    end
+    function (a::Chain{T,V,1})(b::Chain{S,V,1}) where {V,T,S}
+        $(insert_expr((:N,:M,:t,:df))...)
+        out = zero(t)
+        for Q ∈ 1:M
+            @inbounds out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
+        end
+        return Simplex{V}(out::t,Basis{V}())
+    end
+    function (a::Chain{T,V,2})(b::Chain{S,V,1}) where {V,T,S}
+        C = mixedmode(V)
+        (C ≥ 0) && throw(error("wrong basis"))
+        $(insert_expr((:N,:t,:df,:di))...)
+        out = zero(mvec(N,1,t))
+        for Q ∈ 1:Int(N/2)
+            @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v[Q]) : b.v[Q]
+            val≠0 && for i ∈ 1:N
+                @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
             end
         end
+        return Chain{t,V,1}(out)
     end
 end
 
-
-for Chain ∈ MSC
-    @eval begin
-        function $Chain{T,V}(b::Matrix{T}) where {T,V}
-            mixedmode(V)≥0 && throw(error("$V does not support this conversion"))
-            $(insert_expr((:N,:M))...)
-            size(b) ≠ (M,M) && throw(error("dimension mismatch"))
-            out = zeros(mvec(N,2,T))
-            for i ∈ 1:M
-                x = one(Bits)<<(i-1)
-                for j ∈ 1:M
-                    @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
-                end
+@eval begin
+    function Chain{T,V}(b::Matrix{T}) where {T,V}
+        mixedmode(V)≥0 && throw(error("$V does not support this conversion"))
+        $(insert_expr((:N,:M))...)
+        size(b) ≠ (M,M) && throw(error("dimension mismatch"))
+        out = zeros(mvec(N,2,T))
+        for i ∈ 1:M
+            x = one(Bits)<<(i-1)
+            for j ∈ 1:M
+                @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
             end
-            return SChain{T,V,2}(out)
         end
+        return Chain{T,V,2}(out)
     end
 end

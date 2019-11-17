@@ -310,14 +310,14 @@ for side ∈ (:left,:right)
     c,p = Symbol(:complement,side),Symbol(:parity,side)
     h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
     for (c,p) ∈ ((c,p),(h,pg))
-        @eval @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-            d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
-            mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-            v = $(c≠h ? :($pn(V,B,value(d))) : :(value(d)))
-            typeof(V)<:Signature ? ($p(b) ? Simplex{V}(-v,d) : isone(v) ? d : Simplex{V}(v,d)) : Simplex{V}($p(b)*v,d)
-        end
-        for B ∈ MSB
-            @eval $c(b::$B) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
+        @eval begin
+            @pure function $c(b::Basis{V,G,B}) where {V,G,B}
+                d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
+                mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                v = $(c≠h ? :($pn(V,B,value(d))) : :(value(d)))
+                typeof(V)<:Signature ? ($p(b) ? Simplex{V}(-v,d) : isone(v) ? d : Simplex{V}(v,d)) : Simplex{V}($p(b)*v,d)
+            end
+            $c(b::Simplex) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
         end
     end
 end
@@ -346,11 +346,11 @@ export involute
 
 for r ∈ (:reverse,:involute,:conj)
     p = Symbol(:parity,r)
-    @eval @pure function $r(b::Basis{V,G,B}) where {V,G,B}
-        $p(grade(V,B)) ? Simplex{V}(-value(b),b) : b
-    end
-    for implex ∈ MSB
-        @eval $r(b::$implex) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
+    @eval begin
+        @pure function $r(b::Basis{V,G,B}) where {V,G,B}
+            $p(grade(V,B)) ? Simplex{V}(-value(b),b) : b
+        end
+        $r(b::Simplex) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
     end
 end
 
@@ -402,37 +402,25 @@ function mul(a::Basis{V},b::Basis{V},der=derive_mul(V,bits(a),bits(b),1,true)) w
     return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
 
-for implex ∈ MSB
-    @eval begin
-        function *(a::$implex{V},b::Basis{V}) where V
-            v = derive_mul(V,bits(basis(a)),bits(b),a.v,true)
-            bas = mul(basis(a),b,v)
-            order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
-        end
-        function *(a::Basis{V},b::$implex{V}) where V
-            v = derive_mul(V,bits(a),bits(basis(b)),b.v,false)
-            bas = mul(a,basis(b),v)
-            order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
-        end
-    end
+function *(a::Simplex{V},b::Basis{V}) where V
+    v = derive_mul(V,bits(basis(a)),bits(b),a.v,true)
+    bas = mul(basis(a),b,v)
+    order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
+end
+function *(a::Basis{V},b::Simplex{V}) where V
+    v = derive_mul(V,bits(a),bits(basis(b)),b.v,false)
+    bas = mul(a,basis(b),v)
+    order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
 
 #*(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
 #*(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #*(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
-for implex ∈ MSB
-    @eval begin
-        *(a::UniformScaling,b::$implex{V}) where V = V(a)*b
-        *(a::$implex{V},b::UniformScaling) where V = a*V(b)
-    end
-end
-for Chain ∈ MSC
-    @eval begin
-        *(a::UniformScaling,b::$Chain{T,V} where T) where V = V(a)*b
-        *(a::$Chain{T,V} where T,b::UniformScaling) where V = a*V(b)
-    end
-end
+*(a::UniformScaling,b::Simplex{V}) where V = V(a)*b
+*(a::Simplex{V},b::UniformScaling) where V = a*V(b)
+*(a::UniformScaling,b::Chain{T,V} where T) where V = V(a)*b
+*(a::Chain{T,V} where T,b::UniformScaling) where V = a*V(b)
 
 export ∗, ⊛, ⊖
 const ⊖ = *
@@ -557,7 +545,7 @@ end
 
 export ⨼, ⨽
 
-for T ∈ (:TensorTerm,MSC...)
+for T ∈ (:TensorTerm,:Chain)
     @eval @inline Base.abs2(t::T) where T<:$T = contraction(t,t)
 end
 
@@ -568,7 +556,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 """
 @inline dot(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = contraction(a,b)
 
-#=for A ∈ (:TensorTerm,MSC...), B ∈ (:TensorTerm,MSC...)
+#=for A ∈ (:TensorTerm,:Chain), B ∈ (:TensorTerm,:Chain)
     @eval contraction(a::A,b::B) where {A<:$A,B<:$B} where V = contraction(a,b)
 end=#
 
@@ -678,7 +666,7 @@ export ⟂, ∥
         for g ∈ 1:N+1
             Y = indexbasis(N,g-1)
             @inbounds for i ∈ 1:bn[g]
-                @inbounds val = isnothing(d) ? :($b[$(bs[g]+i)]) : :($b[$(bs[g]+i)]/$d)
+                @inbounds val = nothing≠d ? :($b[$(bs[g]+i)]/$d) : :($b[$(bs[g]+i)])
                 for G ∈ 1:N+1
                     @inbounds R = bs[G]
                     X = indexbasis(N,G-1)
@@ -694,7 +682,7 @@ export ⟂, ∥
             for g ∈ 1:N+1
                 Y = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    @inbounds val = $(isnothing(d) ? :($b[bs[g]+i]) : :($b[bs[g]+i]/$d))
+                    @inbounds val = $(nothing≠d ? :($b[bs[g]+i]/$d) : :($b[bs[g]+i]))
                     val≠0 && for G ∈ 1:N+1
                         @inbounds R = bs[G]
                         X = indexbasis(N,G-1)
@@ -723,39 +711,6 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     TF = Field ∉ Fields ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     @eval begin
-        @inline function inneraddvalue!(mv::MSimplex{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
-            if γ≠0
-                g,C,f,Z = interior(α,β,V)
-                !iszero(C) && T≠Any && (return true)
-                v = iszero(C) ? γ : γ*getbasis(V,C)
-                if diffvars(V)≠0
-                    if !iszero(Z)
-                        _,_,Q,_ = symmetricmask(V,α,β)
-                        v *= getbasis(V,Z)
-                    end
-                    order(v)>diffmode(V) && (return false)
-                end
-                f && (mv.v = typeof(V)<:Signature ? (g ? $SUB(mv.v,v) : $ADD(mv.v,v)) : $ADD(mv.v,$MUL(g,v)))
-                return false
-            end
-            return false
-        end
-        @inline function inneraddvalue!_pre(mv::MSimplex{V,0,B,T} where {W,B},α,β,γ::T) where {V,T<:$Field}
-            if γ≠0
-                g,C,f,Z = interior(α,β,V)
-                v = iszero(C) ? γ : Expr(:call,:*,γ,getbasis(V,C))
-                if diffvars(V)≠0
-                    if !iszero(Z)
-                        _,_,Q,_ = symmetricmask(V,α,β)
-                        v = Expr(:call,:*,v,getbasis(V,Z))
-                    end
-                    v = :(h=$v;order(v)>$(diffmode(V)) ? 0 : h)
-                end
-                f && (mv.v = typeof(V)<:Signature ? (g ? :($$SUB($(mv.v),$v)) : :($$ADD($(mv.v),$v))) : :($$ADD($(mv.v),$$MUL($g,$v))))
-                return false
-            end
-            return false
-        end
         @generated function adjoint(m::MultiVector{T,V}) where {T<:$Field,V}
             if ndims(V)<cache_limit
                 if mixedmode(V)<0
@@ -800,313 +755,312 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         ∧(a::MultiVector{T,V},b::$Field) where {T<:$Field,V} = MultiVector{T,V}(a.v.*b)
         ∧(a::$Field,b::MultiGrade{V}) where V = MultiGrade{V}(a.*b.v)
         ∧(a::MultiGrade{V},b::$Field) where V = MultiGrade{V}(a.v.*b)=#
-    end
-    for implex ∈ MSB
-        @eval begin
-            adjoint(b::$implex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
-            *(a::F,b::$implex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
-            *(a::$implex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
-        end
-    end
-    for (A,B) ∈ [(A,B) for A ∈ MSB, B ∈ MSB]
-        @eval function *(a::$A{V,G,A,T} where {G,A},b::$B{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
+        adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
+        *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
+        *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
+        function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
             Simplex(v,mul(ba,bb,v))
         end
-    end
-    for Chain ∈ MSC
-        @eval begin
-            @generated function adjoint(m::$Chain{T,V,G}) where {T<:$Field,V,G}
-                if binomial(ndims(V),G)<(1<<cache_limit)
-                    if mixedmode(V)<0
-                        $(insert_expr((:N,:M,:ib),:svec)...)
-                        out = zeros(svec(N,G,Any))
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Dimension{N}())
-                        end
-                        return :(SChain{$$TF,$(dual(V)),G}($(Expr(:call,:SVector,out...))))
-                    else
-                        return :(SChain{$$TF,$(dual(V)),G}(SVector($$CONJ.(value(m)))))
-                    end
-                else return quote
-                    if mixedmode(V)<0
-                        $(insert_expr((:N,:M,:ib),$(QuoteNode(VEC)))...)
-                        out = zeros($$VEC(N,G,$$TF))
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds setblade!(out,$$CONJ(m.v[i]),dual(V,ib[i],M),Dimension{N}())
-                        end
-                    else
-                        out = $$CONJ.(value(m))
-                    end
-                    SChain{$$TF,dual(V),G}(out)
-                end end
-            end
-            *(a::F,b::$Chain{T,V,G}) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,Ref(a),b.v))
-            *(a::$Chain{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = SChain{promote_type(T,F),V,G}(broadcast($MUL,a.v,Ref(b)))
-            #∧(a::$Field,b::$Chain{T,V,G}) where {T<:$Field,V,G} = SChain{T,V,G}(a.*b.v)
-            #∧(a::$Chain{T,V,G},b::$Field) where {T<:$Field,V,G} = SChain{T,V,G}(a.v.*b)
-            @generated function contraction(a::$Chain{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
-                if binomial(ndims(V),G)<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:mv,:ib),:svec)...)
+        @generated function adjoint(m::Chain{T,V,G}) where {T<:$Field,V,G}
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:ib),:svec)...)
+                    out = zeros(svec(N,G,Any))
                     for i ∈ 1:binomial(N,G)
-                        @inbounds inneraddvalue!_pre(mv,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
+                        @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Dimension{N}())
                     end
-                    return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                else return quote
-                    $(insert_expr((:N,:t,:mv,:ib,:μ),$(QuoteNode(VEC)))...)
+                    return :(Chain{$$TF,$(dual(V)),G}($(Expr(:call,:SVector,out...))))
+                else
+                    return :(Chain{$$TF,$(dual(V)),G}(SVector($$CONJ.(value(m)))))
+                end
+            else return quote
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:ib),$(QuoteNode(VEC)))...)
+                    out = zeros($$VEC(N,G,$$TF))
                     for i ∈ 1:binomial(N,G)
-                        if @inbounds inneraddvalue!(mv,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))&μ
-                            $(insert_expr((:mv,);mv=:(value(mv)))...)
-                            @inbounds inneraddvalue!(mv,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
-                        end
+                        @inbounds setblade!(out,$$CONJ(m.v[i]),dual(V,ib[i],M),Dimension{N}())
                     end
-                    return value_diff(mv)
-                end end
-            end
-            @generated function contraction(a::Basis{V,G},b::$Chain{T,V,G}) where {V,T<:$Field,G}
-                if binomial(ndims(V),G)<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:mv,:ib),:svec)...)
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds inneraddvalue!_pre(mv,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
-                    end
-                    return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                else return quote
-                    $(insert_expr((:N,:t,:mv,:ib,:μ),$(QuoteNode(VEC)))...)
-                    for i ∈ 1:binomial(N,G)
-                        if @inbounds inneraddvalue!(mv,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))&μ
-                            $(insert_expr((:mv,);mv=:(value(mv)))...)
-                            @inbounds inneraddvalue!(mv,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
-                        end
-                    end
-                    return value_diff(mv)
-                end end
-            end
-            @generated function ∧(a::$Chain{T,w,G},b::Basis{W,L}) where {T<:$Field,w,W,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
-                G+L>ndims(V) && (return g_zero(V))
-                if binomial(ndims(w),G)<(1<<cache_limit)
-                    $(insert_expr((:N,:t),VEC,:T,Int)...)
-                    ib = indexbasis(ndims(w),G)
-                    out = zeros(svec(N,G+L,Any))
-                    C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
-                    for i ∈ 1:binomial(ndims(w),G)
-                        X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                        @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),true))
-                    end
-                    return :(SChain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
-                else return quote
-                    V = $V
-                    $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
-                    ib = indexbasis(ndims(w),G)
-                    out = zeros($$VEC(N,G+L,t))
-                    C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
-                    for i ∈ 1:binomial(ndims(w),G)
-                        X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                        if @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],true))&μ
-                            out,t = zeros(svec(N,G+L,Any)) .+ out,Any
-                            @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],true))
-                        end
-                    end
-                    return SChain{t,V,G+L}(out)
-                end end
-            end
-            @generated function ∧(a::Basis{w,G},b::$Chain{T,W,L}) where {w,W,T<:$Field,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
-                G+L>ndims(V) && (return g_zero(V))
-                if binomial(ndims(W),L)<(1<<cache_limit)
-                    $(insert_expr((:N,:t),VEC,Int,:T)...)
-                    ib = indexbasis(ndims(W),L)
-                    out = zeros(svec(N,G+L,Any))
-                    C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
-                    for i ∈ 1:binomial(ndims(W),L)
-                        X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                        @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(b[$i]),false))
-                    end
-                    return :(SChain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
-                else return quote
-                    V = $V
-                    $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
-                    ib = indexbasis(ndims(W),L)
-                    out = zeros($$VEC(N,G+L,t))
-                    C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
-                    for i ∈ 1:binomial(ndims(W),L)
-                        X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                        if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,b[i],false))&μ
-                            out,t = zeros(svec(N,G+L,Any)) .+ out,Any
-                            @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,b[i],false))
-                        end
-                    end
-                    return SChain{t,V,G+L}(out)
-                end end
-            end
+                else
+                    out = $$CONJ.(value(m))
+                end
+                Chain{$$TF,dual(V),G}(out)
+            end end
         end
-        for implex ∈ MSB
-            @eval begin
-                @generated function contraction(a::$Chain{T,V,G},b::$implex{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
-                    if binomial(ndims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:mv,:ib),:svec)...)
-                        X = bits(B)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds inneraddvalue!_pre(mv,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
-                        end
-                        return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                    else return quote
-                        $(insert_expr((:N,:t,:mv,:ib,:μ),$(QuoteNode(VEC)))...)
-                        X = bits(basis(b))
-                        for i ∈ 1:binomial(N,G)
-                        if @inbounds inneraddvalue!(mv,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))&μ
-                                $(insert_expr((:mv,);mv=:(value(mv)))...)
-                                @inbounds inneraddvalue!(mv,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
-                            end
+        *(a::F,b::Chain{T,V,G}) where {F<:$Field,T<:$Field,V,G} = Chain{promote_type(T,F),V,G}(broadcast($MUL,Ref(a),b.v))
+        *(a::Chain{T,V,G},b::F) where {F<:$Field,T<:$Field,V,G} = Chain{promote_type(T,F),V,G}(broadcast($MUL,a.v,Ref(b)))
+        #∧(a::$Field,b::Chain{T,V,G}) where {T<:$Field,V,G} = Chain{T,V,G}(a.*b.v)
+        #∧(a::Chain{T,V,G},b::$Field) where {T<:$Field,V,G} = Chain{T,V,G}(a.v.*b)
+        @generated function contraction(a::Chain{T,V,G},b::Basis{V,L}) where {T<:$Field,V,G,L}
+            G<L && (return g_zero(V))
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t,:ib,:bng),:svec)...)
+                out = zeros(svec(N,G-L,Any))
+                for i ∈ 1:bng
+                    @inbounds skewaddblade!_pre(V,out,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
+                end
+                #return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
+                return :(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
+                out = zeros($$VEC(N,G-L,t))
+                for i ∈ 1:bng
+                    if @inbounds skewaddblade!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))&μ
+                        #$(insert_expr((:out,);mv=:(value(mv)))...)
+                        out,t = zeros(svec(N,G-L,Any)) .+ out,Any
+                        @inbounds skewaddblade!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
+                    end
+                end
+                return value_diff(Chain{t,V,L-G}(out))
+            end end
+        end
+        @generated function contraction(a::Basis{V,L},b::Chain{T,V,G}) where {V,T<:$Field,G,L}
+            L<G && (return g_zero(V))
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t,:ib,:bng),:svec)...)
+                out = zeros(svec(N,L-G,Any))
+                for i ∈ 1:bng
+                    @inbounds skewaddblade!_pre(V,out,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
+                end
+                return :(Chain{$t,$V,L-G}($(Expr(:call,:SVector,out...))))
+            else return quote
+                $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
+                out = zeros($$VEC(N,L-G,t))
+                for i ∈ 1:bng
+                    if @inbounds skewaddblade!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))&μ
+                        out,t = zeros(svec(N,L-G,Any)) .+ out,Any
+                        @inbounds skewaddblade!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
+                    end
+                end
+                return value_diff(Chain{t,V,L-G}(out))
+            end end
+        end
+        @generated function ∧(a::Chain{T,w,G},b::Basis{W,L}) where {T<:$Field,w,W,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (return g_zero(V))
+            if binomial(ndims(w),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t),VEC,:T,Int)...)
+                ib = indexbasis(ndims(w),G)
+                out = zeros(svec(N,G+L,Any))
+                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
+                for i ∈ 1:binomial(ndims(w),G)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),true))
+                end
+                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                V = $V
+                $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
+                ib = indexbasis(ndims(w),G)
+                out = zeros($$VEC(N,G+L,t))
+                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
+                for i ∈ 1:binomial(ndims(w),G)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    if @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],true))&μ
+                        out,t = zeros(svec(N,G+L,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],true))
+                    end
+                end
+                return Chain{t,V,G+L}(out)
+            end end
+        end
+        @generated function ∧(a::Basis{w,G},b::Chain{T,W,L}) where {w,W,T<:$Field,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (return g_zero(V))
+            if binomial(ndims(W),L)<(1<<cache_limit)
+                $(insert_expr((:N,:t),VEC,Int,:T)...)
+                ib = indexbasis(ndims(W),L)
+                out = zeros(svec(N,G+L,Any))
+                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
+                for i ∈ 1:binomial(ndims(W),L)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(b[$i]),false))
+                end
+                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                V = $V
+                $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
+                ib = indexbasis(ndims(W),L)
+                out = zeros($$VEC(N,G+L,t))
+                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
+                for i ∈ 1:binomial(ndims(W),L)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,b[i],false))&μ
+                        out,t = zeros(svec(N,G+L,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,b[i],false))
+                    end
+                end
+                return Chain{t,V,G+L}(out)
+            end end
+        end
+        @generated function contraction(a::Chain{T,V,G},b::Simplex{V,L,B,S}) where {T<:$Field,V,G,B,S<:$Field,L}
+            G<L && (return g_zero(V))
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t,:ib,:bng),:svec)...)
+                out,X = zeros(svec(N,G-L,Any)),bits(B)
+                for i ∈ 1:bng
+                    @inbounds skewaddblade!_pre(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
+                end
+                return :(value_diff(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...)))))
+            else return quote
+                $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
+                out,X = zeros($$VEC(N,G-L,t)),bits(B)
+                for i ∈ 1:bng
+                if @inbounds skewaddblade!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))&μ
+                        out,t = zeros(svec(N,G-L,Any)) .+ out,Any
+                        @inbounds skewaddblade!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
+                    end
 
-                        end
-                        return value_diff(mv)
-                    end end
                 end
-                @generated function contraction(a::$implex{V,G,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,B,S<:$Field}
-                    if binomial(ndims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:mv,:ib),:svec)...)
-                        A = bits(B)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds inneraddvalue!_pre(mv,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
-                        end
-                        return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                    else return quote
-                        $(insert_expr((:N,:t,:mv,:ib,:μ),$(QuoteNode(VEC)))...)
-                        A = bits(basis(a))
-                        for i ∈ 1:binomial(N,G)
-                            if @inbounds inneraddvalue!(mv,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))&μ
-                                $(insert_expr((:mv,);mv=:(value(mv)))...)
-                                @inbounds inneraddvalue!(mv,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
-                            end
-                        end
-                        return value_diff(mv)
-                    end end
-                end
-                @generated function ∧(a::$Chain{T,w,G},b::$implex{W,L,B,S}) where {T<:$Field,w,W,B,S<:$Field,G,L}
-                    V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
-                    G+L>ndims(V) && (return g_zero(V))
-                    if binomial(ndims(w),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:t),VEC,:T,:S)...)
-                        ib = indexbasis(ndims(w),G)
-                        out = zeros(svec(N,G+L,Any))
-                        C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
-                        for i ∈ 1:binomial(ndims(w),G)
-                            X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                            @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
-                        end
-                        return :(SChain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
-                        ib = indexbasis(ndims(w),G)
-                        out = zeros($$VEC(N,G+L,t))
-                        C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
-                        for i ∈ 1:binomial(ndims(w),G)
-                            X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                            if @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],b.v,$$MUL))&μ
-                                out,t = zeros(svec(N,G+L,Any)) .+ out,Any
-                                @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],b.v,$$MUL))
-                            end
-                        end
-                        return SChain{t,V,G+L}(out)
-                    end end
-                end
-                @generated function ∧(a::$implex{w,G,B,S},b::$Chain{T,W,L}) where {T<:$Field,w,W,B,S<:$Field,G,L}
-                    V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
-                    G+L>ndims(V) && (return g_zero(V))
-                    if binomial(ndims(W),L)<(1<<cache_limit)
-                        $(insert_expr((:N,:t),VEC,:S,:T)...)
-                        ib = indexbasis(ndims(W),L)
-                        out = zeros(svec(N,G+L,Any))
-                        C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
-                        for i ∈ 1:binomial(ndims(W),L)
-                            X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                            @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(a.v),:(b[$i]),$(QuoteNode(MUL))))
-                        end
-                        return :(SChain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
-                        ib = indexbasis(ndims(W),L)
-                        out = zeros($$VEC(N,G+L,t))
-                        C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
-                        for i ∈ 1:binomial(ndims(W),L)
-                            X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                            if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,a.v,b[i],$$MUL))&μ
-                                out,t = zeros(svec(N,G+L,Any)) .+ out,Any
-                                @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,a.v,b[i],$$MUL))
-                            end
-                        end
-                        return SChain{t,V,G+L}(out)
-                    end end
-                end
-            end
+                return value_diff(Chain{t,V,G-L}(out))
+            end end
         end
-    end
-    for Chain ∈ MSC, Other ∈ MSC
-        @eval begin
-            @generated function contraction(a::$Chain{T,V,G},b::$Other{S,V,G}) where {T<:$Field,V,G,S<:$Field}
-                if binomial(ndims(V),G)^2<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:mv,:bng,:ib),:svec)...)
-                    for i ∈ 1:bng
-                        @inbounds v,ibi = :(a[$i]),ib[i]
-                        for j ∈ 1:bng
-                            @inbounds inneraddvalue!_pre(mv,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
+        @generated function contraction(a::Simplex{V,L,B,S},b::Chain{T,V,G}) where {T<:$Field,V,G,B,S<:$Field,L}
+            L<G && (return g_zero(V))
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t,:ib,:bng),:svec)...)
+                out,A = zeros(svec(N,L-G,Any)),bits(B)
+                for i ∈ 1:bng
+                    @inbounds skewaddblade!_pre(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
+                end
+                return :(value_diff(Chain{$t,$V,L-G}($(Expr(:call,:SVector,out...)))))
+            else return quote
+                $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
+                out,A = zeros($$VEC(N,L-G,t)),bits(B)
+                for i ∈ 1:bng
+                    if @inbounds skewaddblade!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))&μ
+                        out,t = zeros(svec(N,L-G,Any)) .+ out,Any
+                        @inbounds skewaddblade!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
+                    end
+                end
+                return value_diff(Chain{t,V,L-G}(out))
+            end end
+        end
+        @generated function ∧(a::Chain{T,w,G},b::Simplex{W,L,B,S}) where {T<:$Field,w,W,B,S<:$Field,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (return g_zero(V))
+            if binomial(ndims(w),G)<(1<<cache_limit)
+                $(insert_expr((:N,:t),VEC,:T,:S)...)
+                ib = indexbasis(ndims(w),G)
+                out = zeros(svec(N,G+L,Any))
+                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
+                for i ∈ 1:binomial(ndims(w),G)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
+                end
+                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
+                ib = indexbasis(ndims(w),G)
+                out = zeros($$VEC(N,G+L,t))
+                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
+                for i ∈ 1:binomial(ndims(w),G)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    if @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],b.v,$$MUL))&μ
+                        out,t = zeros(svec(N,G+L,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],b.v,$$MUL))
+                    end
+                end
+                return Chain{t,V,G+L}(out)
+            end end
+        end
+        @generated function ∧(a::Simplex{w,G,B,S},b::Chain{T,W,L}) where {T<:$Field,w,W,B,S<:$Field,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (return g_zero(V))
+            if binomial(ndims(W),L)<(1<<cache_limit)
+                $(insert_expr((:N,:t),VEC,:S,:T)...)
+                ib = indexbasis(ndims(W),L)
+                out = zeros(svec(N,G+L,Any))
+                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
+                for i ∈ 1:binomial(ndims(W),L)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(a.v),:(b[$i]),$(QuoteNode(MUL))))
+                end
+                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
+                ib = indexbasis(ndims(W),L)
+                out = zeros($$VEC(N,G+L,t))
+                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
+                for i ∈ 1:binomial(ndims(W),L)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,a.v,b[i],$$MUL))&μ
+                        out,t = zeros(svec(N,G+L,Any)) .+ out,Any
+                        @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,a.v,b[i],$$MUL))
+                    end
+                end
+                return Chain{t,V,G+L}(out)
+            end end
+        end
+        @generated function contraction(a::Chain{T,V,G},b::Chain{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
+            G<L && (return g_zero(V))
+            if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
+                $(insert_expr((:N,:t,:bng,:bnl),:svec)...)
+                ia = indexbasis(N,G)
+                ib = indexbasis(N,L)
+                out = zeros(svec(N,G-L,Any))
+                for i ∈ 1:bng
+                    @inbounds v,iai = :(a[$i]),ia[i]
+                    for j ∈ 1:bnl
+                        @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
+                    end
+                end
+                return :(value_diff(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...)))))
+            else return quote
+                $(insert_expr((:N,:t,:bng,:bnl,:μ),$(QuoteNode(VEC)))...)
+                ia = indexbasis(N,G)
+                ib = indexbasis(N,L)
+                out = zeros($$VEC(N,G-L,t))
+                for i ∈ 1:bng
+                    @inbounds v,iai = a[i],ia[i]
+                    v≠0 && for j ∈ 1:bnl
+                        if @inbounds skewaddblade!(V,out,iai,ib[j],derive_mul(V,iai,ib[j],v,b[j],$$MUL))&μ
+                            out,t = zeros(svec(N,G-L,Any)) .+ out,Any
+                            @inbounds skewaddblade!(V,out,iai,ib[j],derive_mul(V,iai,ib[j],v,b[j],$$MUL))
                         end
                     end
-                    return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                else return quote
-                    $(insert_expr((:N,:t,:mv,:bng,:ib,:μ),$(QuoteNode(VEC)))...)
-                    for i ∈ 1:bng
-                        @inbounds v,ibi = a[i],ib[i]
-                        v≠0 && for j ∈ 1:bng
-                            if @inbounds inneraddvalue!(mv,ibi,ib[j],derive_mul(V,ibi,ib[j],v,b[j],$$MUL))&μ
-                                $(insert_expr((:mv,);mv=:(value(mv)))...)
-                                @inbounds inneraddvalue!(mv,ibi,ib[j],derive_mul(V,ibi,ib[j],v,b[j],$$MUL))
-                            end
+                end
+                return value_diff(Chain{t,V,G-L}(out))
+            end end
+        end
+        @generated function ∧(a::Chain{T,w,G},b::Chain{S,W,L}) where {T<:$Field,w,S<:$Field,W,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (return g_zero(V))
+            if binomial(ndims(w),G)*binomial(ndims(W),L)<(1<<cache_limit)
+                $(insert_expr((:N,:t),VEC,:T,:S)...)
+                ia = indexbasis(ndims(w),G)
+                ib = indexbasis(ndims(W),L)
+                out = zeros(svec(N,G+L,Any))
+                CA,CB = mixedmode(w)>0,mixedmode(W)>0
+                for i ∈ 1:binomial(ndims(w),G)
+                    @inbounds v,iai = :(a[$i]),ia[i]
+                    x = CA ? dual(V,iai) : iai
+                    for j ∈ 1:binomial(ndims(W),L)
+                        X = @inbounds CB ? dual(V,ib[j]) : ib[j]
+                        outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),$(QuoteNode(MUL))))
+                    end
+                end
+                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+            else return quote
+                $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
+                ia = indexbasis(ndims(w),G)
+                ib = indexbasis(ndims(W),L)
+                out = zeros($$VEC(N,G+L,t))
+                CA,CB = mixedmode(w)>0,mixedmode(W)>0
+                for i ∈ 1:binomial(ndims(w),G)
+                    @inbounds v,iai = a[i],ia[i]
+                    x = CA ? dual(V,iai) : iai
+                    v≠0 && for j ∈ 1:binomial(ndims(W),L)
+                        X = @inbounds CB ? dual(V,ib[j]) : ib[j]
+                        if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,v,b[j],$$MUL))&μ
+                            out,t = zeros(svec(N,G+L,promote_type,Any)) .+ out,Any
+                            @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,v,b[j],$$MUL))
                         end
                     end
-                    return value_diff(mv)
-                end end
-            end
-            @generated function ∧(a::$Chain{T,w,G},b::$Other{S,W,L}) where {T<:$Field,w,S<:$Field,W,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
-                G+L>ndims(V) && (return g_zero(V))
-                if binomial(ndims(w),G)*binomial(ndims(W),L)<(1<<cache_limit)
-                    $(insert_expr((:N,:t),VEC,:T,:S)...)
-                    ia = indexbasis(ndims(w),G)
-                    ib = indexbasis(ndims(W),L)
-                    out = zeros(svec(N,G+L,Any))
-                    CA,CB = mixedmode(w)>0,mixedmode(W)>0
-                    for i ∈ 1:binomial(ndims(w),G)
-                        @inbounds v,iai = :(a[$i]),ia[i]
-                        x = CA ? dual(V,iai) : iai
-                        for j ∈ 1:binomial(ndims(W),L)
-                            X = @inbounds CB ? dual(V,ib[j]) : ib[j]
-                            outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),$(QuoteNode(MUL))))
-                        end
-                    end
-                    return :(SChain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
-                else return quote
-                    $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
-                    ia = indexbasis(ndims(w),G)
-                    ib = indexbasis(ndims(W),L)
-                    out = zeros($$VEC(N,G+L,t))
-                    CA,CB = mixedmode(w)>0,mixedmode(W)>0
-                    for i ∈ 1:binomial(ndims(w),G)
-                        @inbounds v,iai = a[i],ia[i]
-                        x = CA ? dual(V,iai) : iai
-                        v≠0 && for j ∈ 1:binomial(ndims(W),L)
-                            X = @inbounds CB ? dual(V,ib[j]) : ib[j]
-                            if @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,v,b[j],$$MUL))&μ
-                                out,t = zeros(svec(N,G+L,promote_type,Any)) .+ out,Any
-                                @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,v,b[j],$$MUL))
-                            end
-                        end
-                    end
-                    return SChain{t,V,G+L}(out)
-                end end
-            end
+                end
+                return Chain{t,V,G+L}(out)
+            end end
         end
     end
     for side ∈ (:left,:right)
@@ -1114,41 +1068,37 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
         pnp = Symbol(pn,:pre)
         for (c,p) ∈ ((c,p),(h,pg))
-            for Chain ∈ MSC
-                @eval begin
-                    @generated function $c(b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                        mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-                        if binomial(ndims(V),G)<(1<<cache_limit)
-                            $(insert_expr((:N,:ib,:D,:P),:svec)...)
-                            out = zeros(svec(N,G,Any))
-                            D = diffvars(V)
-                            for k ∈ 1:binomial(N,G)
-                                val = :(b.v[$k])
-                                @inbounds p = $p(V,ib[k])
-                                v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
-                                v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,:*,p,v)
-                                @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Dimension{N}())
-                            end
-                            return :(SChain{T,V,$(N-G)}($(Expr(:call,:SVector,out...))))
-                        else return quote
-                            $(insert_expr((:N,:ib,:D,:P),$(QuoteNode(VEC)))...)
-                            out = zeros($$VEC(N,G,T))
-                            D = diffvars(V)
-                            for k ∈ 1:binomial(N,G)
-                                @inbounds val = b.v[k]
-                                if val≠0
-                                    @inbounds p = $$p(V,ib[k])
-                                    v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
-                                    v = typeof(V)<:Signature ? (p ? $$SUB(v) : v) : p*v
-                                    @inbounds setblade!(out,v,complement(N,ib[k],D,P),Dimension{N}())
-                                end
-                            end
-                            return SChain{T,V,N-G}(out)
-                        end end
-                    end
-                end
-            end
             @eval begin
+                @generated function $c(b::Chain{T,V,G}) where {T<:$Field,V,G}
+                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    if binomial(ndims(V),G)<(1<<cache_limit)
+                        $(insert_expr((:N,:ib,:D,:P),:svec)...)
+                        out = zeros(svec(N,G,Any))
+                        D = diffvars(V)
+                        for k ∈ 1:binomial(N,G)
+                            val = :(b.v[$k])
+                            @inbounds p = $p(V,ib[k])
+                            v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
+                            v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,:*,p,v)
+                            @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Dimension{N}())
+                        end
+                        return :(Chain{T,V,$(N-G)}($(Expr(:call,:SVector,out...))))
+                    else return quote
+                        $(insert_expr((:N,:ib,:D,:P),$(QuoteNode(VEC)))...)
+                        out = zeros($$VEC(N,G,T))
+                        D = diffvars(V)
+                        for k ∈ 1:binomial(N,G)
+                            @inbounds val = b.v[k]
+                            if val≠0
+                                @inbounds p = $$p(V,ib[k])
+                                v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
+                                v = typeof(V)<:Signature ? (p ? $$SUB(v) : v) : p*v
+                                @inbounds setblade!(out,v,complement(N,ib[k],D,P),Dimension{N}())
+                            end
+                        end
+                        return Chain{T,V,N-G}(out)
+                    end end
+                end
                 @generated function $c(m::MultiVector{T,V}) where {T<:$Field,V}
                     mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
                     if ndims(V)<cache_limit
@@ -1188,44 +1138,40 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end
     for reverse ∈ (:reverse,:involute,:conj)
         p = Symbol(:parity,reverse)
-        for Chain ∈ MSC
-            @eval begin
-                @generated function $reverse(b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                    if binomial(ndims(V),G)<(1<<cache_limit)
-                        D = diffvars(V)
-                        D==0 && !$p(G) && (return :b)
-                        $(insert_expr((:N,:ib),:svec)...)
-                        out = zeros(svec(N,G,Any))
-                        for k ∈ 1:binomial(N,G)
-                            @inbounds v = :(b.v[$k])
-                            if D==0
-                                @inbounds setblade!_pre(out,:($$SUB($v)),ib[k],Dimension{N}())
-                            else
-                                @inbounds B = ib[k]
-                                setblade!_pre(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Dimension{N}())
-                            end
-                        end
-                        return :(SChain{T,V,G}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        D = diffvars(V)
-                        D==0 && !$$p(G) && (return b)
-                        $(insert_expr((:N,:ib),$(QuoteNode(VEC)))...)
-                        out = zeros($$VEC(N,G,T))
-                        for k ∈ 1:binomial(N,G)
-                            @inbounds v = b.v[k]
-                            v≠0 && if D==0
-                                @inbounds setblade!(out,$$SUB(v),ib[k],Dimension{N}())
-                            else
-                                @inbounds B = ib[k]
-                                setblade!(out,$$p(grade(V,B)) ? $$SUB(v) : v,B,Dimension{N}())
-                            end
-                        end
-                        return SChain{T,V,G}(out)
-                    end end
-                end
-            end
-        end
         @eval begin
+            @generated function $reverse(b::Chain{T,V,G}) where {T<:$Field,V,G}
+                if binomial(ndims(V),G)<(1<<cache_limit)
+                    D = diffvars(V)
+                    D==0 && !$p(G) && (return :b)
+                    $(insert_expr((:N,:ib),:svec)...)
+                    out = zeros(svec(N,G,Any))
+                    for k ∈ 1:binomial(N,G)
+                        @inbounds v = :(b.v[$k])
+                        if D==0
+                            @inbounds setblade!_pre(out,:($$SUB($v)),ib[k],Dimension{N}())
+                        else
+                            @inbounds B = ib[k]
+                            setblade!_pre(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Dimension{N}())
+                        end
+                    end
+                    return :(Chain{T,V,G}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    D = diffvars(V)
+                    D==0 && !$$p(G) && (return b)
+                    $(insert_expr((:N,:ib),$(QuoteNode(VEC)))...)
+                    out = zeros($$VEC(N,G,T))
+                    for k ∈ 1:binomial(N,G)
+                        @inbounds v = b.v[k]
+                        v≠0 && if D==0
+                            @inbounds setblade!(out,$$SUB(v),ib[k],Dimension{N}())
+                        else
+                            @inbounds B = ib[k]
+                            setblade!(out,$$p(grade(V,B)) ? $$SUB(v) : v,B,Dimension{N}())
+                        end
+                    end
+                    return Chain{T,V,G}(out)
+                end end
+            end
             @generated function $reverse(m::MultiVector{T,V}) where {T<:$Field,V}
                 if ndims(V)<cache_limit
                     $(insert_expr((:N,:bs,:bn,:D),:svec)...)
@@ -1329,334 +1275,310 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return MultiVector{t,V}(out)
                 end end
             end
-        end
-        for implex ∈ MSB
-            @eval begin
-                @generated function $op(a::MultiVector{T,V},b::$implex{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
-                    if ndims(V)<cache_limit
-                        $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
-                        X = bits(B)
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a.v[$(bs[g]+i)]),:(b.v),$(QuoteNode(MUL))))
-                            end
+            @generated function $op(a::MultiVector{T,V},b::Simplex{V,G,B,S}) where {T<:$Field,V,G,B,S<:$Field}
+                if ndims(V)<cache_limit
+                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    X = bits(B)
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a.v[$(bs[g]+i)]),:(b.v),$(QuoteNode(MUL))))
                         end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
-                        X = bits(basis(b))
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                if @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a.v[bs[g]+i],b.v,$$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a.v[bs[g]+i],b.v,$$MUL))
-                                end
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-                @generated function $op(a::$implex{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
-                    if ndims(V)<cache_limit
-                        $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
-                        A = bits(B)
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b.v[$(bs[g]+i)]),$(QuoteNode(MUL))))
-                            end
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
-                        A = bits(basis(a))
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                if @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b.v[bs[g]+i],$$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b.v[bs[g]+i],$$MUL))
-                                end
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-            end
-        end
-        for Chain ∈ MSC
-            op ∉ (:∧,) && @eval begin
-                @generated function $op(a::$Chain{T,V,G},b::Basis{V}) where {T<:$Field,V,G}
-                    if binomial(ndims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:out,:ib),:svec)...)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds $preproduct!(V,out,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
-                        for i ∈ 1:binomial(N,G)
-                            if @inbounds $$product!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))&μ
-                                $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-                @generated function $op(a::Basis{V},b::$Chain{T,V,G}) where {V,T<:$Field,G}
-                    if binomial(ndims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:out,:ib),:svec)...)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds $preproduct!(V,out,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
-                        for i ∈ 1:binomial(N,G)
-                            if @inbounds $$product!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))&μ
-                                $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-            end
-            @eval begin
-                @generated function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,S<:$Field,G}
-                    if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
-                        for g ∈ 1:N+1
-                            A = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds val = :(a.v[$(bs[g]+i)])
-                                for j ∈ 1:bng
-                                    @inbounds $preproduct!(V,out,A[i],ib[j],derive_pre(V,A[i],ib[j],val,:(b[$j]),$(QuoteNode(MUL))))
-                                end
-                            end
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
-                        for g ∈ 1:N+1
-                            A = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds val = a.v[bs[g]+i]
-                                val≠0 && for j ∈ 1:bng
-                                    if @inbounds $$product!(V,out,A[i],ib[j],derive_mul(V,A[i],ib[j],val,b[j],$$MUL))&μ
-                                        $(insert_expr((:out,);mv=:out)...)
-                                        @inbounds $$product!(V,out,A[i],ib[j],derive_mul(V,A[i],ib[j],val,b[j],$$MUL))
-                                    end
-                                end
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-                @generated function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {V,G,S<:$Field,T<:$Field}
-                    if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
-                        for g ∈ 1:N+1
-                            B = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds val = :(b.v[$(bs[g]+i)])
-                                for j ∈ 1:bng
-                                    @inbounds $preproduct!(V,out,ib[j],B[i],derive_pre(V,ib[j],B[i],:(a[$j]),val,$(QuoteNode(MUL))))
-                                end
-                            end
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
-                        for g ∈ 1:N+1
-                            B = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds val = b.v[bs[g]+i]
-                                val≠0 && for j ∈ 1:bng
-                                    if @inbounds $$product!(V,out,ib[j],B[i],derive_mul(V,ib[j],B[i],a[j],val,$$MUL))&μ
-                                        $(insert_expr((:out,);mv=:out)...)
-                                        @inbounds $$product!(V,out,ib[j],B[i],derive_mul(V,ib[j],B[i],a[j],val,$$MUL))
-                                    end
-                                end
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-            end
-            for implex ∈ MSB
-                op ∉ (:∧,) && @eval begin
-                    @generated function $op(a::$Chain{T,V,G},b::$implex{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
-                        if ndims(V)<cache_limit
-                            $(insert_expr((:N,:t,:out,:ib),:svec)...)
-                            X = bits(B)
-                            for i ∈ 1:binomial(N,G)
-                                @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
-                            end
-                            return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                        else return quote
-                            $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
-                            X = bits(basis(b))
-                            for i ∈ 1:binomial(N,G)
-                                if @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
-                                end
-                            end
-                            return MultiVector{t,V}(out)
-                        end end
                     end
-                    @generated function $op(a::$implex{V,L,B,S},b::$Chain{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
-                        if ndims(V)<cache_limit
-                            $(insert_expr((:N,:t,:out,:ib),:svec)...)
-                            A = bits(B)
-                            for i ∈ 1:binomial(N,G)
-                                @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
+                    X = bits(basis(b))
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            if @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a.v[bs[g]+i],b.v,$$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a.v[bs[g]+i],b.v,$$MUL))
                             end
-                            return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                        else return quote
-                            $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
-                            A = bits(basis(a))
-                            for i ∈ 1:binomial(N,G)
-                                if @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
-                                end
-                            end
-                            return MultiVector{t,V}(out)
-                        end end
-                    end
-                end
-            end
-        end
-        for (A,B) ∈ [(A,B) for A ∈ MSC, B ∈ MSC]
-            op ∉ (:∧,) && @eval begin
-                @generated function $op(a::$A{T,V,G},b::$B{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
-                    if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
-                        $(insert_expr((:N,:t,:bnl,:ib),:svec)...)
-                        out = zeros(svec(N,t))
-                        B = indexbasis(N,L)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds v,ibi = :(a[$i]),ib[i]
-                            for j ∈ 1:bnl
-                                @inbounds $preproduct!(V,out,ibi,B[j],derive_pre(V,ibi,B[j],v,:(b[$j]),$(QuoteNode(MUL))))
-                            end
-                        end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
-                    else return quote
-                        $(insert_expr((:N,:t,:bnl,:ib,:μ),$(QuoteNode(VEC)))...)
-                        out = zeros($$VEC(N,t))
-                        B = indexbasis(N,L)
-                        for i ∈ 1:binomial(N,G)
-                            @inbounds v,ibi = a[i],ib[i]
-                            v≠0 && for j ∈ 1:bnl
-                                if @inbounds $$product!(V,out,ibi,B[j],derive_mul(V,ibi,B[j],v,b[j],$$MUL))&μ
-                                    $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $$product!(V,out,ibi,B[j],derive_mul(V,ibi,B[j],v,b[j],$$MUL))
-                                end
-                            end
-                        end
-                        return MultiVector{t,V}(out)
-                    end end
-                end
-                #=function $op(a::$A{T,V,1},b::$B{S,W,1}) where {T<:$Field,V,S<:$Field,W}
-                    !(V == dual(W) && V ≠ W) && throw(error())
-                    $(insert_expr((:N,:t,:bnl,:ib),VEC)...)
-                    out = zeros($VEC(N,2,t))
-                    B = indexbasis(N,L)
-                    for i ∈ 1:binomial(N,G)
-                        for j ∈ 1:bnl
-                            @inbounds $product!(V,out,ib[i],B[j],$MUL(a[i],b[j]))
                         end
                     end
                     return MultiVector{t,V}(out)
-                end=#
+                end end
             end
+            @generated function $op(a::Simplex{V,G,B,T},b::MultiVector{S,V}) where {V,G,B,T<:$Field,S<:$Field}
+                if ndims(V)<cache_limit
+                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    A = bits(B)
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b.v[$(bs[g]+i)]),$(QuoteNode(MUL))))
+                        end
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
+                    A = bits(basis(a))
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            if @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b.v[bs[g]+i],$$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b.v[bs[g]+i],$$MUL))
+                            end
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::MultiVector{T,V},b::Chain{S,V,G}) where {T<:$Field,V,S<:$Field,G}
+                if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
+                    for g ∈ 1:N+1
+                        A = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = :(a.v[$(bs[g]+i)])
+                            for j ∈ 1:bng
+                                @inbounds $preproduct!(V,out,A[i],ib[j],derive_pre(V,A[i],ib[j],val,:(b[$j]),$(QuoteNode(MUL))))
+                            end
+                        end
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
+                    for g ∈ 1:N+1
+                        A = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = a.v[bs[g]+i]
+                            val≠0 && for j ∈ 1:bng
+                                if @inbounds $$product!(V,out,A[i],ib[j],derive_mul(V,A[i],ib[j],val,b[j],$$MUL))&μ
+                                    $(insert_expr((:out,);mv=:out)...)
+                                    @inbounds $$product!(V,out,A[i],ib[j],derive_mul(V,A[i],ib[j],val,b[j],$$MUL))
+                                end
+                            end
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::Chain{T,V,G},b::MultiVector{S,V}) where {V,G,S<:$Field,T<:$Field}
+                if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
+                    for g ∈ 1:N+1
+                        B = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = :(b.v[$(bs[g]+i)])
+                            for j ∈ 1:bng
+                                @inbounds $preproduct!(V,out,ib[j],B[i],derive_pre(V,ib[j],B[i],:(a[$j]),val,$(QuoteNode(MUL))))
+                            end
+                        end
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
+                    for g ∈ 1:N+1
+                        B = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = b.v[bs[g]+i]
+                            val≠0 && for j ∈ 1:bng
+                                if @inbounds $$product!(V,out,ib[j],B[i],derive_mul(V,ib[j],B[i],a[j],val,$$MUL))&μ
+                                    $(insert_expr((:out,);mv=:out)...)
+                                    @inbounds $$product!(V,out,ib[j],B[i],derive_mul(V,ib[j],B[i],a[j],val,$$MUL))
+                                end
+                            end
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+        end
+        op ∉ (:∧,:contraction) && @eval begin
+            @generated function $op(a::Chain{T,V,G},b::Basis{V}) where {T<:$Field,V,G}
+                if binomial(ndims(V),G)<(1<<cache_limit)
+                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds $preproduct!(V,out,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
+                    for i ∈ 1:binomial(N,G)
+                        if @inbounds $$product!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))&μ
+                            $(insert_expr((:out,);mv=:out)...)
+                            @inbounds $$product!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::Basis{V},b::Chain{T,V,G}) where {V,T<:$Field,G}
+                if binomial(ndims(V),G)<(1<<cache_limit)
+                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds $preproduct!(V,out,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
+                    for i ∈ 1:binomial(N,G)
+                        if @inbounds $$product!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))&μ
+                            $(insert_expr((:out,);mv=:out)...)
+                            @inbounds $$product!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::Chain{T,V,G},b::Simplex{V,L,B,S}) where {T<:$Field,V,G,L,B,S<:$Field}
+                if ndims(V)<cache_limit
+                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    X = bits(B)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
+                    X = bits(basis(b))
+                    for i ∈ 1:binomial(N,G)
+                        if @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))&μ
+                            $(insert_expr((:out,);mv=:out)...)
+                            @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::Simplex{V,L,B,S},b::Chain{T,V,G}) where {T<:$Field,V,G,L,B,S<:$Field}
+                if ndims(V)<cache_limit
+                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    A = bits(B)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
+                    A = bits(basis(a))
+                    for i ∈ 1:binomial(N,G)
+                        if @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))&μ
+                            $(insert_expr((:out,);mv=:out)...)
+                            @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            @generated function $op(a::Chain{T,V,G},b::Chain{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
+                if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
+                    $(insert_expr((:N,:t,:bnl,:ib),:svec)...)
+                    out = zeros(svec(N,t))
+                    B = indexbasis(N,L)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds v,ibi = :(a[$i]),ib[i]
+                        for j ∈ 1:bnl
+                            @inbounds $preproduct!(V,out,ibi,B[j],derive_pre(V,ibi,B[j],v,:(b[$j]),$(QuoteNode(MUL))))
+                        end
+                    end
+                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                else return quote
+                    $(insert_expr((:N,:t,:bnl,:ib,:μ),$(QuoteNode(VEC)))...)
+                    out = zeros($$VEC(N,t))
+                    B = indexbasis(N,L)
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds v,ibi = a[i],ib[i]
+                        v≠0 && for j ∈ 1:bnl
+                            if @inbounds $$product!(V,out,ibi,B[j],derive_mul(V,ibi,B[j],v,b[j],$$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,ibi,B[j],derive_mul(V,ibi,B[j],v,b[j],$$MUL))
+                            end
+                        end
+                    end
+                    return MultiVector{t,V}(out)
+                end end
+            end
+            #=function $op(a::Chain{T,V,1},b::Chain{S,W,1}) where {T<:$Field,V,S<:$Field,W}
+                !(V == dual(W) && V ≠ W) && throw(error())
+                $(insert_expr((:N,:t,:bnl,:ib),VEC)...)
+                out = zeros($VEC(N,2,t))
+                B = indexbasis(N,L)
+                for i ∈ 1:binomial(N,G)
+                    for j ∈ 1:bnl
+                        @inbounds $product!(V,out,ib[i],B[j],$MUL(a[i],b[j]))
+                    end
+                end
+                return MultiVector{t,V}(out)
+            end=#
         end
     end
 
     ## term addition
 
     for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
-        for (implex,Other) ∈ [(a,b) for a ∈ MSB, b ∈ MSB]
-            @eval begin
-                function $op(a::$implex{V,A,X,T},b::$Other{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
-                    if X == Y
-                        return Simplex{V,A}($bop(value(a),value(b)),X)
-                    elseif A == B
-                        $(insert_expr((:N,:t),VEC)...)
-                        out = zeros($VEC(N,A,t))
-                        setblade!(out,value(a,t),bits(X),Dimension{N}())
-                        setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
-                        return SChain{t,V,A}(out)
-                    else
-                        #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                        #return MultiGrade{V}(a,b)
-                        $(insert_expr((:N,:t,:out),VEC)...)
-                        setmulti!(out,value(a,t),bits(X),Dimension{N}())
-                        setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
-                        return MultiVector{t,V}(out)
-                    end
-                end
-            end
-        end
-        for implex ∈ MSB
-            @eval begin
-                $op(a::$implex{V,G,B,T}) where {V,G,B,T<:$Field} = $implex{V,G,B,$TF}($bop(value(a)))
-                function $op(a::$implex{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
-                    if X == b
-                        return Simplex{V,A}($bop(value(a),value(b)),b)
-                    elseif A == B
-                        $(insert_expr((:N,:t),VEC)...)
-                        out = zeros($VEC(N,A,t))
-                        setblade!(out,value(a,t),bits(X),Dimension{N}())
-                        setblade!(out,$bop(value(b,t)),Y,Dimension{N}())
-                        return SChain{t,V,A}(out)
-                    else
-                        #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                        #return MultiGrade{V}(a,b)
-                        $(insert_expr((:N,:t,:out),VEC)...)
-                        setmulti!(out,value(a,t),bits(X),Dimension{N}())
-                        setmulti!(out,$bop(value(b,t)),Y,Dimension{N}())
-                        return MultiVector{t,V}(out)
-                    end
-                end
-                function $op(a::Basis{V,A,X},b::$implex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
-                    if a == Y
-                        return Simplex{V,A}($bop(value(a),value(b)),a)
-                    elseif A == B
-                        $(insert_expr((:N,:t),VEC)...)
-                        out = zeros($VEC(N,A,t))
-                        setblade!(out,value(a,t),X,Dimension{N}())
-                        setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
-                        return SChain{t,V,A}(out)
-                    else
-                        #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                        #return MultiGrade{V}(a,b)
-                        $(insert_expr((:N,:t,:out),VEC)...)
-                        setmulti!(out,value(a,t),X,Dimension{N}())
-                        setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
-                        return MultiVector{t,V}(out)
-                    end
-                end
-                function $op(a::$implex{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
-                    addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
-                    return MultiVector{t,V}(out)
-                end
-                function $op(a::MultiVector{T,V},b::$implex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = copy(value(a,$VEC(N,t)))
-                    addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
-                    return MultiVector{t,V}(out)
-                end
-            end
-        end
         @eval begin
+            function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
+                if X == Y
+                    return Simplex{V,A}($bop(value(a),value(b)),X)
+                elseif A == B
+                    $(insert_expr((:N,:t),VEC)...)
+                    out = zeros($VEC(N,A,t))
+                    setblade!(out,value(a,t),bits(X),Dimension{N}())
+                    setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
+                    return Chain{t,V,A}(out)
+                else
+                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
+                    #return MultiGrade{V}(a,b)
+                    $(insert_expr((:N,:t,:out),VEC)...)
+                    setmulti!(out,value(a,t),bits(X),Dimension{N}())
+                    setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
+                    return MultiVector{t,V}(out)
+                end
+            end
+            $op(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($bop(value(a)))
+            function $op(a::Simplex{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
+                if X == b
+                    return Simplex{V,A}($bop(value(a),value(b)),b)
+                elseif A == B
+                    $(insert_expr((:N,:t),VEC)...)
+                    out = zeros($VEC(N,A,t))
+                    setblade!(out,value(a,t),bits(X),Dimension{N}())
+                    setblade!(out,$bop(value(b,t)),Y,Dimension{N}())
+                    return Chain{t,V,A}(out)
+                else
+                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
+                    #return MultiGrade{V}(a,b)
+                    $(insert_expr((:N,:t,:out),VEC)...)
+                    setmulti!(out,value(a,t),bits(X),Dimension{N}())
+                    setmulti!(out,$bop(value(b,t)),Y,Dimension{N}())
+                    return MultiVector{t,V}(out)
+                end
+            end
+            function $op(a::Basis{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
+                if a == Y
+                    return Simplex{V,A}($bop(value(a),value(b)),a)
+                elseif A == B
+                    $(insert_expr((:N,:t),VEC)...)
+                    out = zeros($VEC(N,A,t))
+                    setblade!(out,value(a,t),X,Dimension{N}())
+                    setblade!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
+                    return Chain{t,V,A}(out)
+                else
+                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
+                    #return MultiGrade{V}(a,b)
+                    $(insert_expr((:N,:t,:out),VEC)...)
+                    setmulti!(out,value(a,t),X,Dimension{N}())
+                    setmulti!(out,$bop(value(b,t)),bits(Y),Dimension{N}())
+                    return MultiVector{t,V}(out)
+                end
+            end
+            function $op(a::Simplex{V,G,A,S} where A,b::MultiVector{T,V}) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t),VEC)...)
+                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
+                addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::MultiVector{T,V},b::Simplex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t),VEC)...)
+                out = copy(value(a,$VEC(N,t)))
+                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
             $op(a::MultiVector{T,V}) where {T<:$Field,V} = MultiVector{$TF,V}($(bcast(bop,:(value(a),))))
             function $op(a::Basis{V,G},b::MultiVector{T,V}) where {T<:$Field,V,G}
                 $(insert_expr((:N,:t),VEC)...)
@@ -1738,109 +1660,97 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 return MultiVector{t,V}(out)
             end
-        end
-        for (A,B) ∈ [(A,B) for A ∈ MSC, B ∈ MSC]
-            @eval begin
-                function $op(a::$A{T,V,G},b::$B{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
-                    $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
-                    rb = binomsum(N,L)
-                    Rb = binomial(N,L)
-                    @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
-                    return MultiVector{t,V}(out)
-                end
-                function $op(a::$A{T,V,G},b::$B{S,V,G}) where {T<:$Field,V,G,S<:$Field}
-                    return SChain{promote_type(valuetype(a),valuetype(b)),V,G}($(bcast(bop,:(a.v,b.v))))
-                end
+            function $op(a::Chain{T,V,G},b::Chain{S,V,L}) where {T<:$Field,V,G,S<:$Field,L}
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
+                rb = binomsum(N,L)
+                Rb = binomial(N,L)
+                @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
+                return MultiVector{t,V}(out)
             end
-        end
-        for Chain ∈ MSC
-            for implex ∈ MSB
-                @eval begin
-                    function $op(a::$Chain{T,V,G},b::$implex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
-                        $(insert_expr((:N,:t),VEC)...)
-                        out = copy(value(a,$VEC(N,G,t)))
-                        addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
-                        return SChain{t,V,G}(out)
-                    end
-                    function $op(a::$implex{V,G,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,S<:$Field}
-                        $(insert_expr((:N,:t),VEC)...)
-                        out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
-                        addblade!(out,value(a,t),basis(a),Dimension{N}())
-                        return SChain{t,V,G}(out)
-                    end
-                    function $op(a::$Chain{T,V,G},b::$implex{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
-                        $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                        @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-                        addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
-                        return MultiVector{t,V}(out)
-                    end
-                    function $op(a::$implex{V,L,A,S} where A,b::$Chain{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
-                        $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                        @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
-                        addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
-                        return MultiVector{t,V}(out)
-                    end
-                end
+            function $op(a::Chain{T,V,G},b::Chain{S,V,G}) where {T<:$Field,V,G,S<:$Field}
+                return Chain{promote_type(valuetype(a),valuetype(b)),V,G}($(bcast(bop,:(a.v,b.v))))
             end
-            @eval begin
-                $op(a::$Chain{T,V,G}) where {T<:$Field,V,G} = $Chain{$TF,V,G}($(bcast(bop,:(value(a),))))
-                function $op(a::$Chain{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = copy(value(a,$VEC(N,G,t)))
-                    addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
-                    return SChain{t,V,G}(out)
+            function $op(a::Chain{T,V,G},b::Simplex{V,G,B,S} where B) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t),VEC)...)
+                out = copy(value(a,$VEC(N,G,t)))
+                addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::Simplex{V,G,A,S} where A,b::Chain{T,V,G}) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t),VEC)...)
+                out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
+                addblade!(out,value(a,t),basis(a),Dimension{N}())
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::Chain{T,V,G},b::Simplex{V,L,B,S} where B) where {T<:$Field,V,G,L,S<:$Field}
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
+                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::Simplex{V,L,A,S} where A,b::Chain{T,V,G}) where {T<:$Field,V,G,L,S<:$Field}
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
+                addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
+            $op(a::Chain{T,V,G}) where {T<:$Field,V,G} = Chain{$TF,V,G}($(bcast(bop,:(value(a),))))
+            function $op(a::$Chain{T,V,G},b::Basis{V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,:t),VEC)...)
+                out = copy(value(a,$VEC(N,G,t)))
+                addblade!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::Basis{V,G},b::Chain{T,V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,:t),VEC)...)
+                out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
+                addblade!(out,value(a,t),basis(a),Dimension{N}())
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::Chain{T,V,G},b::Basis{V,L}) where {T<:$Field,V,G,L}
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
+                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::Basis{V,L},b::Chain{T,V,G}) where {T<:$Field,V,G,L}
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
+                addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::Chain{T,V,G},b::SparseChain{V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                bt = terms(b)
+                t = promote_type(T,valuetype.(bt)...)
+                out = copy(value(a,$VEC(N,G,t)))
+                for B ∈ bt
+                    addblade!(out,$bop(value(B,t)),bits(B),Dimension{N}())
                 end
-                function $op(a::Basis{V,G},b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
-                    addblade!(out,value(a,t),basis(a),Dimension{N}())
-                    return SChain{t,V,G}(out)
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::SparseChain{V,G},b::Chain{T,V,G}) where {T<:$Field,V,G}
+                $(insert_expr((:N,),VEC)...)
+                at = terms(a)
+                t = promote_type(T,valuetype.(at)...)
+                out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
+                for A ∈ at
+                    addblade!(out,value(A,t),basis(A),Dimension{N}())
                 end
-                function $op(a::$Chain{T,V,G},b::Basis{V,L}) where {T<:$Field,V,G,L}
-                    $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-                    addmulti!(out,$bop(value(b,t)),bits(basis(b)),Dimension{N}())
-                    return MultiVector{t,V}(out)
-                end
-                function $op(a::Basis{V,L},b::$Chain{T,V,G}) where {T<:$Field,V,G,L}
-                    $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                    @inbounds out[r+1:r+bng] = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
-                    addmulti!(out,value(a,t),bits(basis(a)),Dimension{N}())
-                    return MultiVector{t,V}(out)
-                end
-                function $op(a::$Chain{T,V,G},b::SparseChain{V,G}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,),VEC)...)
-                    bt = terms(b)
-                    t = promote_type(T,valuetype.(bt)...)
-                    out = copy(value(a,$VEC(N,G,t)))
-                    for B ∈ bt
-                        addblade!(out,$bop(value(B,t)),bits(B),Dimension{N}())
-                    end
-                    return SChain{t,V,G}(out)
-                end
-                function $op(a::SparseChain{V,G},b::$Chain{T,V,G}) where {T<:$Field,V,G}
-                    $(insert_expr((:N,),VEC)...)
-                    at = terms(a)
-                    t = promote_type(T,valuetype.(at)...)
-                    out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
-                    for A ∈ at
-                        addblade!(out,value(A,t),basis(A),Dimension{N}())
-                    end
-                    return SChain{t,V,G}(out)
-                end
-                function $op(a::$Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S<:$Field}
-                    $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                    out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
-                    @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),bop))
-                    return MultiVector{t,V}(out)
-                end
-                function $op(a::MultiVector{T,V},b::$Chain{S,V,G}) where {T<:$Field,V,G,S<:$Field}
-                    $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                    out = copy(value(a,$VEC(N,t)))
-                    @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
-                    return MultiVector{t,V}(out)
-                end
+                return Chain{t,V,G}(out)
+            end
+            function $op(a::Chain{T,V,G},b::MultiVector{S,V}) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t,:r,:bng),VEC)...)
+                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
+                @inbounds $(add_val(:(+=),:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),ADD))
+                return MultiVector{t,V}(out)
+            end
+            function $op(a::MultiVector{T,V},b::Chain{S,V,G}) where {T<:$Field,V,G,S<:$Field}
+                $(insert_expr((:N,:t,:r,:bng),VEC)...)
+                out = copy(value(a,$VEC(N,t)))
+                @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
+                return MultiVector{t,V}(out)
             end
         end
     end
@@ -1849,42 +1759,26 @@ end
 @eval begin
     *(a::F,b::MultiVector{T,V}) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,Ref(a),b.v))
     *(a::MultiVector{T,V},b::F) where {F<:Number,T,V} = MultiVector{promote_type(T,F),V}(broadcast($Sym.:∏,a.v,Ref(b)))
-end
-for implex ∈ MSB
-    @eval begin
-        *(a::F,b::$implex{V,G,B,T} where B) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
-        *(a::$implex{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
-    end
-end
-for Chain ∈ MSC
-    @eval begin
-        *(a::F,b::$Chain{T,V,G}) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,Ref(a),b.v))
-        *(a::$Chain{T,V,G},b::F) where {F<:Number,T,V,G} = SChain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a.v,Ref(b)))
-    end
+    *(a::F,b::Simplex{V,G,B,T} where B) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
+    *(a::Simplex{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
+    *(a::F,b::Chain{T,V,G}) where {F<:Number,T,V,G} = Chain{promote_type(T,F),V,G}(broadcast($Sym.:∏,Ref(a),b.v))
+    *(a::Chain{T,V,G},b::F) where {F<:Number,T,V,G} = Chain{promote_type(T,F),V,G}(broadcast($Sym.:∏,a.v,Ref(b)))
 end
 
 for F ∈ Fields
     @eval begin
         *(a::F,b::MultiVector{T,V}) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,Ref(a),b.v))
         *(a::MultiVector{T,V},b::F) where {F<:$F,T<:Number,V} = MultiVector{promote_type(T,F),V}(broadcast(*,a.v,Ref(b)))
-    end
-    for implex ∈ MSB
-        @eval begin
-            *(a::F,b::$implex{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a,b.v),basis(b))
-            *(a::$implex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a.v,b),basis(a))
-        end
-    end
-    for Chain ∈ MSC
-        @eval begin
-            *(a::F,b::$Chain{T,V,G}) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,Ref(a),b.v))
-            *(a::$Chain{T,V,G},b::F) where {F<:$F,T<:Number,V,G} = SChain{promote_type(T,F),V,G}(broadcast(*,a.v,Ref(b)))
-        end
+        *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a,b.v),basis(b))
+        *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a.v,b),basis(a))
+        *(a::F,b::Chain{T,V,G}) where {F<:$F,T<:Number,V,G} = Chain{promote_type(T,F),V,G}(broadcast(*,Ref(a),b.v))
+        *(a::Chain{T,V,G},b::F) where {F<:$F,T<:Number,V,G} = Chain{promote_type(T,F),V,G}(broadcast(*,a.v,Ref(b)))
     end
 end
 
 for op ∈ (:*,:cross)
-    for A ∈ (Basis,MSB...,MSC...,MultiVector)
-        for B ∈ (Basis,MSB...,MSC...,MultiVector)
+    for A ∈ (Basis,Simplex,Chain,MultiVector)
+        for B ∈ (Basis,Simplex,Chain,MultiVector)
             @eval @inline $op(a::$A,b::$B) = interop($op,a,b)
         end
     end
@@ -1926,7 +1820,7 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                 out = zeros(mvec(N,A,t))
                 setblade!(out,value(a,t),bits(a),Dimension{N}())
                 setblade!(out,$op(value(b,t)),bits(b),Dimension{N}())
-                return SChain{t,V,A}(out)
+                return Chain{t,V,A}(out)
             else
                 #@warn("sparse MultiGrade{V} objects not properly handled yet")
                 #return MultiGrade{V}(a,b)
@@ -2012,7 +1906,7 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
             MultiGrade{V,A|B}(out)
         end
     end
-    for Tens ∈ (:(TensorTerm{V,B}),[:($(MSC[k]){T,V,B} where T) for k ∈ 1:2]...,:(SparseChain{V,B}))
+    for Tens ∈ (:(TensorTerm{V,B}),:(Chain{T,V,B} where T),:(SparseChain{V,B}))
         @eval begin
             function $op(a::MultiGrade{V,A},b::T) where {T<:$Tens} where {V,A,B}
                 N = ndims(V)
@@ -2122,37 +2016,29 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             end
             throw(error("inv($m) is undefined"))
         end
-    end
-    for implex ∈ MSB
-        @eval begin
-            function $nv(b::$implex{V,G,B,T}) where {V,G,B,T}
-                Simplex{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
-            end
-            function $nv(b::$implex{V,G,B,Any}) where {V,G,B}
-                Simplex{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
-            end
+        function $nv(b::Simplex{V,G,B,T}) where {V,G,B,T}
+            Simplex{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
         end
-    end
-    for Chain ∈ MSC
-        @eval function $nv(a::$Chain)
+        function $nv(b::Simplex{V,G,B,Any}) where {V,G,B}
+            Simplex{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+        end
+        function $nv(a::Chain)
             r,v,q = ~a,abs2(a),diffvars(vectorspace(a))≠0
             q&&typeof(v)<:TensorMixed ? Expr(:call,$(QuoteNode(d)),r,v) : $d(r,value(v))
         end
     end
-    for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
+    for Term ∈ (:TensorTerm,:Chain,:MultiVector,:MultiGrade)
         @eval @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
     end
 end
 
 function generate_inverses(Mod,T)
     for (nv,d,ds) ∈ ((:inv,:/,:($Sym.:/)),(:inv_rat,://,:($Sym.://)))
-        for Term ∈ (:TensorTerm,MSC...,:MultiVector,:MultiGrade)
+        for Term ∈ (:TensorTerm,:Chain,:MultiVector,:MultiGrade)
             @eval $d(a::S,b::T) where {S<:$Term,T<:$Mod.$T} = a*$ds(1,b)
         end
-        for implex ∈ MSB
-            @eval function $nv(b::$implex{V,G,B,$Mod.$T}) where {V,G,B}
-                $implex{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
-            end
+        @eval function $nv(b::Simplex{V,G,B,$Mod.$T}) where {V,G,B}
+            Simplex{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
         end
     end
 end
@@ -2162,35 +2048,23 @@ for T ∈ (:Real,:Complex)
 end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
-    for implex ∈ MSB
-        @eval Base.$op(b::$implex{V,G,B,T},m) where {V,G,B,T} = Simplex{V,G,B}($op(value(b),m))
-    end
-    for Chain ∈ MSC
-        @eval Base.$op(a::$Chain{T,V,G},m::S) where {T,V,G,S} = SChain{promote_type(T,S),V,G}($op.(value(a),m))
-    end
+    @eval Base.$op(b::Simplex{V,G,B,T},m) where {V,G,B,T} = Simplex{V,G,B}($op(value(b),m))
+    @eval Base.$op(a::Chain{T,V,G},m::S) where {T,V,G,S} = Chain{promote_type(T,S),V,G}($op.(value(a),m))
     @eval begin
         Base.$op(a::Basis{V,G},m) where {V,G} = Basis{V,G}($op(value(a),m))
         Base.$op(a::MultiVector{T,V},m::S) where {T,V,S} = MultiVector{promote_type(T,S),V}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
-    for implex ∈ MSB
-        @eval Base.$op(b::$implex{V,G,B,T}) where {V,G,B,T} = Simplex{V,G,B}($op(value(b)))
-    end
-    for Chain ∈ MSC
-        @eval Base.$op(a::$Chain{T,V,G}) where {T,V,G} = SChain{promote_type(T,Float64),V,G}($op.(value(a)))
-    end
+    @eval Base.$op(b::Simplex{V,G,B,T}) where {V,G,B,T} = Simplex{V,G,B}($op(value(b)))
+    @eval Base.$op(a::Chain{T,V,G}) where {T,V,G} = Chain{promote_type(T,Float64),V,G}($op.(value(a)))
     @eval begin
         Base.$op(a::Basis{V,G}) where {V,G} = Basis{V,G}($op(value(a)))
         Base.$op(a::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,Float64),V}($op.(value(a)))
     end
 end
-for implex ∈ MSB
-    @eval Base.rationalize(t::Type,b::$implex{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = Simplex{V,G,B}(rationalize(t,value(b),tol))
-end
-for Chain ∈ MSC
-    @eval Base.rationalize(t::Type,a::$Chain{T,V,G};tol::Real=eps(T)) where {T,V,G} = SChain{T,V,G}(rationalize.(t,value(a),tol))
-end
+Base.rationalize(t::Type,b::Simplex{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = Simplex{V,G,B}(rationalize(t,value(b),tol))
+Base.rationalize(t::Type,a::Chain{T,V,G};tol::Real=eps(T)) where {T,V,G} = Chain{T,V,G}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Basis{V,G},tol::Real=eps(T)) where {V,G} = Basis{V,G}(rationalize(t,value(a),tol))
 Base.rationalize(t::Type,a::MultiVector{T,V};tol::Real=eps(T)) where {T,V} = MultiVector{T,V}(rationalize.(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)

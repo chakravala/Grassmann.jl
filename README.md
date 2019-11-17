@@ -63,7 +63,7 @@ streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5
 ![paper/img/wave.png](paper/img/wave.png)
 
 Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
-Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, along with the standard lower dimensional algebras to be fully optimized.
+Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, along with hybrid optimizations for low-dimensional algebra code generation.
 Thanks to the design of the product algebra code generation, any additional optimizations to the type stability will automatically enhance all the different products simultaneously.
 Likewise, any new product formulas will be able to quickly gain from the setup of all of the existing optimizations.
 
@@ -205,7 +205,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
 
-By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the `Dimension{N}` and `Grade{G}` and `VectorBundle{N,D,O}` via the `TensorAlgebra` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `MSimplex{V,G,B,T}`, `SChain{T,V,G}`, `MChain{T,V,G}`, `MultiVector{T,V}`, and `MultiGrade{V}` types.
+By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the `Dimension{N}` and `Grade{G}` and `VectorBundle{N,D,O}` via the `TensorAlgebra` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{T,V,G}`, `SparseChain{V,G}`, `MultiVector{T,V}`, and `MultiGrade{V}` types.
 
 For the oriented sets of the Grassmann exterior algebra, the parity of `(-1)^P` is factored into transposition compositions when interchanging ordering of the tensor product argument permutations.
 The symmetrical algebra does not need to track this parity, but has higher multiplicities in its indices.
@@ -236,12 +236,12 @@ julia> v13∧v2 # exterior tensor product
 julia> ans^2 # applies geometric product
 1v
 
-julia> @btime h = 2v1+v3 # vector element
+julia> @btime 2v1+v3 # vector element
   37.794 ns (3 allocations: 80 bytes)
 2v₁ + 0v₂ + 1v₃ + 0v₄
 
-julia> @btime $h⋅$h # inner product
-  105.948 ns (2 allocations: 160 bytes)
+julia> @btime $ans⋅$ans # inner product
+  15.266 ns (3 allocations: 48 bytes)
 -3v
 ```
 It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to `S` instead of `V` and basis elements to `b` instead of `v`, so that their local names do not interfere:
@@ -284,17 +284,17 @@ julia> i,j,k = hyperplanes(ℝ^3)
  1v₁₃
  -1v₁₂
 
-julia> @btime i^2, j^2, k^2, i*j*k
-  158.925 ns (5 allocations: 112 bytes)
+julia> @btime $i^2, $j^2, $k^2, $i*$j*$k
+  0.027 ns (0 allocations: 0 bytes)
 (-1v, -1v, -1v, -1v)
 
 julia> @btime -(j+k) * (j+k)
-  176.233 ns (8 allocations: 240 bytes)
-2
+  97.373 ns (4 allocations: 176 bytes)
+2.0v⃖
 
 julia> @btime -(j+k) * i
-  111.394 ns (6 allocations: 192 bytes)
-0 - 1v₁₂ - 1v₁₃
+  67.695 ns (3 allocations: 144 bytes)
+0.0 - 1.0v₁₂ - 1.0v₁₃
 ```
 Alternatively, another representation of the quaternions is
 ```Julia
@@ -636,7 +636,7 @@ julia> @btime F(3)*v1
 3v₁
 
 julia> @btime inv($ans)
-  26.636 ns (0 allocations: 0 bytes)
+  14.965 ns (0 allocations: 0 bytes)
 5v₁
 ```
 By default, the coefficients are required to be `<:Number`. However, if this does not suit your needs, alternative scalar product algebras can be specified with

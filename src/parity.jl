@@ -311,33 +311,29 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 @pure radial(V::T,G) where T<:Manifold = findall(.!signbit(V,G))
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
-    @eval $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
-    for Chain ∈ MSC
-        @eval function $op(t::$Chain{T,V,G}) where {T,V,G}
+    @eval begin
+        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
+        function $op(t::Chain{T,V,G}) where {T,V,G}
             out = copy(value(t,mvec(ndims(V),G,T)))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            SChain{T,V,G}(out)
+            Chain{T,V,G}(out)
         end
-    end
-    @eval function $op(t::MultiVector{T,V}) where {T,V}
-        out = copy(value(t,mvec(ndims(V),T)))
-        for k ∈ $other(V)
-            @inbounds out[k]≠0 && (out[k] = zero(T))
+        function $op(t::MultiVector{T,V}) where {T,V}
+            out = copy(value(t,mvec(ndims(V),T)))
+            for k ∈ $other(V)
+                @inbounds out[k]≠0 && (out[k] = zero(T))
+            end
+            MultiVector{T,V}(out)
         end
-        MultiVector{T,V}(out)
     end
 end
 
 odd(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
 even(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
-for Chain ∈ MSC
-    @eval begin
-        odd(t::$Chain{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
-        even(t::$Chain{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
-    end
-end
+odd(t::Chain{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
+even(t::Chain{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
 function odd(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
@@ -364,12 +360,8 @@ end
 
 imag(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
 real(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
-for Chain ∈ MSC
-    @eval begin
-        imag(t::$Chain{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
-        real(t::$Chain{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
-    end
-end
+imag(t::Chain{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
+real(t::Chain{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
 function imag(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))

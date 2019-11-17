@@ -11,7 +11,7 @@ export exph, log_fast, logh_fast
 
 function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     S,term,f = t,(t^2)/2,norm(t)
-    norms = MVector(f,norm(term),f)
+    norms = SizedVector{3}(f,norm(term),f)
     k::Int = 3
     @inbounds while norms[2]<norms[1] || norms[2]>1
         S += term
@@ -35,7 +35,7 @@ end
         term = zeros(mvec(N,t))
         S .= B
         out .= value(b^2)/2
-        norms = MVector(nb,norm(out),norm(term))
+        norms = SizedVector{3}(nb,norm(out),norm(term))
         k::Int = 3
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
             S += out
@@ -43,7 +43,7 @@ end
             @inbounds ns ≈ norms[3] && break
             term .= out
             out .= 0
-            # term *= b/k 
+            # term *= b/k
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 1
@@ -56,7 +56,7 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
     w2,f = w^2,norm(w)
     prod = w*w2
     S,term = w,prod/3
-    norms = MVector(f,norm(term),f)
+    norms = SizedVector{3}(f,norm(term),f)
     k::Int = 5
     @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
         S += term
@@ -70,7 +70,7 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-@eval @generated function qlog_fast(b::MultiVector{T,V,E},x::Int=10000) where {T,V,E} 
+@eval @generated function qlog_fast(b::MultiVector{T,V,E},x::Int=10000) where {T,V,E}
     loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
@@ -83,7 +83,7 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
         S .= value(b)
         out .= value(b*w2)
         term .= out/3
-        norms = MVector(f,norm(term),f)
+        norms = SizedVector{3}(f,norm(term),f)
         k::Int = 5
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
             S += term
@@ -123,7 +123,7 @@ function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
     S,term = τ/2,(τ^2)/24
     f = norm(S)
-    norms = MVector(f,norm(term),f)
+    norms = SizedVector{3}(f,norm(term),f)
     k::Int = 6
     @inbounds while norms[2]<norms[1] || norms[2]>1
         S += term
@@ -148,7 +148,7 @@ end
         term = zeros(mvec(N,t))
         S .= value(τ)/2
         out .= value((τ^2))/24
-        norms = MVector(norm(S),norm(out),norm(term))
+        norms = SizedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 6
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
             S += out
@@ -171,7 +171,7 @@ end
 function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     τ,f = t^2,norm(t)
     S,term = t,(t*τ)/6
-    norms = MVector(f,norm(term),f)
+    norms = SizedVector{3}(f,norm(term),f)
     k::Int = 5
     @inbounds while norms[2]<norms[1] || norms[2]>1
         S += term
@@ -196,7 +196,7 @@ end
         term = zeros(mvec(N,t))
         S .= value(b)
         out .= value(b*τ)/6
-        norms = MVector(norm(S),norm(out),norm(term))
+        norms = SizedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 5
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
             S += out
@@ -215,28 +215,18 @@ end
 
 exph(t) = cosh(t)+sinh(t)
 
-function log_fast(t::T) where T<:TensorAlgebra{V} where V
-    term = zero(V)
-    norm = MVector(0.,0.)
-    while true
-        en = exp(term)
-        term -= 2(en-t)/(en+t)
-        @inbounds norm .= (norm[2],norm(term))
-        @inbounds norm[1] ≈ norm[2] && break
+for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
+    @eval function $logfast(t::T) where T<:TensorAlgebra{V} where V
+        term = zero(V)
+        norm = SizedVector{2}(0.,0.)
+        while true
+            en = $expf(term)
+            term -= 2(en-t)/(en+t)
+            @inbounds norm .= (norm[2],norm(term))
+            @inbounds norm[1] ≈ norm[2] && break
+        end
+        return term
     end
-    return term
-end
-
-function logh_fast(t::T) where T<:TensorAlgebra{V} where V
-    term = zero(V)
-    norm = MVector(0.,0.)
-    while true
-        en = exph(term)
-        term -= 2(en-t)/(en+t)
-        @inbounds norm .= (norm[2],norm(term))
-        @inbounds norm[1] ≈ norm[2] && break
-    end
-    return term
 end
 
 #=function log(t::T) where T<:TensorAlgebra{V} where V

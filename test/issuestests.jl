@@ -74,10 +74,10 @@ end
 @testset "Issue #22: Error in MultiVector constructor for Chains" begin
     basis"++"
 
-    a = MChain(v1 + v2)
-    @test typeof(a) <: MChain
+    a = v1 + v2
+    @test typeof(a) <: Chain
 
     @test MultiVector(a) == v1 + v2
-    @test SChain(v) == v
+    @test Chain(v) == v
 end
 end

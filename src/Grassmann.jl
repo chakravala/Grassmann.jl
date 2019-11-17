@@ -416,7 +416,7 @@ export ∇, Δ, ∂, d, ↑, ↓
 generate_products(:(Leibniz.Operator),:svec)
 
 @pure function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
-    (O<1||diffvars(V)==0) && (return SChain{Int,V,1}(ones(Int,ndims(V))))
+    (O<1||diffvars(V)==0) && (return Chain{Int,V,1}(ones(Int,ndims(V))))
     G,D,C = grade(V),diffvars(V)==1,mixedmode(V)<0
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
@@ -470,8 +470,7 @@ export skeleton, 𝒫, collapse, subcomplex, chain, path
 absym(t) = abs(t)
 absym(t::Basis) = t
 absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
-absym(t::SChain{T,V,G}) where {T,V,G} = SChain{T,V,G}(absym.(value(t)))
-absym(t::MChain{T,V,G}) where {T,V,G} = MChain{T,V,G}(absym.(value(t)))
+absym(t::Chain{T,V,G}) where {T,V,G} = Chain{T,V,G}(absym.(value(t)))
 absym(t::MultiVector{T,V}) where {T,V} = MultiVector{T,V}(absym.(value(t)))
 
 collapse(a,b) = a⋅absym(∂(b))
@@ -488,7 +487,7 @@ function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     for k ∈ 2:G
         setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Dimension{N}())
     end
-    return MChain{Int,V,2}(out)
+    return Chain{Int,V,2}(out)
 end
 path(t) = chain(t,Val{false}())
 
@@ -594,16 +593,15 @@ function __init__()
         end
     end
     @require GeometryTypes="4d00f742-c7ba-57c2-abde-4428a4b178cb" begin
-        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(SChain{valuetype(t),V}(vector(t))))
+        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(Chain{valuetype(t),V}(vector(t))))
         Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryTypes.Point(zeros(valuetype(t),ndims(V))...)
         Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorAlgebra{V} where V = GeometryTypes.Point(value(vector(t)))
-        Base.convert(::Type{GeometryTypes.Point},t::MChain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
-        Base.convert(::Type{GeometryTypes.Point},t::SChain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
+        Base.convert(::Type{GeometryTypes.Point},t::Chain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
         export points, vectorfield
         points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
-        vectorfield(t,V=vectorspace(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪vectorspace(t))(SChain{ptype(p),W,1}(p.data)))⊘t))))
+        vectorfield(t,V=vectorspace(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪vectorspace(t))(Chain{ptype(p),W,1}(p.data)))⊘t))))
     end
     #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
