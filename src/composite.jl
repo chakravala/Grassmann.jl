@@ -7,7 +7,7 @@ export exph, log_fast, logh_fast
 ## exponential & logarithm function
 
 @inline Base.expm1(t::Basis{V,0}) where V = Simplex{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(expm1(value(t)))
+@inline Base.expm1(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.expm1(value(t)))
 
 function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     S,term,f = t,(t^2)/2,norm(t)
@@ -108,7 +108,7 @@ end
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
         @inline Base.$qrt(t::Basis{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}($qrt(value(t)))
+        @inline Base.$qrt(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}($Sym.$qrt(value(t)))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
@@ -117,7 +117,7 @@ end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(cosh(value(t)))
+@inline Base.cosh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.cosh(value(t)))
 
 function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
@@ -166,7 +166,7 @@ end
     end
 end
 
-@inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(sinh(value(t)))
+@inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.sinh(value(t)))
 
 function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     τ,f = t^2,norm(t)

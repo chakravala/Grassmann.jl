@@ -1957,7 +1957,7 @@ function ^(v::T,i::Integer) where T<:TensorTerm
     for k ∈ 1:(i-1)%4
         out *= basis(v)
     end
-    return typeof(v)<:Basis ? out : out*value(v)^i
+    return typeof(v)<:Basis ? out : out*DirectSum.:^(value(v),i)
 end
 
 function Base.:^(v::T,i::S) where {T<:TensorAlgebra{V},S<:Integer} where V
