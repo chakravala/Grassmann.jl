@@ -801,7 +801,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     @inbounds skewaddblade!_pre(V,out,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
                 end
                 #return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
-                return :(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,valuetype(b)),$V,G-L}($(Expr(:call,:SVector,out...))))
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
                 out = zeros($$VEC(N,G-L,t))
@@ -823,7 +823,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 for i ∈ 1:bng
                     @inbounds skewaddblade!_pre(V,out,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
                 end
-                return :(Chain{$t,$V,L-G}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,valuetype(a)),$V,L-G}($(Expr(:call,:SVector,out...))))
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
                 out = zeros($$VEC(N,L-G,t))
@@ -848,7 +848,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),true))
                 end
-                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,valuetype(b)),$V,G+L}($(Expr(:call,:SVector,out...))))
             else return quote
                 V = $V
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
@@ -877,7 +877,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(b[$i]),false))
                 end
-                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,valuetype(a)),$V,G+L}($(Expr(:call,:SVector,out...))))
             else return quote
                 V = $V
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
@@ -902,7 +902,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 for i ∈ 1:bng
                     @inbounds skewaddblade!_pre(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
                 end
-                return :(value_diff(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...)))))
+                return :(value_diff(Chain{promote_type(T,S),$V,G-L}($(Expr(:call,:SVector,out...)))))
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
                 out,X = zeros($$VEC(N,G-L,t)),bits(B)
@@ -924,7 +924,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 for i ∈ 1:bng
                     @inbounds skewaddblade!_pre(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
                 end
-                return :(value_diff(Chain{$t,$V,L-G}($(Expr(:call,:SVector,out...)))))
+                return :(value_diff(Chain{promote_type(T,S),$V,L-G}($(Expr(:call,:SVector,out...)))))
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
                 out,A = zeros($$VEC(N,L-G,t)),bits(B)
@@ -949,7 +949,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     @inbounds outeraddblade!_pre(V,out,X,y,derive_pre(V,X,y,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
                 end
-                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,S),$V,G+L}($(Expr(:call,:SVector,out...))))
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(w),G)
@@ -977,7 +977,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     @inbounds outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,:(a.v),:(b[$i]),$(QuoteNode(MUL))))
                 end
-                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,S),$V,G+L}($(Expr(:call,:SVector,out...))))
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(W),L)
@@ -1006,7 +1006,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
                     end
                 end
-                return :(value_diff(Chain{$t,$V,G-L}($(Expr(:call,:SVector,out...)))))
+                return :(value_diff(Chain{promote_type(T,S),$V,G-L}($(Expr(:call,:SVector,out...)))))
             else return quote
                 $(insert_expr((:N,:t,:bng,:bnl,:μ),$(QuoteNode(VEC)))...)
                 ia = indexbasis(N,G)
@@ -1041,7 +1041,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         outeraddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),$(QuoteNode(MUL))))
                     end
                 end
-                return :(Chain{$t,$V,G+L}($(Expr(:call,:SVector,out...))))
+                return :(Chain{promote_type(T,S),$V,G+L}($(Expr(:call,:SVector,out...))))
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ia = indexbasis(ndims(w),G)

@@ -52,6 +52,47 @@ end
     end
 end
 
+function Base.exp(t::T) where T<:TensorTerm{V} where V
+    sq = t*t
+    if isscalar(sq)
+        vsq = value(scalar(sq))
+        isnull(vsq) && (return 1+t)
+        grade(t)==0 && (return Simplex{V}(DirectSum.exp(value(t))))
+        i = basis(t)
+        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t)))))
+        return vsq<0 ? cos(θ)+i*sin(θ) : cosh(θ)+i*sinh(θ)
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::Chain{V}) where V
+    sq = t*t
+    if isscalar(sq)
+        vsq = value(scalar(sq))
+        isnull(vsq) && (return 1+t)
+        grade(t)==0 && (return Simplex{V}(DirectSum.exp(value(t)[1])))
+        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t)))))
+        return vsq<0 ? cos(θ)+t*(sin(θ)/θ) : cosh(θ)+t*(sinh(θ)/θ)
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::MultiVector)
+    st = scalar(t)
+    mt = t-scalar(t)
+    sq = mt*mt
+    if isscalar(sq)
+        vsq = value(scalar(sq))
+        isnull(vsq) && (return DirectSum.exp(value(st))*(1+t))
+        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt)))))
+        return exp(value(st))*(vsq<0 ? cos(θ)+mt*(sin(θ)/θ) : cosh(θ)+mt*(sinh(θ)/θ))
+    else
+        return DirectSum.exp(value(st))*(1+expm1(mt))
+    end
+end
+
 function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
     w2,f = w^2,norm(w)
     prod = w*w2
