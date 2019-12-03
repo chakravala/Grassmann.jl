@@ -165,7 +165,7 @@ end
         @inbounds m,val = df[Q][1],df[Q][2] ? -(value(b)) : value(b)
         out = zero(mvec(N,1,T))
         for i ∈ 1:N
-            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
+            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Val{N}())
         end
         return Chain{T,V,1}(out)
     end
@@ -204,7 +204,7 @@ end
         out = zero(mvec(N,1,T))
         @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v) : b.v
         for i ∈ 1:N
-            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
+            i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Val{N}())
         end
         return Chain{t,V,1}(out)
     end
@@ -224,7 +224,7 @@ end
         for Q ∈ 1:Int(N/2)
             @inbounds m,val = df[Q][1],df[Q][2] ? -(b.v[Q]) : b.v[Q]
             val≠0 && for i ∈ 1:N
-                @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Dimension{N}())
+                @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,one(Bits)<<(i-1),Val{N}())
             end
         end
         return Chain{t,V,1}(out)
@@ -240,7 +240,7 @@ end
         for i ∈ 1:M
             x = one(Bits)<<(i-1)
             for j ∈ 1:M
-                @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Dimension{N}())
+                @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(one(Bits)<<(M+j-1)),Val{N}())
             end
         end
         return Chain{T,V,2}(out)

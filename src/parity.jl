@@ -96,7 +96,7 @@ end
     return pcc, bas, cc, zero(UInt)
 end
 
-@pure function parityregressive(V::Signature{N,M,S},a,b,::Grade{skew}=Grade{false}()) where {N,M,S,skew}
+@pure function parityregressive(V::Signature{N,M,S},a,b,::Val{skew}=Val{false}()) where {N,M,S,skew}
     D = diffvars(V)
     (A,B,Q,Z),NG = symmetricmask(V,a,b),N-D
     α,β = complement(N,A,D),complement(N,B,D)
@@ -126,7 +126,7 @@ end
     A,B,Q,Z = symmetricmask(V,a,b)
     diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
     γ = complement(N,B,diffvars(V))
-    p,C,t = parityregressive(V,A,γ,Grade{true}())
+    p,C,t = parityregressive(V,A,γ,Val{true}())
     return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
 end
 
@@ -134,7 +134,7 @@ end
     A,B,Q,Z = symmetricmask(V,a,b)
     diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
     γ = complement(N,B,diffvars(V))
-    p,C,t = parityregressive(Signature(V),A,γ,Grade{true}())
+    p,C,t = parityregressive(Signature(V),A,γ,Val{true}())
     ind = indices(B,N)
     g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
@@ -330,10 +330,8 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     end
 end
 
-odd(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
-even(t::T) where T<:TensorTerm{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
-odd(t::Chain{V,G}) where {V,G} = parityinvolute(G) ? t : zero(V)
-even(t::Chain{V,G}) where {V,G} = parityinvolute(G) ? zero(V) : t
+odd(t::T) where T<:TensorGraded{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
+even(t::T) where T<:TensorGraded{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
 function odd(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
@@ -358,10 +356,8 @@ function even(t::MultiVector{T,V}) where {T,V}
     MultiVector{T,V}(out)
 end
 
-imag(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
-real(t::T) where T<:TensorTerm{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
-imag(t::Chain{V,G}) where {V,G} = parityreverse(G) ? t : zero(V)
-real(t::Chain{V,G}) where {V,G} = parityreverse(G) ? zero(V) : t
+imag(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
+real(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
 function imag(t::MultiVector{T,V}) where {T,V}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))

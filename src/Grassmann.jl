@@ -482,10 +482,10 @@ function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     G < 2 && (return t)
     out,ind = zeros(mvec(N,2,Int)), indices(C,N)
     if T || G == 2
-        setblade!(out,G==2 ? v : -v,bit2int(indexbits(N,[ind[1],ind[end]])),Dimension{N}())
+        setblade!(out,G==2 ? v : -v,bit2int(indexbits(N,[ind[1],ind[end]])),Val{N}())
     end
     for k ∈ 2:G
-        setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Dimension{N}())
+        setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Val{N}())
     end
     return Chain{Int,V,2}(out)
 end
@@ -498,7 +498,7 @@ function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     B = bits(basis(x))
     count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
 end
-function skeleton(x::S,v::Val{T}=Val{true}()) where {S<:TensorMixed{Q,V} where Q} where {V,T}
+function skeleton(x::Chain{Q,V} where Q,v::Val{T}=Val{true}()) where {V,T}
     N,G,g = ndims(V),grade(x),0
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
@@ -533,7 +533,6 @@ function __init__()
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
         ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(a,b)
         ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(b,a)
-        parany = (parany...,Reduce.RExpr)
         parval = (parval...,Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)
         for T ∈ (:RExpr,:Symbol,:Expr)
@@ -551,7 +550,7 @@ function __init__()
            grade(x) == 2 ? LightGraphs.add_edge!(g,ind...) : LightGraphs.SimpleDiGraph(∂(x),g)
            return g
         end
-        function LightGraphs.SimpleDiGraph(x::S,g=LightGraphs.SimpleDiGraph(grade(V))) where {S<:TensorMixed{T,V} where T} where V
+        function LightGraphs.SimpleDiGraph(x::Chain{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
             N,G = ndims(V),grade(x)
             ib = indexbasis(N,G)
             for k ∈ 1:binomial(N,G)

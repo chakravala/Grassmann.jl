@@ -7,7 +7,7 @@ export exph, log_fast, logh_fast
 ## exponential & logarithm function
 
 @inline Base.expm1(t::Basis{V,0}) where V = Simplex{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.expm1(value(t)))
+@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     S,term,f = t,(t^2)/2,norm(t)
@@ -52,28 +52,16 @@ end
     end
 end
 
-function Base.exp(t::T) where T<:TensorTerm{V} where V
-    sq = t*t
+function Base.exp(t::T) where T<:TensorGraded{V,G} where {V,G}
+    S = T<:TensorTerm
+    i = S ? basis(t) : t
+    sq = i*i
     if isscalar(sq)
         vsq = value(scalar(sq))
         isnull(vsq) && (return 1+t)
-        grade(t)==0 && (return Simplex{V}(DirectSum.exp(value(t))))
-        i = basis(t)
+        G==0 && (return Simplex{V}(DirectSum.exp(value(S ? t : scalar(t)))))
         θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t)))))
-        return vsq<0 ? cos(θ)+i*sin(θ) : cosh(θ)+i*sinh(θ)
-    else
-        return 1+expm1(t)
-    end
-end
-
-function Base.exp(t::Chain{V}) where V
-    sq = t*t
-    if isscalar(sq)
-        vsq = value(scalar(sq))
-        isnull(vsq) && (return 1+t)
-        grade(t)==0 && (return Simplex{V}(DirectSum.exp(value(t)[1])))
-        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t)))))
-        return vsq<0 ? cos(θ)+t*(sin(θ)/θ) : cosh(θ)+t*(sinh(θ)/θ)
+        vsq<0 ? cos(θ)+i*(S ? sin(θ) : sin(θ)/θ) : cosh(θ)+i*(S ? sinh(θ) : sinh(θ)/θ)
     else
         return 1+expm1(t)
     end
@@ -89,7 +77,7 @@ function Base.exp(t::MultiVector)
         θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt)))))
         return exp(value(st))*(vsq<0 ? cos(θ)+mt*(sin(θ)/θ) : cosh(θ)+mt*(sinh(θ)/θ))
     else
-        return DirectSum.exp(value(st))*(1+expm1(mt))
+        return 1+expm1(t)
     end
 end
 
@@ -149,7 +137,7 @@ end
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
         @inline Base.$qrt(t::Basis{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}($Sym.$qrt(value(t)))
+        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
@@ -158,7 +146,7 @@ end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.cosh(value(t)))
+@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.cosh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     τ = t^2
@@ -207,7 +195,7 @@ end
     end
 end
 
-@inline Base.sinh(t::T) where T<:TensorTerm{V,0} where V = Simplex{V}(DirectSum.sinh(value(t)))
+@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     τ,f = t^2,norm(t)
