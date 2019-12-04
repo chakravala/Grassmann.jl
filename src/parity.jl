@@ -313,26 +313,26 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval begin
         $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
-        function $op(t::Chain{T,V,G}) where {T,V,G}
+        function $op(t::Chain{V,G,T}) where {V,G,T}
             out = copy(value(t,mvec(ndims(V),G,T)))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            Chain{T,V,G}(out)
+            Chain{V,G,T}(out)
         end
-        function $op(t::MultiVector{T,V}) where {T,V}
+        function $op(t::MultiVector{V,T}) where {V,T}
             out = copy(value(t,mvec(ndims(V),T)))
             for k ∈ $other(V)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            MultiVector{T,V}(out)
+            MultiVector{V,T}(out)
         end
     end
 end
 
 odd(t::T) where T<:TensorGraded{V,G} where {V,G} = parityinvolute(G) ? t : zero(V)
 even(t::T) where T<:TensorGraded{V,G} where {V,G} = parityinvolute(G) ? zero(V) : t
-function odd(t::MultiVector{T,V}) where {T,V}
+function odd(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -342,9 +342,9 @@ function odd(t::MultiVector{T,V}) where {T,V}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{T,V}(out)
+    MultiVector{V,T}(out)
 end
-function even(t::MultiVector{T,V}) where {T,V}
+function even(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -353,12 +353,12 @@ function even(t::MultiVector{T,V}) where {T,V}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{T,V}(out)
+    MultiVector{V,T}(out)
 end
 
 imag(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
 real(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
-function imag(t::MultiVector{T,V}) where {T,V}
+function imag(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -368,9 +368,9 @@ function imag(t::MultiVector{T,V}) where {T,V}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{T,V}(out)
+    MultiVector{V,T}(out)
 end
-function real(t::MultiVector{T,V}) where {T,V}
+function real(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -379,5 +379,5 @@ function real(t::MultiVector{T,V}) where {T,V}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{T,V}(out)
+    MultiVector{V,T}(out)
 end

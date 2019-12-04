@@ -24,7 +24,7 @@ function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
     return S
 end
 
-@eval @generated function Base.expm1(b::MultiVector{T,V}) where {T,V}
+@eval @generated function Base.expm1(b::MultiVector{V,T}) where {V,T}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
     return quote
         B = value(b)
@@ -48,7 +48,7 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 1
         end
-        return MultiVector{t,V}(S)
+        return MultiVector{V,t}(S)
     end
 end
 
@@ -99,12 +99,12 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-@eval @generated function qlog_fast(b::MultiVector{T,V,E},x::Int=10000) where {T,V,E}
+@eval @generated function qlog_fast(b::MultiVector{V,T,E},x::Int=10000) where {V,T,E}
     loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
-        w2::MultiVector{T,V,E} = b^2
+        w2::MultiVector{V,T,E} = b^2
         B = value(w2)
         S = zeros(mvec(N,t))
         prod = zeros(mvec(N,t))
@@ -127,7 +127,7 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
             k += 2
         end
         S *= 2
-        return MultiVector{t,V}(S)
+        return MultiVector{V,t}(S)
     end
 end
 
@@ -165,13 +165,13 @@ function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
     return 1+S
 end
 
-@eval @generated function Base.cosh(b::MultiVector{T,V,E}) where {T,V,E}
+@eval @generated function Base.cosh(b::MultiVector{V,T,E}) where {V,T,E}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Simplex{V}(cosh(sb)))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::MultiVector{T,V,E} = b^2
+        τ::MultiVector{V,T,E} = b^2
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -191,7 +191,7 @@ end
             k += 2
         end
         @inbounds S[1] += 1
-        return MultiVector{t,V}(S)
+        return MultiVector{V,t}(S)
     end
 end
 
@@ -213,13 +213,13 @@ function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
     return S
 end
 
-@eval @generated function Base.sinh(b::MultiVector{T,V,E}) where {T,V,E}
+@eval @generated function Base.sinh(b::MultiVector{V,T,E}) where {V,T,E}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Simplex{V}(sinh(sb)))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::MultiVector{T,V,E} = b^2
+        τ::MultiVector{V,T,E} = b^2
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -238,7 +238,7 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 2
         end
-        return MultiVector{t,V}(S)
+        return MultiVector{V,t}(S)
     end
 end
 

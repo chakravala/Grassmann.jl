@@ -124,7 +124,7 @@ Base.length(a::T) where T<:SubAlgebra{V} where V = 1<<ndims(V)
 +(::SubAlgebra{V},::SubAlgebra{W}) where {V,W} = getalgebra(V⊕W)
 
 for M ∈ (:Signature,:DiagonalForm)
-    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{Int,V}(ones(Int,1<<ndims(V)))
+    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{V,Int}(ones(Int,1<<ndims(V)))
 end
 
 ## Algebra{N}
@@ -416,7 +416,7 @@ export ∇, Δ, ∂, d, ↑, ↓
 generate_products(:(Leibniz.Operator),:svec)
 
 @pure function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
-    (O<1||diffvars(V)==0) && (return Chain{Int,V,1}(ones(Int,ndims(V))))
+    (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(ones(Int,ndims(V))))
     G,D,C = grade(V),diffvars(V)==1,mixedmode(V)<0
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
@@ -470,8 +470,8 @@ export skeleton, 𝒫, collapse, subcomplex, chain, path
 absym(t) = abs(t)
 absym(t::Basis) = t
 absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
-absym(t::Chain{T,V,G}) where {T,V,G} = Chain{T,V,G}(absym.(value(t)))
-absym(t::MultiVector{T,V}) where {T,V} = MultiVector{T,V}(absym.(value(t)))
+absym(t::Chain{V,G,T}) where {V,G,T} = Chain{V,G,T}(absym.(value(t)))
+absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V,T}(absym.(value(t)))
 
 collapse(a,b) = a⋅absym(∂(b))
 
@@ -487,7 +487,7 @@ function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     for k ∈ 2:G
         setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Val{N}())
     end
-    return Chain{Int,V,2}(out)
+    return Chain{V,2,Int}(out)
 end
 path(t) = chain(t,Val{false}())
 
@@ -498,7 +498,7 @@ function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     B = bits(basis(x))
     count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
 end
-function skeleton(x::Chain{Q,V} where Q,v::Val{T}=Val{true}()) where {V,T}
+function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
     N,G,g = ndims(V),grade(x),0
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
@@ -508,7 +508,7 @@ function skeleton(x::Chain{Q,V} where Q,v::Val{T}=Val{true}()) where {V,T}
     end
     return g
 end
-function skeleton(x::MultiVector{S,V} where S,v::Val{T}=Val{true}()) where {V,T}
+function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
     N,g = ndims(V),0
     for i ∈ 0:N
         R = binomsum(N,i)
@@ -526,8 +526,8 @@ function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
         *(a::Reduce.RExpr,b::Basis{V}) where V = Simplex{V}(a,b)
         *(a::Basis{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
-        *(a::Reduce.RExpr,b::MultiVector{T,V}) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        *(a::MultiVector{T,V},b::Reduce.RExpr) where {T,V} = MultiVector{promote_type(T,F),V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
+        *(a::Reduce.RExpr,b::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,F)}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::Reduce.RExpr) where {V,T} = MultiVector{V,promote_type(T,F)}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         *(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
@@ -550,7 +550,7 @@ function __init__()
            grade(x) == 2 ? LightGraphs.add_edge!(g,ind...) : LightGraphs.SimpleDiGraph(∂(x),g)
            return g
         end
-        function LightGraphs.SimpleDiGraph(x::Chain{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
+        function LightGraphs.SimpleDiGraph(x::Chain{V},g=LightGraphs.SimpleDiGraph(grade(V))) where V
             N,G = ndims(V),grade(x)
             ib = indexbasis(N,G)
             for k ∈ 1:binomial(N,G)
@@ -561,7 +561,7 @@ function __init__()
             end
             return g
         end
-        function LightGraphs.SimpleDiGraph(x::MultiVector{T,V} where T,g=LightGraphs.SimpleDiGraph(grade(V))) where V
+        function LightGraphs.SimpleDiGraph(x::MultiVector{V},g=LightGraphs.SimpleDiGraph(grade(V))) where V
            N = ndims(V)
            for i ∈ 2:N
                 R = binomsum(N,i)
@@ -592,15 +592,15 @@ function __init__()
         end
     end
     @require GeometryTypes="4d00f742-c7ba-57c2-abde-4428a4b178cb" begin
-        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(Chain{valuetype(t),V}(vector(t))))
+        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(Chain{V,valuetype(t)}(vector(t))))
         Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryTypes.Point(zeros(valuetype(t),ndims(V))...)
         Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorAlgebra{V} where V = GeometryTypes.Point(value(vector(t)))
-        Base.convert(::Type{GeometryTypes.Point},t::Chain{T,V,G}) where {T,V,G} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
+        Base.convert(::Type{GeometryTypes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
         export points, vectorfield
         points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
-        vectorfield(t,V=vectorspace(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪vectorspace(t))(Chain{ptype(p),W,1}(p.data)))⊘t))))
+        vectorfield(t,V=vectorspace(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪vectorspace(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing

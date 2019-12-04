@@ -205,7 +205,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
 
-By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the dimension `N` and grade `G` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{T,V,G}`, `SparseChain{V,G}`, `MultiVector{T,V}`, and `MultiGrade{V}` types.
+By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the dimension `N` and grade `G` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{V,G,T}`, `SparseChain{V,G,T}`, `MultiVector{V,T}`, and `MultiGrade{V,G}` types.
 
 For the oriented sets of the Grassmann exterior algebra, the parity of `(-1)^P` is factored into transposition compositions when interchanging ordering of the tensor product argument permutations.
 The symmetrical algebra does not need to track this parity, but has higher multiplicities in its indices.
@@ -580,10 +580,10 @@ julia> generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
 
 julia> const E24,W24 = Λ(24), ℝ^24+(ℝ^24)';
 
-julia> const Leech = SChain{Float64,W24}(generator./sqrt(8));
+julia> const Leech = SChain{W24,Float64}(generator./sqrt(8));
 
 julia> typeof(Leech)
-SChain{Float64,⟨++++++++++++++++++++++++------------------------⟩*,2,1128}
+SChain{⟨++++++++++++++++++++++++------------------------⟩*,2,Float64,1128}
 
 julia> ndims(vectorspace(Leech))
 48
