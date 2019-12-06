@@ -54,7 +54,7 @@ end
     i, j, k = hyperplanes(ℝ^3)
     alpha = 0.5π
 
-    @test exp(alpha/2*(i)) ≈ sqrt(2)*(1-i)/2
+    @test exp(alpha/2*(i)) ≈ sqrt(2)*(1+i)/2
 
     a, b, c = 1/sqrt(2) * [1, 1, 0]
     @test exp(alpha/2*(a*i + b*j + c*k)) ≈ (sqrt(2)+j+i)/2

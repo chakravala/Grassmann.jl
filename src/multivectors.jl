@@ -29,8 +29,8 @@ parsym = (Symbol,parval...)
 
 ## pseudoscalar
 
-using LinearAlgebra
-import LinearAlgebra: I
+import LinearAlgebra
+import LinearAlgebra: I, UniformScaling
 export UniformScaling, I
 
 ## MultiBasis{N}
@@ -128,7 +128,7 @@ function show(io::IO,m::Simplex)
 end
 for VG ∈ ((:V,),(:V,:G))
     @eval function Simplex{$(VG...)}(v,b::Simplex{V,G}) where {V,G}
-        order(v)+order(b)>diffmode(V) ? zero(V) : Simplex{V,G,basis(b)}(v*b.v)
+        order(v)+order(b)>diffmode(V) ? zero(V) : Simplex{V,G,basis(b)}(DirectSum.∏(v,b.v))
     end
 end
 
@@ -162,10 +162,10 @@ Chain(v::Basis{V,G}) where {V,G} = Chain{V,G,Int}(one(Int),v)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(ndims(V),G)
-    @inbounds if T == Any && typeof(m.v[1]) ∈ parsym
-        @inbounds tmv = typeof(m.v[1])
+    @inbounds tmv = typeof(m.v[1])
+    if |(broadcast(<:,tmv,parsym)...)
         par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
-        @inbounds par ? print(io,m.v[1]) : print(io,"(",m.v[1],")")
+        @inbounds par ? print(io,"(",m.v[1],")") : print(io,m.v[1])
     else
         @inbounds print(io,m.v[1])
     end
@@ -538,16 +538,16 @@ function betti(t::T) where T<:TensorAlgebra{V} where V
 end
 
 function isapprox(a::S,b::T) where {S<:TensorGraded,T<:TensorGraded}
-    vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? norm(a)≈norm(b) : (iszero(a) && iszero(b)))
+    vectorspace(a)==vectorspace(b) && (grade(a)==grade(b) ? DirectSum.:≈(norm(a),norm(b)) : (isnull(a) && isnull(b)))
 end
 function isapprox(a::S,b::T) where {S<:TensorAlgebra,T<:TensorAlgebra}
     rtol = Base.rtoldefault(valuetype(a), valuetype(b), 0)
     return norm(a-b) <= rtol * max(norm(a), norm(b))
 end
-isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && value(a) ≈ value(b)
-for T ∈ Fields
+isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = vectorspace(a)==vectorspace(b) && DirectSum.:≈(value(a),value(b))
+for T ∈ (Fields...,Symbol,Expr)
     @eval begin
-        isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:$T} where V =isapprox(a,Simplex{V}(b))
+        isapprox(a::S,b::T) where {S<:TensorAlgebra{V},T<:$T} where V = isapprox(a,Simplex{V}(b))
         isapprox(a::S,b::T) where {S<:$T,T<:TensorAlgebra} = isapprox(b,a)
     end
 end

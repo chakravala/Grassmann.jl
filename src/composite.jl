@@ -29,7 +29,7 @@ end
     return quote
         B = value(b)
         sb,nb = scalar(b),norm(B)
-        sb ≈ nb && (return Simplex{V}(expm1(sb)))
+        sb ≈ nb && (return Simplex{V}(DirectSum.expm1(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -52,16 +52,33 @@ end
     end
 end
 
+@inline unabs!(t) = t
+@inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
+
 function Base.exp(t::T) where T<:TensorGraded{V,G} where {V,G}
-    S = T<:TensorTerm
-    i = S ? basis(t) : t
+    S = T<:Basis
+    i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
-        vsq = value(scalar(sq))
-        isnull(vsq) && (return 1+t)
+        hint = value(scalar(sq))
+        isnull(hint) && (return 1+t)
         G==0 && (return Simplex{V}(DirectSum.exp(value(S ? t : scalar(t)))))
-        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t)))))
-        vsq<0 ? cos(θ)+i*(S ? sin(θ) : sin(θ)/θ) : cosh(θ)+i*(S ? sinh(θ) : sinh(θ)/θ)
+        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t))))))
+        hint<0 ? DirectSum.cos(θ)+t*(S ? DirectSum.sin(θ) : DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+t*(S ? DirectSum.sinh(θ) : DirectSum.:/(DirectSum.sinh(θ),θ))
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V,G} where {V,G,hint}
+    S = T<:Basis
+    i = T<:TensorTerm ? basis(t) : t
+    sq = i*i
+    if isscalar(sq)
+        isnull(hint) && (return 1+t)
+        G==0 && (return Simplex{V}(DirectSum.exp(value(S ? t : scalar(t)))))
+        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t))))))
+        hint<0 ? DirectSum.cos(θ)+t*(S ? DirectSum.sin(θ) : DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+t*(S ? DirectSum.sinh(θ) : DirectSum.:/(DirectSum.sinh(θ),θ))
     else
         return 1+expm1(t)
     end
@@ -72,10 +89,23 @@ function Base.exp(t::MultiVector)
     mt = t-scalar(t)
     sq = mt*mt
     if isscalar(sq)
-        vsq = value(scalar(sq))
-        isnull(vsq) && (return DirectSum.exp(value(st))*(1+t))
-        θ = DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt)))))
-        return exp(value(st))*(vsq<0 ? cos(θ)+mt*(sin(θ)/θ) : cosh(θ)+mt*(sinh(θ)/θ))
+        hint = value(scalar(sq))
+        isnull(hint) && (return DirectSum.exp(value(st))*(1+t))
+        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt))))))
+        return DirectSum.exp(value(st))*(hint<0 ? DirectSum.cos(θ)+mt*(DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+mt*(DirectSum.:/(DirectSum.sinh(θ),θ)))
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::MultiVector,::Val{hint}) where hint
+    st = scalar(t)
+    mt = t-scalar(t)
+    sq = mt*mt
+    if isscalar(sq)
+        isnull(hint) && (return DirectSum.exp(value(st))*(1+t))
+        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt))))))
+        return DirectSum.exp(value(st))*(hint<0 ? DirectSum.cos(θ)+mt*(DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+mt*(DirectSum.:/(DirectSum.sinh(θ),θ)))
     else
         return 1+expm1(t)
     end
@@ -169,7 +199,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(cosh(sb)))
+        sb ≈ nb && (return Simplex{V}(DirectSum.cosh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::MultiVector{V,T,E} = b^2
         B = value(τ)
@@ -217,7 +247,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(sinh(sb)))
+        sb ≈ nb && (return Simplex{V}(DirectSum.sinh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::MultiVector{V,T,E} = b^2
         B = value(τ)
@@ -242,7 +272,7 @@ end
     end
 end
 
-exph(t) = cosh(t)+sinh(t)
+exph(t) = Base.cosh(t)+Base.sinh(t)
 
 for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
     @eval function $logfast(t::T) where T<:TensorAlgebra{V} where V
