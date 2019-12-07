@@ -17,7 +17,7 @@ makedocs(
 )
 
 deploydocs(
-    repo   = "github.com/chakravala/Reduce.jl.git",
+    repo   = "github.com/chakravala/Grassmann.jl.git",
     target = "build",
     deps = nothing,
     make = nothing
