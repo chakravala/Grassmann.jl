@@ -327,13 +327,13 @@ for side ∈ (:left,:right)
 end
 
 @doc """
-    complementright(ω::TensorAlgebra)
+    complementrighthodge(ω::TensorAlgebra)
 
 Grassmann-Poincare-Hodge complement: ⋆ω = ω∗I
 """ complementrighthodge
 
 @doc """
-    complementleft(ω::TensorAlgebra)
+    complementlefthodge(ω::TensorAlgebra)
 
 Grassmann-Poincare left complement: ⋆'ω = I∗'ω
 """ complementlefthodge
