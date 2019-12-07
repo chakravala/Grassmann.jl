@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="./docs/src/assets/logo.png" alt="Grassmann.jl"/>
+  <img src="./dev/assets/logo.png" alt="Grassmann.jl"/>
 </p>
-
-# Grassmann.jl
 
 *⟨Leibniz-Grassmann-Clifford-Hestenes⟩ differential geometric algebra / multivector simplicial complex*
 
