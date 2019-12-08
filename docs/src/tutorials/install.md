@@ -1,11 +1,11 @@
-## Installation
+# Installation
 
 Availability of this package and its subpackages can be automatically handled with the Julia package manager with `using Pkg` and `Pkg.add("Grassmann")` or by entering:
 ```Julia
 pkg> add Grassmann
 ```
 
-### Requirements
+## Requirements
 
 When the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
 
