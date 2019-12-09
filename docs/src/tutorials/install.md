@@ -9,7 +9,7 @@ pkg> add Grassmann
 
 When the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
 
-This requires a merged version of `ComputedFieldTypes` at https://github.com/vtjnash/ComputedFieldTypes.jl
+This requires a merged version of `ComputedFieldTypes` at [ComputedFieldTypes.jl](https://github.com/vtjnash/ComputedFieldTypes.jl).
 
 Interoperability of `TensorAlgebra` with other packages is automatically enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
 
