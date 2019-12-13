@@ -12,11 +12,15 @@ makedocs(
     authors = "Michael Reed",
     pages = Any[
         "Home" => "index.md",
+        "Design" => "design.md",
+        "Algebra" => "algebra.md",
         "Library" => "library.md",
         "Tutorials" => Any[
             "tutorials/install.md",
-            "tutorials/quick-start.md"
-            ]
+            "tutorials/quick-start.md",
+            "tutorials/forms.md"
+            ],
+        "References" => "references.md"
         ]
 )
 

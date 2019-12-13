@@ -1977,7 +1977,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         end
         function $nv(a::Chain)
             r,v,q = ~a,abs2(a),diffvars(vectorspace(a))≠0
-            q&&!(typeof(v)<:TensorTerm) ? Expr(:call,$(QuoteNode(d)),r,v) : $d(r,value(v))
+            q&&!(typeof(v)<:TensorGraded && grade(v)==0) ? $d(r,v) : $d(r,value(scalar(v)))
         end
     end
     for Term ∈ (:TensorGraded,:TensorMixed)
