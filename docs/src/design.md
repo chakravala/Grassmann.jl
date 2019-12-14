@@ -1,4 +1,4 @@
-# Grassmann.jl design and code generation
+# `TensorAlgebra` design, `Manifold` code generation
 
 Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with geometric algebra at high dimensions, along with the accompanying support packages. 
 The design is based on the `TensorAlgebra` abstract type interoperability from [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl) with a `VectorBundle` parameter from [DirectSum.jl](https://github.com/chakravala/DirectSum.jl).
@@ -15,6 +15,12 @@ The nature of the geometric algebra code generation enables one to easily extend
 Mathematics of `Grassmann` can be used to study unitary groups used in quantum computing by building efficient computational representations of their algebras.
 Applicability of the Grassmann computational package not only maps to quantum computing, but has the potential of impacting countless other engineering and scientific computing applications.
 It can be used to work with automatic differentiation and differential geometry, algebraic forms and invariant theory, electric circuits and wave scattering, spacetime geometry and relativity, computer graphics and photogrammetry, and much more.
+
+Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite.
+Conformal geometric algebra is possible with the Minkowski plane ``v_{\infty\emptyset}``, based on the null-basis.
+In general, multivalued quantum logic is enabled by the ``\wedge,\vee,\star`` Grassmann lattice.
+Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
+Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic `χ`.
 
 Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
 Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, along with hybrid optimizations for low-dimensional algebra code generation.

@@ -1,9 +1,16 @@
 # Installation
 
+*Grassmann.jl* is a package for the [Julia language](https://julialang.org), which should be installed from website or the recommended method for your operating system (GNU/Linux/Mac/Windows).
+
 Availability of this package and its subpackages can be automatically handled with the Julia package manager with `using Pkg` and `Pkg.add("Grassmann")` or by entering:
 ```Julia
 pkg> add Grassmann
 ```
+If you would like to keep up to date with the latest commits, instead use
+```Julia
+pkg> add Grassmann#master
+```
+which is not recommended if you want to use a stable release.
 
 ## Requirements
 

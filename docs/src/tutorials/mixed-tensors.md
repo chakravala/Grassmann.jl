@@ -1,7 +1,9 @@
-## Constructing linear transformations from mixed tensor product ⊗
+# Mixed tensor product ⊗
 
 Groups such as SU(n) can alternatively be represented with the dual Grassmann’s exterior product algebra, generating a `2^(2n)`-dimensional mother algebra with geometric product from the `n`-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the `n^2`-dimensional bivector subspace of the full `(2n)!/(2(2n−2)!)`-dimensional bivector sub-algebra.
 The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the (1,1)-tensor bivector algebra.
+
+## Constructing linear transformations
 
 Note that `Λ(3)` gives the vector basis, and `Λ(3)'` gives the covector basis:
 ```Julia

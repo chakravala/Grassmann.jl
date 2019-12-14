@@ -13,7 +13,7 @@ julia> basis"3"
 
 Given a three dimensional GA with the orthonormal basis ``v_i\cdot v_j = \delta_{ij}``, the basis consists of scalars, three vectors, three bivectors, and a trivector.
 ```math
-\{\underbrace{v}_{\mbox{scalar}},\qquad\underbrace{v_{1},v_{2},v_{3}}_{\mbox{vectors}},\qquad\underbrace{v_{12},v_{23},v_{13}}_{\mbox{bivectors}},\qquad\underbrace{v_{123}}_{\mbox{trivector}}\}
+\{\underbrace{v}{\mbox{scalar}},\qquad\underbrace{v_1,v_2,v_3}{\mbox{vectors}},\qquad\underbrace{v_{12},v_{23},v_{13}}{\mbox{bivectors}},\qquad\underbrace{v_{123}}{\mbox{trivector}}\}
 ```
 The `@basis` macro declares the algebra and assigns the `Basis` elements to local variables. The `Grassmann.Algebra` can also be assigned to `G3` as
 ```Julia
@@ -85,7 +85,7 @@ julia> A(1)
 julia> A(2)
 3v₁₂ + 0v₁₃ + 0v₂₃
 ```
-Using the reversion and grade projection operators, we can define the magnitude of `A` as ``|A|^2 = \langle{\tilde A A\rangle``
+Using the reversion and grade projection operators, we can define the magnitude of `A` as ``|A|^2 = \langle\tilde A A\rangle``
 ```Julia
 julia> ~A*A
 30 + 4v₁ + 12v₂ + 24v₃

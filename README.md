@@ -30,7 +30,7 @@ This `Grassmann` package for the Julia language was created by [github.com/chakr
 These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
 Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Bandcamp](https://music.crucialflow.com) or contribute (documentation, tests, examples) in the repositories.
 
-  * [Design, code generation](#design-code-generation)
+  * [TensorAlgebra design, Manifold code generation](#tensoralgebra-design-manifold-code-generation)
 	 * [Requirements](#requirements)
 	 * [Grassmann for enterprise](#grassmann-for-enterprise)
 	 * [Direct-sum yields VectorBundle parametric type polymorphism ⨁](#direct-sum-yields-vectorspace-parametric-type-polymorphism-)
@@ -39,7 +39,7 @@ Please consider donating to show your thanks and appreciation to this project at
 	 * [Approaching ∞ dimensions with SparseAlgebra and ExtendedAlgebra](#approaching--dimensions-with-sparsealgebra-and-extendedalgebra)
   * [References](#references)
 
-#### Design, code generation
+#### `TensorAlgebra` design, `Manifold` code generation
 
 Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with geometric algebra at high dimensions, along with the accompanying support packages. 
 The design is based on the `TensorAlgebra` abstract type interoperability from [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl) with a `VectorBundle` parameter from [DirectSum.jl](https://github.com/chakravala/DirectSum.jl).
@@ -60,6 +60,12 @@ using Grassmann, Makie; @basis S"∞+++"
 streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
 ```
 ![paper/img/wave.png](paper/img/wave.png)
+
+Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite.
+Conformal geometric algebra is possible with the Minkowski plane, based on the null-basis.
+In general, multivalued quantum logic is enabled by the `∧,∨,⋆` Grassmann lattice.
+Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
+Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic `χ`.
 
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
