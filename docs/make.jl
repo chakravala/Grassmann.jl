@@ -18,6 +18,7 @@ makedocs(
         "Tutorials" => Any[
             "tutorials/install.md",
             "tutorials/quick-start.md",
+            "tutorials/algebra-of-space.md",
             "tutorials/forms.md"
             ],
         "References" => "references.md"

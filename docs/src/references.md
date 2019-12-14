@@ -7,6 +7,7 @@
 [![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![BiVector](https://img.shields.io/badge/bivector.net-Discourse-blueviolet)](https://bivector.net)
 
+* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf). 2019.
 * Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp). 1957.
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/). 2011.
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)

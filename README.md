@@ -121,7 +121,6 @@ The direct sum operator `⊕` can be used to join spaces (alternatively `+`), an
 The direct sum of a `VectorBundle` and its dual `V⊕V'` represents the full mother space `V*`.
 In addition to the direct-sum operation, several other operations are supported, such as `∪,∩,⊆,⊇` for set operations.
 Due to the design of the `VectorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
-**Remark**. Although some of the operations like `∪` and `⊕` are similar and sometimes result in the same values, the `union` and `sum` are entirely different operations in general.
 
 Calling manifolds with sets of indices constructs the subspace representations.
 Given `M(s::Int...)` one can encode `SubManifold{length(s),M,s}` with induced orthogonal space, such that computing unions of submanifolds is done by inspecting the parameter `s`.
@@ -144,6 +143,8 @@ Some of the method names like `+,-,\otimes,\times,\cdot,*` for `TensorAlgebra` e
 Additionally, a universal unit volume element can be specified in terms of `LinearAlgebra.UniformScaling`, which is independent of `V` and has its interpretation only instantiated by the context of the `TensorAlgebra{V}` element being operated on.
 The universal interoperability of `LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the `VectorBundle` form of any other `TensorAlgebra` element is handled globally.
 This enables the usage of `I` from `LinearAlgebra` as a universal pseudoscalar element.
+
+More information about `AbstractTensors` is available  at https://github.com/chakravala/AbstractTensors.jl
 
 # Grassmann elements and geometric algebra Λ(V)
 
@@ -267,6 +268,7 @@ Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used
 The sparse representations are a work in progress to be improved with time.
 
 ## References
+* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf). 2019.
 * Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp). 1957.
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/). 2011.
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)

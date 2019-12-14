@@ -227,9 +227,9 @@ setindex!(m::MultiVector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{V,T} where T) where V = ndims(V)
 
-(m::MultiVector{V,T})(g::Int,b::Type{B}=Chain) where {T,V,B} = m(Val{g}(),b)
+(m::MultiVector{V,T})(g::Int) where {T,V,B} = m(Val{g}())
 function (m::MultiVector{V,T})(::Val{g}) where {V,T,g,B}
-    Chain{V,T,g}(m[g])
+    Chain{V,g,T}(m[g])
 end
 function (m::MultiVector{V,T})(g::Int,i::Int) where {V,T,B}
     Simplex{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
