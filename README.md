@@ -31,7 +31,7 @@ This `Grassmann` package for the Julia language was created by [github.com/chakr
 These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
 Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Bandcamp](https://music.crucialflow.com) or contribute (documentation, tests, examples) in the repositories.
 
-  * [Design, code generation](#design-code-generation)
+  * [TensorAlgebra design, Manifold code generation](#tensoralgebra-design-manifold-code-generation)
 	 * [Requirements](#requirements)
 	 * [Grassmann for enterprise](#grassmann-for-enterprise)
 	 * [Direct-sum yields VectorBundle parametric type polymorphism ⨁](#direct-sum-yields-vectorspace-parametric-type-polymorphism-)
@@ -40,7 +40,7 @@ Please consider donating to show your thanks and appreciation to this project at
 	 * [Approaching ∞ dimensions with SparseAlgebra and ExtendedAlgebra](#approaching--dimensions-with-sparsealgebra-and-extendedalgebra)
   * [References](#references)
 
-#### Design, code generation
+#### `TensorAlgebra` design, `Manifold` code generation
 
 Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with geometric algebra at high dimensions, along with the accompanying support packages. 
 The design is based on the `TensorAlgebra` abstract type interoperability from [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl) with a `VectorBundle` parameter from [DirectSum.jl](https://github.com/chakravala/DirectSum.jl).
@@ -61,6 +61,12 @@ using Grassmann, Makie; @basis S"∞+++"
 streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5..1.5,-1.5..1.5,gridsize=(10,10))
 ```
 ![paper/img/wave.png](https://raw.githubusercontent.com/chakravala/Grassmann.jl/master/paper/img/wave.png)
+
+Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite.
+Conformal geometric algebra is possible with the Minkowski plane, based on the null-basis.
+In general, multivalued quantum logic is enabled by the `∧,∨,⋆` Grassmann lattice.
+Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
+Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic `χ`.
 
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
@@ -121,7 +127,7 @@ The `tangent` map takes `V` to its tangent space and can be applied repeatedly f
 The direct sum operator `⊕` can be used to join spaces (alternatively `+`), and the dual space functor `'` is an involution which toggles a dual vector space with inverted signature.
 The direct sum of a `VectorBundle` and its dual `V⊕V'` represents the full mother space `V*`.
 In addition to the direct-sum operation, several other operations are supported, such as `∪,∩,⊆,⊇` for set operations.
-Due to the design of the `VectorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
+Due to the design of the `VectorBundle` dispatch, these bit parametric operations enable code optimizations at compile-time.
 
 Calling manifolds with sets of indices constructs the subspace representations.
 Given `M(s::Int...)` one can encode `SubManifold{length(s),M,s}` with induced orthogonal space, such that computing unions of submanifolds is done by inspecting the parameter `s`.
@@ -139,7 +145,7 @@ This means that different packages can create tensor types having a common under
 The key to making the whole interoperability work is that each `TensorAlgebra` subtype shares a `VectorBundle` parameter (with all `isbitstype` parameters), which contains all the info needed at compile time to make decisions about conversions. So other packages need only use the vector space information to decide on how to convert based on the implementation of a type. If external methods are needed, they can be loaded by `Requires` when making a separate package with `TensorAlgebra` interoperability.
 
 Since `VectorBundle` choices are fundamental to `TensorAlgebra` operations, the universal interoperability between `TensorAlgebra{V}` elements with different associated `VectorBundle` choices is naturally realized by applying the `union` morphism to operations.
-Some of the method names like `+,-,\otimes,\times,\cdot,*` for `TensorAlgebra` elements are shared across different packages, with interoperability.
+Some of the method names like `+,-,⊗,×,⋅,*` for `TensorAlgebra` elements are shared across different packages, with interoperability.
 
 Additionally, a universal unit volume element can be specified in terms of `LinearAlgebra.UniformScaling`, which is independent of `V` and has its interpretation only instantiated by the context of the `TensorAlgebra{V}` element being operated on.
 The universal interoperability of `LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the `VectorBundle` form of any other `TensorAlgebra` element is handled globally.
@@ -170,7 +176,7 @@ Both symmetry classes can be characterized by the same geometric product.
 Grassmann's exterior algebra doesn't invoke the properties of multi-sets, as it is related to the algebra of oriented sets; while the Leibniz symmetric algebra is that of unoriented multi-sets.
 Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
-Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
+Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference.
 
 The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
 ```Julia
