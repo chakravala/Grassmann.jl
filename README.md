@@ -75,7 +75,18 @@ More information and tutorials are available at [https://grassmann.crucialflow.c
 
 ### Requirements
 
-Availability of this package and its subpackages can be automatically handled with the Julia package manager; however, when the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
+*Grassmann.jl* is a package for the [Julia language](https://julialang.org), which can be obtained from their website or the recommended method for your operating system (GNU/Linux/Mac/Windows). Go to [docs.julialang.org](https://docs.julialang.org) for documentation.
+
+Availability of this package and its subpackages can be automatically handled with the Julia package manager `using Pkg` and `Pkg.add("Grassmann")` or by entering:
+```Julia
+pkg> add Grassmann
+```
+If you would like to keep up to date with the latest commits, instead use
+```Julia
+pkg> add Grassmann#master
+```
+which is not recommended if you want to use a stable release.
+When the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
 
 This requires a merged version of `ComputedFieldTypes` at [https://github.com/vtjnash/ComputedFieldTypes.jl](https://github.com/vtjnash/ComputedFieldTypes.jl)
 
