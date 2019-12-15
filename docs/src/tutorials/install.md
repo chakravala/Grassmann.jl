@@ -1,8 +1,8 @@
 # Installation
 
-*Grassmann.jl* is a package for the [Julia language](https://julialang.org), which should be installed from website or the recommended method for your operating system (GNU/Linux/Mac/Windows).
+*Grassmann.jl* is a package for the [Julia language](https://julialang.org), which can be obtained from their website or the recommended method for your operating system (GNU/Linux/Mac/Windows). Go to [docs.julialang.org](https://docs.julialang.org) for documentation.
 
-Availability of this package and its subpackages can be automatically handled with the Julia package manager with `using Pkg` and `Pkg.add("Grassmann")` or by entering:
+Availability of this package and its subpackages can be automatically handled with the Julia package manager `using Pkg` and `Pkg.add("Grassmann")` or by entering:
 ```Julia
 pkg> add Grassmann
 ```
@@ -18,7 +18,7 @@ When the `master` branch is used it is possible that some of the dependencies al
 
 This requires a merged version of `ComputedFieldTypes` at [ComputedFieldTypes.jl](https://github.com/vtjnash/ComputedFieldTypes.jl).
 
-Interoperability of `TensorAlgebra` with other packages is automatically enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
+Interoperability of `TensorAlgebra` with other packages is enabled by [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) and [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl).
 
 The package is compatible via [Requires.jl](https://github.com/MikeInnes/Requires.jl) with 
 [Reduce.jl](https://github.com/chakravala/Reduce.jl),

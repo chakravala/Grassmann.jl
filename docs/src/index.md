@@ -9,13 +9,13 @@
 [![BiVector](https://img.shields.io/badge/bivector.net-Discourse-blueviolet)](https://bivector.net)
 
 The [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) package provides tools for doing computations based on multi-linear algebra, differential geometry, and spin groups using the extended tensor algebra known as Leibniz-Grassmann-Clifford-Hestenes geometric algebra.
-Combinatorial products include `∧, ∨, ⋅, *, ⋆, ', ~, d, ∂` (which are the exterior, regressive, inner, and geometric products; along with the Hodge star, adjoint, reversal, differential and boundary operators).
+Combinatorial products include ``\wedge, \vee, \cdot, *, \star, ', \sim, d, \partial`` (which are the exterior, regressive, inner, and geometric products; along with the Hodge star, adjoint, reversal, differential and boundary operators).
 Kernelized operations are built up from composite sparse tensor products and Hodge duality, with high dimensional support for up to 62 indices using staged caching and precompilation. Code generation enables concise yet highly extensible definitions.
 [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) multivector parametric type polymorphism is based on tangent bundle vector spaces and conformal projective geometry to make the dispatch highly extensible for many applications.
 Additionally, universal interoperability between different sub-algebras is enabled by [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl), on which the type system is built.
 
 ```@contents
-Pages = ["index.md","design.md","algebra.md","library.md","references.md"]
+Pages = ["design.md","algebra.md","library.md","references.md"]
 ```
 
 This `Grassmann` package for the Julia language was created by [github.com/chakravala](https://github.com/chakravala) for mathematics and computer algebra research with differential geometric algebras.

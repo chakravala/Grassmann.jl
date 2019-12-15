@@ -1,11 +1,11 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using Documenter, DirectSum, AbstractTensors, Grassmann
+using Documenter, DirectSum, AbstractTensors, Leibniz, Grassmann
 
 makedocs(
     # options
-    modules = [DirectSum,AbstractTensors,Grassmann],
+    modules = [DirectSum,AbstractTensors,Leibniz,Grassmann],
     doctest = false,
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
     sitename = "Grassmann.jl",

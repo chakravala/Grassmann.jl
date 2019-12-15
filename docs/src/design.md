@@ -20,7 +20,7 @@ Thus, computations involving fully general rotational algebras and Lie bivector 
 Conformal geometric algebra is possible with the Minkowski plane ``v_{\infty\emptyset}``, based on the null-basis.
 In general, multivalued quantum logic is enabled by the ``\wedge,\vee,\star`` Grassmann lattice.
 Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
-Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic `χ`.
+Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic ``\chi``.
 
 Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
 Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, along with hybrid optimizations for low-dimensional algebra code generation.
@@ -44,9 +44,11 @@ and `μ` is an integer specifying the order of the tangent bundle (i.e. multipli
 
 The metric signature of the `Basis{V,1}` elements of a vector space `V` can be specified with the `V"..."` constructor by using `+` and `-` to specify whether the `Basis{V,1}` element of the corresponding index squares to `+1` or `-1`.
 For example, `S"+++"` constructs a positive definite 3-dimensional `VectorBundle`.
-```Julia
-julia> ℝ^3 == V"+++" == vectorspace(3)
-true
+```@setup ds
+using DirectSum
+```
+```@repl ds
+ℝ^3 == V"+++" == vectorspace(3)
 ```
 It is also possible to specify an arbitrary `DiagonalForm` having numerical values for the basis with degeneracy `D"1,1,1,0"`, although the `Signature` format has a more compact representation.
 Further development will result in more metric types.
@@ -55,49 +57,29 @@ Declaring an additional plane at infinity is done by specifying it in the string
 Additionally, the *null-basis* based on the projective split for confromal geometric algebra would be specified with `∞∅` initially (i.e. 5D CGA `S"∞∅+++"`). These two declared basis elements are interpreted in the type system.
 
 The `tangent` map takes `V` to its tangent space and can be applied repeatedly for higher orders, such that `tangent(V,μ,ν)` can be used to specify `μ` and `ν`.
-```Julia
-julia> V = tangent(ℝ^3)
-⟨+++₁⟩
-
-julia> V'
-⟨---¹⟩'
-
-julia> V+V'
-⟨+++---₁¹⟩*
+```@repl ds
+V = tangent(ℝ^3)
+V'
+V+V'
 ```
 The direct sum operator `⊕` can be used to join spaces (alternatively `+`), and the dual space functor `'` is an involution which toggles a dual vector space with inverted signature.
-```Julia
-julia> V = ℝ'⊕ℝ^3
-⟨-+++⟩
-
-julia> V'
-⟨+---⟩'
-
-julia> W = V⊕V'
-⟨-++++---⟩*
+```@repl ds
+V = ℝ'⊕ℝ^3
+V'
+W = V⊕V'
 ```
 The direct sum of a `VectorBundle` and its dual `V⊕V'` represents the full mother space `V*`.
-```Julia
-julia> collect(V) # all vector basis elements
-Grassmann.Algebra{⟨-+++⟩,16}(v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, ...)
-
-julia> collect(V') # all covector basis elements
-Grassmann.Algebra{⟨+---⟩',16}(w, w¹, w², w³, w⁴, w¹², w¹³, w¹⁴, w²³, w²⁴, w³⁴, w¹²³, w¹²⁴, w¹³⁴, ...)
-
-julia> collect(W) # all mixed basis elements
-Grassmann.Algebra{⟨-++++---⟩*,256}(v, v₁, v₂, v₃, v₄, w¹, w², w³, w⁴, v₁₂, v₁₃, v₁₄, v₁w¹, v₁w², ...
+```@repl ds
+collect(V) # all vector basis elements
+collect(V') # all covector basis elements
+collect(W) # all mixed basis elements
 ```
 In addition to the direct-sum operation, several other operations are supported, such as `∪,∩,⊆,⊇` for set operations.
 Due to the design of the `VectorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
-```Julia
-julia> ℝ+ℝ' ⊇ vectorspace(1)
-true
-
-julia> ℝ ∩ ℝ' == vectorspace(0)
-true
-
-julia> ℝ ∪ ℝ' == ℝ+ℝ'
-true
+```@repl ds
+ℝ+ℝ' ⊇ vectorspace(1)
+ℝ ∩ ℝ' == vectorspace(0)
+ℝ ∪ ℝ' == ℝ+ℝ'
 ```
 **Remark**. Although some of the operations like `∪` and `⊕` are similar and sometimes result in the same values, the `union` and `sum` are entirely different operations in general.
 

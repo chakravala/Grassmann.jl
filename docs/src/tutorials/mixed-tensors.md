@@ -6,45 +6,34 @@ The package `Grassmann` is working towards making the full extent of this number
 ## Constructing linear transformations
 
 Note that `Λ(3)` gives the vector basis, and `Λ(3)'` gives the covector basis:
-```Julia
-julia> Λ(3)
-Grassmann.Algebra{⟨+++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
-
-julia> Λ(3)'
-Grassmann.Algebra{⟨---⟩',8}(w, w¹, w², w³, w¹², w¹³, w²³, w¹²³)
+```@setup ga
+using Grassmann
+```
+```@repl ga
+Λ(3)
+Λ(3)'
 ```
 The following command yields a local 2D vector and covector basis,
-```Julia
-julia> mixedbasis"2"
-(⟨++--⟩*, v, v₁, v₂, w¹, w², v₁₂, v₁w¹, v₁w², v₂w¹, v₂w², w¹², v₁₂w¹, v₁₂w², v₁w¹², v₂w¹², v₁₂w¹²)
-
-julia> w1+2w2
-1w¹ + 2w²
-
-julia> ans(v1+v2)
-3v
+```@repl ga
+mixedbasis"2"
+w1+2w2
+ans(v1+v2)
 ```
 The sum `w1+2w2` is interpreted as a covector element of the dual vector space, which can be evaluated as a linear functional when a vector argument is input.
 Using these in the workspace, it is possible to use the Grassmann exterior `∧`-tensor product operation to construct elements `ℒ` of the (1,1)-bivector subspace of linear transformations from the `Grade{2}` algebra.
-```Julia
-julia> ℒ = (v1+2v2)∧(3w1+4w2)
-0v₁₂ + 3v₁w¹ + 4v₁w² + 6v₂w¹ + 8v₂w² + 0w¹²
+```@repl ga
+ℒ = (v1+2v2)∧(3w1+4w2)
 ```
 The element `ℒ` is a linear form which can take `Grade{1}` vectors as input,
-```Julia
-julia> ℒ(v1+v2)
-7v₁ + 14v₂ + 0w¹ + 0w²
-
-julia> L = [1,2] * [3,4]'; L * [1,1]
-2-element Array{Int64,1}:
-  7
- 14
+```@repl ga
+ℒ(v1+v2)
+L = [1,2] * [3,4]'; L * [1,1]
 ```
 which is a computation equivalent to a matrix computation.
 
 The `TensorAlgebra` evalution is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
 
-## Importing the generators of the Leech lattice
+## Importing the Leech lattice generator
 
 In the example below, we define a constant `Leech` which can be used to obtain linear combinations of the Leech lattice,
 ```Julia
