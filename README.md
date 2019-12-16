@@ -76,7 +76,6 @@ More information and tutorials are available at [https://grassmann.crucialflow.c
 ### Requirements
 
 *Grassmann.jl* is a package for the [Julia language](https://julialang.org), which can be obtained from their website or the recommended method for your operating system (GNU/Linux/Mac/Windows). Go to [docs.julialang.org](https://docs.julialang.org) for documentation.
-
 Availability of this package and its subpackages can be automatically handled with the Julia package manager `using Pkg` and `Pkg.add("Grassmann")` or by entering:
 ```Julia
 pkg> add Grassmann
