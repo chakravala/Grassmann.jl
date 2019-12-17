@@ -2071,7 +2071,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             sd = scalar(d)
             value(sd) ≈ fd && (return $d(rm,sd))
             for k ∈ 1:ndims(V)
-                @inbounds norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                @inbounds DirectSum.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
         end

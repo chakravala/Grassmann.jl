@@ -439,7 +439,7 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{V,promote_type(typeval.(v.v)
 import Base: isinf, isapprox
 import DirectSum: grade
 import AbstractTensors: scalar, involute, unit, even, odd
-import LinearAlgebra: rank
+import LinearAlgebra: rank, norm
 export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, gdims, betti, χ
 
 const VBV = Union{Simplex,Chain,MultiVector}

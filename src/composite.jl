@@ -28,7 +28,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
     return quote
         B = value(b)
-        sb,nb = scalar(b),norm(B)
+        sb,nb = scalar(b),DirectSum.norm(B)
         sb ≈ nb && (return Simplex{V}(DirectSum.expm1(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         S = zeros(mvec(N,t))

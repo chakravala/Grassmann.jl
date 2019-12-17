@@ -65,7 +65,7 @@ function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
     N = ndims(V)
     M = Int(N/2)
     T = valuetype(a)
-    bi = indices(a,N)
+    bi = indices(a)
     ib = indexbasis(N,1)
     @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
     t = bits(b)≠v
