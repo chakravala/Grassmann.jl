@@ -1,6 +1,6 @@
 # Grassmann elements and geometric algebra Λ(V)
 
-The Grassmann `Basis` elements ``v_k\in\Lambda_1V`` and ``w^k\in\Lambda^1V`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L_1V`` are partial tangent derivations and ``\epsilon_k\in L^1V`` are dependent functions of the `tangent` manifold.
+The Grassmann `Basis` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V`` are dependent functions of the `tangent` manifold.
 Let ``V\in\text{Vect}_{\mathbb k}`` be a `VectorBundle` with dual space ``V'`` and the basis elements ``w_k:V\rightarrow\mathbb K``, then for all ``x\in V,c\in\mathbb K`` it holds: ``(w^i+w^j)(x) = w^i(x)+w^j(x)`` and ``(cw^k)(x) = cw^k(x)`` hold.
 An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
 ``(\bigotimes_k \omega_k)(v_1,\dots,v_{\sum_k p_k}) = \prod_k \omega_k(v_1,\dots,v_{p_k})``.
@@ -36,7 +36,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including ``\cup,\cap,\oplus`` and the index operation ``\ominus``, which is symmetric difference operation.
 
-By virtue of Julia's multiple dispatch on the field type ``T``, methods can specialize on the dimension ``N`` and grade ``G`` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{V,G,T}`, `SparseChain{V,G,T}`, `MultiVector{V,T}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `VectorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
 
 The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
 ```@repl ga
@@ -204,7 +204,9 @@ In topology there is *boundary* operator ``\partial`` defined by ``\partial\epsi
 
 Vorticity curl of vector-field:
 ``\star d(dx_1+dx_2+dx_3) = (∂_2 -∂_3)dx_1 + (∂_3 -∂_1)dx_2 + (∂_1 -∂_2)dx_3``.
-
+```@repl ga
+@basis tangent(ℝ^3,2,3); ⋆d(v1+v2+v3)
+```
 Boundary of 3-simplex, faces of simplex (oriented): ``\partial(v_{1234}) = -\partial_4v_{123}+\partial_3v_{124}-\partial_2v_{134}+\partial_1v_{234}``.
 ```@repl ga
 ∂(Λ(tangent(ℝ^4,2,4)).v1234)
@@ -228,7 +230,10 @@ Dirac operator is ``(\nabla^2)^\frac12\omega = \pm\nabla\ominus\omega = \pm\nabl
 ```
 Elements ``\omega\in\mathcal H^p M = \{\nabla\omega = 0\mid\omega\in \Omega^pM\}`` are *harmonic* forms if ``\nabla\omega = 0`` and hence both *closed* ``d\omega=0`` and *coclosed* ``\delta\omega=0``.
 Hodge decomposition: ``\Omega^pM=\mathcal H^pM\oplus\text{im}(d\Omega^{p-1}M)\oplus\text{im}(\partial\Omega^{p+1}M)``.
-
+```@repl ga
+ω = 4.5v12 + 7.4v13
+V(∇^2)*ω == V(∇)*V(∇)*ω == d(∂(ω)) + ∂(d(ω))
+```
 Let ``\nabla\in\Lambda^1V``, then ``\omega = (\nabla\backslash\nabla)\ominus\omega = \nabla\backslash(d\omega + \partial\omega)`` where ``\nabla\parallel\partial\omega`` and ``\nabla\perp d\omega``.
 Let's reflect across the hyperplane ``\star\nabla``, then
 ``\nabla\backslash (d\omega-\partial\omega) = \nabla\backslash(d\omega-\partial\omega)\ominus(\nabla\backslash\nabla) = -\nabla^2\backslash(d\omega+\partial\omega)\ominus\nabla = -\nabla\backslash\omega\ominus\nabla``.
@@ -452,7 +457,7 @@ julia> (∂1+∂12) * (:(x1^2*x2^2)*ϵ1 + :(sin(x1))*ϵ2)
 ```
 Although fully generalized, the implementation in this release is still experimental.
 
-## Symbolic coefficients by declaring a scalar algebra
+## Symbolic coefficients by declaring algebra
 
 Due to the abstract generality of the code generation of the `Grassmann` product algebra, it is easily possible to extend the entire set of operations to other kinds of scalar coefficient types.
 ```julia

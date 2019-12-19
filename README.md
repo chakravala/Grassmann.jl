@@ -64,8 +64,8 @@ streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4),V(1,2,3)),-1.5..1.5,-1.5
 Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite.
 Conformal geometric algebra is possible with the Minkowski plane, based on the null-basis.
 In general, multivalued quantum logic is enabled by the `∧,∨,⋆` Grassmann lattice.
-Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
-Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic `χ`.
+Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
+Importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and Betti numbers with Euler characteristic `χ`.
 
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
@@ -75,7 +75,7 @@ More information and tutorials are available at https://grassmann.crucialflow.co
 ### Requirements
 
 *Grassmann.jl* is a package for the [Julia language](https://julialang.org), which can be obtained from their website or the recommended method for your operating system (GNU/Linux/Mac/Windows). Go to [docs.julialang.org](https://docs.julialang.org) for documentation.
-Availability of this package and its subpackages can be automatically handled with the Julia package manager `using Pkg` and `Pkg.add("Grassmann")` or by entering:
+Availability of this package and its subpackages can be automatically handled with the Julia package manager `using Pkg; Pkg.add("Grassmann")` or
 ```Julia
 pkg> add Grassmann
 ```
@@ -84,7 +84,7 @@ If you would like to keep up to date with the latest commits, instead use
 pkg> add Grassmann#master
 ```
 which is not recommended if you want to use a stable release.
-When the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to) the following packages:
+When the `master` branch is used it is possible that some of the dependencies also require a development branch before the release. This may include (but is not limited to):
 
 This requires a merged version of `ComputedFieldTypes` at https://github.com/vtjnash/ComputedFieldTypes.jl
 
@@ -184,7 +184,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
 
-By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the dimension `N` and grade `G` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{V,G,T}`, `SparseChain{V,G,T}`, `MultiVector{V,T}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `VectorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
 
 The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
 ```Julia

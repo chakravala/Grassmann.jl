@@ -204,8 +204,8 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$v))
                         if diffvars(V)≠0
-                            !iszero(Z) && (val = Expr(:call,:*,getbasis(loworder(V),Z)))
-                            val = :(h=$val;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
+                            val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                         end
                         $spre(m,val,(A⊻B)|Q,Val{N}())
                     end
@@ -232,7 +232,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$(pcc ? :($$SUB($v)) : v)))
                         if diffvars(V)≠0
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
-                            val = :(h=$val;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                         end
                         $spre(m,val,bas|Q,Val{N}())
                         cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Val{N}())
@@ -273,7 +273,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                                 if !iszero(Z)
                                     _,_,Q,_ = symmetricmask(V,A,B)
                                     v = Expr(:call,:*,v,getbasis(loworder(V),Z))
-                                    v = :(h=$v;$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                                 end
                             end
                             t && $spre(m,typeof(V) <: Signature ? g ? :($$SUB($v)) : v : Expr(:call,$(QuoteNode(MUL)),g,v),C,Val{N}())
