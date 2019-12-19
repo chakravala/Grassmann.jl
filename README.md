@@ -105,7 +105,7 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 
 ## Grassmann for enterprise
 
-Available as part of the Tidelift Subscription
+Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or [Bandcamp](https://music.crucialflow.com); also available as part of the [Tidelift](https://tidelift.com/funding/github/julia/Grassmann) Subscription:
 
 The maintainers of Grassmann and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source dependencies you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use. [Learn more.](https://tidelift.com/subscription/pkg/julia-grassmann?utm_source=julia-grassmann&utm_medium=referral&utm_campaign=enterprise&utm_term=repo)
 
@@ -115,9 +115,9 @@ The *DirectSum.jl* package is a work in progress providing the necessary tools t
 Due to the parametric type system for the generating `VectorBundle`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
 Although intended for use with the *Grassmann.jl* package, `DirectSum` can be used independently.
 
-Let `N` be the rank of a `Manifold{N}`.
-The type `VectorBundle{N,P,g,ν,μ}` uses *byte-encoded* data available at pre-compilation, where
-`P` specifies the basis for up and down projection,
+Let `n` be the rank of a `Manifold{n}`.
+The type `VectorBundle{n,ℙ,g,ν,μ}` uses *byte-encoded* data available at pre-compilation, where
+`ℙ` specifies the basis for up and down projection,
 `g` is a bilinear form that specifies the metric of the space,
 and `μ` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, `ν` is the number of tangent variables.
 
@@ -166,27 +166,26 @@ More information about `AbstractTensors` is available  at [https://github.com/ch
 # Grassmann elements and geometric algebra Λ(V)
 
 The Grassmann `Basis` elements `vₖ` and `wᵏ` are linearly independent vector and covector elements of `V`, while the Leibniz `Operator` elements `∂ₖ` are partial tangent derivations and `ϵᵏ` are dependent functions of the `tangent` manifold.
+An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps.
 Higher `grade` elements correspond to `SubManifold` subspaces, while higher `order` function elements become homogenous polynomials and Taylor series.
-The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 
 Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `Basis` ⟨w₁⊗⋯⊗wₖ⟩, where `grade` is determined by the number of anti-symmetric basis elements in its tensor product decomposition.
 The algebra is partitioned into both symmetric and anti-symmetric tensor equivalence classes.
-Higher-order composite tensor elements are oriented-multi-sets.
-Anti-symmetric indices have two orientations and higher multiplicities of them result in zero values, so the only interesting multiplicity is 1.
-The Leibniz-Taylor algebra is a quotient polynomial ring  so that `ϵₖ^(μ+1)` is zero.
-
-By virtue of Julia's multiple dispatch on the field type `T`, methods can specialize on the dimension `N` and grade `G` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,T}`, `Chain{V,G,T}`, `SparseChain{V,G,T}`, `MultiVector{V,T}`, and `MultiGrade{V,G}` types.
-
 For the oriented sets of the Grassmann exterior algebra, the parity of `(-1)^P` is factored into transposition compositions when interchanging ordering of the tensor product argument permutations.
 The symmetrical algebra does not need to track this parity, but has higher multiplicities in its indices.
 Symmetric differential function algebra of Leibniz trivializes the orientation into a single class of index multi-sets, while Grassmann's exterior algebra is partitioned into two oriented equivalence classes by anti-symmetry.
 Full tensor algebra can be sub-partitioned into equivalence classes in multiple ways based on the element symmetry, grade, and metric signature composite properties.
 Both symmetry classes can be characterized by the same geometric product.
 
+Higher-order composite tensor elements are oriented-multi-sets.
+Anti-symmetric indices have two orientations and higher multiplicities of them result in zero values, so the only interesting multiplicity is 1.
+The Leibniz-Taylor algebra is a quotient polynomial ring  so that `ϵₖ^(μ+1)` is zero.
 Grassmann's exterior algebra doesn't invoke the properties of multi-sets, as it is related to the algebra of oriented sets; while the Leibniz symmetric algebra is that of unoriented multi-sets.
 Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference.
+
+By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `VectorBundle{N}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
 
 The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
 ```Julia
