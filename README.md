@@ -65,7 +65,7 @@ Thus, computations involving fully general rotational algebras and Lie bivector 
 Conformal geometric algebra is possible with the Minkowski plane, based on the null-basis.
 In general, multivalued quantum logic is enabled by the `∧,∨,⋆` Grassmann lattice.
 Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
-Importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and Betti numbers with Euler characteristic `χ`.
+Dirac-Clifford product yields generalized Hodge-Laplacian and Betti numbers with Euler characteristic `χ`.
 
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
@@ -283,13 +283,14 @@ Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used
 The sparse representations are a work in progress to be improved with time.
 
 ## References
-* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf). 2019.
-* Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp). 1957.
-* John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/). 2011.
+* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf) (2019)
+* Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp) (1957)
+* John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
 * David Hestenes, [Universal Geometric Algebra](http://lomont.org/math/geometric-algebra/Universal%20Geometric%20Algebra%20-%20Hestenes%20-%201988.pdf), Pure and Applied (1988)
-* David Hestenes, [Tutorial on geometric calculus](http://geocalc.clas.asu.edu/pdf/Tutorial%20on%20Geometric%20Calculus.pdf). Advances in Applied Clifford Algebra, 2013.
-* Lachlan Gunn, Derek Abbott, James Chappell, Ashar Iqbal, [Functions of multivector variables](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4361175/pdf/pone.0116943.pdf). 2011.
-* Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf). 2016.
-* Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv, 2011.
+* David Hestenes, Renatus Ziegler, [Projective Geometry with Clifford Algebra](http://geocalc.clas.asu.edu/pdf/PGwithCA.pdf), Acta Appl. Math. (2019)
+* David Hestenes, [Tutorial on geometric calculus](http://geocalc.clas.asu.edu/pdf/Tutorial%20on%20Geometric%20Calculus.pdf). Advances in Applied Clifford Algebra (2013)
+* Lachlan Gunn, Derek Abbott, James Chappell, Ashar Iqbal, [Functions of multivector variables](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4361175/pdf/pone.0116943.pdf) (2011)
+* Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)
+* Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv (2011)
 * Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)

@@ -340,6 +340,18 @@ Grassmann-Poincare-Hodge complement: ⋆ω = ω∗I
 Grassmann-Poincare left complement: ⋆'ω = I∗'ω
 """ complementlefthodge
 
+@doc """
+    complementright(::TensorAlgebra)
+
+Non-metric variant of Grassmann-Poincare-Hodge complement.
+""" complementright
+
+@doc """
+    complementleft(::TensorAlgebra)
+
+Non-metric variant Grassmann-Poincare left complement.
+""" complementleft
+
 ## reverse
 
 import Base: reverse, conj, ~
@@ -391,9 +403,9 @@ Clifford conjugate of a `MultiVector` element: conj(ω) = involute(~ω)
 ## geometric product
 
 """
-    *(a::TensorAlgebra,b::TensorAlgebra)
+    *(ω::TensorAlgebra,η::TensorAlgebra)
 
-Geometric algebraic product: a*b = (-1)ᵖdet(a∩b)⊗(Λ(a⊖b)∪L(a⊕b))
+Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω⊕η))
 """
 @pure *(a::Basis{V},b::Basis{V}) where V = mul(a,b)
 
@@ -432,9 +444,9 @@ export ∗, ⊛, ⊖
 const ⊖ = *
 
 """
-    ∗(a::TensorAlgebra,b::TensorAlgebra)
+    ∗(ω::TensorAlgebra,η::TensorAlgebra)
 
-Reversed geometric product: a∗b = (~a)*b
+Reversed geometric product: ω∗η = (~ω)*η
 """
 @inline ∗(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = (~a)*b
 
@@ -458,7 +470,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
     if diffvars(V)≠0 && !iszero(Z)
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return Simplex{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
@@ -496,7 +508,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return Simplex{V}(p ? -v : v,getbasis(V,C))
@@ -543,7 +555,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return Simplex{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
@@ -589,7 +601,7 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(getbasis(V,Z),v) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
     return Simplex{V}(p ? -v : v,getbasis(V,C))
@@ -646,6 +658,8 @@ Sandwich product: ω⊘η = (~ω)⊖η⊖ω
 """
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = diffvars(V)≠0 ? (~y)*x*involute(y) : inv(y)*x*involute(y)
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{W}) where {V,W} = interop(⊘,x,y)
+⊘(x::TensorAlgebra{V},y::UniformScaling) where V = x⊘V(y)
+⊘(x::UniformScaling,y::TensorAlgebra{V}) where V = V(x)⊘y
 
 """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
@@ -2133,8 +2147,25 @@ for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
         Base.$op(a::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,Float64)}($op.(value(a)))
     end
 end
+for op ∈ (:isfinite,)
+    @eval Base.$op(b::Simplex{V,G,B,T}) where {V,G,B,T} = $op(value(b))
+    @eval Base.$op(a::Chain{V,G,T}) where {V,G,T} = prod($op.(value(a)))
+    @eval begin
+        Base.$op(a::Basis{V,G}) where {V,G} = $op(value(a))
+        Base.$op(a::MultiVector{V,T}) where {V,T} = prod($op.(value(a)))
+    end
+end
 Base.rationalize(t::Type,b::Simplex{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = Simplex{V,G,B}(rationalize(t,value(b),tol))
 Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G,T}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Basis{V,G},tol::Real=eps(T)) where {V,G} = Basis{V,G}(rationalize(t,value(a),tol))
 Base.rationalize(t::Type,a::MultiVector{V,T};tol::Real=eps(T)) where {V,T} = MultiVector{V,T}(rationalize.(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
+
+# comparison (special case for scalars)
+
+Base.isless(a::T,b::S) where {T<:TensorTerm{V,0},S<:TensorTerm{W,0}} where {V,W} = isless(value(a),value(b))
+Base.isless(a::T,b) where T<:TensorTerm{V,0} where V = isless(value(a),b)
+Base.isless(a,b::T) where T<:TensorTerm{V,0} where V = isless(a,value(b))
+Base.:<=(x::T,y::S) where {T<:TensorTerm{V,0},S<:TensorTerm{W,0}} where {V,W} = isless(x,y) | (x == y)
+Base.:<=(x::T,y) where T<:TensorTerm{V,0} where V = isless(x,y) | (x == y)
+Base.:<=(x,y::T) where T<:TensorTerm{V,0} where V = isless(x,y) | (x == y)

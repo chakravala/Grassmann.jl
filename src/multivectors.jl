@@ -33,8 +33,13 @@ import LinearAlgebra
 import LinearAlgebra: I, UniformScaling
 export UniformScaling, I
 
-## MultiBasis{N}
+## Basis{V,G,B}
 
+"""
+    Basis{V,G,B} <: TensorTerm{V,G} <: TensorGraded{V,G} <: TensorAlgebra{V}
+
+Basis type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, bits `B::UInt64`.
+"""
 struct Basis{V,G,B} <: TensorTerm{V,G}
     @pure Basis{V,G,B}() where {V,G,B} = new{V,G,B}()
 end
@@ -91,8 +96,13 @@ end
 
 @inline show(io::IO, e::Basis) = DirectSum.printindices(io,vectorspace(e),bits(e))
 
-## Simplex{N}
+## Simplex{V,G,B,𝕂}
 
+"""
+    Simplex{V,G,B,𝕂} <: TensorTerm{V,G} <: TensorGraded{V,G} <: TensorAlgebra{V}
+
+Simplex type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, basis `B::Basis{V,G}`, and the scalar field `𝕂::Type`.
+"""
 struct Simplex{V,G,B,T} <: TensorTerm{V,G}
     v::T
     Simplex{A,B,C,D}(t::E) where E<:D where {A,B,C,D} = new{A,B,C,D}(t)
@@ -135,11 +145,17 @@ end
 ==(a::TensorTerm{V,G},b::TensorTerm{V,G}) where {V,G} = basis(a) == basis(b) ? value(a) == value(b) : 0 == value(a) == value(b)
 ==(a::TensorTerm,b::TensorTerm) = 0 == value(a) == value(b)
 
-## Chain{V,G,T}
+## Chain{V,G,𝕂}
 
 @computed struct Chain{V,G,T} <: TensorGraded{V,G}
     v::SVector{binomial(ndims(V),G),T}
 end
+
+@doc """
+    Chain{V,G,𝕂} <: TensorGraded{V,G} <: TensorAlgebra{V}
+
+Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
+""" Chain
 
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
@@ -208,8 +224,13 @@ end
 ==(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .== b.v)
 ==(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value(b))
 
-## MultiVector{V,T}
+## MultiVector{V,𝕂}
 
+"""
+    MultiVector{V,𝕂} <: TensorMixed{V} <: TensorAlgebra{V}
+
+Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
+"""
 struct MultiVector{V,T,E} <: TensorMixed{V}
     v::SArray{Tuple{E},T,1,E}
 end
@@ -322,6 +343,11 @@ end
 
 ## SparseChain{V,G}
 
+"""
+    SparseChain{V,G} <: TensorGraded{V,G} <: TensorAlgebra{V}
+
+Sparse chain type with pseudoscalar `V::Manifold` and grade/rank `G::Int`.
+"""
 struct SparseChain{V,G,T} <: TensorGraded{V,G}
     v::SparseVector{T,Int}
 end
@@ -389,6 +415,12 @@ end
     v::SVector{count_ones(G),TensorGraded{V}}
 end
 
+@doc """
+    MultiGrade{V,G} <: TensorMixed{V,G} <: TensorAlgebra{V}
+
+Sparse multivector type with pseudoscalar `V::Manifold` and grade encoding `G::UInt64`.
+""" MultiGrade
+
 terms(v::MultiGrade) = v.v
 value(v::MultiGrade) = collect(Base.Iterators.flatten(value.(terms(v))))
 
@@ -441,6 +473,7 @@ import DirectSum: grade
 import AbstractTensors: scalar, involute, unit, even, odd
 import LinearAlgebra: rank, norm
 export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, gdims, betti, χ
+export valuetype, scalar, isscalar, vector, isvector, indices
 
 const VBV = Union{Simplex,Chain,MultiVector}
 
@@ -466,6 +499,7 @@ end
 @pure order(m::Basis{V,G,B} where G) where {V,B} = count_ones(symmetricmask(V,B,B)[4])
 @pure order(m::Simplex) = order(basis(m))+order(value(m))
 @pure order(m) = 0
+@pure UInt(m::T) where T<:TensorTerm = bits(basis(m))
 @pure bits(m::T) where T<:TensorTerm = bits(basis(m))
 @pure bits(::Type{Basis{V,G,B}}) where {V,G,B} = B
 
@@ -477,9 +511,14 @@ end
 @pure hasorigin(t::Simplex) = hasorigin(basis(t))
 @pure hasorigin(m::TensorAlgebra) = hasorigin(vectorspace(m))
 
-@inline χ(V,b::UInt,t) = iszero(t) ? 0 : isodd(count_ones(symmetricmask(V,b,b)[1])) ? 1 : -1
-χ(t::T) where T<:TensorTerm{V,G} where {V,G} = χ(V,bits(basis(t)),t)
+"""
+    χ(::TensorAlgebra)
+
+Compute the Euler characteristic χ = ∑ₚ(-1)ᵖbₚ.
+"""
 χ(t::T) where T<:TensorAlgebra{V} where V = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+χ(t::T) where T<:TensorTerm{V,G} where {V,G} = χ(V,bits(basis(t)),t)
+@inline χ(V,b::UInt,t) = iszero(t) ? 0 : isodd(count_ones(symmetricmask(V,b,b)[1])) ? 1 : -1
 
 function gdims(t::T) where T<:TensorTerm{V} where V
     B,N = bits(basis(t)),ndims(V)
@@ -527,6 +566,11 @@ function null(t::T) where T<:TensorAlgebra{V} where V
     return SVector(out)
 end
 
+"""
+    betti(::TensorAlgebra)
+
+Compute the Betti numbers.
+"""
 function betti(t::T) where T<:TensorAlgebra{V} where V
     d = gdims(t)
     r = rank(t,d)
@@ -553,7 +597,7 @@ for T ∈ (Fields...,Symbol,Expr)
 end
 
 """
-    scalar(multivector)
+    scalar(::TensorAlgebra)
     
 Return the scalar (grade 0) part of any multivector.
 """
@@ -566,6 +610,11 @@ Return the scalar (grade 0) part of any multivector.
 @inline scalar(t::MultiVector{V}) where V = @inbounds Simplex{V}(t.v[1])
 @inline scalar(t::MultiGrade{V,G}) where {V,G} = @inbounds 1 ∈ indices(G) ? terms(t)[1] : zero(V)
 
+"""
+    vector(::TensorAlgebra)
+
+Return the vector (grade 1) part of any multivector.
+"""
 @pure vector(t::Basis{V,0} where V) = t
 @pure vector(t::Basis{V}) where V = zero(V)
 @inline vector(t::T) where T<:TensorGraded{V,1} where V = t
@@ -580,8 +629,13 @@ Return the scalar (grade 0) part of any multivector.
 
 @pure isscalar(t::Basis) = grade(t) == 0
 @inline isscalar(t::T) where T<:TensorGraded = grade(t) == 0 || iszero(t)
-@inline isscalar(t::MultiVector) = norm(t) ≈ scalar(t)
+@inline isscalar(t::MultiVector) = norm(t.v[2:end]) ≈ 0
 @inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
+
+@pure isvector(t::Basis) = grade(t) == 1
+@inline isvector(t::T) where T<:TensorGraded = grade(t) == 1 || iszero(t)
+@inline isvector(t::MultiVector) = norm(t) ≈ norm(vector(t))
+@inline isvector(t::MultiGrade) = norm(t) ≈ norm(vector(t))
 
 for T ∈ (Expr,Symbol)
     @eval @inline Base.iszero(t::Simplex{V,G,B,$T} where {V,G,B}) = false

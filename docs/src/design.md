@@ -32,6 +32,12 @@ This enables the usage of many different types of `TensorAlgebra` along with var
 
 ## Direct-sum yields `VectorBundle` parametric type polymorphism ⨁
 
+[![DOI](https://zenodo.org/badge/169765288.svg)](https://zenodo.org/badge/latestdoi/169765288)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/DirectSum.jl)](https://github.com/chakravala/DirectSum.jl/releases)
+[![GitHub commits since latest release](https://img.shields.io/github/commits-since/chakravala/DirectSum.jl/latest?label=new%20commits)](https://github.com/chakravala/DirectSum.jl/commits)
+[![Build Status](https://travis-ci.org/chakravala/DirectSum.jl.svg?branch=master)](https://travis-ci.org/chakravala/DirectSum.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/ipaggdeq2f1509pl?svg=true)](https://ci.appveyor.com/project/chakravala/directsum-jl)
+
 The *DirectSum.jl* package is a work in progress providing the necessary tools to work with an arbitrary `Manifold` specified by an encoding.
 Due to the parametric type system for the generating `VectorBundle`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
 Although intended for use with the *Grassmann.jl* package, `DirectSum` can be used independently.
@@ -121,6 +127,12 @@ An application of this is in the `Grasmann` package, where dual indexing is used
 More information about `DirectSum` is available  at [https://github.com/chakravala/DirectSum.jl](https://github.com/chakravala/DirectSum.jl)
 
 ## Interoperability for `TensorAlgebra{V}`
+
+[![DOI](https://zenodo.org/badge/169811826.svg)](https://zenodo.org/badge/latestdoi/169811826)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/AbstractTensors.jl)](https://github.com/chakravala/AbstractTensors.jl/releases)
+[![GitHub commits since latest release](https://img.shields.io/github/commits-since/chakravala/AbstractTensors.jl/latest?label=new%20commits)](https://github.com/chakravala/AbstractTensors.jl/commits)
+[![Build Status](https://travis-ci.org/chakravala/AbstractTensors.jl.svg?branch=master)](https://travis-ci.org/chakravala/AbstractTensors.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/yey8huk505h4b81u?svg=true)](https://ci.appveyor.com/project/chakravala/abstracttensors-jl)
 
 The `AbstractTensors` package is intended for universal interoperability of the abstract `TensorAlgebra` type system.
 All `TensorAlgebra{V}` subtypes have type parameter ``V``, used to store a `VectorBundle` value obtained from *DirectSum.jl*.

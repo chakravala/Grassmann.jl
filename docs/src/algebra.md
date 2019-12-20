@@ -1,6 +1,6 @@
 # Grassmann elements and geometric algebra Λ(V)
 
-The Grassmann `Basis` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V`` are dependent functions of the `tangent` manifold.
+The Grassmann `Basis` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V'`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V'`` are dependent functions of the `tangent` manifold.
 Let ``V\in\text{Vect}_{\mathbb k}`` be a `VectorBundle` with dual space ``V'`` and the basis elements ``w_k:V\rightarrow\mathbb K``, then for all ``x\in V,c\in\mathbb K`` it holds: ``(w^i+w^j)(x) = w^i(x)+w^j(x)`` and ``(cw^k)(x) = cw^k(x)`` hold.
 An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
 ``(\bigotimes_k \omega_k)(v_1,\dots,v_{\sum_k p_k}) = \prod_k \omega_k(v_1,\dots,v_{p_k})``.
@@ -9,7 +9,11 @@ Higher `grade` elements correspond to `SubManifold` subspaces, while higher `ord
 using Grassmann
 ```
 ```@repl ga
-Λ(ℝ^3), Λ == Grassmann.Algebra
+G3 = Λ(ℝ^3), Λ == Grassmann.Algebra
+
+Λ(tangent(ℝ^2))
+
+Λ(tangent(Grassmann.V0',3,3))
 ```
 Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `Basis` ``\langle v_{i_1}\otimes\cdots\otimes v_{i_k}\rangle_k : V'^k\rightarrow\mathbb K``, where `rank` is determined by the sum of basis index multiplicities in the tensor product decomposition.
 The Grassmann anti-symmetric exterior basis is denoted by ``v_{i_1\dots i_g}\in\Lambda^gV`` having the dual elements ``w^{i_1\cdots i_g}\in\Lambda^gV'``, while the Leibniz symmetric basis will be denoted by ``\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L^gV`` with corresponding ``\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV'`` adjoint elements.
@@ -23,7 +27,9 @@ The symmetrical algebra does not need to track this parity, but has higher multi
 Symmetric differential function algebra of Leibniz trivializes the orientation into a single class of index multi-sets, while Grassmann's exterior algebra is partitioned into two oriented equivalence classes by anti-symmetry.
 Full tensor algebra can be sub-partitioned into equivalence classes in multiple ways based on the element symmetry, grade, and metric signature composite properties.
 Both symmetry classes can be characterized by the same geometric product.
-
+```@repl ga
+indices(Λ(3).v12)
+```
 A higher-order composite tensor element is an oriented-multi-set ``X`` such that
 ``v_X = \bigotimes_k v_{i_k}^{\otimes\mu_k}`` with the indices ``X = \left((i_1,\mu_1),\dots,(i_g,\mu_g)\right)`` and ``|X|=\sum_k\mu_k`` is tensor `rank`.
 Anti-symmetric indices ``\Lambda X\subseteq\Lambda V`` have two orientations and higher multiplicities of them result in zero values, so the only interesting multiplicity is ``\mu_k\equiv1``.
@@ -60,7 +66,7 @@ let k = (b1 + b2) - b3
 	   println(k)
 end end
 ```
-Alternatively, if you do not wish to assign these variables to your local workspace, the versatile constructors of `Grassmann.Algebra{N}` can be used to contain them, which is exported to the user as the method `Λ(V)`,
+Alternatively, if you do not wish to assign these variables to your local workspace, the versatile constructors of `Grassmann.Algebra{V}` can be used to contain them, which is exported to the user as the method `Λ(V)`,
 ```@repl ga
 G3 = Λ(3) # equivalent to Λ(V"+++"), Λ(ℝ^3), Λ.V3
 G3.v13 ⊖ G3.v12
@@ -412,6 +418,9 @@ For that variation of complement, ``||\omega||^2 I = \omega\,\wedge\,!\omega`` h
 v∞ * !v∞, v∅ * !v∅
 ```
 In this example, the null-basis properties from the projective split are shown.
+```@repl ga
+tangent(S"∞∅++",2,4)(∇^2)
+```
 
 ## Differential forms and tangent algebra
 

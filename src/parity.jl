@@ -356,7 +356,18 @@ function even(t::MultiVector{V,T}) where {V,T}
     MultiVector{V,T}(out)
 end
 
+"""
+    imag(ω::TensorAlgebra)
+
+The `imag` part `(ω-(~ω))/2` is defined by `abs2(imag(ω)) == -(imag(ω)^2)`.
+"""
 imag(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? t : zero(V)
+
+"""
+real(ω::TensorAlgebra)
+
+The `real` part `(ω+(~ω))/2` is defined by `abs2(real(ω)) == real(ω)^2`.
+"""
 real(t::T) where T<:TensorGraded{V,G} where {V,G} = parityreverse(G) ? zero(V) : t
 function imag(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
