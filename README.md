@@ -288,7 +288,7 @@ The sparse representations are a work in progress to be improved with time.
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
 * David Hestenes, [Universal Geometric Algebra](http://lomont.org/math/geometric-algebra/Universal%20Geometric%20Algebra%20-%20Hestenes%20-%201988.pdf), Pure and Applied (1988)
-* David Hestenes, Renatus Ziegler, [Projective Geometry with Clifford Algebra](http://geocalc.clas.asu.edu/pdf/PGwithCA.pdf), Acta Appl. Math. (2019)
+* David Hestenes, Renatus Ziegler, [Projective Geometry with Clifford Algebra](http://geocalc.clas.asu.edu/pdf/PGwithCA.pdf), Acta Appl. Math. (1991)
 * David Hestenes, [Tutorial on geometric calculus](http://geocalc.clas.asu.edu/pdf/Tutorial%20on%20Geometric%20Calculus.pdf). Advances in Applied Clifford Algebra (2013)
 * Lachlan Gunn, Derek Abbott, James Chappell, Ashar Iqbal, [Functions of multivector variables](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4361175/pdf/pone.0116943.pdf) (2011)
 * Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)

@@ -101,7 +101,7 @@ end
 """
     Simplex{V,G,B,𝕂} <: TensorTerm{V,G} <: TensorGraded{V,G} <: TensorAlgebra{V}
 
-Simplex type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, basis `B::Basis{V,G}`, and the scalar field `𝕂::Type`.
+Simplex type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, basis `B::Basis{V,G}`, scalar field `𝕂::Type`.
 """
 struct Simplex{V,G,B,T} <: TensorTerm{V,G}
     v::T

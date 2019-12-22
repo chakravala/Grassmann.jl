@@ -9,7 +9,7 @@ Higher `grade` elements correspond to `SubManifold` subspaces, while higher `ord
 using Grassmann
 ```
 ```@repl ga
-G3 = Λ(ℝ^3), Λ == Grassmann.Algebra
+Λ(ℝ^3), Λ == Grassmann.Algebra
 
 Λ(tangent(ℝ^2))
 
