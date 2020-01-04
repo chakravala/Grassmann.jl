@@ -19,7 +19,7 @@ makedocs(
             "tutorials/install.md",
             "tutorials/quick-start.md",
             "tutorials/algebra-of-space.md",
-            "tutorials/mixed-tensors.md"
+            "tutorials/dyadic-tensors.md"
             ],
         "References" => "references.md"
         ]

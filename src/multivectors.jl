@@ -422,7 +422,7 @@ Sparse multivector type with pseudoscalar `V::Manifold` and grade encoding `G::U
 """ MultiGrade
 
 terms(v::MultiGrade) = v.v
-value(v::MultiGrade) = collect(Base.Iterators.flatten(value.(terms(v))))
+value(v::MultiGrade) = reduce(vcat,value.(terms(v)))
 
 MultiGrade{V}(v::Vector{T}) where T<:TensorGraded{V} where V = MultiGrade{V,|(UInt(1).<<grade.(v)...)}(SVector(v...))
 MultiGrade(v::Vector{T}) where T<:TensorGraded{V} where V = MultiGrade{V}(v)

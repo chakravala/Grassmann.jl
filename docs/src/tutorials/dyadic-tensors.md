@@ -1,7 +1,7 @@
-# Mixed tensor product ⊗
+# Dyadic tensor product ⊗
 
-Groups such as SU(n) can alternatively be represented with the dual Grassmann’s exterior product algebra, generating a ``2^{2n}``-dimensional mother algebra with geometric product from the ``n``-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the `n^2`-dimensional bivector subspace of the full ``\frac{(2n)!}{2(2n−2)!}``-dimensional bivector sub-algebra.
-The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the (1,1)-tensor bivector algebra.
+Dyadic tensors are represented with the Grassmann’s exterior product algebra, generating a ``2^{2n}``-dimensional mother algebra with the direct sum of the ``n``-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the ``n^2``-dimensional bivector subspace of the full ``\frac{(2n)!}{2(2n−2)!}``-dimensional bivector sub-algebra.
+The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the dyadic (1,1)-tensor bivector algebra.
 
 ## Constructing linear transformations
 
@@ -20,11 +20,11 @@ w1+2w2
 ans(v1+v2)
 ```
 The sum `w1+2w2` is interpreted as a covector element of the dual vector space, which can be evaluated as a linear functional when a vector argument is input.
-Using these in the workspace, it is possible to use the Grassmann exterior `∧`-tensor product operation to construct elements `ℒ` of the (1,1)-bivector subspace of linear transformations from the `Grade{2}` algebra.
+Using these in the workspace, it is possible to use the Grassmann exterior ``\wedge``-tensor product operation to construct elements `ℒ` of the dyadic (1,1)-bivector subspace of linear transformations from the mother algebra.
 ```@repl ga
 ℒ = (v1+2v2)∧(3w1+4w2)
 ```
-The element `ℒ` is a linear form which can take `Grade{1}` vectors as input,
+The element `ℒ` is a linear form which can be evaluated,
 ```@repl ga
 ℒ(v1+v2)
 L = [1,2] * [3,4]'; L * [1,1]
