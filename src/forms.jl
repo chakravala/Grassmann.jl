@@ -1,5 +1,97 @@
-#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+
+## conversions
+
+@pure choicevec(M,G,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,G,T) : mvec(M,G,T)
+@pure choicevec(M,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,T) : mvec(M,T)
+
+#@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
+#@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
+
+function (W::Signature)(b::Chain{V,G,T}) where {V,G,T}
+    V==W && (return b)
+    !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
+    WC,VC = mixedmode(W),mixedmode(V)
+    #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+    #    return V0
+    N,M = ndims(V),ndims(W)
+    out = zeros(choicevec(M,G,valuetype(b)))
+    ib = indexbasis(N,G)
+    for k ∈ 1:length(ib)
+        @inbounds if b[k] ≠ 0
+            @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
+            if WC<0 && VC≥0
+                @inbounds setblade!(out,b[k],mixed(V,B),Val{M}())
+            elseif WC≥0 && VC≥0
+                @inbounds setblade!(out,b[k],B,Val{M}())
+            else
+                throw(error("arbitrary Manifold intersection not yet implemented."))
+            end
+        end
+    end
+    return Chain{W,G,T}(out)
+end
+function (W::SubManifold{V,M,S})(b::Chain{V,1,T}) where {M,V,S,T}
+    Chain{W,1,T}(b.v[indices(bits(W),ndims(V))])
+end
+function (W::SubManifold{V,M,S})(b::Chain{V,G,T}) where {M,V,S,T,G}
+    out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
+    ib = indexbasis(N,G)
+    for k ∈ 1:length(ib)
+        @inbounds if b[k] ≠ 0
+            @inbounds if count_ones(ib[k]&S) == G
+                @inbounds setblade!(out,b[k],lowerbits(M,S,ib[k]),Val{M}())
+            end
+        end
+    end
+    return Chain{W,G,T}(out)
+end
+
+function (W::Signature)(m::MultiVector{V,T}) where {V,T}
+    V==W && (return m)
+    !(V⊆W) && throw(error("cannot convert from $(V) to $(W)"))
+    WC,VC = mixedmode(W),mixedmode(V)
+    #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+    #    return V0
+    N,M = ndims(V),ndims(W)
+    out = zeros(choicevec(M,valuetype(m)))
+    bs = binomsum_set(N)
+    for i ∈ 1:N+1
+        ib = indexbasis(N,i-1)
+        for k ∈ 1:length(ib)
+            @inbounds s = k+bs[i]
+            @inbounds if m.v[s] ≠ 0
+                @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
+                if WC<0 && VC≥0
+                    @inbounds setmulti!(out,m.v[s],mixed(V,B),Val{M}())
+                elseif WC≥0 && VC≥0
+                    @inbounds setmulti!(out,m.v[s],B,Val{M}())
+                else
+                    throw(error("arbitrary Manifold intersection not yet implemented."))
+                end
+            end
+        end
+    end
+    return MultiVector{W,T}(out)
+end
+
+function (W::SubManifold{V,M,S})(m::MultiVector{V,T}) where {M,V,S,T}
+    out,N = zeros(choicevec(M,valuetype(m))),ndims(V)
+    bs = binomsum_set(N)
+    for i ∈ 1:N+1
+        ib = indexbasis(N,i-1)
+        for k ∈ 1:length(ib)
+            @inbounds s = k+bs[i]
+            @inbounds if m.v[s] ≠ 0
+                @inbounds if count_ones(ib[k]&S) == i-1
+                    @inbounds setmulti!(out,m.v[s],lowerbits(N,S,ib[k]),Val{M}())
+                end
+            end
+        end
+    end
+    return MultiVector{W,T}(out)
+end
 
 #### need separate storage for m and F for caching
 
@@ -50,105 +142,25 @@ const dualindexC_cache = Vector{Vector{Int}}[]
     @inbounds (C ? dualindexC_cache : dualindex_cache)[M]
 end
 
-## Basis forms
-
-(a::Basis)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-function (a::Basis{V,1,A})(b::Basis{V,1,B}) where {V,A,B}
-    T = valuetype(a)
-    x = bits(a)
-    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-    bits(b)∉(x,X) ? zero(V) : ((V[intlog(B)+1] ? -one(T) : one(T))*Basis{V}())
-end
-function (a::Basis{V,2,A})(b::Basis{V,1,B}) where {V,A,B}
-    C = mixedmode(V)
-    (C ≥ 0) && throw(error("wrong basis"))
-    N = ndims(V)
-    M = Int(N/2)
-    T = valuetype(a)
-    bi = indices(a)
-    ib = indexbasis(N,1)
-    @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-    t = bits(b)≠v
-    @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -one(T) : one(T))*getbasis(V,ib[bi[1]]))
-end
-
-# implex forms
-
-(a::Simplex)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-function (a::Basis{V,1,A})(b::Simplex{V,1,X,T} where X) where {V,A,T}
-    x = bits(a)
-    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-    Y = bits(basis(b))
-    Y∉(x,X) && (return zero(V))
-    (V[intlog(Y)+1] ? -(b.v) : b.v) * Basis{V}()
-end
-function (a::Simplex{V,1,X,T} where X)(b::Basis{V,1,B}) where {V,T,B}
-    x = bits(basis(a))
-    X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-    Y = bits(b)
-    Y∉(x,X) && (return zero(V))
-    (V[intlog(Y)+1] ? -(a.v) : a.v) * Basis{V}()
-end
-@eval begin
-    function (a::Simplex{V,1,X,T} where X)(b::Simplex{V,1,Y,S} where Y) where {V,T,S}
-        $(insert_expr((:t,))...)
-        x = bits(basis(a))
-        X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
-        Y = bits(basis(b))
-        Y∉(x,X) && (return zero(V))
-        Simplex{V}((a.v*(V[intlog(Y)+1] ? -(b.v) : b.v))::t,Basis{V}())
-    end
-    function (a::Simplex{V,2,A,T})(b::Basis{V,1,B}) where {V,A,T,B}
-        C = mixedmode(V)
-        (C ≥ 0) && throw(error("wrong basis"))
-        $(insert_expr((:N,:M))...)
-        bi = indices(basis(a),N)
-        ib = indexbasis(N,1)
-        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-        t = bits(b)≠v
-        @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(a.v) : a.v)*getbasis(V,ib[bi[1]]))
-    end
-    function (a::Basis{V,2,A})(b::Simplex{V,1,B,T}) where {V,A,B,T}
-        C = mixedmode(V)
-        (C ≥ 0) && throw(error("wrong basis"))
-        $(insert_expr((:N,:M))...)
-        bi = indices(a,N)
-        ib = indexbasis(N,1)
-        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-        t = bits(basis(b))≠v
-        @inbounds t ? zero(V) : ((V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
-    end
-    function (a::Simplex{V,2,A,T})(b::Simplex{V,1,B,S}) where {V,A,T,B,S}
-        C = mixedmode(V)
-        (C ≥ 0) && throw(error("wrong basis"))
-        $(insert_expr((:N,:M,:t))...)
-        bi = indices(basis(a),N)
-        ib = indexbasis(N,1)
-        @inbounds v = ib[bi[2]>M ? bi[2]-M : bi[2]]
-        j = bits(basis(b))≠v
-        @inbounds j ? zero(V) : (a.v*(V[intlog(v)+1] ? -(b.v) : b.v)*getbasis(V,ib[bi[1]]))
-    end
-end
-
 ## Chain forms
 
 (a::Chain)(b::T) where {T<:TensorAlgebra} = interform(a,b)
-function (a::Basis{V,1,A})(b::Chain{V,1,T}) where {V,A,T}
+function (a::SubManifold{V,1,A})(b::Chain{V,1,T}) where {V,A,T}
     x = bits(a)
     X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
     Y = 0≠X ? X : x
     @inbounds out = b.v[bladeindex(ndims(V),Y)]
-    Simplex{V}((V[intlog(Y)+1] ? -(out) : out),Basis{V}())
+    Simplex{V}((V[intlog(Y)+1] ? -(out) : out),SubManifold{V}())
 end
-function (a::Chain{V,1,T})(b::Basis{V,1,B}) where {T,V,B}
+function (a::Chain{V,1,T})(b::SubManifold{V,1,B}) where {T,V,B}
     x = bits(b)
     X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
     Y = X>2^ndims(V) ? x : X
     @inbounds out = a.v[bladeindex(ndims(V),Y)]
-    Simplex{V}((V[intlog(x)+1] ? -(out) : out),Basis{V}())
+    Simplex{V}((V[intlog(x)+1] ? -(out) : out),SubManifold{V}())
 end
 @eval begin
-    function (a::Basis{V,2,A})(b::Chain{V,1,T}) where {V,A,T}
+    function (a::SubManifold{V,2,A})(b::Chain{V,1,T}) where {V,A,T}
         C = mixedmode(V)
         (C ≥ 0) && throw(error("wrong basis"))
         $(insert_expr((:N,:M))...)
@@ -157,7 +169,7 @@ end
         @inbounds m = bi[2]>M ? bi[2]-M : bi[2]
         @inbounds ((V[m] ? -(b.v[m]) : b.v[m])*getbasis(V,ib[bi[1]]))
     end
-    function (a::Chain{V,2,T})(b::Basis{V,1,B}) where {T,V,B}
+    function (a::Chain{V,2,T})(b::SubManifold{V,1,B}) where {T,V,B}
         C = mixedmode(V)
         (C ≥ 0) && throw(error("wrong basis"))
         $(insert_expr((:N,:df,:di))...)
@@ -177,7 +189,7 @@ end
         X = mixedmode(V)<0 ? x<<Int(ndims(V)/2) : x
         Y = X>2^ndims(V) ? x : X
         @inbounds out = a.v[bladeindex(ndims(V),Y)]
-        Simplex{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,Basis{V}())
+        Simplex{V}(((V[intlog(x)+1] ? -(out) : out)*b.v)::t,SubManifold{V}())
     end
     function (a::Simplex{V,1,X,T} where X)(b::Chain{V,1,S}) where {V,T,S}
         $(insert_expr((:t,))...)
@@ -185,7 +197,7 @@ end
         X = mixedmode(V)<0 ? x>>Int(ndims(V)/2) : x
         Y = 0≠X ? X : x
         @inbounds out = b.v[bladeindex(ndims(V),Y)]
-        Simplex{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,Basis{V}())
+        Simplex{V}((a.v*(V[intlog(Y)+1] ? -(out) : out))::t,SubManifold{V}())
     end
     function (a::Simplex{V,2,A,T})(b::Chain{V,1,S}) where {V,A,T,S}
         C = mixedmode(V)
@@ -214,7 +226,7 @@ end
         for Q ∈ 1:M
             @inbounds out += a.v[df[Q][1]]*(df[Q][2] ? -(b.v[Q]) : b.v[Q])
         end
-        return Simplex{V}(out::t,Basis{V}())
+        return Simplex{V}(out::t,SubManifold{V}())
     end
     function (a::Chain{V,2,T})(b::Chain{V,1,S}) where {V,T,S}
         C = mixedmode(V)

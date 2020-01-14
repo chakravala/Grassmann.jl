@@ -78,7 +78,7 @@ for 𝔽 in [Float64]
                 dims = ndims(G)
 
                 # all basis elements of the whole algebra
-                basis = collect(G)[1:end]
+                basis = Λ(G).b
 
                 # all basis vectors of the generating vectorspace
                 basisvecs = basis[2:dims+1]

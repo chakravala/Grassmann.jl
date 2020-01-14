@@ -5,5 +5,5 @@ Pages = ["library.md"]
 ```
 
 ```@autodocs
-Modules = [DirectSum, Grassmann, AbstractTensors, Leibniz]
+Modules = [AbstractTensors, DirectSum, Grassmann, Leibniz]
 ```

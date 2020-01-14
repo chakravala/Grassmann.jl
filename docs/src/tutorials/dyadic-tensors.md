@@ -66,12 +66,12 @@ julia> generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
 
 julia> const E24,W24 = Λ(24), ℝ^24+(ℝ^24)';
 
-julia> const Leech = SChain{W24,Float64}(generator./sqrt(8));
+julia> const Leech = Chain{SubManifold(W24),Float64}(generator./sqrt(8));
 
 julia> typeof(Leech)
-SChain{⟨++++++++++++++++++++++++------------------------⟩*,2,Float64,1128}
+Chain{⟨++++++++++++++++++++++++------------------------⟩*,2,Float64,1128}
 
-julia> ndims(vectorspace(Leech))
+julia> ndims(Manifold(Leech))
 48
 ```
 The `Leech` generator matrix is contained in the 1128-dimensional bivector subalgebra of the space with 48 indices.

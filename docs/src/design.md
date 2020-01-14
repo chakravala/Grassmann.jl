@@ -30,7 +30,7 @@ Likewise, any new product formulas will be able to quickly gain from the setup o
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
 
-## Direct-sum yields `VectorBundle` parametric type polymorphism ⨁
+## DirectSum yields `VectorBundle` parametric type polymorphism ⨁
 
 [![DOI](https://zenodo.org/badge/169765288.svg)](https://zenodo.org/badge/latestdoi/169765288)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/DirectSum.jl)](https://github.com/chakravala/DirectSum.jl/releases)
@@ -51,19 +51,19 @@ The type `VectorBundle{n,ℙ,g,ν,μ}` uses *byte-encoded* data available at pre
 ``g`` is a bilinear form that specifies the metric of the space,
 and ``\mu`` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, ``\nu`` is the number of tangent variables.
 The dual space functor ``'``
-is an involution which toggles a dual vector space with inverted signature with property ``V' = \text{Hom}(V,\mathbb K)`` and having `Basis` generators
+is an involution which toggles a dual vector space with inverted signature with property ``V' = \text{Hom}(V,\mathbb K)`` and having `SubManifold` generators
 ```math
 \langle v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu\rangle=M\leftrightarrow M' = \langle w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu\rangle
 ```
 where ``v_i,w_i`` are a basis for the vectors and covectors, while ``\partial_j,\epsilon_j`` are a basis for differential operators and tensor fields.
 
-The metric signature of the `Basis{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` constructor by using ``+`` and ``-`` to specify whether the `Basis{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
+The metric signature of the `SubManifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` constructor by using ``+`` and ``-`` to specify whether the `SubManifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
 For example, `S"+++"` constructs a positive definite 3-dimensional `VectorBundle`.
 ```@setup ds
 using DirectSum
 ```
 ```@repl ds
-ℝ^3 == V"+++" == vectorspace(3)
+ℝ^3 == V"+++" == Manifold(3)
 ```
 It is also possible to specify an arbitrary `DiagonalForm` having numerical values for the basis with degeneracy `D"1,1,1,0"`, although the `Signature` format has a more compact representation.
 Further development will result in more metric types.
@@ -76,7 +76,7 @@ The index number ``n`` of the `VectorBundle` corresponds to the total number of 
 The `tangent` map takes ``V`` to its tangent space and can be applied repeatedly for higher orders, such that `tangent(V,μ,ν)` can be used to specify ``\mu`` and ``\nu``.
 ```@repl ds
 V = tangent(ℝ^3)
-V'
+tangent(V')
 V+V'
 ```
 The direct sum operator ``\oplus`` can be used to join spaces (alternatively ``+``), and the dual space functor ``'`` is an involution which toggles a dual vector space with inverted signature.
@@ -87,15 +87,15 @@ W = V⊕V'
 ```
 The direct sum of a `VectorBundle` and its dual ``V\oplus V'`` represents the full mother space ``V*``.
 ```@repl ds
-collect(V) # all vector basis elements
-collect(V') # all covector basis elements
-collect(W) # all mixed basis elements
+collect(V) # all SubManifold vector basis elements
+collect(SubManifold(V')) # all covector basis elements
+collect(SubManifold(W)) # all mixed basis elements
 ```
 In addition to the direct-sum operation, several other operations are supported, such as ``\cup,\cap,\subseteq,\supseteq`` for set operations.
 Due to the design of the `VectorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
 ```@repl ds
-ℝ+ℝ' ⊇ vectorspace(1)
-ℝ ∩ ℝ' == vectorspace(0)
+ℝ+ℝ' ⊇ Manifold(1)
+ℝ ∩ ℝ' == Manifold(0)
 ℝ ∪ ℝ' == ℝ+ℝ'
 ```
 **Remark**. Although some of the operations like ``\cup`` and ``\oplus`` are similar and sometimes result in the same values, the `union` and `sum` are entirely different operations in general.
@@ -139,10 +139,7 @@ All `TensorAlgebra{V}` subtypes have type parameter ``V``, used to store a `Vect
 By itself, this package does not impose any specifications or structure on the `TensorAlgebra{V}` subtypes and elements, aside from requiring ``V`` to be a `VectorBundle`.
 This means that different packages can create tensor types having a common underlying `VectorBundle` structure.
 For example, this is mainly used in *Grassmann.jl* to define various `SubAlgebra`, `TensorTerm` and `TensorMixed` types, each with subtypes. Externalizing the abstract type helps extend the dispatch to other packages.
-```julia
-julia> Grassmann.TensorTerm{V,G} <: AbstractTensors.TensorAlgebra{V}
-true
-```
+
 The key to making the whole interoperability work is that each `TensorAlgebra` subtype shares a `VectorBundle` parameter (with all `isbitstype` parameters), which contains all the info needed at compile time to make decisions about conversions. So other packages need only use the vector space information to decide on how to convert based on the implementation of a type. If external methods are needed, they can be loaded by `Requires` when making a separate package with `TensorAlgebra` interoperability.
 
 Since `VectorBundle` choices are fundamental to `TensorAlgebra` operations, the universal interoperability between `TensorAlgebra{V}` elements with different associated `VectorBundle` choices is naturally realized by applying the `union` morphism to operations,
@@ -177,7 +174,7 @@ nothing # hide
 ```
 which should satisfy (using the ``\cup`` operation as defined in `DirectSum`)
 ```@repl at
-op(a,b) |> vectorspace == vectorspace(a) ∪ vectorspace(b)
+op(a,b) |> Manifold == Manifold(a) ∪ Manifold(b)
 ```
 Thus, interoperability is simply a matter of defining one additional fallback method for the operation and also a new form `VectorBundle` compatibility morphism.
 
@@ -199,7 +196,7 @@ nothing # hide
 ```
 which should satisfy (using the ``\cup`` operation as defined in `DirectSum`)
 ```@repl at
-b(a) |> vectorspace == vectorspace(a) ∪ vectorspace(b)
+b(a) |> Manifold == Manifold(a) ∪ Manifold(b)
 ```
 The purpose of the `interop` and `interform` methods is to help unify the interoperability of `TensorAlgebra` elements.
 

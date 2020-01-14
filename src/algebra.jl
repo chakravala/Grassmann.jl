@@ -1,32 +1,22 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractLattices: ∧, ∨, dist
-import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction
+import AbstractTensors: ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction, TAG
 import DirectSum: diffcheck, diffmode, tangent, hasinforigin, hasorigininf, symmetricsplit
 export tangent
 
-const Field = Real
-const ExprField = Union{Expr,Symbol}
-
-@pure g_one(b::Type{Basis{V}}) where V = getbasis(V,bits(b))
-@pure g_zero(V::Manifold) = 0*one(V)
-@pure g_one(V::Manifold) = Basis{V}()
-@pure g_one(::Type{T}) where T = one(T)
-@pure g_zero(::Type{T}) where T = zero(T)
-
 ## mutating operations
 
-const Sym = :DirectSum
+import DirectSum: g_one, g_zero, Field, ExprField
+const Sym = :AbstractTensors
 const SymField = Any
 
 @pure derive(n::N,b) where N<:Number = zero(typeof(n))
 derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
 #derive(n,b,a::T,t) where T<:TensorAlgebra = t ? (a,derive(n,b)) : (derive(n,b),a)
-
-symmetricsplit(V::M,b::Basis) where M<:Manifold = symmetricsplit(V,bits(b))
 
 @inline function derive_mul(V,A,B,v,x::Bool)
     if !(diffvars(V)≠0 && mixedmode(V)<0)
@@ -132,20 +122,15 @@ function derive_post(V,::Val{A},::Val{B},a,b,*) where {A,B}
     return α*β
 end
 
-@pure isnull(::Expr) = false
-@pure isnull(::Symbol) = false
-isnull(n) = iszero(n)
+import DirectSum: loworder, isnull
 
-for M ∈ (:Signature,:DiagonalForm)
-    @eval @pure loworder(V::$M{N,M,S,D,O}) where {N,M,S,D,O} = O≠0 ? $M{N,M,S,D,O-1}() : V
-end
-@pure loworder(::SubManifold{N,M,S}) where {N,M,S} = SubManifold{N,loworder(M),S}()
-
-add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
+bcast(op,arg) = op ∈ (:(AbstractTensors.:∑),:(AbstractTensors.:-)) ? Expr(:.,op,arg) : Expr(:call,op,arg.args...)
 
 set_val(set,expr,val) = Expr(:(=),expr,set≠:(=) ? Expr(:call,:($Sym.:∑),expr,val) : val)
 
 pre_val(set,expr,val) = set≠:(=) ? :(isnull($expr) ? ($expr=Expr(:call,:($Sym.:∑),$val)) : push!($expr.args,$val)) : Expr(:(=),expr,val)
+
+add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
 
 function generate_mutators(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
@@ -157,7 +142,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inbounds $(set_val(set,:(out[i]),:val))
                 return out
             end
-            for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
+            for (i,B) ∈ ((:i,UInt),(:(bits(i)),SubManifold))
                 @eval begin
                     @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
                         @inbounds $(set_val(set,:(out[$index(intlog(M),$i)]),:val))
@@ -169,7 +154,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                 end
             end
-            for (i,B) ∈ ((:i,Bits),(:(bits(i)),Basis))
+            for (i,B) ∈ ((:i,UInt),(:(bits(i)),SubManifold))
                 @eval begin
                     @inline function $spre(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
                         ind = $index(intlog(M),$i)
@@ -187,7 +172,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
         for s ∈ (sm,sb)
             spre = Symbol(s,:_pre)
             @eval begin
-                @inline function $(Symbol(:join,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:join,s))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
@@ -199,7 +184,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
-                @inline function $(Symbol(:join,spre))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:join,spre))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$v))
@@ -211,7 +196,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
-                @inline function $(Symbol(:geom,s))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:geom,s))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
@@ -225,7 +210,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
-                @inline function $(Symbol(:geom,spre))(V::W,m::$M,a::Bits,b::Bits,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
+                @inline function $(Symbol(:geom,spre))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
@@ -242,14 +227,14 @@ function generate_mutators(M,F,set_val,SUB,MUL)
             end
             for j ∈ (:join,:geom)
                 for S ∈ (s,spre)
-                    @eval @inline function $(Symbol(j,S))(m::$M,v::S,A::Basis{V},B::Basis{V}) where {V,T<:$F,S<:$F,M}
+                    @eval @inline function $(Symbol(j,S))(m::$M,v::S,A::SubManifold{V},B::SubManifold{V}) where {V,T<:$F,S<:$F,M}
                         $(Symbol(j,S))(V,m,bits(A),bits(B),v)
                     end
                 end
             end
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
                 @eval begin
-                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::Bits,B::Bits,val::T) where W<:Manifold{N} where {N,T,M}
+                    @inline function $(Symbol(prod,s))(V::W,m::$M,A::UInt,B::UInt,val::T) where W<:Manifold{N} where {N,T,M}
                         if val ≠ 0
                             g,C,t,Z = $uct(A,B,V)
                             v = val
@@ -265,7 +250,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         end
                         return false
                     end
-                    @inline function $(Symbol(prod,spre))(V::W,m::$M,A::Bits,B::Bits,val::T) where W<:Manifold{N} where {N,T,M}
+                    @inline function $(Symbol(prod,spre))(V::W,m::$M,A::UInt,B::UInt,val::T) where W<:Manifold{N} where {N,T,M}
                         if val ≠ 0
                             g,C,t,Z = $uct(A,B,V)
                             v = val
@@ -283,7 +268,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
 
                 end
                 for S ∈ (s,spre)
-                    @eval @inline function $(Symbol(prod,S))(m::$M,A::Basis{V},B::Basis{V},v::T) where {V,T,M}
+                    @eval @inline function $(Symbol(prod,S))(m::$M,A::SubManifold{V},B::SubManifold{V},v::T) where {V,T,M}
                         $(Symbol(prod,S))(V,m,bits(A),bits(B),v)
                     end
                 end
@@ -302,104 +287,6 @@ end
 
 @inline outeraddblade!_pre(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
 
-
-# Hodge star ★
-
-const complementrighthodge = ⋆
-const complementright = !
-
-## complement
-
-export complementleft, complementright, ⋆, complementlefthodge, complementrighthodge
-
-for side ∈ (:left,:right)
-    c,p = Symbol(:complement,side),Symbol(:parity,side)
-    h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
-    for (c,p) ∈ ((c,p),(h,pg))
-        @eval begin
-            @pure function $c(b::Basis{V,G,B}) where {V,G,B}
-                d = getbasis(V,complement(ndims(V),B,diffvars(V),$(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))))
-                mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
-                v = $(c≠h ? :($pn(V,B,value(d))) : :(value(d)))
-                typeof(V)<:Signature ? ($p(b) ? Simplex{V}(-v,d) : isone(v) ? d : Simplex{V}(v,d)) : Simplex{V}($p(b)*v,d)
-            end
-            $c(b::Simplex) = value(b)≠0 ? value(b)*$c(basis(b)) : g_zero(vectorspace(b))
-        end
-    end
-end
-
-@doc """
-    complementrighthodge(ω::TensorAlgebra)
-
-Grassmann-Poincare-Hodge complement: ⋆ω = ω∗I
-""" complementrighthodge
-
-@doc """
-    complementlefthodge(ω::TensorAlgebra)
-
-Grassmann-Poincare left complement: ⋆'ω = I∗'ω
-""" complementlefthodge
-
-@doc """
-    complementright(::TensorAlgebra)
-
-Non-metric variant of Grassmann-Poincare-Hodge complement.
-""" complementright
-
-@doc """
-    complementleft(::TensorAlgebra)
-
-Non-metric variant Grassmann-Poincare left complement.
-""" complementleft
-
-## reverse
-
-import Base: reverse, conj, ~
-export involute
-
-@pure grade_basis(V,B) = B&(one(Bits)<<DirectSum.grade(V)-1)
-@pure grade_basis(v,::Basis{V,G,B} where G) where {V,B} = grade_basis(V,B)
-@pure grade(V,B) = count_ones(grade_basis(V,B))
-@pure grade(v,::Basis{V,G,B} where G) where {V,B} = grade(V,B)
-
-for r ∈ (:reverse,:involute,:conj)
-    p = Symbol(:parity,r)
-    @eval begin
-        @pure function $r(b::Basis{V,G,B}) where {V,G,B}
-            $p(grade(V,B)) ? Simplex{V}(-value(b),b) : b
-        end
-        $r(b::Simplex) = value(b) ≠ 0 ? value(b) * $r(basis(b)) : g_zero(vectorspace(b))
-    end
-end
-
-"""
-    ~(ω::TensorAlgebra)
-
-Reverse of a `MultiVector` element: ~ω = (-1)^(grade(ω)*(grade(ω)-1)/2)*ω
-"""
-reverse(a::UniformScaling{Bool}) = UniformScaling(!a.λ)
-reverse(a::UniformScaling{T}) where T<:Field = UniformScaling(-a.λ)
-
-"""
-    reverse(ω::TensorAlgebra)
-
-Reverse of a `MultiVector` element: ~ω = (-1)^(grade(ω)*(grade(ω)-1)/2)*ω
-"""
-@inline ~(b::TensorAlgebra) = reverse(b)
-@inline ~(b::UniformScaling) = reverse(b)
-
-@doc """
-    involute(ω::TensorAlgebra)
-
-Involute of a `MultiVector` element: ~ω = (-1)^grade(ω)*ω
-""" involute
-
-@doc """
-    conj(ω::TensorAlgebra)
-
-Clifford conjugate of a `MultiVector` element: conj(ω) = involute(~ω)
-""" conj
-
 ## geometric product
 
 """
@@ -407,9 +294,9 @@ Clifford conjugate of a `MultiVector` element: conj(ω) = involute(~ω)
 
 Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω⊕η))
 """
-@pure *(a::Basis{V},b::Basis{V}) where V = mul(a,b)
+@pure *(a::SubManifold{V},b::SubManifold{V}) where V = mul(a,b)
 
-function mul(a::Basis{V},b::Basis{V},der=derive_mul(V,bits(a),bits(b),1,true)) where V
+function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b),1,true)) where V
     ba,bb = bits(a),bits(b)
     (diffcheck(V,ba,bb) || iszero(der)) && (return g_zero(V))
     A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
@@ -420,19 +307,19 @@ function mul(a::Basis{V},b::Basis{V},der=derive_mul(V,bits(a),bits(b),1,true)) w
     return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
 
-function *(a::Simplex{V},b::Basis{V}) where V
+function *(a::Simplex{V},b::SubManifold{V}) where V
     v = derive_mul(V,bits(basis(a)),bits(b),a.v,true)
     bas = mul(basis(a),b,v)
     order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
-function *(a::Basis{V},b::Simplex{V}) where V
+function *(a::SubManifold{V},b::Simplex{V}) where V
     v = derive_mul(V,bits(a),bits(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
     order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
 
-#*(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
-#*(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
+#*(a::MultiGrade{V},b::SubManifold{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
+#*(a::SubManifold{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #*(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
 *(a::UniformScaling,b::Simplex{V}) where V = V(a)*b
@@ -441,20 +328,19 @@ end
 *(a::Chain{V},b::UniformScaling) where V = a*V(b)
 
 export ∗, ⊛, ⊖
-const ⊖ = *
+import AbstractTensors: ⊖, ⊘, ∗
 
-"""
+@doc """
     ∗(ω::TensorAlgebra,η::TensorAlgebra)
 
 Reversed geometric product: ω∗η = (~ω)*η
-"""
-@inline ∗(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = (~a)*b
+""" Grassmann.:∗
 
 ## exterior product
 
 export ∧, ∨, ⊗
 
-@pure function ∧(a::Basis{V},b::Basis{V}) where V
+@pure function ∧(a::SubManifold{V},b::SubManifold{V}) where V
     ba,bb = bits(a),bits(b)
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb) || iszero(derive_mul(V,ba,bb,1,true))) && (return g_zero(V))
@@ -468,7 +354,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = bits(x),bits(y)
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
+    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if diffvars(V)≠0 && !iszero(Z)
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
@@ -476,8 +362,8 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return Simplex{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
-#∧(a::MultiGrade{V},b::Basis{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
-#∧(a::Basis{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
+#∧(a::MultiGrade{V},b::SubManifold{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
+#∧(a::SubManifold{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
 """
@@ -493,7 +379,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
-@pure function ∨(a::Basis{V},b::Basis{V}) where V
+@pure function ∨(a::SubManifold{V},b::SubManifold{V}) where V
     p,C,t,Z = regressive(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
@@ -505,7 +391,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = bits(basis(a)),bits(basis(b))
     p,C,t,Z = regressive(ba,bb,V)
     !t  && (return g_zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
+    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
@@ -523,12 +409,15 @@ Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(�
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
 
-"""
+for X ∈ TAG, Y ∈ TAG
+    @eval Base.:&(a::$X{V},b::$Y{V}) where V = a∨b
+end
+
+@doc """
     ∨(ω::TensorAlgebra,η::TensorAlgebra)
 
 Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(⋆.(ω)...))
-"""
-Base.:&(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∨b
+""" Grassmann.:&
 
 ## interior product: a ∨ ⋆(b)
 
@@ -540,7 +429,7 @@ export ⋅
 
 Interior (right) contraction product: ω⋅η = ω∨⋆η
 """
-@pure function contraction(a::Basis{V},b::Basis{V}) where V
+@pure function contraction(a::SubManifold{V},b::SubManifold{V}) where V
     g,C,t,Z = interior(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
@@ -552,7 +441,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     ba,bb = bits(basis(a)),bits(basis(b))
     g,C,t,Z = interior(ba,bb,V)
     !t && (return g_zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
+    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
@@ -563,16 +452,11 @@ end
 
 export ⨼, ⨽
 
-@inline Base.abs2(t::T) where T<:TensorGraded = contraction(t,t)
-
-"""
+@doc """
     dot(ω::TensorAlgebra,η::TensorAlgebra)
 
 Interior (right) contraction product: ω⋅η = ω∨⋆η
-"""
-@inline dot(a::A,b::B) where {A<:TensorAlgebra{V},B<:TensorAlgebra{V}} where V = contraction(a,b)
-
-@inline contraction(a::A,b::B) where {A<:TensorGraded,B<:TensorGraded} where V = contraction(a,b)
+""" dot
 
 ## cross product
 
@@ -584,9 +468,7 @@ export ×
 
 Cross product: ω×η = ⋆(ω∧η)
 """
-cross(t::T...) where T<:TensorAlgebra = ⋆(∧(t...))
-
-@pure function cross(a::Basis{V},b::Basis{V}) where V
+@pure function cross(a::SubManifold{V},b::SubManifold{V}) where V
     p,C,t,Z = crossprod(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return zero(V))
     d = getbasis(V,C)
@@ -598,7 +480,7 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = bits(basis(a)),bits(basis(b))
     p,C,t,Z = crossprod(ba,bb,V)
     !t && (return zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),DirectSum.∏)
+    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if diffvars(V)≠0 && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
@@ -624,7 +506,7 @@ Symmetrization projection: ⊙(ω...) = ∑(∏(σ.(ω)...))/factorial(length(ω
 Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(length(ω))
 """
 function ⊠(x::TensorAlgebra...)
-    K,V,out = length(x),∪(vectorspace.(x)...),prod(x)
+    K,V,out = length(x),∪(Manifold.(x)...),prod(x)
     P,F = collect(permutations(1:K)),factorial(K)
     for n ∈ 2:F
         p = prod(x[P[n]])
@@ -633,40 +515,49 @@ function ⊠(x::TensorAlgebra...)
     return out/F
 end
 
-"""
+for X ∈ TAG, Y ∈ TAG
+    @eval <<(a::$X{V},b::$Y{V}) where V = a⊙b
+end
+
+@doc """
     ⊙(ω::TensorAlgebra,η::TensorAlgebra)
 
 Symmetrization projection: ⊙(ω...) = ∑(∏(σ.(ω)...))/factorial(length(ω))
-"""
-<<(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊙b
+""" Grassmann.:<<
 
-"""
+for X ∈ TAG, Y ∈ TAG
+    @eval >>(a::$X{V},b::$Y{V}) where V = a⊠b
+end
+
+@doc """
     ⊠(ω::TensorAlgebra,η::TensorAlgebra)
 
 Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(length(ω))
-"""
->>(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a⊠b
+""" Grassmann.:>>
 
 ## sandwich product
 
 export ⊘
 
-"""
+for X ∈ TAG, Y ∈ TAG
+    @eval ⊘(x::$X{V},y::$Y{V}) where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
+end
+
+@doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
 Sandwich product: ω⊘η = (~ω)⊖η⊖ω
-"""
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = diffvars(V)≠0 ? (~y)*x*involute(y) : inv(y)*x*involute(y)
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{W}) where {V,W} = interop(⊘,x,y)
-⊘(x::TensorAlgebra{V},y::UniformScaling) where V = x⊘V(y)
-⊘(x::UniformScaling,y::TensorAlgebra{V}) where V = V(x)⊘y
+""" Grassmann.:⊘
 
-"""
+for X ∈ TAG, Y ∈ TAG
+    @eval >>>(x::$X{V},y::$Y{V}) where V = x * y * ~x
+end
+
+@doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
-"""
->>>(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = x * y * ~x
+""" Grassmann.:>>>
 
 ## linear algebra
 
@@ -716,99 +607,25 @@ export ⟂, ∥
 end
 
 function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
-    if Field == Grassmann.Field
-        generate_mutators(:(MArray{Tuple{M},T,1,M}),Number,Expr,:-,:*)
-    elseif Field ∈ (SymField,:(SymPy.Sym))
-        generate_mutators(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
-    end
-    PAR && for par ∈ (:parval,:parsym)
-        @eval $par = ($par...,$Field)
-    end
     TF = Field ∉ Fields ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
+    generate_sums(Field,VEC,MUL,ADD,SUB,CONJ,PAR)
     @eval begin
-        @generated function adjoint(m::MultiVector{V,T}) where {V,T<:$Field}
-            if ndims(V)<cache_limit
-                if mixedmode(V)<0
-                    $(insert_expr((:N,:M,:bs,:bn),:vec)...)
-                    out = zeros(svec(N,Any))
-                    for g ∈ 1:N+1
-                        ib = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds setmulti!_pre(out,:($$CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
-                        end
-                    end
-                else
-                    out = :(MultiVector{$(dual(V))}(SVector($$CONJ.(value(m)))))
-                end
-                return :(MultiVector{$(dual(V))}($(Expr(:call,:SVector,out...))))
-            else return quote
-                if mixedmode(V)<0
-                    $(insert_expr((:N,:M,:bs,:bn),$(QuoteNode(VEC)))...)
-                    out = zeros($$VEC(N,$$TF))
-                    for g ∈ 1:N+1
-                        ib = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds setmulti!(out,$$CONJ(m.v[bs[g]+i]),dual(V,ib[i],M))
-                        end
-                    end
-                else
-                    out = $$CONJ.(value(m))
-                end
-                MultiVector{dual(V),$$TF}(out)
-            end end
-        end
-        *(a::F,b::Basis{V}) where {F<:$EF,V} = Simplex{V}(a,b)
-        *(a::Basis{V},b::F) where {F<:$EF,V} = Simplex{V}(b,a)
-        *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,a.v,Ref(b)))
-        *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))
-        *(a::MultiGrade{V,G},b::F) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,a.v,Ref(b)))
-        ∧(a::$Field,b::$Field) = $MUL(a,b)
-        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
-        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
-        #=∧(a::$Field,b::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,T}(a.*b.v)
-        ∧(a::MultiVector{V,T},b::$Field) where {V,T<:$Field} = MultiVector{V,T}(a.v.*b)
-        ∧(a::$Field,b::MultiGrade{V,G}) where V = MultiGrade{V,G}(a.*b.v)
-        ∧(a::MultiGrade{V,G},b::$Field) where V = MultiGrade{V,G}(a.v.*b)=#
-        adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
-        *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
-        *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
         function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
             Simplex(v,mul(ba,bb,v))
         end
-        @generated function adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
-            if binomial(ndims(V),G)<(1<<cache_limit)
-                if mixedmode(V)<0
-                    $(insert_expr((:N,:M,:ib),:svec)...)
-                    out = zeros(svec(N,G,Any))
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
-                    end
-                    return :(Chain{$(dual(V)),G,$$TF}($(Expr(:call,:SVector,out...))))
-                else
-                    return :(Chain{$(dual(V)),G,$$TF}(SVector($$CONJ.(value(m)))))
-                end
-            else return quote
-                if mixedmode(V)<0
-                    $(insert_expr((:N,:M,:ib),$(QuoteNode(VEC)))...)
-                    out = zeros($$VEC(N,G,$$TF))
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds setblade!(out,$$CONJ(m.v[i]),dual(V,ib[i],M),Val{N}())
-                    end
-                else
-                    out = $$CONJ.(value(m))
-                end
-                Chain{dual(V),G,$$TF}(out)
-            end end
-        end
-        *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,a.v,Ref(b)))
-        #∧(a::$Field,b::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,T}(a.*b.v)
-        #∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
-        @generated function contraction(a::Chain{V,G,T},b::Basis{V,L}) where {V,G,T<:$Field,L}
+        ∧(a::$Field,b::$Field) = $MUL(a,b)
+        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
+        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
+        #=∧(a::$Field,b::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,T}(a.*b.v)
+        ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
+        ∧(a::$Field,b::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,T}(a.*b.v)
+        ∧(a::MultiVector{V,T},b::$Field) where {V,T<:$Field} = MultiVector{V,T}(a.v.*b)
+        ∧(a::$Field,b::MultiGrade{V,G}) where V = MultiGrade{V,G}(a.*b.v)
+        ∧(a::MultiGrade{V,G},b::$Field) where V = MultiGrade{V,G}(a.v.*b)=#
+        @generated function contraction(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,T<:$Field,L}
             G<L && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
@@ -843,7 +660,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G,t}(out))
             end end
         end
-        @generated function contraction(a::Basis{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
+        @generated function contraction(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
             L<G && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
@@ -876,8 +693,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G,t}(out))
             end end
         end
-        @generated function ∧(a::Chain{w,G,T},b::Basis{W,L}) where {w,G,T<:$Field,W,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+        @generated function ∧(a::Chain{w,G,T},b::SubManifold{W,L}) where {w,G,T<:$Field,W,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
             G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(w),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,Int)...)
@@ -917,8 +734,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
             end end
         end
-        @generated function ∧(a::Basis{w,G},b::Chain{W,L,T}) where {w,W,T<:$Field,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+        @generated function ∧(a::SubManifold{w,G},b::Chain{W,L,T}) where {w,W,T<:$Field,G,L}
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
             G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,Int,:T)...)
@@ -969,7 +786,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return if μ
                     :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
                 else
-                    :(value_diff($V,G-L,Chain{promote_type(T,S)}($(Expr(:call,:SVector,out...)))))
+                    :(value_diff(Chain{$V,G-L,promote_type(T,S)}($(Expr(:call,:SVector,out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
@@ -1021,7 +838,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Simplex{W,L,B,S}) where {w,G,T<:$Field,W,B,S<:$Field,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
             G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(w),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,:S)...)
@@ -1061,7 +878,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Simplex{w,G,B,S},b::Chain{W,L,T}) where {T<:$Field,w,W,B,S<:$Field,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
             G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:S,:T)...)
@@ -1144,7 +961,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W+w : w+W) : (return :(interop(∧,a,b))))
+            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
             G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
             if binomial(ndims(w),G)*binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,:S)...)
@@ -1348,7 +1165,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                          (:cross,:crossaddmulti!))
         preproduct! = Symbol(product!,:_pre)
         @eval begin
-            @generated function $op(a::MultiVector{V,T},b::Basis{V,G,B}) where {V,T<:$Field,G,B}
+            @generated function $op(a::MultiVector{V,T},b::SubManifold{V,G,B}) where {V,T<:$Field,G,B}
                 if ndims(V)<cache_limit
                     $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
                     for g ∈ 1:N+1
@@ -1372,7 +1189,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return MultiVector{V,t}(out)
                 end end
             end
-            @generated function $op(a::Basis{V,G,A},b::MultiVector{V,T}) where {V,G,A,T<:$Field}
+            @generated function $op(a::SubManifold{V,G,A},b::MultiVector{V,T}) where {V,G,A,T<:$Field}
                 if ndims(V)<cache_limit
                     $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
                     for g ∈ 1:N+1
@@ -1520,7 +1337,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
         end
         op ∉ (:∧,:contraction) && @eval begin
-            @generated function $op(a::Chain{V,G,T},b::Basis{V}) where {V,G,T<:$Field}
+            @generated function $op(a::Chain{V,G,T},b::SubManifold{V}) where {V,G,T<:$Field}
                 if binomial(ndims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:out,:ib),:svec)...)
                     for i ∈ 1:binomial(N,G)
@@ -1538,7 +1355,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return MultiVector{V,t}(out)
                 end end
             end
-            @generated function $op(a::Basis{V},b::Chain{V,G,T}) where {V,G,T<:$Field}
+            @generated function $op(a::SubManifold{V},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 if binomial(ndims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:out,:ib),:svec)...)
                     for i ∈ 1:binomial(N,G)
@@ -1638,9 +1455,88 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end=#
         end
     end
+end
 
-    ## term addition
-
+function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
+    if Field == Grassmann.Field
+        generate_mutators(:(MArray{Tuple{M},T,1,M}),Number,Expr,SUB,MUL)
+    elseif Field ∈ (SymField,:(SymPy.Sym))
+        generate_mutators(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
+    end
+    PAR && (DirectSum.extend_field(Field); parsym = (parsym...,Field))
+    TF = Field ∉ Fields ? :Any : :T
+    EF = Field ≠ Any ? Field : ExprField
+    Field ∉ Fields && @eval begin
+        Base.:*(a::F,b::SubManifold{V}) where {F<:$EF,V} = Simplex{V}(a,b)
+        Base.:*(a::SubManifold{V},b::F) where {F<:$EF,V} = Simplex{V}(b,a)
+        Base.:*(a::F,b::Simplex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
+        Base.:*(a::Simplex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
+        Base.adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
+    end
+    @eval begin
+        *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,Ref(a),b.v))
+        *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,a.v,Ref(b)))
+        *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,a.v,Ref(b)))
+        *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))
+        *(a::MultiGrade{V,G},b::F) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,a.v,Ref(b)))
+        @generated function adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
+            if binomial(ndims(V),G)<(1<<cache_limit)
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:ib),:svec)...)
+                    out = zeros(svec(N,G,Any))
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
+                    end
+                    return :(Chain{$(dual(V)),G,$$TF}($(Expr(:call,:SVector,out...))))
+                else
+                    return :(Chain{$(dual(V)),G,$$TF}(SVector($$CONJ.(value(m)))))
+                end
+            else return quote
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:ib),$(QuoteNode(VEC)))...)
+                    out = zeros($$VEC(N,G,$$TF))
+                    for i ∈ 1:binomial(N,G)
+                        @inbounds setblade!(out,$$CONJ(m.v[i]),dual(V,ib[i],M),Val{N}())
+                    end
+                else
+                    out = $$CONJ.(value(m))
+                end
+                Chain{dual(V),G,$$TF}(out)
+            end end
+        end
+        @generated function adjoint(m::MultiVector{V,T}) where {V,T<:$Field}
+            if ndims(V)<cache_limit
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:bs,:bn),:vec)...)
+                    out = zeros(svec(N,Any))
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds setmulti!_pre(out,:($$CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
+                        end
+                    end
+                else
+                    out = :(MultiVector{$(dual(V))}(SVector($$CONJ.(value(m)))))
+                end
+                return :(MultiVector{$(dual(V))}($(Expr(:call,:SVector,out...))))
+            else return quote
+                if mixedmode(V)<0
+                    $(insert_expr((:N,:M,:bs,:bn),$(QuoteNode(VEC)))...)
+                    out = zeros($$VEC(N,$$TF))
+                    for g ∈ 1:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds setmulti!(out,$$CONJ(m.v[bs[g]+i]),dual(V,ib[i],M))
+                        end
+                    end
+                else
+                    out = $$CONJ.(value(m))
+                end
+                MultiVector{dual(V),$$TF}(out)
+            end end
+        end
+    end
     for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
         @eval begin
             function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
@@ -1662,7 +1558,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
             end
             $op(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($bop(value(a)))
-            function $op(a::Simplex{V,A,X,T},b::Basis{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
+            function $op(a::Simplex{V,A,X,T},b::SubManifold{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
                 if X == b
                     return Simplex{V,A}($bop(value(a),value(b)),b)
                 elseif A == B
@@ -1680,7 +1576,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return MultiVector{V,t}(out)
                 end
             end
-            function $op(a::Basis{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
+            function $op(a::SubManifold{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
                 if a == Y
                     return Simplex{V,A}($bop(value(a),value(b)),a)
                 elseif A == B
@@ -1711,13 +1607,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return MultiVector{V,t}(out)
             end
             $op(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(bop,:(value(a),))))
-            function $op(a::Basis{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
+            function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
                 return MultiVector{V,t}(out)
             end
-            function $op(a::MultiVector{V,T},b::Basis{V,G}) where {V,T<:$Field,G}
+            function $op(a::MultiVector{V,T},b::SubManifold{V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
@@ -1756,7 +1652,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         vA = value(A,t)
                         addmulti!(out,vA.nzval,vA.nzind)
                     else
-                        g = grade(A)
+                        g = rank(A)
                         r = binomsum(N,g)
                         @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(A,$VEC(N,g,t))),bop))
                     end
@@ -1776,7 +1672,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         vB = value(B,t)
                         addmulti!(out,vB.nzval,vB.nzind)
                     else
-                        g = grade(B)
+                        g = rank(B)
                         r = binomsum(N,g)
                         @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t))),bop))
                     end
@@ -1785,7 +1681,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
             function $op(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = value(a,MVector{bng,t})
+                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                 rb = binomsum(N,L)
                 Rb = binomial(N,L)
                 @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
@@ -1819,25 +1715,25 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return MultiVector{V,t}(out)
             end
             $op(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(bop,:(value(a),))))
-            function $op(a::$Chain{V,G,T},b::Basis{V,G}) where {V,G,T<:$Field}
+            function $op(a::$Chain{V,G,T},b::SubManifold{V,G}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,G,t)))
                 addblade!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
                 return Chain{V,G,t}(out)
             end
-            function $op(a::Basis{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
+            function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                 addblade!(out,value(a,t),basis(a),Val{N}())
                 return Chain{V,G,t}(out)
             end
-            function $op(a::Chain{V,G,T},b::Basis{V,L}) where {V,G,T<:$Field,L}
+            function $op(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,T<:$Field,L}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
                 return MultiVector{V,t}(out)
             end
-            function $op(a::Basis{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
+            function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
@@ -1875,6 +1771,23 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end
 end
 
+generate_products()
+generate_products(Complex)
+generate_products(Rational{BigInt},:svec)
+for Big ∈ (BigFloat,BigInt)
+    generate_products(Big,:svec)
+    generate_products(Complex{Big},:svec)
+end
+generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
+function generate_derivation(m,t,d,c)
+    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(Manifold(b),bits(b))))
+end
+function generate_algebra(m,t,d=nothing,c=nothing)
+    generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
+    generate_inverses(m,t)
+    !isnothing(d) && generate_derivation(m,t,d,c)
+end
+
 @eval begin
     *(a::F,b::MultiVector{V,T}) where {F<:Number,V,T} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.:∏,Ref(a),b.v))
     *(a::MultiVector{V,T},b::F) where {F<:Number,V,T} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.:∏,a.v,Ref(b)))
@@ -1896,28 +1809,11 @@ for F ∈ Fields
 end
 
 for op ∈ (:*,:cross)
-    for A ∈ (Basis,Simplex,Chain,MultiVector)
-        for B ∈ (Basis,Simplex,Chain,MultiVector)
+    for A ∈ (SubManifold,Simplex,Chain,MultiVector)
+        for B ∈ (SubManifold,Simplex,Chain,MultiVector)
             @eval @inline $op(a::$A,b::$B) = interop($op,a,b)
         end
     end
-end
-
-generate_products()
-generate_products(Complex)
-generate_products(Rational{BigInt},:svec)
-for Big ∈ (BigFloat,BigInt)
-    generate_products(Big,:svec)
-    generate_products(Complex{Big},:svec)
-end
-generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
-function generate_derivation(m,t,d,c)
-    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(vectorspace(b),bits(b))))
-end
-function generate_algebra(m,t,d=nothing,c=nothing)
-    generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
-    generate_inverses(m,t)
-    !isnothing(d) && generate_derivation(m,t,d,c)
 end
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}
@@ -1925,13 +1821,13 @@ const NSE = Union{Symbol,Expr,<:Real,<:Complex}
 for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     for Term ∈ (:TensorGraded,:TensorMixed)
         @eval begin
-            $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*one(vectorspace(a)))
-            $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*one(vectorspace(b)),b)
+            $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*one(Manifold(a)))
+            $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*one(Manifold(b)),b)
         end
     end
     @eval begin
-        $op(a::Basis{V,G,B} where G) where {V,B} = Simplex($op(value(a)),a)
-        function $op(a::Basis{V,A},b::Basis{V,B}) where {V,A,B}
+        $op(a::SubManifold{V,G,B} where G) where {V,B} = Simplex($op(value(a)),a)
+        function $op(a::SubManifold{V,A},b::SubManifold{V,B}) where {V,A,B}
             if a == b
                 return Simplex{V,A}($op(value(a),value(b)),basis(a))
             elseif A == B
@@ -1970,18 +1866,18 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
             bl = length(bt)
             out = convert(Vector{TensorGraded{V}},at)
             N = ndims(V)
-            i,k,bk = 0,1,grade(out[1])
+            i,k,bk = 0,1,rank(out[1])
             while i < bl
                 k += 1
                 i += 1
-                bas = grade(bt[i])
+                bas = rank(bt[i])
                 if bas == bk
                     $(Expr(eop,:(out[k-1]),:(bt[i])))
-                    k < length(out) ? (bk = grade(out[k])) : (k -= 1)
+                    k < length(out) ? (bk = rank(out[k])) : (k -= 1)
                 elseif bas<bk
                     insert!(out,k-1,bt[i])
                 elseif k ≤ length(out)
-                    bk = grade(out[k])
+                    bk = rank(out[k])
                     i -= 1
                 else
                     insert!(out,k,bt[i])
@@ -1993,7 +1889,7 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
         function $op(a::MultiGrade{V,A},b::T) where T<:TensorGraded{V,B} where {V,A,B}
             N = ndims(V)
             out = convert(Vector{TensorGraded{V}},terms(a))
-            i,k,bk,bl = 0,1,grade(out[1]),length(out)
+            i,k,bk,bl = 0,1,rank(out[1]),length(out)
             while i < bl
                 k += 1
                 i += 1
@@ -2004,7 +1900,7 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                     insert!(out,k-1,b)
                     break
                 elseif k ≤ length(out)
-                    bk = grade(out[k])
+                    bk = rank(out[k])
                 else
                     insert!(out,k,b)
                     break
@@ -2036,15 +1932,16 @@ end
 ## exponentiation
 
 function ^(v::T,i::Integer) where T<:TensorTerm
-    i == 0 && (return getbasis(vectorspace(v),0))
+    i == 0 && (return getbasis(Manifold(v),0))
     out = basis(v)
     for k ∈ 1:(i-1)%4
         out *= basis(v)
     end
-    return typeof(v)<:Basis ? out : out*DirectSum.:^(value(v),i)
+    return typeof(v)<:SubManifold ? out : out*AbstractTensors.:^(value(v),i)
 end
 
-function Base.:^(v::T,i::S) where {T<:TensorAlgebra{V},S<:Integer} where V
+function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
+    V = Manifold(v)
     isone(i) && (return v)
     out = one(V)
     if i < 8 # optimal choice ?
@@ -2069,11 +1966,11 @@ end
 
 ## division
 
-@pure abs2_inv(::Basis{V,G,B} where G) where {V,B} = abs2(getbasis(V,grade_basis(V,B)))
+@pure abs2_inv(::SubManifold{V,G,B} where G) where {V,B} = abs2(getbasis(V,grade_basis(V,B)))
 
 for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
-        @pure function $nv(b::Basis{V,G,B}) where {V,G,B}
+        @pure function $nv(b::SubManifold{V,G,B}) where {V,G,B}
             $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
         end
         @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
@@ -2085,7 +1982,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             sd = scalar(d)
             value(sd) ≈ fd && (return $d(rm,sd))
             for k ∈ 1:ndims(V)
-                @inbounds DirectSum.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
         end
@@ -2107,12 +2004,12 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             Simplex{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
         end
         function $nv(a::Chain)
-            r,v,q = ~a,abs2(a),diffvars(vectorspace(a))≠0
+            r,v,q = ~a,abs2(a),diffvars(Manifold(a))≠0
             q&&!(typeof(v)<:TensorGraded && grade(v)==0) ? $d(r,v) : $d(r,value(scalar(v)))
         end
     end
     for Term ∈ (:TensorGraded,:TensorMixed)
-        @eval @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(vectorspace(a)(b))
+        @eval @pure $d(a::S,b::UniformScaling) where S<:$Term = a*$nv(Manifold(a)(b))
     end
 end
 
@@ -2132,40 +2029,19 @@ for T ∈ (:Real,:Complex)
 end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
-    @eval Base.$op(b::Simplex{V,G,B,T},m) where {V,G,B,T} = Simplex{V,G,B}($op(value(b),m))
-    @eval Base.$op(a::Chain{V,G,T},m::S) where {V,G,T,S} = Chain{V,G,promote_type(T,S)}($op.(value(a),m))
     @eval begin
-        Base.$op(a::Basis{V,G},m) where {V,G} = Basis{V,G}($op(value(a),m))
+        Base.$op(a::Chain{V,G,T},m::S) where {V,G,T,S} = Chain{V,G,promote_type(T,S)}($op.(value(a),m))
         Base.$op(a::MultiVector{V,T},m::S) where {T,V,S} = MultiVector{V,promote_type(T,S)}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
-    @eval Base.$op(b::Simplex{V,G,B,T}) where {V,G,B,T} = Simplex{V,G,B}($op(value(b)))
-    @eval Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G,promote_type(T,Float64)}($op.(value(a)))
     @eval begin
-        Base.$op(a::Basis{V,G}) where {V,G} = Basis{V,G}($op(value(a)))
+        Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G,promote_type(T,Float64)}($op.(value(a)))
         Base.$op(a::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,Float64)}($op.(value(a)))
     end
 end
-for op ∈ (:isfinite,)
-    @eval Base.$op(b::Simplex{V,G,B,T}) where {V,G,B,T} = $op(value(b))
-    @eval Base.$op(a::Chain{V,G,T}) where {V,G,T} = prod($op.(value(a)))
-    @eval begin
-        Base.$op(a::Basis{V,G}) where {V,G} = $op(value(a))
-        Base.$op(a::MultiVector{V,T}) where {V,T} = prod($op.(value(a)))
-    end
-end
-Base.rationalize(t::Type,b::Simplex{V,G,B,T};tol::Real=eps(T)) where {V,G,B,T} = Simplex{V,G,B}(rationalize(t,value(b),tol))
+Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
+Base.isfinite(a::MultiVector) = prod(isfinite.(value(a)))
 Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G,T}(rationalize.(t,value(a),tol))
-Base.rationalize(t::Type,a::Basis{V,G},tol::Real=eps(T)) where {V,G} = Basis{V,G}(rationalize(t,value(a),tol))
 Base.rationalize(t::Type,a::MultiVector{V,T};tol::Real=eps(T)) where {V,T} = MultiVector{V,T}(rationalize.(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
-
-# comparison (special case for scalars)
-
-Base.isless(a::T,b::S) where {T<:TensorTerm{V,0},S<:TensorTerm{W,0}} where {V,W} = isless(value(a),value(b))
-Base.isless(a::T,b) where T<:TensorTerm{V,0} where V = isless(value(a),b)
-Base.isless(a,b::T) where T<:TensorTerm{V,0} where V = isless(a,value(b))
-Base.:<=(x::T,y::S) where {T<:TensorTerm{V,0},S<:TensorTerm{W,0}} where {V,W} = isless(x,y) | (x == y)
-Base.:<=(x::T,y) where T<:TensorTerm{V,0} where V = isless(x,y) | (x == y)
-Base.:<=(x,y::T) where T<:TensorTerm{V,0} where V = isless(x,y) | (x == y)

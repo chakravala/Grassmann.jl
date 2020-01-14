@@ -1,15 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 export exph, log_fast, logh_fast
 
 ## exponential & logarithm function
 
-@inline Base.expm1(t::Basis{V,0}) where V = Simplex{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.expm1(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.expm1(t::SubManifold{V,0}) where V = Simplex{V}(ℯ-1)
+@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
-function Base.expm1(t::T) where T<:TensorAlgebra{V} where V
+function Base.expm1(t::T) where T<:TensorAlgebra
+    V = Manifold(t)
     S,term,f = t,(t^2)/2,norm(t)
     norms = SizedVector{3}(f,norm(term),f)
     k::Int = 3
@@ -28,8 +29,8 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
     return quote
         B = value(b)
-        sb,nb = scalar(b),DirectSum.norm(B)
-        sb ≈ nb && (return Simplex{V}(DirectSum.expm1(value(sb))))
+        sb,nb = scalar(b),AbstractTensors.norm(B)
+        sb ≈ nb && (return Simplex{V}(AbstractTensors.expm1(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -56,29 +57,29 @@ end
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
 function Base.exp(t::T) where T<:TensorGraded{V,G} where {V,G}
-    S = T<:Basis
+    S = T<:SubManifold
     i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return 1+t)
-        G==0 && (return Simplex{V}(DirectSum.exp(value(S ? t : scalar(t)))))
-        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t))))))
-        hint<0 ? DirectSum.cos(θ)+t*(S ? DirectSum.sin(θ) : DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+t*(S ? DirectSum.sinh(θ) : DirectSum.:/(DirectSum.sinh(θ),θ))
+        G==0 && (return Simplex{V}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
+        hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
         return 1+expm1(t)
     end
 end
 
 function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V,G} where {V,G,hint}
-    S = T<:Basis
+    S = T<:SubManifold
     i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
         isnull(hint) && (return 1+t)
-        G==0 && (return Simplex{V}(DirectSum.exp(value(S ? t : scalar(t)))))
-        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(t))))))
-        hint<0 ? DirectSum.cos(θ)+t*(S ? DirectSum.sin(θ) : DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+t*(S ? DirectSum.sinh(θ) : DirectSum.:/(DirectSum.sinh(θ),θ))
+        G==0 && (return Simplex{V}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
+        hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
         return 1+expm1(t)
     end
@@ -90,9 +91,9 @@ function Base.exp(t::MultiVector)
     sq = mt*mt
     if isscalar(sq)
         hint = value(scalar(sq))
-        isnull(hint) && (return DirectSum.exp(value(st))*(1+t))
-        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt))))))
-        return DirectSum.exp(value(st))*(hint<0 ? DirectSum.cos(θ)+mt*(DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+mt*(DirectSum.:/(DirectSum.sinh(θ),θ)))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
         return 1+expm1(t)
     end
@@ -103,15 +104,16 @@ function Base.exp(t::MultiVector,::Val{hint}) where hint
     mt = t-scalar(t)
     sq = mt*mt
     if isscalar(sq)
-        isnull(hint) && (return DirectSum.exp(value(st))*(1+t))
-        θ = unabs!(DirectSum.sqrt(DirectSum.abs(value(scalar(abs2(mt))))))
-        return DirectSum.exp(value(st))*(hint<0 ? DirectSum.cos(θ)+mt*(DirectSum.:/(DirectSum.sin(θ),θ)) : DirectSum.cosh(θ)+mt*(DirectSum.:/(DirectSum.sinh(θ),θ)))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
         return 1+expm1(t)
     end
 end
 
-function qlog(w::T,x::Int=10000) where T<:TensorAlgebra{V} where V
+function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
+    V = Manifold(w)
     w2,f = w^2,norm(w)
     prod = w*w2
     S,term = w,prod/3
@@ -166,7 +168,7 @@ end
 
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
-        @inline Base.$qrt(t::Basis{V,0} where V) = t
+        @inline Base.$qrt(t::SubManifold{V,0} where V) = t
         @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
@@ -176,9 +178,10 @@ end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.cosh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
 
-function Base.cosh(t::T) where T<:TensorAlgebra{V} where V
+function Base.cosh(t::T) where T<:TensorAlgebra
+    V = Manifold(t)
     τ = t^2
     S,term = τ/2,(τ^2)/24
     f = norm(S)
@@ -199,7 +202,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(DirectSum.cosh(value(sb))))
+        sb ≈ nb && (return Simplex{V}(AbstractTensors.cosh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::MultiVector{V,T,E} = b^2
         B = value(τ)
@@ -225,9 +228,10 @@ end
     end
 end
 
-@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(DirectSum.sinh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
-function Base.sinh(t::T) where T<:TensorAlgebra{V} where V
+function Base.sinh(t::T) where T<:TensorAlgebra
+    V = Manifold(t)
     τ,f = t^2,norm(t)
     S,term = t,(t*τ)/6
     norms = SizedVector{3}(f,norm(term),f)
@@ -247,7 +251,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(DirectSum.sinh(value(sb))))
+        sb ≈ nb && (return Simplex{V}(AbstractTensors.sinh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::MultiVector{V,T,E} = b^2
         B = value(τ)
@@ -275,7 +279,8 @@ end
 exph(t) = Base.cosh(t)+Base.sinh(t)
 
 for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
-    @eval function $logfast(t::T) where T<:TensorAlgebra{V} where V
+    @eval function $logfast(t::T) where T<:TensorAlgebra
+        V = Manifold(t)
         term = zero(V)
         norm = SizedVector{2}(0.,0.)
         while true
@@ -288,7 +293,8 @@ for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
     end
 end
 
-#=function log(t::T) where T<:TensorAlgebra{V} where V
+#=function log(t::T) where T<:TensorAlgebra
+    V = Manifold(t)
     norms::Tuple = (norm(t),0)
     k::Int = 3
     τ = t-1
