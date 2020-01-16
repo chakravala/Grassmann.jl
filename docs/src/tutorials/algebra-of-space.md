@@ -13,7 +13,7 @@ Given a three dimensional GA with the orthonormal basis ``v_i\cdot v_j = \delta_
 ```math
 \{\underbrace{v}_{\text{scalar}},\qquad\underbrace{v_1,v_2,v_3}_{\text{vectors}},\qquad\underbrace{v_{12},v_{23},v_{13}}_{\text{bivectors}},\qquad\underbrace{v_{123}}_{\text{trivector}}\}
 ```
-The `@basis` macro declares the algebra and assigns the `SubManifold` elements to local variables. The `DirectSum.Basis` can also be assigned to `G3` as
+The `@basis` macro declares the algebra and assigns the `SubManifold` elements to local variables. The `Basis` can also be assigned to `G3` as
 ```@repl ga
 G3 = Λ(3)
 ```

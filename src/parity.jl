@@ -139,7 +139,7 @@ const parity_extra = Dict{UInt,Dict{UInt,Dict{UInt,Bool}}}[]
 end
 @pure function parity(a::UInt,b::UInt,v::Signature)
     d=diffmask(v)
-    D=mixedmode(v)<0 ? |(d...) : d
+    D=isdyadic(v) ? |(d...) : d
     parity(ndims(v),metric(v),(a&~D),(b&~D))
 end
 @pure parity(a::UInt,b::UInt,v::Manifold) = parity(a,b,Signature(v))

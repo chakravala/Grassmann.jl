@@ -19,7 +19,7 @@ derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
 #derive(n,b,a::T,t) where T<:TensorAlgebra = t ? (a,derive(n,b)) : (derive(n,b),a)
 
 @inline function derive_mul(V,A,B,v,x::Bool)
-    if !(diffvars(V)≠0 && mixedmode(V)<0)
+    if !(istangent(V) && isdyadic(V))
         return v
     else
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
@@ -37,7 +37,7 @@ derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
 end
 
 @inline function derive_mul(V,A,B,a,b,*)
-    if !(diffvars(V)≠0 && mixedmode(V)<0)
+    if !(istangent(V) && isdyadic(V))
         return a*b
     else
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
@@ -67,7 +67,7 @@ end
 end
 
 function derive_pre(V,A,B,v,x)
-    if !(diffvars(V)≠0 && mixedmode(V)<0)
+    if !(istangent(V) && isdyadic(V))
         return v
     else
         return :(derive_post($V,$(Val{A}()),$(Val{B}()),$v,$x))
@@ -75,7 +75,7 @@ function derive_pre(V,A,B,v,x)
 end
 
 function derive_pre(V,A,B,a,b,p)
-    if !(diffvars(V)≠0 && mixedmode(V)<0)
+    if !(istangent(V) && isdyadic(V))
         return Expr(:call,p,a,b)
     else
         return :(derive_post($V,$(Val{A}()),$(Val{B}()),$a,$b,$p))
@@ -201,7 +201,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
-                        if diffvars(V)≠0
+                        if istangent(V)
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
@@ -215,7 +215,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
                         val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$(pcc ? :($$SUB($v)) : v)))
-                        if diffvars(V)≠0
+                        if istangent(V)
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                             val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                         end
@@ -238,7 +238,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         if val ≠ 0
                             g,C,t,Z = $uct(A,B,V)
                             v = val
-                            if diffvars(V)≠0
+                            if istangent(V)
                                 if !iszero(Z)
                                     T≠Any && (return true)
                                     _,_,Q,_ = symmetricmask(V,A,B)
@@ -254,7 +254,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         if val ≠ 0
                             g,C,t,Z = $uct(A,B,V)
                             v = val
-                            if diffvars(V)≠0
+                            if istangent(V)
                                 if !iszero(Z)
                                     _,_,Q,_ = symmetricmask(V,A,B)
                                     v = Expr(:call,:*,v,getbasis(loworder(V),Z))
@@ -355,7 +355,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
-    if diffvars(V)≠0 && !iszero(Z)
+    if istangent(V) && !iszero(Z)
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
@@ -383,7 +383,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
     p,C,t,Z = regressive(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
     return p ? Simplex{V}(-1,d) : d
 end
 
@@ -392,7 +392,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     p,C,t,Z = regressive(ba,bb,V)
     !t  && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
-    if diffvars(V)≠0 && !iszero(Z)
+    if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
@@ -433,7 +433,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     g,C,t,Z = interior(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
     return typeof(V) <: Signature ? (g ? Simplex{V}(-1,d) : d) : Simplex{V}(g,d)
 end
 
@@ -442,7 +442,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     g,C,t,Z = interior(ba,bb,V)
     !t && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
-    if diffvars(V)≠0 && !iszero(Z)
+    if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
@@ -472,7 +472,7 @@ Cross product: ω×η = ⋆(ω∧η)
     p,C,t,Z = crossprod(a,b)
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return zero(V))
     d = getbasis(V,C)
-    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
+    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
     return p ? Simplex{V}(-1,d) : d
 end
 
@@ -481,7 +481,7 @@ function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     p,C,t,Z = crossprod(ba,bb,V)
     !t && (return zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
-    if diffvars(V)≠0 && !iszero(Z)
+    if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
@@ -626,7 +626,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         ∧(a::$Field,b::MultiGrade{V,G}) where V = MultiGrade{V,G}(a.*b.v)
         ∧(a::MultiGrade{V,G},b::$Field) where V = MultiGrade{V,G}(a.v.*b)=#
         @generated function contraction(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,T<:$Field,L}
-            G<L && diffvars(V)==0 && (return g_zero(V))
+            G<L && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
                 out = zeros(μ ? svec(N,Any) : svec(N,G-L,Any))
@@ -661,7 +661,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function contraction(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
-            L<G && diffvars(V)==0 && (return g_zero(V))
+            L<G && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
                 out = zeros(μ ? svec(N,Any) : svec(N,L-G,Any))
@@ -694,13 +694,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::SubManifold{W,L}) where {w,G,T<:$Field,W,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
-            G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
+            V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(w),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,Int)...)
                 ib = indexbasis(ndims(w),G)
                 out = zeros(μ ? svec(N,Any) : svec(N,G+L,Any))
-                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
+                C,y = isdual(w),isdual(W) ? dual(V,bits(b)) : bits(b)
                 for i ∈ 1:binomial(ndims(w),G)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -719,7 +719,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(w),G)
                 out = zeros(μ ? $$VEC(N,t) : $$VEC(N,G+L,t))
-                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(b)) : bits(b)
+                C,y = isdual(w),isdual(W) ? dual(V,bits(b)) : bits(b)
                 for i ∈ 1:binomial(ndims(w),G)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -735,13 +735,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::SubManifold{w,G},b::Chain{W,L,T}) where {w,W,T<:$Field,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
-            G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
+            V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,Int,:T)...)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,G+L,Any))
-                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
+                C,x = isdual(W),isdual(w) ? dual(V,bits(a)) : bits(a)
                 for i ∈ 1:binomial(ndims(W),L)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -760,7 +760,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ ? $$VEC(N,t) : $$VEC(N,G+L,t))
-                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(a)) : bits(a)
+                C,x = isdual(W),isdual(w) ? dual(V,bits(a)) : bits(a)
                 for i ∈ 1:binomial(ndims(W),L)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -776,7 +776,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function contraction(a::Chain{V,G,T},b::Simplex{V,L,B,S}) where {V,G,T<:$Field,B,S<:$Field,L}
-            G<L && diffvars(V)==0 && (return g_zero(V))
+            G<L && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
                 out,X = zeros(μ ? svec(N,Any) : svec(N,G-L,Any)),bits(B)
@@ -805,7 +805,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function contraction(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,B,S<:$Field,L}
-            L<G && diffvars(V)==0 && (return g_zero(V))
+            L<G && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
                 out,A = zeros(μ ? svec(N,Any) : svec(N,L-G,Any)),bits(B)
@@ -838,13 +838,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Simplex{W,L,B,S}) where {w,G,T<:$Field,W,B,S<:$Field,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
-            G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
+            V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(w),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,:S)...)
                 ib = indexbasis(ndims(w),G)
                 out = zeros(μ ? svec(N,Any) : svec(N,G+L,Any))
-                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
+                C,y = isdual(w),isdual(W) ? dual(V,bits(B)) : bits(B)
                 for i ∈ 1:binomial(ndims(w),G)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -862,7 +862,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(w),G)
                 out = zeros(μ ? $$VEC(N,t) : $$VEC(N,G+L,t))
-                C,y = mixedmode(w)>0,mixedmode(W)>0 ? dual(V,bits(B)) : bits(B)
+                C,y = isdual(w),isdual(W) ? dual(V,bits(B)) : bits(B)
                 for i ∈ 1:binomial(ndims(w),G)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -878,13 +878,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Simplex{w,G,B,S},b::Chain{W,L,T}) where {T<:$Field,w,W,B,S<:$Field,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
-            G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
+            V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:S,:T)...)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,G+L,Any))
-                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
+                C,x = isdual(W),isdual(w) ? dual(V,bits(B)) : bits(B)
                 for i ∈ 1:binomial(ndims(W),L)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -902,7 +902,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ ? $$VEC(N,t) : $$VEC(N,G+L,t))
-                C,x = mixedmode(W)>0,mixedmode(w)>0 ? dual(V,bits(B)) : bits(B)
+                C,x = isdual(W),isdual(w) ? dual(V,bits(B)) : bits(B)
                 for i ∈ 1:binomial(ndims(W),L)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     if μ
@@ -918,7 +918,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function contraction(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,L,T<:$Field,S<:$Field}
-            G<L && diffvars(V)==0 && (return g_zero(V))
+            G<L && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:bng,:bnl,:μ),:svec)...)
                 ia = indexbasis(N,G)
@@ -961,14 +961,14 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}
-            V = w==W ? w : ((w==dual(W)) ? (mixedmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
-            G+L>ndims(V) && diffvars(V)==0 && (return g_zero(V))
+            V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+            G+L>ndims(V) && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(w),G)*binomial(ndims(W),L)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:μ),VEC,:T,:S)...)
                 ia = indexbasis(ndims(w),G)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,G+L,Any))
-                CA,CB = mixedmode(w)>0,mixedmode(W)>0
+                CA,CB = isdual(w),isdual(W)
                 for i ∈ 1:binomial(ndims(w),G)
                     @inbounds v,iai = :(a[$i]),ia[i]
                     x = CA ? dual(V,iai) : iai
@@ -991,7 +991,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 ia = indexbasis(ndims(w),G)
                 ib = indexbasis(ndims(W),L)
                 out = zeros(μ $$VEC(N,t) : $$VEC(N,G+L,t))
-                CA,CB = mixedmode(w)>0,mixedmode(W)>0
+                CA,CB = isdual(w),isdual(W)
                 for i ∈ 1:binomial(ndims(w),G)
                     @inbounds v,iai = a[i],ia[i]
                     x = CA ? dual(V,iai) : iai
@@ -1018,7 +1018,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         for (c,p) ∈ ((c,p),(h,pg))
             @eval begin
                 @generated function $c(b::Chain{V,G,T}) where {V,G,T<:$Field}
-                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                     if binomial(ndims(V),G)<(1<<cache_limit)
                         $(insert_expr((:N,:ib,:D,:P),:svec)...)
                         out = zeros(svec(N,G,Any))
@@ -1048,7 +1048,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end end
                 end
                 @generated function $c(m::MultiVector{V,T}) where {V,T<:$Field}
-                    mixedmode(V)<0 && throw(error("Complement for mixed tensors is undefined"))
+                    isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                     if ndims(V)<cache_limit
                         $(insert_expr((:N,:bs,:bn,:P),:svec)...)
                         out = zeros(svec(N,Any))
@@ -1482,7 +1482,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         *(a::MultiGrade{V,G},b::F) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,a.v,Ref(b)))
         @generated function adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
             if binomial(ndims(V),G)<(1<<cache_limit)
-                if mixedmode(V)<0
+                if isdyadic(V)
                     $(insert_expr((:N,:M,:ib),:svec)...)
                     out = zeros(svec(N,G,Any))
                     for i ∈ 1:binomial(N,G)
@@ -1493,7 +1493,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     return :(Chain{$(dual(V)),G,$$TF}(SVector($$CONJ.(value(m)))))
                 end
             else return quote
-                if mixedmode(V)<0
+                if isdyadic(V)
                     $(insert_expr((:N,:M,:ib),$(QuoteNode(VEC)))...)
                     out = zeros($$VEC(N,G,$$TF))
                     for i ∈ 1:binomial(N,G)
@@ -1507,7 +1507,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         end
         @generated function adjoint(m::MultiVector{V,T}) where {V,T<:$Field}
             if ndims(V)<cache_limit
-                if mixedmode(V)<0
+                if isdyadic(V)
                     $(insert_expr((:N,:M,:bs,:bn),:vec)...)
                     out = zeros(svec(N,Any))
                     for g ∈ 1:N+1
@@ -1521,7 +1521,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 end
                 return :(MultiVector{$(dual(V))}($(Expr(:call,:SVector,out...))))
             else return quote
-                if mixedmode(V)<0
+                if isdyadic(V)
                     $(insert_expr((:N,:M,:bs,:bn),$(QuoteNode(VEC)))...)
                     out = zeros($$VEC(N,$$TF))
                     for g ∈ 1:N+1

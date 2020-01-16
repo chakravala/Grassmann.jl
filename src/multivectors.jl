@@ -284,7 +284,7 @@ end
 end
 
 @doc """
-    MultiGrade{V,G} <: TensorMixed{V,G} <: TensorAlgebra{V}
+    MultiGrade{V,G} <: TensorMixed{V} <: TensorAlgebra{V}
 
 Sparse multivector type with pseudoscalar `V::Manifold` and grade encoding `G::UInt64`.
 """ MultiGrade

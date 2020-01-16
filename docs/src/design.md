@@ -30,7 +30,7 @@ Likewise, any new product formulas will be able to quickly gain from the setup o
 The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
 This enables the usage of many different types of `TensorAlgebra` along with various `VectorBundle` parameters and interoperability for a wide range of scientific and research applications.
 
-## DirectSum yields `VectorBundle` parametric type polymorphism ⨁
+## DirectSum yields `VectorBundle` parametric type polymorphism
 
 [![DOI](https://zenodo.org/badge/169765288.svg)](https://zenodo.org/badge/latestdoi/169765288)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/DirectSum.jl)](https://github.com/chakravala/DirectSum.jl/releases)

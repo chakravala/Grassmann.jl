@@ -11,7 +11,7 @@ export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, Diago
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: hasinf, hasorigin, mixedmode, dual, value, V0, ⊕, pre, vsn
+import DirectSum: hasinf, hasorigin, dyadmode, dual, value, V0, ⊕, pre, vsn
 import DirectSum: generate, basis, dual, getalgebra, getbasis, metric
 import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffvars, diffmask, symmetricmask, indexstring, indexsymbol, combo
 
@@ -59,7 +59,7 @@ end
 
 @pure function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
     (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(ones(Int,N)))
-    G,D,C = grade(V),diffvars(V)==1,mixedmode(V)<0
+    G,D,C = grade(V),diffvars(V)==1,isdyadic(V)
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
     isone(O) && (return ∇)
@@ -70,7 +70,7 @@ end
 @pure function (M::SubManifold{W,N})(d::Leibniz.Derivation{T,O}) where {W,N,T,O}
     V = isbasis(M) ? W : M
     (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(ones(Int,N)))
-    G,D,C = grade(V),diffvars(V)==1,mixedmode(V)<0
+    G,D,C = grade(V),diffvars(V)==1,isdyadic(V)
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
     isone(O) && (return ∇)

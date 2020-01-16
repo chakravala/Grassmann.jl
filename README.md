@@ -108,7 +108,7 @@ Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors]
 
 The maintainers of Grassmann and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source dependencies you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use. [Learn more.](https://tidelift.com/subscription/pkg/julia-grassmann?utm_source=julia-grassmann&utm_medium=referral&utm_campaign=enterprise&utm_term=repo)
 
-## Direct-sum yields `VectorBundle` parametric type polymorphism ⨁
+## DirectSum yields `VectorBundle` parametric type polymorphism ⨁
 
 The *DirectSum.jl* package is a work in progress providing the necessary tools to work with an arbitrary `Manifold` specified by an encoding.
 Due to the parametric type system for the generating `VectorBundle`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
@@ -120,10 +120,10 @@ The type `VectorBundle{n,ℙ,g,ν,μ}` uses *byte-encoded* data available at pre
 `g` is a bilinear form that specifies the metric of the space,
 and `μ` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, `ν` is the number of tangent variables.
 
-The metric signature of the `Basis{V,1}` elements of a vector space `V` can be specified with the `V"..."` constructor by using `+` and `-` to specify whether the `Basis{V,1}` element of the corresponding index squares to `+1` or `-1`.
+The metric signature of the `SubManifold{V,1}` elements of a vector space `V` can be specified with the `V"..."` constructor by using `+` and `-` to specify whether the `SubManifold{V,1}` element of the corresponding index squares to `+1` or `-1`.
 For example, `S"+++"` constructs a positive definite 3-dimensional `VectorBundle`.
 ```Julia
-julia> ℝ^3 == V"+++" == vectorspace(3)
+julia> ℝ^3 == V"+++" == Manifold(3)
 true
 ```
 It is also possible to specify an arbitrary `DiagonalForm` having numerical values for the basis with degeneracy `D"1,1,1,0"`, although the `Signature` format has a more compact representation.
@@ -164,11 +164,11 @@ More information about `AbstractTensors` is available  at https://github.com/cha
 
 # Grassmann elements and geometric algebra Λ(V)
 
-The Grassmann `Basis` elements `vₖ` and `wᵏ` are linearly independent vector and covector elements of `V`, while the Leibniz `Operator` elements `∂ₖ` are partial tangent derivations and `ϵᵏ` are dependent functions of the `tangent` manifold.
+The Grassmann `SubManifold` elements `vₖ` and `wᵏ` are linearly independent vector and covector elements of `V`, while the Leibniz `Operator` elements `∂ₖ` are partial tangent derivations and `ϵᵏ` are dependent functions of the `tangent` manifold.
 An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps.
 Higher `grade` elements correspond to `SubManifold` subspaces, while higher `order` function elements become homogenous polynomials and Taylor series.
 
-Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `Basis` ⟨w₁⊗⋯⊗wₖ⟩, where `grade` is determined by the number of anti-symmetric basis elements in its tensor product decomposition.
+Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `SubManifold` ⟨w₁⊗⋯⊗wₖ⟩, where `grade` is determined by the number of anti-symmetric basis elements in its tensor product decomposition.
 The algebra is partitioned into both symmetric and anti-symmetric tensor equivalence classes.
 For the oriented sets of the Grassmann exterior algebra, the parity of `(-1)^P` is factored into transposition compositions when interchanging ordering of the tensor product argument permutations.
 The symmetrical algebra does not need to track this parity, but has higher multiplicities in its indices.
@@ -184,25 +184,25 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
 
-By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `VectorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Basis{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `VectorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `SubManifold{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
 
-The elements of the `Algebra` can be generated in many ways using the `Basis` elements created by the `@basis` macro,
+The elements of the `Basis` can be generated in many ways using the `SubManifold` elements created by the `@basis` macro,
 ```Julia
 julia> using Grassmann; @basis ℝ'⊕ℝ^3 # equivalent to basis"-+++"
 (⟨-+++⟩, v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
 ```
-As a result of this macro, all of the `Basis{V,G}` elements generated by that `VectorBundle` become available in the local workspace with the specified naming.
-The first argument provides signature specifications, the second argument is the variable name for the `VectorBundle`, and the third and fourth argument are the the prefixes of the `Basis` vector names (and covector basis names). By default, `V` is assigned the `VectorBundle` and `v` is the prefix for the `Basis` elements.
+As a result of this macro, all of the `SubManifold{V,G}` elements generated by that `VectorBundle` become available in the local workspace with the specified naming.
+The first argument provides signature specifications, the second argument is the variable name for the `VectorBundle`, and the third and fourth argument are the the prefixes of the `SubManifold` vector names (and covector basis names). By default, `V` is assigned the `VectorBundle` and `v` is the prefix for the `SubManifold` elements.
 
 It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to `S` instead of `V` and basis elements to `b` instead of `v`, so that their local names do not interfere.
-Alternatively, if you do not wish to assign these variables to your local workspace, the versatile `Grassmann.Algebra{N}` constructors can be used to contain them, which is exported to the user as the method `Λ(V)`.
+Alternatively, if you do not wish to assign these variables to your local workspace, the versatile `DirctSum.Basis` constructors can be used to contain them, which is exported to the user as the method `Λ(V)`.
 
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 
 Together with [LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
 ```Julia
 using Grassmann, Compose # environment: LightGraphs, GraphPlot
-x = Grassmann.Algebra(ℝ^7).v123
+x = Λ(ℝ^7).v123
 Grassmann.graph(x+!x)
 draw(PDF("simplex.pdf",16cm,16cm),x+!x)
 ```
@@ -267,19 +267,19 @@ The 62 indices require full alpha-numeric labeling with lower-case and capital l
 v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 ```
 Full `MultiVector` allocations are only possible for `N≤22`, but sparse operations are also available at higher dimensions.
-While `Grassmann.Algebra{V}` is a container for the `TensorAlgebra` generators of `V`, the `Grassmann.Algebra` is only cached for `N≤8`.
-For the range of dimensions `8<N≤22`$, the `Grassmann.SparseAlgebra` type is used.
+While `DirectSum.Basis{V}` is a container for the `TensorAlgebra` generators of `V`, the `DirectSum.Basis` is only cached for `N≤8`.
+For the range of dimensions `8<N≤22`$, the `DirectSum.SparseBasis` type is used.
 ```Julia
 julia> Λ(22)
-Grassmann.SparseAlgebra{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)
+DirectSum.SparseBasis{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)
 ```
-This is the largest `SparseAlgebra` that can be generated with Julia, due to array size limitations.
+This is the largest `SparseBasis` that can be generated with Julia, due to array size limitations.
 
-To reach higher dimensions with `N>22`, the `Grassmann.ExtendedAlgebra` type is used.
+To reach higher dimensions with `N>22`, the `DirectSum.ExtendedBasis` type is used.
 It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 62 standard keyboard characters, this fits nicely.
 At 22 dimensions and lower there is better caching, with further extra caching for 8 dimensions or less.
-Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the `ExtendedAlgebra` built in.
-Full `MultiVector` elements are not representable when `ExtendedAlgebra` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
+Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the `ExtendedBasis` built in.
+Full `MultiVector` elements are not representable when `ExtendedBasis` is used, but the performance of the `SubManifold` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
 The sparse representations are a work in progress to be improved with time.
 
 ## References
