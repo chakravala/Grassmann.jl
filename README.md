@@ -140,7 +140,7 @@ In addition to the direct-sum operation, several other operations are supported,
 Due to the design of the `VectorBundle` dispatch, these bit parametric operations enable code optimizations at compile-time.
 
 Calling manifolds with sets of indices constructs the subspace representations.
-Given `M(s::Int...)` one can encode `SubManifold{length(s),M,s}` with induced orthogonal space, such that computing unions of submanifolds is done by inspecting the parameter `s`.
+Given `M(s::Int...)` one can encode `SubManifold{M,length(s),indexbits(s)}` with induced orthogonal space, such that computing unions of submanifolds is done by inspecting the parameter `s`.
 Operations on `Manifold` types is automatically handled at compile time.
 
 More information about `DirectSum` is available  at [https://github.com/chakravala/DirectSum.jl](https://github.com/chakravala/DirectSum.jl)
