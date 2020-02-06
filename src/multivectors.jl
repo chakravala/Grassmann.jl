@@ -2,9 +2,9 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorTerm, TensorGraded, TensorMixed, SubManifold, Simplex, MultiVector, SparseChain, MultiGrade
+export TensorTerm, TensorGraded, TensorMixed, SubManifold, Simplex, MultiVector, SparseChain, MultiGrade, ChainBundle
 
-import DirectSum: TensorGraded, TensorTerm
+import DirectSum: TensorGraded, TensorTerm, grade
 abstract type TensorMixed{V} <: TensorAlgebra{V} end
 
 # symbolic print types
@@ -39,7 +39,7 @@ Base.firstindex(m::Chain) = 1
 @pure Base.length(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
 
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
-    Simplex{V,G,Basis{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
+    Simplex{V,G,SubManifold{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
 end
 
 function Chain{V,G,T}(val::T,v::SubManifold{V,G}) where {V,G,T}
@@ -96,6 +96,55 @@ for var ∈ ((:V,:G,:T),(:V,:T),(:T,),())
 end
 ==(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .== b.v)
 ==(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value(b))
+
+"""
+    ChainBundle{V,G,P} <: Manifold{V} <: TensorAlgebra{V}
+
+Subsets of a bundle cross-section over a `Manifold` topology.
+"""
+struct ChainBundle{V,G,T,Points} <: Manifold{V}
+    @pure ChainBundle{V,G,T,P}() where {V,G,T,P} = new{V,G,T,P}()
+end
+
+const bundle_cache = (Vector{Chain{V,G,T,X}} where {V,G,T,X})[]
+function ChainBundle(c::Vector{Chain{V,G,T,X}} where X) where {V,G,T}
+    push!(bundle_cache,c)
+    ChainBundle{V,G,T,length(bundle_cache)}()
+end
+function clearbundlecache!()
+    for P ∈ 1:length(bundle_cache)
+        deletebundle!(P)
+    end
+end
+@pure bundle(::ChainBundle{V,G,T,P} where {V,G,T}) where P = P
+@pure deletebundle!(V) = deletebundle!(bundle(V))
+@pure deletebundle!(P::Int) = (bundle_cache[P] = [Chain{ℝ^0,0,Int}(SVector(0))])
+@pure isbundle(::ChainBundle) = true
+@pure isbundle(t) = false
+@pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(parent(t))
+@pure islocal(t) = isbundle(t) && rank(t)==1 && valuetype(t)==Int && ispoints(parent(t))
+@pure iscell(t) = isbundle(t) && islocal(parent(t))
+
+@pure Manifold(::ChainBundle{V}) where V = V
+@pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
+@pure grade(::ChainBundle{V}) where V = grade(V)
+@pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
+@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
+
+value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
+AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
+
+getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
+getindex(m::ChainBundle,i) = getindex(value(m),i)
+setindex!(m::ChainBundle,k,i) = setindex!(value(m),k,i)
+Base.firstindex(m::ChainBundle) = 1
+Base.lastindex(m::ChainBundle) = length(value(m))
+Base.length(m::ChainBundle) = length(value(m))
+Base.resize!(m::ChainBundle,n::Int) = resize!(value(m),n)
+
+Base.display(m::ChainBundle) = (print(showbundle(m));display(value(m)))
+Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
+@pure showbundle(m::ChainBundle{V,G}) where {V,G} = "$(iscell(m) ? 'C' : islocal(m) ? 'I' : 'Λ')$(DirectSum.sups[G])$V×"
 
 ## MultiVector{V,𝕂}
 

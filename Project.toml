@@ -1,10 +1,9 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
-AbstractLattices = "398f06c4-4d28-53ec-89ca-5b2656b7603d"
 AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
 ComputedFieldTypes = "459fdd68-db75-56b8-8c15-d717a790f88e"
 DirectSum = "22fd7b30-a8c0-5bf2-aabe-97783860d07c"
@@ -18,10 +17,9 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 [compat]
 julia = "1"
 Reduce = "1.2"
-Leibniz = "0.0.3"
-DirectSum = "0.5.1"
-AbstractTensors = "0.4.2"
-AbstractLattices = "0.1.2"
+Leibniz = "0.0.4"
+DirectSum = "0.5.3"
+AbstractTensors = "0.4.3"
 ComputedFieldTypes = "0.1"
 StaticArrays = "0"
 Requires = "1"

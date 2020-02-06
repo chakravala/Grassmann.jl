@@ -64,7 +64,7 @@ julia> generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
        0 0 0 0 0 0 0 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0;
        -3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
 
-julia> const E24,W24 = Λ(24), ℝ^24+(ℝ^24)';
+julia> const E24,W24 = Λ(24), ℝ^24⊕(ℝ^24)';
 
 julia> const Leech = Chain{SubManifold(W24),Float64}(generator./sqrt(8));
 

@@ -3,8 +3,7 @@ module Grassmann
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using StaticArrays, SparseArrays
-using AbstractLattices, ComputedFieldTypes
+using StaticArrays, SparseArrays, ComputedFieldTypes
 using DirectSum, AbstractTensors, Requires
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, DiagonalForm, value
@@ -30,6 +29,7 @@ export UniformScaling, I=#
 include("multivectors.jl")
 include("parity.jl")
 include("algebra.jl")
+include("products.jl")
 include("composite.jl")
 include("forms.jl")
 
@@ -90,7 +90,7 @@ function boundary_rank(t::T,d=gdims(t)) where T<:TensorAlgebra
     return SVector(out)
 end
 
-function null(t::T) where T<:TensorAlgebra
+function boundary_null(t::T) where T<:TensorAlgebra
     d = gdims(t)
     r = boundary_rank(t,d)
     out = zeros(MVector{ndims(t)+1,Int})
@@ -209,6 +209,23 @@ function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
         end
     end
     return g
+end
+
+generate_products()
+generate_products(Complex)
+generate_products(Rational{BigInt},:svec)
+for Big ∈ (BigFloat,BigInt)
+    generate_products(Big,:svec)
+    generate_products(Complex{Big},:svec)
+end
+generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
+function generate_derivation(m,t,d,c)
+    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(Manifold(b),bits(b))))
+end
+function generate_algebra(m,t,d=nothing,c=nothing)
+    generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
+    generate_inverses(m,t)
+    !isnothing(d) && generate_derivation(m,t,d,c)
 end
 
 function __init__()
