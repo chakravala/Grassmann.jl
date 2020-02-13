@@ -322,3 +322,49 @@ end
     end
     return sum(terms[1:end-1])
 end=#
+
+export detsimplex, mass, load, mean, barycenter
+
+det(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = [∧(V[k]...) for k ∈ value.(m)]
+detsimplex(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = det(m)/factorial(ndims(V)-1)
+mean(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = sum(m)/length(m)
+mean(m::SVector{N,Chain{V,G,T,X}} where {V,G,T,X}) where N = +(m...)/N
+barycenter(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (s=sum(m);s/s[1])
+for op ∈ (:det,:detsimplex,:mean,:barycenter)
+    @eval @pure $op(m::ChainBundle) = ChainBundle($op(value(m)))
+end
+for op ∈ (:mean,:barycenter)
+    ops = Symbol(op,:s)
+    @eval @pure $ops(m::ChainBundle{p}) where p = [$op(p[k]) for k ∈ value.(value(m))]
+end
+mass(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (N=ndims(m);detsimplex(m)/Int(factorial(N)/factorial(N-2)))
+@pure mass(m::ChainBundle) = (N=ndims(m);ChainBundle(value(detsimplex(m))/Int(factorial(N)/factorial(N-2))))
+load(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = detsimplex(m)/(ndims(m)-1)
+@pure load(m::ChainBundle) = ChainBundle(value(detsimplex(m))/(ndims(m)-1))
+
+const array_cache = (Array{T,2} where T)[]
+function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
+    for k ∈ length(array_cache):B
+        push!(array_cache,Array{Any,2}(undef,0,0))
+    end
+    isempty(array_cache[B]) && (array_cache[B] = [m[i][j] for i∈1:length(m),j∈1:ndims(Manifold(m))])
+    return array_cache[B]
+end
+
+for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
+    @eval begin
+        Base.$op(a::Chain{V,G,T},m::S) where {V,G,T,S} = Chain{V,G,promote_type(T,S)}($op.(value(a),m))
+        Base.$op(a::MultiVector{V,T},m::S) where {T,V,S} = MultiVector{V,promote_type(T,S)}($op.(value(a),m))
+    end
+end
+for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
+    @eval begin
+        Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G,promote_type(T,Float64)}($op.(value(a)))
+        Base.$op(a::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,Float64)}($op.(value(a)))
+    end
+end
+Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
+Base.isfinite(a::MultiVector) = prod(isfinite.(value(a)))
+Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G,T}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::MultiVector{V,T};tol::Real=eps(T)) where {V,T} = MultiVector{V,T}(rationalize.(t,value(a),tol))
+Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)

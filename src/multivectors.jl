@@ -121,9 +121,9 @@ end
 @pure deletebundle!(P::Int) = (bundle_cache[P] = [Chain{ℝ^0,0,Int}(SVector(0))])
 @pure isbundle(::ChainBundle) = true
 @pure isbundle(t) = false
-@pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(parent(t))
-@pure islocal(t) = isbundle(t) && rank(t)==1 && valuetype(t)==Int && ispoints(parent(t))
-@pure iscell(t) = isbundle(t) && islocal(parent(t))
+@pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(Manifold(t))
+@pure islocal(t) = isbundle(t) && rank(t)==1 && valuetype(t)==Int && ispoints(Manifold(t))
+@pure iscell(t) = isbundle(t) && islocal(Manifold(t))
 
 @pure Manifold(::ChainBundle{V}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G

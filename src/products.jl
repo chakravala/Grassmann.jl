@@ -367,7 +367,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         if μ
                             @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
                         else
-                            print(length(out))
+                            #print(length(out))
                             @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
                         end
                     end

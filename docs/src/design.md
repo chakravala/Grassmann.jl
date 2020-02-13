@@ -126,6 +126,50 @@ An application of this is in the `Grasmann` package, where dual indexing is used
 
 More information about `DirectSum` is available  at [https://github.com/chakravala/DirectSum.jl](https://github.com/chakravala/DirectSum.jl)
 
+## Approaching ∞ dimensions with `SparseBasis` and `ExtendedBasis`
+
+In order to work with a `TensorAlgebra{V}`, it is necessary for some computations to be cached. This is usually done automatically when accessed.
+```julia
+julia> Λ(7) ⊕ Λ(7)'
+DirectSum.SparseBasis{⟨+++++++-------⟩*,16384}(v, ..., v₁₂₃₄₅₆₇w¹²³⁴⁵⁶⁷)
+```
+One way of declaring the cache for all 3 combinations of a `TensorBundle{N}` and its dual is to ask for the sum `Λ(V) + Λ(V)'`, which is equivalent to `Λ(V⊕V')`, but this does not initialize the cache of all 3 combinations unlike the former.
+
+Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
+The parametric type formalism in `Grassmann` is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.
+
+It is possible to reach `Simplex` elements with up to ``N=62`` vertices from a `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+```@repl ds
+Λ(62)
+Λ(62).v32a87Ng
+```
+The 62 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to ``4,611,686,018,427,387,904`` dimensions with Julia `using Grassmann`. Then the volume element is
+```@example
+using DirectSum # hide
+DirectSum.printindices(stdout,DirectSum.indices(UInt(2^62-1))) # hide
+```
+Full `MultiVector` allocations are only possible for ``N\leq22``, but sparse operations are also available at higher dimensions.
+While `DirectSum.Basis{V}` is a container for the `TensorAlgebra` generators of ``V``, the `Basis` is only cached for ``N\leq8``.
+For the range of dimensions ``8<N\leq22``, the `SparseBasis` type is used.
+```julia
+julia> Λ(22)
+DirectSum.SparseBasis{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)
+```
+This is the largest `SparseBasis` that can be generated with Julia, due to array size limitations.
+
+To reach higher dimensions with ``N>22``, the `DirectSum.ExtendedBasis` type is used.
+It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 62 standard keyboard characters, this fits.
+```@repl ds
+V = ℝ^22
+Λ(V+V')
+```
+At 22 dimensions and lower there is better caching, with further extra caching for 8 dimensions or less.
+Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the `ExtendedBasis` built in.
+It is still feasible to extend to a further super-extended 128-bit representation using the `UInt128` type (but this will require further modifications of internals and helper functions.
+To reach into infinity even further, it is theoretically possible to construct ultra-extensions also using dictionaries.
+Full `MultiVector` elements are not representable when `ExtendedBasis` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
+The sparse representations are a work in progress to be improved with time.
+
 ## Interoperability for `TensorAlgebra{V}`
 
 [![DOI](https://zenodo.org/badge/169811826.svg)](https://zenodo.org/badge/latestdoi/169811826)

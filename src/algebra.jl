@@ -709,24 +709,6 @@ for T ∈ (:Real,:Complex)
     generate_inverses(Base,T)
 end
 
-for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
-    @eval begin
-        Base.$op(a::Chain{V,G,T},m::S) where {V,G,T,S} = Chain{V,G,promote_type(T,S)}($op.(value(a),m))
-        Base.$op(a::MultiVector{V,T},m::S) where {T,V,S} = MultiVector{V,promote_type(T,S)}($op.(value(a),m))
-    end
-end
-for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
-    @eval begin
-        Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G,promote_type(T,Float64)}($op.(value(a)))
-        Base.$op(a::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,Float64)}($op.(value(a)))
-    end
-end
-Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
-Base.isfinite(a::MultiVector) = prod(isfinite.(value(a)))
-Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G,T}(rationalize.(t,value(a),tol))
-Base.rationalize(t::Type,a::MultiVector{V,T};tol::Real=eps(T)) where {V,T} = MultiVector{V,T}(rationalize.(t,value(a),tol))
-Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
-
 ### Sum Algebra Constructor
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}

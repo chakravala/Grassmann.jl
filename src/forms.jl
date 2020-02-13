@@ -9,6 +9,9 @@
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
+(W::SubManifold)(V::ChainBundle) = ChainBundle(W.(value(V)))
+(M::ChainBundle)(b::Int...) = SubManifold{M}(b)
+
 (W::Signature)(b::Chain{V,G,T}) where {V,G,T} = SubManifold(W)(b)
 function (W::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
     if isbasis(W)

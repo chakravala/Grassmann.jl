@@ -308,8 +308,49 @@ function __init__()
         points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
-    #@require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" nothing
+    @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
+        AbstractPlotting.mesh(t::ChainBundle{p};args...) where p = AbstractPlotting.mesh(p,t;args...)
+        AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...) = AbstractPlotting.mesh(submesh(p),array(t);args...)
+        const submesh_cache = (Array{T,2} where T)[]
+        function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
+            for k ∈ length(submesh_cache):B
+                push!(submesh_cache,Array{Any,2}(undef,0,0))
+            end
+            isempty(submesh_cache[B]) && (submesh_cache[B] = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))])
+            return submesh_cache[B]
+        end
+    end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
+    @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
+        const matlab_cache = (Array{T,2} where T)[]
+        function matlab(p::Array{T,2} where T,B)
+            for k ∈ length(matlab_cache):B
+                push!(matlab_cache,Array{Any,2}(undef,0,0))
+            end
+            matlab_cache[B] = p
+        end
+        function matlab(p::ChainBundle{V,G,T,B} where {V,G,T}) where B
+            if length(matlab_cache)<B || isempty(matlab_cache[B])
+                ap = array(p)'
+                matlab(islocal(p) ? vcat(ap,ones(length(p))') : ap[2:end,:],B)
+            else
+                return matlab_cache[B]
+            end
+        end
+        export initmesh, pdegrad
+        function initmesh(g,args...)
+            (p,e,t) = MATLAB.mxcall(:initmesh,3,Matrix{Float64}(g),args...)
+            s = size(p,1)+1; V = SubManifold(ℝ^s)
+            P = ChainBundle([Chain{V,1,Float64}(vcat(1,p[:,k])) for k ∈ 1:size(p,2)])
+            T = ChainBundle([Chain{P,1,Int}(Int.(t[1:s,k])) for k ∈ 1:size(t,2)])
+            matlab(p,bundle(P)); matlab(t,bundle(T))
+            return (P,e,T)
+        end
+        function pdegrad(p,t,Φ)
+            P,T = matlab(p),matlab(t)
+            MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))
+        end
+    end
 end
 
 end # module
