@@ -323,7 +323,8 @@ end
     return sum(terms[1:end-1])
 end=#
 
-export detsimplex, mass, load, mean, barycenter
+import LinearAlgebra: det
+export detsimplex, mean, barycenter, means, barycenters, initmesh
 
 det(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = [∧(V[k]...) for k ∈ value.(m)]
 detsimplex(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = det(m)/factorial(ndims(V)-1)
@@ -335,12 +336,20 @@ for op ∈ (:det,:detsimplex,:mean,:barycenter)
 end
 for op ∈ (:mean,:barycenter)
     ops = Symbol(op,:s)
-    @eval @pure $ops(m::ChainBundle{p}) where p = [$op(p[k]) for k ∈ value.(value(m))]
+    @eval begin
+        @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
+        @pure $ops(m::ChainBundle,::SubManifold{p}) where p = $ops(m,p)
+        @pure $ops(m::ChainBundle,p::ChainBundle) = [$op(p[k]) for k ∈ value.(value(m))]
+    end
 end
-mass(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (N=ndims(m);detsimplex(m)/Int(factorial(N)/factorial(N-2)))
-@pure mass(m::ChainBundle) = (N=ndims(m);ChainBundle(value(detsimplex(m))/Int(factorial(N)/factorial(N-2))))
-load(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = detsimplex(m)/(ndims(m)-1)
-@pure load(m::ChainBundle) = ChainBundle(value(detsimplex(m))/(ndims(m)-1))
+
+function initmesh(r::T) where T<:AbstractRange
+    G = Λ(ℝ^2)
+    p = ChainBundle(collect(r).*G.v2.+G.v1)
+    e = ChainBundle(Chain{p(2),1,Int}.([(1,),(length(p),)]))
+    t = ChainBundle(Chain{p,1,Int}.([(i,i+1) for i ∈ 1:length(p)-1]))
+    return p,e,t
+end
 
 const array_cache = (Array{T,2} where T)[]
 function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B

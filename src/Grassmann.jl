@@ -309,9 +309,10 @@ function __init__()
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
-        AbstractPlotting.mesh(t::ChainBundle{p};args...) where p = AbstractPlotting.mesh(p,t;args...)
+        AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
         AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...) = AbstractPlotting.mesh(submesh(p),array(t);args...)
         const submesh_cache = (Array{T,2} where T)[]
+        export submesh
         function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
             for k ∈ length(submesh_cache):B
                 push!(submesh_cache,Array{Any,2}(undef,0,0))
@@ -337,15 +338,16 @@ function __init__()
                 return matlab_cache[B]
             end
         end
-        export initmesh, pdegrad
         function initmesh(g,args...)
             (p,e,t) = MATLAB.mxcall(:initmesh,3,Matrix{Float64}(g),args...)
             s = size(p,1)+1; V = SubManifold(ℝ^s)
             P = ChainBundle([Chain{V,1,Float64}(vcat(1,p[:,k])) for k ∈ 1:size(p,2)])
+            E = ChainBundle([Chain{P(2:s...),1,Int}(Int.(e[1:s-1,k])) for k ∈ 1:size(e,2)])
             T = ChainBundle([Chain{P,1,Int}(Int.(t[1:s,k])) for k ∈ 1:size(t,2)])
-            matlab(p,bundle(P)); matlab(t,bundle(T))
-            return (P,e,T)
+            matlab(p,bundle(P)); matlab(e,bundle(E)); matlab(t,bundle(T))
+            return (P,E,T)
         end
+        export pdegrad
         function pdegrad(p,t,Φ)
             P,T = matlab(p),matlab(t)
             MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))

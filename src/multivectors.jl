@@ -128,9 +128,13 @@ end
 @pure Manifold(::ChainBundle{V}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
+@pure Base.ndims(::ChainBundle{V}) where V = ndims(V)
+@pure Base.ndims(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ndims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
+@pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
+value(c::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
 AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 

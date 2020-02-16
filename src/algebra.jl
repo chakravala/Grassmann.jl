@@ -612,7 +612,7 @@ end
 
 ## exponentiation
 
-function ^(v::T,i::Integer) where T<:TensorTerm
+function ^(v::T,i::S) where {T<:TensorTerm,S<:Integer}
     i == 0 && (return getbasis(Manifold(v),0))
     out = basis(v)
     for k ∈ 1:(i-1)%4
