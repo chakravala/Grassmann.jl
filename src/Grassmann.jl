@@ -159,8 +159,8 @@ export skeleton, 𝒫, collapse, subcomplex, chain, path
 absym(t) = abs(t)
 absym(t::SubManifold) = t
 absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
-absym(t::Chain{V,G,T}) where {V,G,T} = Chain{V,G,T}(absym.(value(t)))
-absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V,T}(absym.(value(t)))
+absym(t::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(absym.(value(t)))
+absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V}(absym.(value(t)))
 
 collapse(a,b) = a⋅absym(∂(b))
 
@@ -176,7 +176,7 @@ function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     for k ∈ 2:G
         setblade!(out,v,bit2int(indexbits(N,ind[[k-1,k]])),Val{N}())
     end
-    return Chain{V,2,Int}(out)
+    return Chain{V,2}(out)
 end
 path(t) = chain(t,Val{false}())
 
@@ -232,8 +232,8 @@ function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
         *(a::Reduce.RExpr,b::SubManifold{V}) where V = Simplex{V}(a,b)
         *(a::SubManifold{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
-        *(a::Reduce.RExpr,b::MultiVector{V,T}) where {V,T} = MultiVector{V,promote_type(T,F)}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::Reduce.RExpr) where {V,T} = MultiVector{V,promote_type(T,F)}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
+        *(a::Reduce.RExpr,b::MultiVector{V,T}) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::Reduce.RExpr) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         *(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
@@ -310,7 +310,13 @@ function __init__()
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
-        AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...) = AbstractPlotting.mesh(submesh(p),array(t);args...)
+        function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
+            if ndims(p) == 2
+                AbstractPlotting.plot(submesh(p)[:,1],args[:color])
+            else
+                AbstractPlotting.mesh(submesh(p),array(t);args...)
+            end
+        end
         const submesh_cache = (Array{T,2} where T)[]
         export submesh
         function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
@@ -348,6 +354,7 @@ function __init__()
             return (P,E,T)
         end
         export pdegrad
+        pdegrad(t::ChainBundle,Φ) = pdegrad(points(t),t,Φ)
         function pdegrad(p,t,Φ)
             P,T = matlab(p),matlab(t)
             MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))

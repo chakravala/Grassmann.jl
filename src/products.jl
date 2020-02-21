@@ -20,7 +20,7 @@
                 end
             end
         end
-        (:N,:t,:out), :(out .= $(Expr(:call,:SVector,out...)))
+        (:N,:t,:out), :(out .= $(Expr(:call,tvec(N,:t),out...)))
     else
         (:N,:t,:out,:bs,:bn,:μ), quote
             for g ∈ 1:N+1
@@ -42,6 +42,8 @@
         end
     end
 end
+
+insert_t(x) = Expr(:block,:(t=promote_type(valuetype(a),valuetype(b))),x)
 
 function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
     TF = Field ∉ Fields ? :Any : :T
@@ -76,9 +78,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end
                 #return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G-L,promote_type(T,valuetype(b))}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G-L}($(Expr(:call,tvec(N,G-L,:t),out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
@@ -94,7 +96,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds skewaddblade!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
                     end
                 end
-                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G,t}(out))
+                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G}(out))
             end end
         end
         @generated function contraction(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
@@ -110,9 +112,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,L-G,promote_type(T,valuetype(a))}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,L-G}($(Expr(:call,tvec(N,L-G,:t),out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
@@ -127,7 +129,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds skewaddblade!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
                     end
                 end
-                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G,t}(out))
+                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G}(out))
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::SubManifold{W,L}) where {w,G,T<:$Field,W,L}
@@ -147,9 +149,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G+L,promote_type(T,valuetype(b))}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G+L}($(Expr(:call,tvec(N,G+L,:t),out...)))))
                 end
             else return quote
                 V = $V
@@ -168,7 +170,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],true))
                     end
                 end
-                return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
+                return μ ? MultiVector{V}(out) : Chain{V,G+L}(out)
             end end
         end
         @generated function ∧(a::SubManifold{w,G},b::Chain{W,L,T}) where {w,W,T<:$Field,G,L}
@@ -188,9 +190,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G+L,promote_type(T,valuetype(a))}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G+L}($(Expr(:call,tvec(N,G+L,:t),out...)))))
                 end
             else return quote
                 V = $V
@@ -209,7 +211,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,b[i],false))
                     end
                 end
-                return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
+                return μ ? MultiVector{V}(out) : Chain{V,G+L}(out)
             end end
         end
         @generated function contraction(a::Chain{V,G,T},b::Simplex{V,L,B,S}) where {V,G,T<:$Field,B,S<:$Field,L}
@@ -221,9 +223,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     @inbounds skewaddblade!_pre(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(value_diff(Chain{$V,G-L,promote_type(T,S)}($(Expr(:call,:SVector,out...)))))
+                    insert_t(:(value_diff(Chain{$V,G-L}($(Expr(:call,tvec(N,G-L,:t),out...))))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
@@ -238,7 +240,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds skewaddblade!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
                     end
                 end
-                return μ ? MultiVector{V}(out) : value_diff(Chain{V,G-L,t}(out))
+                return μ ? MultiVector{V}(out) : value_diff(Chain{V,G-L}(out))
             end end
         end
         @generated function contraction(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,B,S<:$Field,L}
@@ -254,9 +256,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(value_diff(Chain{$V,L-G,promote_type(T,S)}($(Expr(:call,:SVector,out...)))))
+                    insert_t(:(value_diff(Chain{$V,L-G}($(Expr(:call,tvec(N,L-G,:t),out...))))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:ib,:bng,:μ),$(QuoteNode(VEC)))...)
@@ -271,7 +273,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds skewaddblade!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
                     end
                 end
-                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G,t}(out))
+                return μ ? MultiVector{V}(out) : value_diff(Chain{V,L-G}(out))
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Simplex{W,L,B,S}) where {w,G,T<:$Field,W,B,S<:$Field,L}
@@ -291,9 +293,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(multivector{$v}($(expr(:call,:svector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G+L,promote_type(T,S)}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G+L}($(Expr(:call,tvec(N,G+L,:t),out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
@@ -311,7 +313,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds outeraddblade!(V,out,X,y,derive_mul(V,X,y,a[i],b.v,$$MUL))
                     end
                 end
-                return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
+                return μ ? MultiVector{V}(out) : Chain{V,G+L}(out)
             end end
         end
         @generated function ∧(a::Simplex{w,G,B,S},b::Chain{W,L,T}) where {T<:$Field,w,W,B,S<:$Field,G,L}
@@ -331,9 +333,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G+L,promote_type(T,S)}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G+L}($(Expr(:call,tvec(N,G+L,:t),out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
@@ -351,7 +353,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds outeraddblade!(V,out,x,X,derive_mul(V,x,X,a.v,b[i],$$MUL))
                     end
                 end
-                return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
+                return μ ? MultiVector{V}(out) : Chain{V,G+L}(out)
             end end
         end
         @generated function contraction(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,L,T<:$Field,S<:$Field}
@@ -373,9 +375,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(value_diff(Chain{$V,G-L,promote_type(T,S)}($(Expr(:call,:SVector,out...)))))
+                    insert_t(:(value_diff(Chain{$V,G-L}($(Expr(:call,tvec(N,G-L,:t),out...))))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:bng,:bnl,:μ),$(QuoteNode(VEC)))...)
@@ -395,7 +397,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                     end
                 end
-                return μ ? MultiVector{V,t}(out) : value_diff(Chain{V,G-L,t}(out))
+                return μ ? MultiVector{V}(out) : value_diff(Chain{V,G-L}(out))
             end end
         end
         @generated function ∧(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}
@@ -420,9 +422,9 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    :(MultiVector{$V}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
                 else
-                    :(Chain{$V,G+L,promote_type(T,S)}($(Expr(:call,:SVector,out...))))
+                    insert_t(:(Chain{$V,G+L}($(Expr(:call,tvec(N,G+L,:t),out...)))))
                 end
             else return quote
                 $(insert_expr((:N,:t,:μ),$(QuoteNode(VEC)))...)
@@ -445,7 +447,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                     end
                 end
-                return μ ? MultiVector{V}(out) : Chain{V,G+L,t}(out)
+                return μ ? MultiVector{V}(out) : Chain{V,G+L}(out)
             end end
         end
     end
@@ -468,7 +470,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,:*,p,v)
                             @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
                         end
-                        return :(Chain{V,$(N-G),T}($(Expr(:call,:SVector,out...))))
+                        return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
                     else return quote
                         $(insert_expr((:N,:ib,:D,:P),$(QuoteNode(VEC)))...)
                         out = zeros($$VEC(N,G,T))
@@ -482,7 +484,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                                 @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
                             end
                         end
-                        return Chain{V,N-G,T}(out)
+                        return Chain{V,N-G}(out)
                     end end
                 end
                 @generated function $c(m::MultiVector{V,T}) where {V,T<:$Field}
@@ -500,7 +502,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                                 @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())
                             end
                         end
-                        return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                        return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
                     else return quote
                         $(insert_expr((:N,:bs,:bn,:P),$(QuoteNode(VEC)))...)
                         out = zeros($$VEC(N,T))
@@ -516,7 +518,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                                 end
                             end
                         end
-                        return MultiVector{V,T}(out)
+                        return MultiVector{V}(out)
                     end end
                 end
             end
@@ -540,7 +542,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             setblade!_pre(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Val{N}())
                         end
                     end
-                    return :(Chain{V,G,T}($(Expr(:call,:SVector,out...))))
+                    return :(Chain{V,G}($(Expr(:call,tvec(N,:T),out...))))
                 else return quote
                     D = diffvars(V)
                     D==0 && !$$p(G) && (return b)
@@ -555,7 +557,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             setblade!(out,$$p(grade(V,B)) ? $$SUB(v) : v,B,Val{N}())
                         end
                     end
-                    return Chain{V,G,T}(out)
+                    return Chain{V,G}(out)
                 end end
             end
             @generated function $reverse(m::MultiVector{V,T}) where {V,T<:$Field}
@@ -575,7 +577,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
                 else return quote
                     $(insert_expr((:N,:bs,:bn,:D),$(QuoteNode(VEC)))...)
                     out = zeros($$VEC(N,T))
@@ -592,7 +594,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,T}(out)
+                    return MultiVector{V}(out)
                 end end
             end
         end
@@ -612,7 +614,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $preproduct!(V,out,ib[i],B,derive_pre(V,ib[i],B,:(a.v[$(bs[g]+i)]),true))
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,:t),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                     for g ∈ 1:N+1
@@ -624,19 +626,19 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::SubManifold{V,G,A},b::MultiVector{V,T}) where {V,G,A,T<:$Field}
                 if ndims(V)<cache_limit
-                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),:svec)...)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(b.v[$(bs[g]+i)]),false))
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                     for g ∈ 1:N+1
@@ -648,13 +650,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T<:$Field,S<:$Field}
                 loop = generate_loop_multivector(V,:(a.v),:(b.v),$(QuoteNode(MUL)),$product!,$preproduct!)
                 if ndims(V)<cache_limit/2
-                    return :(MultiVector{V}($(loop[2].args[2])))
+                    return insert_t(:(MultiVector{V}($(loop[2].args[2]))))
                 else return quote
                     $(insert_expr(loop[1],$(QuoteNode(VEC)))...)
                     $(loop[2])
@@ -663,7 +665,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
             @generated function $op(a::MultiVector{V,T},b::Simplex{V,G,B,S}) where {V,T<:$Field,G,B,S<:$Field}
                 if ndims(V)<cache_limit
-                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),:svec)...)
                     X = bits(B)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
@@ -671,7 +673,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a.v[$(bs[g]+i)]),:(b.v),$(QuoteNode(MUL))))
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
                     X = bits(basis(b))
@@ -684,12 +686,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::Simplex{V,G,B,T},b::MultiVector{V,S}) where {V,G,B,T<:$Field,S<:$Field}
                 if ndims(V)<cache_limit
-                    $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
+                    $(insert_expr((:N,:t,:out,:bs,:bn,:μ),:svec)...)
                     A = bits(B)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
@@ -697,7 +699,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b.v[$(bs[g]+i)]),$(QuoteNode(MUL))))
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                     A = bits(basis(a))
@@ -710,12 +712,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::MultiVector{V,T},b::Chain{V,G,S}) where {V,T<:$Field,S<:$Field,G}
                 if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),:svec)...)
                     for g ∈ 1:N+1
                         A = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
@@ -725,7 +727,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                     for g ∈ 1:N+1
@@ -740,12 +742,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,G,S<:$Field,T<:$Field}
                 if binomial(ndims(V),G)*(1<<ndims(V))<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn),:svec)...)
+                    $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),:svec)...)
                     for g ∈ 1:N+1
                         B = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
@@ -755,7 +757,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:bng,:ib,:bs,:bn,:μ),$(QuoteNode(VEC)))...)
                     for g ∈ 1:N+1
@@ -770,18 +772,18 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
         end
         op ∉ (:∧,:contraction) && @eval begin
             @generated function $op(a::Chain{V,G,T},b::SubManifold{V}) where {V,G,T<:$Field}
                 if binomial(ndims(V),G)<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                     for i ∈ 1:binomial(N,G)
                         @inbounds $preproduct!(V,out,ib[i],bits(b),derive_pre(V,ib[i],bits(b),:(a[$i]),true))
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
                     for i ∈ 1:binomial(N,G)
@@ -790,16 +792,16 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $$product!(V,out,ib[i],bits(b),derive_mul(V,ib[i],bits(b),a[i],true))
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::SubManifold{V},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 if binomial(ndims(V),G)<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                     for i ∈ 1:binomial(N,G)
                         @inbounds $preproduct!(V,out,bits(a),ib[i],derive_pre(V,bits(a),ib[i],:(b[$i]),false))
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
                     for i ∈ 1:binomial(N,G)
@@ -808,17 +810,17 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $$product!(V,out,bits(a),ib[i],derive_mul(V,bits(a),ib[i],b[i],false))
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::Chain{V,G,T},b::Simplex{V,L,B,S}) where {V,G,T<:$Field,L,B,S<:$Field}
                 if ndims(V)<cache_limit
-                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                     X = bits(B)
                     for i ∈ 1:binomial(N,G)
                         @inbounds $preproduct!(V,out,ib[i],X,derive_pre(V,ib[i],B,:(a[$i]),:(b.v),$(QuoteNode(MUL))))
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
                     X = bits(basis(b))
@@ -828,17 +830,17 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $$product!(V,out,ib[i],X,derive_mul(V,ib[i],B,a[i],b.v,$$MUL))
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,L,B,S<:$Field}
                 if ndims(V)<cache_limit
-                    $(insert_expr((:N,:t,:out,:ib),:svec)...)
+                    $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                     A = bits(B)
                     for i ∈ 1:binomial(N,G)
                         @inbounds $preproduct!(V,out,A,ib[i],derive_pre(V,A,ib[i],:(a.v),:(b[$i]),$(QuoteNode(MUL))))
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:out,:ib,:μ),$(QuoteNode(VEC)))...)
                     A = bits(basis(a))
@@ -848,12 +850,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $$product!(V,out,A,ib[i],derive_mul(V,A,ib[i],a.v,b[i],$$MUL))
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             @generated function $op(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
                 if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
-                    $(insert_expr((:N,:t,:bnl,:ib),:svec)...)
+                    $(insert_expr((:N,:t,:bnl,:ib,:μ),:svec)...)
                     out = zeros(svec(N,t))
                     B = indexbasis(N,L)
                     for i ∈ 1:binomial(N,G)
@@ -862,7 +864,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             @inbounds $preproduct!(V,out,ibi,B[j],derive_pre(V,ibi,B[j],v,:(b[$j]),$(QuoteNode(MUL))))
                         end
                     end
-                    return :(MultiVector{V}($(Expr(:call,:SVector,out...))))
+                    return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
                 else return quote
                     $(insert_expr((:N,:t,:bnl,:ib,:μ),$(QuoteNode(VEC)))...)
                     out = zeros($$VEC(N,t))
@@ -876,7 +878,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             end
                         end
                     end
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end end
             end
             #=function $op(a::Chain{V,1,T},b::Chain{W,1,S}) where {V,T<:$Field,W,S<:$Field}
@@ -889,10 +891,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         @inbounds $product!(V,out,ib[i],B[j],$MUL(a[i],b[j]))
                     end
                 end
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end=#
         end
     end
 end
-
-

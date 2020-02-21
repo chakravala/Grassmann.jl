@@ -24,11 +24,26 @@ export UniformScaling, I
     v::SVector{binomial(ndims(V),G),T}
 end
 
-@doc """
+"""
     Chain{V,G,𝕂} <: TensorGraded{V,G}
 
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
-""" Chain
+"""
+Chain{V,G}(val::S) where {V,G,S<:AbstractVector{T}} where T = Chain{V,G,T}(val)
+function Chain(val::T,v::SubManifold{V,G}) where {V,G,T}
+    N = ndims(V)
+    Chain{V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Val{N}()))
+end
+Chain(v::SubManifold{V,G}) where {V,G} = Chain(one(Int),v)
+for var ∈ ((:V,:G,:T),(:V,:T),(:T,))
+    @eval Chain{$(var...)}(v::SubManifold{V,G}) where {V,G,T} = Chain(one(T),v)
+end
+for var ∈ ((:V,:G,:T),(:V,:T),(:T,),())
+    @eval begin
+        Chain{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T} = Chain(v.v,basis(v))
+        Chain{$(var...)}(v::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(SVector{binomial(ndims(V),G),T}(v.v))
+    end
+end
 
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
@@ -41,13 +56,6 @@ Base.firstindex(m::Chain) = 1
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
     Simplex{V,G,SubManifold{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
 end
-
-function Chain{V,G,T}(val::T,v::SubManifold{V,G}) where {V,G,T}
-    N = ndims(V)
-    Chain{V,G,T}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Val{N}()))
-end
-
-Chain(v::SubManifold{V,G}) where {V,G} = Chain{V,G,Int}(one(Int),v)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(ndims(V),G)
@@ -83,15 +91,6 @@ for T ∈ Fields
     @eval begin
         ==(a::T,b::Chain{V,G} where V) where {T<:$T,G} = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
         ==(a::Chain{V,G} where V,b::T) where {T<:$T,G} = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
-    end
-end
-for var ∈ ((:V,:G,:T),(:V,:T),(:T,))
-    @eval Chain{$(var...)}(v::SubManifold{V,G}) where {V,G,T} = Chain{V,G,T}(one(T),v)
-end
-for var ∈ ((:V,:G,:T),(:V,:T),(:T,),())
-    @eval begin
-        Chain{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T} = Chain{V,G,T}(v.v,basis(v))
-        Chain{$(var...)}(v::Chain{V,G,T}) where {V,G,T} = Chain{V,G,T}(SVector{binomial(ndims(V),G),T}(v.v))
     end
 end
 ==(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .== b.v)
@@ -152,18 +151,40 @@ Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
 
 ## MultiVector{V,𝕂}
 
-struct MultiVector{V,T,E} <: TensorMixed{V}
-    v::SArray{Tuple{E},T,1,E} #SVector{1<<ndims(V),T}
+@computed struct MultiVector{V,T} <: TensorMixed{V}
+    v::SVector{1<<ndims(V),T}
 end
 
-@doc """
+"""
     MultiVector{V,𝕂} <: TensorMixed{V} <: TensorAlgebra{V}
 
 Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
-""" MultiVector
-
-MultiVector{V,T}(v::MArray{Tuple{E},S,1,E}) where S<:T where {V,T,E} = MultiVector{V,S,E}(SVector(v))
-MultiVector{V,T}(v::SArray{Tuple{E},S,1,E}) where S<:T where {V,T,E} = MultiVector{V,S,E}(v)
+"""
+MultiVector{V}(v::S) where {V,S<:AbstractVector{T}} where T = MultiVector{V,T}(v)
+function MultiVector(val::T,v::SubManifold{V,G}) where {V,T,G}
+    N = ndims(V)
+    MultiVector{V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
+end
+MultiVector(v::SubManifold{V,G}) where {V,G} = MultiVector(one(Int),v)
+for var ∈ ((:V,:T),(:T,))
+    @eval function MultiVector{$(var...)}(v::SubManifold{V,G}) where {V,T,G}
+        return MultiVector(one(T),v)
+    end
+end
+for var ∈ ((:V,:T),(:T,),())
+    @eval begin
+        function MultiVector{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T}
+            return MultiVector(v.v,basis(v))
+        end
+        function MultiVector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
+            N = ndims(V)
+            out = zeros(mvec(N,T))
+            r = binomsum(N,G)
+            @inbounds out[r+1:r+binomial(N,G)] = v.v
+            return MultiVector{V}(out)
+        end
+    end
+end
 
 function getindex(m::MultiVector{V,T},i::Int) where {V,T}
     N = ndims(V)
@@ -182,45 +203,6 @@ function (m::MultiVector{V,T})(::Val{g}) where {V,T,g,B}
 end
 function (m::MultiVector{V,T})(g::Int,i::Int) where {V,T,B}
     Simplex{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
-end
-
-MultiVector{V}(v::StaticArray{Tuple{M},T,1}) where {V,T,M} = MultiVector{V,T}(v)
-for var ∈ ((:V,:T),(:V,))
-    @eval begin
-        MultiVector{$(var...)}(v::SizedArray) where {V,T} = MultiVector{V,T}(SVector{1<<ndims(V),T}(v))
-        MultiVector{$(var...)}(v::Vector{T}) where {T,V} = MultiVector{V,T}(SVector{1<<ndims(V),T}(v))
-        MultiVector{$(var...)}(v::T...) where {T,V} = MultiVector{V,T}(SVector{1<<ndims(V),T}(v))
-        function MultiVector{$(var...)}(val::T,v::SubManifold{V,G}) where {T,V,G}
-            N = ndims(V)
-            MultiVector{V,T}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
-        end
-    end
-end
-function MultiVector(val::T,v::SubManifold{V,G}) where {V,T,G}
-    N = ndims(V)
-    MultiVector{V,T}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
-end
-
-MultiVector(v::SubManifold{V,G}) where {V,G} = MultiVector{V,Int}(one(Int),v)
-
-for var ∈ ((:V,:T),(:T,))
-    @eval function MultiVector{$(var...)}(v::SubManifold{V,G}) where {V,T,G}
-        return MultiVector{V,T}(one(T),v)
-    end
-end
-for var ∈ ((:V,:T),(:T,),())
-    @eval begin
-        function MultiVector{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T}
-            return MultiVector{V,T}(v.v,basis(v))
-        end
-        function MultiVector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
-            N = ndims(V)
-            out = zeros(mvec(N,T))
-            r = binomsum(N,G)
-            @inbounds out[r+1:r+binomial(N,G)] = v.v
-            return MultiVector{V,T}(out)
-        end
-    end
 end
 
 function show(io::IO, m::MultiVector{V,T}) where {V,T}
@@ -358,7 +340,8 @@ function MultiGrade(m::MultiVector{V,T}) where {V,T}
     for i ∈ 0:N
         @inbounds !prod(m[i].==0) && (G|=UInt(1)<<i;out[i+1]=chainvalues(V,m[i],Val{i}()))
     end
-    return count_ones(G)≠1 ? MultiGrade{V,G}(SVector(out[indices(G,N+1)]...)) : out[1]
+    cG = count_ones(G)
+    return cG≠1 ? MultiGrade{V,G}(SVector{cG,T}(out[indices(G,N+1)]...)) : out[1]
 end
 
 function show(io::IO, m::MultiGrade{V,G}) where {V,G}
@@ -379,7 +362,7 @@ end
         @inbounds (val,b) = typeof(v.v[k]) <: Basis ? (one(T),v.v[k]) : (v.v[k].v,basis(v.v[k]))
         setmulti!(out,convert(T,val),bits(b),Val{N}())
     end
-    return MultiVector{V,T}(out)
+    return MultiVector{V}(out)
 end
 
 MultiVector{V}(v::MultiGrade{V}) where V = MultiVector{V}(v)

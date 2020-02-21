@@ -47,7 +47,7 @@ function (W::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
                     end
                 end
             end
-            return Chain{W,G,T}(out)
+            return Chain{W,G}(out)
         end
     elseif V⊆W
         WC,VC,N = isdyadic(W),isdyadic(V),ndims(V)
@@ -67,7 +67,7 @@ function (W::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
                 end
             end
         end
-        return Chain{W,G,T}(out)
+        return Chain{W,G}(out)
     else
         throw(error("cannot convert from $(V) to $(W)"))
     end
@@ -93,7 +93,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
                 end
             end
         end
-        return MultiVector{W,T}(out)
+        return MultiVector{W}(out)
     elseif V⊆W
         WC,VC,N = isdyadic(W),isdyadic(V),ndims(V)
         #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
@@ -116,7 +116,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
                 end
             end
         end
-        return MultiVector{W,T}(out)
+        return MultiVector{W}(out)
     else
         throw(error("cannot convert from $(V) to $(W)"))
     end
@@ -191,7 +191,7 @@ end
         for i ∈ 1:N
             i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,UInt(1)<<(i-1),Val{N}())
         end
-        return Chain{V,1,T}(out)
+        return Chain{V,1}(out)
     end
     function (a::Chain{V,1})(b::Simplex{V,1}) where V
         $(insert_expr((:t,))...)
@@ -224,7 +224,7 @@ end
         for i ∈ 1:N
             i≠m && @inbounds setblade!(out,a.v[di[Q][i]]*val,UInt(1)<<(i-1),Val{N}())
         end
-        return Chain{V,1,t}(out)
+        return Chain{V,1}(out)
     end
     function (a::Chain{V,1})(b::Chain{V,1}) where V
         $(insert_expr((:N,:M,:t,:df))...)
@@ -244,7 +244,7 @@ end
                 @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,UInt(1)<<(i-1),Val{N}())
             end
         end
-        return Chain{V,1,t}(out)
+        return Chain{V,1}(out)
     end
 end
 
@@ -260,6 +260,6 @@ end
                 @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(UInt(1)<<(M+j-1)),Val{N}())
             end
         end
-        return Chain{V,2,T}(out)
+        return Chain{V,2}(out)
     end
 end

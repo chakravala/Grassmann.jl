@@ -9,6 +9,10 @@ export tangent
 
 ## mutating operations
 
+@pure tvec(N,G,t::Symbol=:Any) = :(SVector{$(binomial(N,G)),$t})
+@pure tvec(N,t::Symbol=:Any) = :(SVector{$(1<<N),$t})
+@pure tvec(N,μ::Bool) = tvec(N,μ ? :Any : :t)
+
 import DirectSum: g_one, g_zero, Field, ExprField
 const Sym = :AbstractTensors
 const SymField = Any
@@ -730,14 +734,14 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                 out = zeros(mvec(N,A,t))
                 setblade!(out,value(a,t),bits(a),Val{N}())
                 setblade!(out,$op(value(b,t)),bits(b),Val{N}())
-                return Chain{V,A,t}(out)
+                return Chain{V,A}(out)
             else
                 #@warn("sparse MultiGrade{V} objects not properly handled yet")
                 #return MultiGrade{V}(a,b)
                 $(insert_expr((:N,:t,:out))...)
                 setmulti!(out,value(a,t),bits(a),Val{N}())
                 setmulti!(out,$op(value(b,t)),bits(b),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
         end
         function $op(a::SparseChain{V,G,T},b::SparseChain{V,G,S}) where {V,G,T,S}
@@ -828,10 +832,10 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         Base.adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
     end
     @eval begin
-        *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G,promote_type(T,F)}(broadcast($MUL,a.v,Ref(b)))
-        *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.∏,a.v,Ref(b)))
+        *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a),b.v))
+        *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b)))
+        *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,a.v,Ref(b)))
         *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))
         *(a::MultiGrade{V,G},b::F) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,a.v,Ref(b)))
         @generated function adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
@@ -842,9 +846,9 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     for i ∈ 1:binomial(N,G)
                         @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
                     end
-                    return :(Chain{$(dual(V)),G,$$TF}($(Expr(:call,:SVector,out...))))
+                    return :(Chain{$(dual(V)),G}($(Expr(:call,tvec(N,TF),out...))))
                 else
-                    return :(Chain{$(dual(V)),G,$$TF}(SVector($$CONJ.(value(m)))))
+                    return :(Chain{$(dual(V)),G}($$CONJ.(value(m))))
                 end
             else return quote
                 if isdyadic(V)
@@ -856,13 +860,13 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 else
                     out = $$CONJ.(value(m))
                 end
-                Chain{dual(V),G,$$TF}(out)
+                Chain{dual(V),G}(out)
             end end
         end
         @generated function adjoint(m::MultiVector{V,T}) where {V,T<:$Field}
             if ndims(V)<cache_limit
                 if isdyadic(V)
-                    $(insert_expr((:N,:M,:bs,:bn),:vec)...)
+                    $(insert_expr((:N,:M,:bs,:bn),:svec)...)
                     out = zeros(svec(N,Any))
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
@@ -870,10 +874,10 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                             @inbounds setmulti!_pre(out,:($$CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
                         end
                     end
+                    return :(MultiVector{$(dual(V))}($(Expr(:call,tvec(N,TF),out...))))
                 else
-                    out = :(MultiVector{$(dual(V))}(SVector($$CONJ.(value(m)))))
+                    return :(MultiVector{$(dual(V))}($$CONJ.(value(m))))
                 end
-                return :(MultiVector{$(dual(V))}($(Expr(:call,:SVector,out...))))
             else return quote
                 if isdyadic(V)
                     $(insert_expr((:N,:M,:bs,:bn),$(QuoteNode(VEC)))...)
@@ -887,7 +891,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 else
                     out = $$CONJ.(value(m))
                 end
-                MultiVector{dual(V),$$TF}(out)
+                MultiVector{dual(V)}(out)
             end end
         end
     end
@@ -901,14 +905,14 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     out = zeros($VEC(N,A,t))
                     setblade!(out,value(a,t),bits(X),Val{N}())
                     setblade!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return Chain{V,A,t}(out)
+                    return Chain{V,A}(out)
                 else
                     #@warn("sparse MultiGrade{V} objects not properly handled yet")
                     #return MultiGrade{V}(a,b)
                     $(insert_expr((:N,:t,:out),VEC)...)
                     setmulti!(out,value(a,t),bits(X),Val{N}())
                     setmulti!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end
             end
             $op(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($bop(value(a)))
@@ -920,14 +924,14 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     out = zeros($VEC(N,A,t))
                     setblade!(out,value(a,t),bits(X),Val{N}())
                     setblade!(out,$bop(value(b,t)),Y,Val{N}())
-                    return Chain{V,A,t}(out)
+                    return Chain{V,A}(out)
                 else
                     #@warn("sparse MultiGrade{V} objects not properly handled yet")
                     #return MultiGrade{V}(a,b)
                     $(insert_expr((:N,:t,:out),VEC)...)
                     setmulti!(out,value(a,t),bits(X),Val{N}())
                     setmulti!(out,$bop(value(b,t)),Y,Val{N}())
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end
             end
             function $op(a::SubManifold{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
@@ -938,60 +942,60 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     out = zeros($VEC(N,A,t))
                     setblade!(out,value(a,t),X,Val{N}())
                     setblade!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return Chain{V,A,t}(out)
+                    return Chain{V,A}(out)
                 else
                     #@warn("sparse MultiGrade{V} objects not properly handled yet")
                     #return MultiGrade{V}(a,b)
                     $(insert_expr((:N,:t,:out),VEC)...)
                     setmulti!(out,value(a,t),X,Val{N}())
                     setmulti!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return MultiVector{V,t}(out)
+                    return MultiVector{V}(out)
                 end
             end
             function $op(a::Simplex{V,G,A,S} where A,b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             $op(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(bop,:(value(a),))))
             function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::SubManifold{V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 $(add_val(eop,:out,:(value(b,$VEC(N,t))),bop))
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::SparseChain{V,G,S},b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 at = value(a)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 addmulti!(out,at.nzval,binomsum(N,G).+at.nzind)
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::SparseChain{V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 bt = value(b)
                 out = copy(value(a,$VEC(N,t)))
                 addmulti!(out,$bop.(bt.nzval),binomsum(N,G).+bt.nzind)
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiGrade{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
                 $(insert_expr((:N,),VEC)...)
@@ -1011,7 +1015,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                         @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(A,$VEC(N,g,t))),bop))
                     end
                 end
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::MultiGrade{V,G}) where {V,T<:$Field,G}
                 $(insert_expr((:N,),VEC)...)
@@ -1031,7 +1035,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                         @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t))),bop))
                     end
                 end
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
@@ -1039,7 +1043,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 rb = binomsum(N,L)
                 Rb = binomial(N,L)
                 @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T<:$Field,S<:$Field}
                 return Chain{V,G,promote_type(valuetype(a),valuetype(b))}($(bcast(bop,:(a.v,b.v))))
@@ -1048,50 +1052,50 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,G,t)))
                 addblade!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::Simplex{V,G,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                 addblade!(out,value(a,t),basis(a),Val{N}())
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::Chain{V,G,T},b::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::Simplex{V,L,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,L,S<:$Field}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             $op(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(bop,:(value(a),))))
             function $op(a::$Chain{V,G,T},b::SubManifold{V,G}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,G,t)))
                 addblade!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                 addblade!(out,value(a,t),basis(a),Val{N}())
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,T<:$Field,L}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = $(bcast(bop,:(copy(value(b,$VEC(N,G,t))),)))
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::Chain{V,G,T},b::SparseChain{V,G}) where {V,G,T<:$Field}
                 $(insert_expr((:N,),VEC)...)
@@ -1099,7 +1103,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 t = promote_type(T,valuetype.(bt)...)
                 out = copy(value(a,$VEC(N,G,t)))
                 addmulti!(out,bt.nzval,bt.nzind)
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::SparseChain{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 $(insert_expr((:N,),VEC)...)
@@ -1107,22 +1111,20 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 t = promote_type(T,valuetype.(at)...)
                 out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
                 addmulti!(out,at.nzval,at.nzind)
-                return Chain{V,G,t}(out)
+                return Chain{V,G}(out)
             end
             function $op(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,G,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
                 @inbounds $(add_val(:(+=),:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),ADD))
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
                 out = copy(value(a,$VEC(N,t)))
                 @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
-                return MultiVector{V,t}(out)
+                return MultiVector{V}(out)
             end
         end
     end
 end
-
-

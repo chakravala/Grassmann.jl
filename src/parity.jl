@@ -216,14 +216,14 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            Chain{V,G,T}(out)
+            Chain{V,G}(out)
         end
         function $op(t::MultiVector{V,T}) where {V,T}
             out = copy(value(t,mvec(ndims(V),T)))
             for k ∈ $other(V)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
-            MultiVector{V,T}(out)
+            MultiVector{V}(out)
         end
     end
 end
@@ -238,7 +238,7 @@ function odd(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V,T}(out)
+    MultiVector{V}(out)
 end
 function even(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
@@ -249,7 +249,7 @@ function even(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V,T}(out)
+    MultiVector{V}(out)
 end
 
 function imag(t::MultiVector{V,T}) where {V,T}
@@ -262,7 +262,7 @@ function imag(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V,T}(out)
+    MultiVector{V}(out)
 end
 function real(t::MultiVector{V,T}) where {V,T}
     N = ndims(V)
@@ -273,5 +273,5 @@ function real(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V,T}(out)
+    MultiVector{V}(out)
 end
