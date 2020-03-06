@@ -467,7 +467,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             val = :(b.v[$k])
                             @inbounds p = $p(V,ib[k])
                             v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
-                            v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,:*,p,v)
+                            v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,$MUL,p,v)
                             @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
                         end
                         return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
@@ -480,7 +480,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             if val≠0
                                 @inbounds p = $$p(V,ib[k])
                                 v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
-                                v = typeof(V)<:Signature ? (p ? $$SUB(v) : v) : p*v
+                                v = typeof(V)<:Signature ? (p ? $$SUB(v) : v) : $$MUL(p,v)
                                 @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
                             end
                         end
@@ -601,8 +601,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end
 
     for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
-                         (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!),
-                         (:cross,:crossaddmulti!))
+                         (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
         preproduct! = Symbol(product!,:_pre)
         @eval begin
             @generated function $op(a::MultiVector{V,T},b::SubManifold{V,G,B}) where {V,T<:$Field,G,B}

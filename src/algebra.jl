@@ -235,7 +235,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                 end
             end
-            for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior),(:cross,:crossprod))
+            for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior))
                 @eval begin
                     @inline function $(Symbol(prod,s))(V::W,m::$M,A::UInt,B::UInt,val::T) where W<:Manifold{N} where {N,T,M}
                         if val ≠ 0
@@ -350,6 +350,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
+@generated ∧(t::T) where T<:SVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
+∧(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = [∧(V[k]) for k ∈ value.(m)]
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 
 export ∧, ∨, ⊗
@@ -466,34 +468,14 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 
 ## cross product
 
-import LinearAlgebra: cross
+import LinearAlgebra: cross, ×
 export ×
 
-"""
+@doc """
     cross(ω::TensorAlgebra,η::TensorAlgebra)
 
 Cross product: ω×η = ⋆(ω∧η)
-"""
-@pure function cross(a::SubManifold{V},b::SubManifold{V}) where V
-    p,C,t,Z = crossprod(a,b)
-    (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return zero(V))
-    d = getbasis(V,C)
-    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return p ? Simplex{V}(-1,d) : d
-end
-
-function cross(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    ba,bb = bits(basis(a)),bits(basis(b))
-    p,C,t,Z = crossprod(ba,bb,V)
-    !t && (return zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
-    if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
-        count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
-    end
-    return Simplex{V}(p ? -v : v,getbasis(V,C))
-end
+""" LinearAlgebra.cross
 
 # symmetrization and anti-symmetrization
 
@@ -593,11 +575,9 @@ for F ∈ Fields
     end
 end
 
-for op ∈ (:*,:cross)
-    for A ∈ (SubManifold,Simplex,Chain,MultiVector)
-        for B ∈ (SubManifold,Simplex,Chain,MultiVector)
-            @eval @inline $op(a::$A,b::$B) = interop($op,a,b)
-        end
+for A ∈ (SubManifold,Simplex,Chain,MultiVector)
+    for B ∈ (SubManifold,Simplex,Chain,MultiVector)
+        @eval @inline *(a::$A,b::$B) = interop(*,a,b)
     end
 end
 
@@ -830,6 +810,9 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         Base.:*(a::F,b::Simplex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
         Base.:*(a::Simplex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
         Base.adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
+        Base.promote_rule(::Type{Simplex{V,G,B,T}},::Type{S}) where {V,G,T,B,S<:$Field} = Simplex{V,G,B,promote_type(T,S)}
+        Base.promote_rule(::Type{Chain{V,G,T,B}},::Type{S}) where {V,G,T,B,S<:$Field} = Chain{V,G,promote_type(T,S),B}
+        Base.promote_rule(::Type{MultiVector{V,T,B}},::Type{S}) where {V,T,B,S<:$Field} = MultiVector{V,promote_type(T,S),B}
     end
     @eval begin
         *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a),b.v))

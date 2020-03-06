@@ -63,21 +63,18 @@ end
     return p ? -1 : 1, C, t, Z
 end
 
-@pure function parityinterior(V::Signature{N,M,S},a,b) where {N,M,S}
+#=@pure function parityinterior(V::Signature{N,M,S},a,b) where {N,M,S}
     A,B,Q,Z = symmetricmask(V,a,b)
     diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
-    γ = complement(N,B,diffvars(V))
-    p,C,t = parityregressive(V,A,γ,Val{true}())
+    p,C,t = parityregressive(V,A,complement(N,B,diffvars(V)),Val{true}())
     return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
-end
+end=#
 
 @pure function parityinterior(V::M,a,b) where M<:Manifold{N} where N
     A,B,Q,Z = symmetricmask(V,a,b)
     diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
-    γ = complement(N,B,diffvars(V))
-    p,C,t = parityregressive(Signature(V),A,γ,Val{true}())
-    ind = indices(B,N)
-    g = prod(V[ind])
+    p,C,t = parityregressive(Signature(V),A,complement(N,B,diffvars(V)),Val{true}())
+    ind = indices(B,N); g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
 end
 
@@ -85,27 +82,6 @@ end
     A,B = symmetricmask(V,a,b)
     g = abs(prod(V[indices(A&B,ndims(V))]))
     parity(A,B,Signature(V)) ? -(g) : g
-end
-
-@pure function paritycrossprod(V::Signature{N,M,S},a,b) where {N,M,S}
-    A,B,Q,Z = symmetricmask(V,a,b)
-    if (count_ones(A&B)==0) && !(hasinf(M) && isodd(A) && isodd(B))
-        C = A ⊻ B
-        return (parity(N,S,A,B)⊻parityrighthodge(S,C,N)), complement(N,C,diffvars(V))|Q, true, Z
-    else
-        return false, zero(UInt), false, Z
-    end
-end
-
-@pure function paritycrossprod(V::M,a,b) where M<:Manifold{N} where N
-    A,B,Q,Z = symmetricmask(V,a,b)
-    if (count_ones(A&B)==0) && !(hasinf(V) && isodd(A) && isodd(B))
-        C = A ⊻ B
-        g = parityrighthodge(V,C,N)
-        return parity(A,B,V) ? -(g) : g, complement(N,C,diffvars(V))|Q, true, Z
-    else
-        return 1, zero(UInt), false, Z
-    end
 end
 
 ### parity cache
@@ -147,7 +123,7 @@ end
 
 ### parity product caches
 
-for par ∈ (:conformal,:regressive,:interior,:crossprod)
+for par ∈ (:conformal,:regressive,:interior)
     calc = Symbol(:parity,par)
     T = Tuple{Any,UInt,Bool,UInt}
     extra = Symbol(par,:_extra)

@@ -131,6 +131,7 @@ end
 @pure Base.ndims(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ndims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
+@pure DirectSum.supermanifold(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
 value(c::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = c
