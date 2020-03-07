@@ -326,22 +326,23 @@ end=#
 export detsimplex, initmesh
 
 detsimplex(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ∧(m)/factorial(ndims(V)-1)
+detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = sum(m)/length(m)
 mean(m::T) where T<:SVector = sum(m)/length(m)
 barycenter(m::SVector{N,Chain{V,G,T,X}} where {V,G,T,X}) where N = (s=sum(m);s/s[1])
 barycenter(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (s=sum(m);s/s[1])
 curl(m::SVector{N,Chain{V,G,T,X}} where {N,G,T,X}) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
-for op ∈ (:∧,:detsimplex)
-    @eval @pure $op(m::ChainBundle) = ChainBundle($op(value(m)))
-end
+LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
+∧(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = LinearAlgebra.det(V,m)
+∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
 for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
         export $op, $ops
         @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
         @pure $ops(m::ChainBundle,::SubManifold{p}) where p = $ops(m,p)
-        @pure $ops(m::ChainBundle,p) = [$op(p[k]) for k ∈ value.(value(m))]
+        @pure $ops(m::ChainBundle,p) = $op.(getindex.(Ref(p),value.(value(m))))
     end
 end
 
