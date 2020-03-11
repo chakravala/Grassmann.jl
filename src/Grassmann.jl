@@ -45,7 +45,7 @@ end
 
 using Leibniz
 import Leibniz: ∇, Δ, d # ∂
-export ∇, Δ, ∂, d, ↑, ↓
+export ∇, Δ, ∂, d, δ, ↑, ↓
 
 generate_products(:(Leibniz.Operator),:svec)
 for T ∈ (:(Simplex{V}),:(Chain{V}),:(MultiVector{V}))
@@ -80,6 +80,7 @@ end
 
 ∂(ω::T) where T<:TensorAlgebra = ω⋅Manifold(ω)(∇)
 d(ω::T) where T<:TensorAlgebra = Manifold(ω)(∇)∧ω
+δ(ω::T) where T<:TensorAlgebra = -∂(ω)
 
 function boundary_rank(t::T,d=gdims(t)) where T<:TensorAlgebra
     out = gdims(∂(t))
