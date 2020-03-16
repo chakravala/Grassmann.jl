@@ -542,7 +542,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                             setblade!_pre(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Val{N}())
                         end
                     end
-                    return :(Chain{V,G}($(Expr(:call,tvec(N,:T),out...))))
+                    return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
                 else return quote
                     D = diffvars(V)
                     D==0 && !$$p(G) && (return b)
