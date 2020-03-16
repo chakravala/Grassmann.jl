@@ -161,5 +161,3 @@ function barycoords(p, a, b, c)
 end
 barycoords(0.25v1+0.25v2, 0v1, 1v1, 1v2)
 ```
-
-```
