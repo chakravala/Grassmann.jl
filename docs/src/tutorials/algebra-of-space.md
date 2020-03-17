@@ -147,3 +147,17 @@ R_seq(args...) = (R = prod(exp.(args./2)); a -> ~R*a*R)
 R = R_seq(π/2*v23, π/2*v12, v1)
 R(v1)
 ```
+
+## Barycentric Coordinates
+
+We can find the barycentric coordinates of a point in a triangle using area ratios.
+```@repl ga
+function barycoords(p, a, b, c)
+  ab = b-a
+  ca = a-c
+  bc = c-b
+  A = -ab∧ca
+  (bc∧(p-b)/A, ca∧(p-c)/A, ab∧(p-a)/A)
+end
+barycoords(0.25v1+0.25v2, 0v1, 1v1, 1v2)
+```
