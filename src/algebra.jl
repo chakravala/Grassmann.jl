@@ -529,6 +529,8 @@ export ⊘
 for X ∈ TAG, Y ∈ TAG
     @eval ⊘(x::$X{V},y::$Y{V}) where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
 end
+⊘(x::Chain{V,1},y::T) where {V,G,T<:TensorAlgebra} = diffvars(V)≠0 ? conj(y)*x*y : ((~y)*x*involute(y))(Val(G))/(y⊛y)
+
 
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
@@ -634,6 +636,7 @@ end
 
 for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
+        @pure $nv(b::SubManifold{V,0} where V) = b
         @pure function $nv(b::SubManifold{V,G,B}) where {V,G,B}
             $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
         end
@@ -661,6 +664,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             end
             throw(error("inv($m) is undefined"))
         end
+        $nv(b::Simplex{V,0,B}) where {V,B} = Simplex{V,0,B}(AbstractTensors.inv(value(b)))
         function $nv(b::Simplex{V,G,B,T}) where {V,G,B,T}
             Simplex{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
         end
@@ -816,6 +820,10 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
     @eval begin
         *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a),b.v))
         *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b)))
+        *(a::Simplex{V,0,B,F},b::Chain{V,G,T}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a.v),b.v))
+        *(a::Chain{V,G,T},b::Simplex{V,0,B,F}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b.v)))
+        *(a::SubManifold{V,0},b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = b
+        *(a::Chain{V,G,T},b::SubManifold{V,0}) where {F<:$Field,V,G,T<:$Field} = a
         *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,Ref(a),b.v))
         *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,a.v,Ref(b)))
         *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))

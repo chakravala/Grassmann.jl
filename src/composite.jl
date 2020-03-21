@@ -340,9 +340,10 @@ for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
         export $op, $ops
+        $ops(m::Vector{Chain{p,G,T,X}} where {G,T,X}) where p = $ops(m,p)
         @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
-        @pure $ops(m::ChainBundle,::SubManifold{p}) where p = $ops(m,p)
-        @pure $ops(m::ChainBundle,p) = $op.(getindex.(Ref(p),value.(value(m))))
+        @pure $ops(m,::SubManifold{p}) where p = $ops(m,p)
+        @pure $ops(m,p) = $op.(getindex.(Ref(p),value.(value(m))))
     end
 end
 

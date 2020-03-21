@@ -20,8 +20,8 @@ export UniformScaling, I
 
 ## Chain{V,G,𝕂}
 
-@computed struct Chain{V,G,T} <: TensorGraded{V,G}
-    v::SVector{binomial(ndims(V),G),T}
+@computed struct Chain{V,G,𝕂} <: TensorGraded{V,G}
+    v::SVector{binomial(ndims(V),G),𝕂}
 end
 
 """
@@ -29,21 +29,18 @@ end
 
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
 """
-Chain{V,G}(val::S) where {V,G,S<:AbstractVector{T}} where T = Chain{V,G,T}(val)
-function Chain(val::T,v::SubManifold{V,G}) where {V,G,T}
+Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,𝕂}(val)
+Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(args...))
+function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
     N = ndims(V)
-    Chain{V,G}(setblade!(zeros(mvec(N,G,T)),val,bits(v),Val{N}()))
+    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val{N}()))
 end
-Chain(v::SubManifold{V,G}) where {V,G} = Chain(one(Int),v)
-for var ∈ ((:V,:G,:T),(:V,:T),(:T,))
-    @eval Chain{$(var...)}(v::SubManifold{V,G}) where {V,G,T} = Chain(one(T),v)
-end
-for var ∈ ((:V,:G,:T),(:V,:T),(:T,),())
-    @eval begin
-        Chain{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T} = Chain(v.v,basis(v))
-        Chain{$(var...)}(v::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(SVector{binomial(ndims(V),G),T}(v.v))
-    end
-end
+Chain(v::SubManifold) = Chain(one(Int),v)
+Chain(v::Simplex) = Chain(v.v,basis(v))
+Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(v.v))
+Chain{𝕂}(v::SubManifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
+Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
+Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(v.v))
 
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
@@ -126,14 +123,17 @@ end
 @pure iscell(t) = isbundle(t) && islocal(Manifold(t))
 
 @pure Manifold(::ChainBundle{V}) where V = V
+@pure Manifold(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
 @pure Base.ndims(::ChainBundle{V}) where V = ndims(V)
 @pure Base.ndims(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ndims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
+@pure Base.parent(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
 @pure DirectSum.supermanifold(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
+@pure points(t::Vector{Chain{p,G,T,X}} where {G,T,X}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
 value(c::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
@@ -199,7 +199,7 @@ setindex!(m::MultiVector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{V,T} where T) where V = ndims(V)
 
-(m::MultiVector{V,T})(g::Int) where {T,V,B} = m(Val{g}())
+(m::MultiVector{V,T})(g::Int) where {T,V,B} = m(Val(g))
 function (m::MultiVector{V,T})(::Val{g}) where {V,T,g,B}
     Chain{V,g,T}(m[g])
 end

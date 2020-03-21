@@ -306,10 +306,12 @@ function __init__()
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
         export points, vectorfield
-        points(f,V=identity;r=-2π:0.0001:2π) = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
+        points(f::F,V=identity;r=-2π:0.0001:2π) where F<:Function = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
+        AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(GeometryTypes.Point.(value(V(2:ndims(V)...)(p))),GeometryTypes.Point.(value(v));args...)
+        AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(GeometryTypes.Point.(value(V(2:ndims(V)...)(p))),GeometryTypes.Point.(value(v));args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
@@ -320,11 +322,12 @@ function __init__()
         end
         const submesh_cache = (Array{T,2} where T)[]
         export submesh
+        submesh(m) = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))]
         function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
             for k ∈ length(submesh_cache):B
                 push!(submesh_cache,Array{Any,2}(undef,0,0))
             end
-            isempty(submesh_cache[B]) && (submesh_cache[B] = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))])
+            isempty(submesh_cache[B]) && (submesh_cache[B] = submesh(value(m)))
             return submesh_cache[B]
         end
     end
@@ -358,7 +361,9 @@ function __init__()
         pdegrad(t::ChainBundle,Φ) = pdegrad(points(t),t,Φ)
         function pdegrad(p,t,Φ)
             P,T = matlab(p),matlab(t)
-            MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))
+            u,v = MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))
+            V = DirectSum.parent(p)(2,3)
+            [Chain{V,1}(SVector(u[k],v[k])) for k ∈ 1:length(p)]
         end
     end
 end
