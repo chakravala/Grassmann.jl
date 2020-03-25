@@ -41,6 +41,11 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V
 Chain{𝕂}(v::SubManifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
 Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
 Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(v.v))
+Chain{V,G,T,X}(x::Simplex{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(ndims(V),G,T)))
+function Chain{V,0,T,X}(x::Simplex{V,0,v}) where {V,T,X,v}
+    N = ndims(V)
+    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),bits(v),Val{N}()))
+end
 
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]

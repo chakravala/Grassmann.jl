@@ -354,16 +354,8 @@ function __init__()
             P = ChainBundle([Chain{V,1,Float64}(vcat(1,p[:,k])) for k ∈ 1:size(p,2)])
             E = ChainBundle([Chain{P(2:s...),1,Int}(Int.(e[1:s-1,k])) for k ∈ 1:size(e,2)])
             T = ChainBundle([Chain{P,1,Int}(Int.(t[1:s,k])) for k ∈ 1:size(t,2)])
-            matlab(p,bundle(P)); matlab(e,bundle(E)); matlab(t,bundle(T))
+            #matlab(p,bundle(P)); matlab(e,bundle(E)); matlab(t,bundle(T))
             return (P,E,T)
-        end
-        export pdegrad
-        pdegrad(t::ChainBundle,Φ) = pdegrad(points(t),t,Φ)
-        function pdegrad(p,t,Φ)
-            P,T = matlab(p),matlab(t)
-            u,v = MATLAB.mxcall.(:pdeprtni,1,Ref(P),Ref(T),MATLAB.mxcall(:pdegrad,2,P,T,Φ))
-            V = DirectSum.parent(p)(2,3)
-            [Chain{V,1}(SVector(u[k],v[k])) for k ∈ 1:length(p)]
         end
     end
 end
