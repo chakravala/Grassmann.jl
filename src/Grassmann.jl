@@ -310,8 +310,10 @@ function __init__()
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
-        AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(GeometryTypes.Point.(value(V(2:ndims(V)...)(p))),GeometryTypes.Point.(value(v));args...)
-        AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(GeometryTypes.Point.(value(V(2:ndims(V)...)(p))),GeometryTypes.Point.(value(v));args...)
+        AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)
+        AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
+        AbstractPlotting.arrows(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
+        AbstractPlotting.arrows!(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows!(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
