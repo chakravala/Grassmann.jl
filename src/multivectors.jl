@@ -16,7 +16,7 @@ parsym = (Symbol,parval...)
 
 import LinearAlgebra
 import LinearAlgebra: I, UniformScaling
-export UniformScaling, I
+export UniformScaling, I, points
 
 ## Chain{V,G,𝕂}
 

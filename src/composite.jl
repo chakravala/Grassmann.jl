@@ -396,3 +396,23 @@ if VERSION >= v"1.4"
     *(transA::LinearAlgebra.Transpose{<:Any,<:SparseMatrixCSC{TA,S}}, B::SparseArrays.AdjOrTransStridedOrTriangularMatrix{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =
         (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(B, T, (size(transA, 1), size(B, 2))), transA, B, 1, 0))
 end
+
+@generated function StaticArrays._diff(::Size{S}, a::SVector{Q,Chain{V,G,W,X}}, ::Val{D}) where {S,D,Q,V,G,W,X}
+    N = length(S)
+    Snew = ([n==D ? S[n]-1 : S[n] for n = 1:N]...,)
+
+    exprs = Array{Expr}(undef, Snew)
+    itr = [1:n for n = Snew]
+
+    for i1 = Base.product(itr...)
+        i2 = copy([i1...])
+        i2[D] = i1[D] + 1
+        exprs[i1...] = :(a[$(i2...)] - a[$(i1...)])
+    end
+
+    return quote
+        Base.@_inline_meta
+        T = eltype(a)
+        @inbounds return similar_type(a, T, Size($Snew))(tuple($(exprs...)))
+    end
+end

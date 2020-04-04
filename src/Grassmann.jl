@@ -350,15 +350,25 @@ function __init__()
                 return matlab_cache[B]
             end
         end
-        function initmesh(g,args...)
-            (p,e,t) = MATLAB.mxcall(:initmesh,3,Matrix{Float64}(g),args...)
+        function initmeshall(g,args...)
+            p,e,t = MATLAB.mxcall(:initmesh,3,Matrix{Float64}(g),args...)
             s = size(p,1)+1; V = SubManifold(ℝ^s)
             P = ChainBundle([Chain{V,1,Float64}(vcat(1,p[:,k])) for k ∈ 1:size(p,2)])
             E = ChainBundle([Chain{P(2:s...),1,Int}(Int.(e[1:s-1,k])) for k ∈ 1:size(e,2)])
             T = ChainBundle([Chain{P,1,Int}(Int.(t[1:s,k])) for k ∈ 1:size(t,2)])
+            return (P,E,T,t)
+        end
+        function initmesh(g,args...)
+            P,E,T = initmeshall(g,args...)
             #matlab(p,bundle(P)); matlab(e,bundle(E)); matlab(t,bundle(T))
             return (P,E,T)
         end
+        function initmeshes(g,args...)
+            P,E,T,t = initmeshall(g,args...)
+            D = [Int(t[end,k]) for k ∈ 1:size(t,2)]
+            return (P,E,T,D)
+        end
+        export initmeshes
     end
 end
 
