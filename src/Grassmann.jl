@@ -314,6 +314,8 @@ function __init__()
         AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
         AbstractPlotting.arrows(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
         AbstractPlotting.arrows!(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows!(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
+        AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
@@ -321,16 +323,6 @@ function __init__()
             else
                 AbstractPlotting.mesh(submesh(p),array(t);args...)
             end
-        end
-        const submesh_cache = (Array{T,2} where T)[]
-        export submesh
-        submesh(m) = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))]
-        function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
-            for k ∈ length(submesh_cache):B
-                push!(submesh_cache,Array{Any,2}(undef,0,0))
-            end
-            isempty(submesh_cache[B]) && (submesh_cache[B] = submesh(value(m)))
-            return submesh_cache[B]
         end
     end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
@@ -350,25 +342,46 @@ function __init__()
                 return matlab_cache[B]
             end
         end
+        initmesh(g,args...) = initmeshall(g,args...)[1:3]
+        initmeshall(g::Matrix{Int},args...) = initmeshall(Matrix{Float64}(g),args...)
         function initmeshall(g,args...)
-            p,e,t = MATLAB.mxcall(:initmesh,3,Matrix{Float64}(g),args...)
-            s = size(p,1)+1; V = SubManifold(ℝ^s)
-            P = ChainBundle([Chain{V,1,Float64}(vcat(1,p[:,k])) for k ∈ 1:size(p,2)])
-            E = ChainBundle([Chain{P(2:s...),1,Int}(Int.(e[1:s-1,k])) for k ∈ 1:size(e,2)])
-            T = ChainBundle([Chain{P,1,Int}(Int.(t[1:s,k])) for k ∈ 1:size(t,2)])
-            return (P,E,T,t)
-        end
-        function initmesh(g,args...)
-            P,E,T = initmeshall(g,args...)
-            #matlab(p,bundle(P)); matlab(e,bundle(E)); matlab(t,bundle(T))
-            return (P,E,T)
+            P,E,T = MATLAB.mxcall(:initmesh,3,g,args...)
+            s = size(P,1)+1; V = SubManifold(ℝ^s)
+            p = ChainBundle([Chain{V,1,Float64}(vcat(1,P[:,k])) for k ∈ 1:size(P,2)])
+            e = ChainBundle([Chain{p(2:s...),1,Int}(Int.(E[1:s-1,k])) for k ∈ 1:size(E,2)])
+            t = ChainBundle([Chain{p,1,Int}(Int.(T[1:s,k])) for k ∈ 1:size(T,2)])
+            return (p,e,t,T,E,P)
         end
         function initmeshes(g,args...)
-            P,E,T,t = initmeshall(g,args...)
-            D = [Int(t[end,k]) for k ∈ 1:size(t,2)]
-            return (P,E,T,D)
+            p,e,t,T = initmeshall(g,args...)
+            p,e,t,[Int(T[end,k]) for k ∈ 1:size(T,2)]
         end
         export initmeshes
+        function refinemesh(g,args...)
+            p,e,t,T,E,P = initmeshall(g,args...)
+            matlab(P,bundle(p)); matlab(E,bundle(e)); matlab(T,bundle(t))
+            return (g,p,e,t)
+        end
+        refinemesh3(g,p::ChainBundle,e,t,s...) = MATLAB.mxcall(:refinemesh,3,g,matlab(p),matlab(e),matlab(t),s...)
+        refinemesh4(g,p::ChainBundle,e,t,s...) = MATLAB.mxcall(:refinemesh,4,g,matlab(p),matlab(e),matlab(t),s...)
+        refinemesh(g,p::ChainBundle,e,t) = refinemesh3(g,p,e,t)
+        refinemesh(g,p::ChainBundle,e,t,s::String) = refinemesh3(g,p,e,t,s)
+        refinemesh(g,p::ChainBundle,e,t,η::Vector{Int}) = refinemesh3(g,p,e,t,float.(η))
+        refinemesh(g,p::ChainBundle,e,t,η::Vector{Int},s::String) = refinemesh3(g,p,e,t,float.(η),s)
+        refinemes(g,p::ChainBundle,e,t,u) = refinemesh4(g,p,e,t,u)
+        refinemesh(g,p::ChainBundle,e,t,u,s::String) = refinemesh4(g,p,e,t,u,s)
+        refinemesh(g,p::ChainBundle,e,t,u,η) = refinemesh4(g,p,e,t,u,float.(η))
+        refinemesh(g,p::ChainBundle,e,t,u,η,s) = refinemesh4(g,p,e,t,u,float.(η),s)
+        refinemesh!(g::Matrix{Int},p::ChainBundle,args...) = refinemesh!(Matrix{Float64}(g),p,args...)
+        function refinemesh!(g,p::ChainBundle{V},e,t,s...) where V
+            P,E,T = refinemesh(g,p,e,t,s...); l = size(P,1)+1
+            matlab(P,bundle(p)); matlab(E,bundle(e)); matlab(T,bundle(t))
+            submesh!(p); array!(t)
+            bundle_cache[bundle(p)] = [Chain{V,1,Float64}(vcat(1,P[:,k])) for k ∈ 1:size(P,2)]
+            bundle_cache[bundle(e)] = [Chain{p(2:l...),1,Int}(Int.(E[1:l-1,k])) for k ∈ 1:size(E,2)]
+            bundle_cache[bundle(t)] = [Chain{p,1,Int}(Int.(T[1:l,k])) for k ∈ 1:size(T,2)]
+            return (p,e,t)
+        end
     end
 end
 

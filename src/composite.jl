@@ -323,7 +323,7 @@ end
     return sum(terms[1:end-1])
 end=#
 
-export detsimplex, initmesh
+export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
 detsimplex(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
@@ -347,12 +347,27 @@ for op ∈ (:mean,:barycenter,:curl)
     end
 end
 
-function initmesh(r::T) where T<:AbstractRange
+function initmesh(r::R) where R<:AbstractRange
     G = Λ(ℝ^2)
     p = ChainBundle(collect(r).*G.v2.+G.v1)
     e = ChainBundle(Chain{p(2),1,Int}.([(1,),(length(p),)]))
     t = ChainBundle(Chain{p,1,Int}.([(i,i+1) for i ∈ 1:length(p)-1]))
     return p,e,t
+end
+
+select(η,ϵ=sqrt(norm(η)^2/length(η))) = sort!(findall(x->x>ϵ,η))
+refinemesh(g::R,args...) where R<:AbstractRange = (g,initmesh(g,args...)...)
+function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:AbstractRange}
+    p = points(t)
+    x,T,V = value(p),value(t),Manifold(p)
+    for i ∈ η
+        push!(x,Chain{V,1}(SVector(1,(x[i+1][2]+x[i][2])/2)))
+    end
+    sort!(x,by=x->x[2]); submesh!(p)
+    e[end] = Chain{p(2),1}(SVector(length(x)))
+    for i ∈ length(t)+2:length(x)
+        push!(T,Chain{p,1}(SVector{2,Int}(i-1,i)))
+    end
 end
 
 const array_cache = (Array{T,2} where T)[]
@@ -362,6 +377,22 @@ function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     end
     isempty(array_cache[B]) && (array_cache[B] = [m[i][j] for i∈1:length(m),j∈1:ndims(Manifold(m))])
     return array_cache[B]
+end
+function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
+    length(array_cache) ≥ B && (array_cache[B] = Array{Any,2}(undef,0,0))
+end
+
+const submesh_cache = (Array{T,2} where T)[]
+submesh(m) = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))]
+function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
+    for k ∈ length(submesh_cache):B
+        push!(submesh_cache,Array{Any,2}(undef,0,0))
+    end
+    isempty(submesh_cache[B]) && (submesh_cache[B] = submesh(value(m)))
+    return submesh_cache[B]
+end
+function submesh!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
+    length(submesh_cache) ≥ B && (submesh_cache[B] = Array{Any,2}(undef,0,0))
 end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
