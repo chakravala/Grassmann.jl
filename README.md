@@ -6,7 +6,7 @@
 
 *⟨Leibniz-Grassmann-Clifford-Hestenes⟩ differential geometric algebra / multivector simplicial complex*
 
-[![YouTube](https://img.shields.io/badge/JuliaCon%202019-YouTube-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
+[![Financial Contributors on Open Collective](https://opencollective.com/grassmannjl/all/badge.svg?label=financial+contributors)](https://opencollective.com/grassmannjl) [![YouTube](https://img.shields.io/badge/JuliaCon%202019-YouTube-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
 [![DropBox](https://img.shields.io/badge/download_PDF-DropBox-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
 [![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://grassmann.crucialflow.com/stable)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://grassmann.crucialflow.com/dev)
@@ -294,3 +294,33 @@ The sparse representations are a work in progress to be improved with time.
 * Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)
 * Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv (2011)
 * Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)
+
+## Contributors
+
+### Code Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="https://github.com/chakravala/Grassmann.jl/graphs/contributors"><img src="https://opencollective.com/grassmannjl/contributors.svg?width=890&button=false" /></a>
+
+### Financial Contributors
+
+Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/grassmannjl/contribute)]
+
+#### Individuals
+
+<a href="https://opencollective.com/grassmannjl"><img src="https://opencollective.com/grassmannjl/individuals.svg?width=890"></a>
+
+#### Organizations
+
+Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/grassmannjl/contribute)]
+
+<a href="https://opencollective.com/grassmannjl/organization/0/website"><img src="https://opencollective.com/grassmannjl/organization/0/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/1/website"><img src="https://opencollective.com/grassmannjl/organization/1/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/2/website"><img src="https://opencollective.com/grassmannjl/organization/2/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/3/website"><img src="https://opencollective.com/grassmannjl/organization/3/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/4/website"><img src="https://opencollective.com/grassmannjl/organization/4/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/5/website"><img src="https://opencollective.com/grassmannjl/organization/5/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/6/website"><img src="https://opencollective.com/grassmannjl/organization/6/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/7/website"><img src="https://opencollective.com/grassmannjl/organization/7/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/8/website"><img src="https://opencollective.com/grassmannjl/organization/8/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/9/website"><img src="https://opencollective.com/grassmannjl/organization/9/avatar.svg"></a>
