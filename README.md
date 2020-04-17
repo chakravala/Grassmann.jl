@@ -8,6 +8,7 @@
 
 [![YouTube](https://img.shields.io/badge/JuliaCon%202019-YouTube-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
 [![DropBox](https://img.shields.io/badge/download_PDF-DropBox-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/chakravala/Grassmann.jl)
 [![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://grassmann.crucialflow.com/stable)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://grassmann.crucialflow.com/dev)
 [![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
@@ -20,11 +21,12 @@ The [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) multivector param
 Additionally, the universal interoperability between different sub-algebras is enabled by [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl), on which the type system is built.
 
 [![DOI](https://zenodo.org/badge/101519786.svg)](https://zenodo.org/badge/latestdoi/101519786)
+[![Financial Contributors on Open Collective](https://opencollective.com/grassmannjl/all/badge.svg?label=sponsors)](https://opencollective.com/grassmannjl)
+[![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 [![Build Status](https://travis-ci.org/chakravala/Grassmann.jl.svg?branch=master)](https://travis-ci.org/chakravala/Grassmann.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/c36u0rgtm2rjcquk?svg=true)](https://ci.appveyor.com/project/chakravala/grassmann-jl)
 [![Coverage Status](https://coveralls.io/repos/chakravala/Grassmann.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/chakravala/Grassmann.jl?branch=master)
 [![codecov.io](https://codecov.io/github/chakravala/Grassmann.jl/coverage.svg?branch=master)](https://codecov.io/github/chakravala/Grassmann.jl?branch=master)
-[![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 
 This `Grassmann` package for the Julia language was created by [github.com/chakravala](https://github.com/chakravala) for mathematics and computer algebra research with differential geometric algebras.
 These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
@@ -294,3 +296,33 @@ The sparse representations are a work in progress to be improved with time.
 * Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)
 * Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv (2011)
 * Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)
+
+## Contributors
+
+### Code Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="https://github.com/chakravala/Grassmann.jl/graphs/contributors"><img src="https://opencollective.com/grassmannjl/contributors.svg?width=890&button=false" /></a>
+
+### Financial Contributors
+
+Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/grassmannjl/contribute)]
+
+#### Individuals
+
+<a href="https://opencollective.com/grassmannjl"><img src="https://opencollective.com/grassmannjl/individuals.svg?width=890"></a>
+
+#### Organizations
+
+Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/grassmannjl/contribute)]
+
+<a href="https://opencollective.com/grassmannjl/organization/0/website"><img src="https://opencollective.com/grassmannjl/organization/0/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/1/website"><img src="https://opencollective.com/grassmannjl/organization/1/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/2/website"><img src="https://opencollective.com/grassmannjl/organization/2/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/3/website"><img src="https://opencollective.com/grassmannjl/organization/3/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/4/website"><img src="https://opencollective.com/grassmannjl/organization/4/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/5/website"><img src="https://opencollective.com/grassmannjl/organization/5/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/6/website"><img src="https://opencollective.com/grassmannjl/organization/6/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/7/website"><img src="https://opencollective.com/grassmannjl/organization/7/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/8/website"><img src="https://opencollective.com/grassmannjl/organization/8/avatar.svg"></a>
+<a href="https://opencollective.com/grassmannjl/organization/9/website"><img src="https://opencollective.com/grassmannjl/organization/9/avatar.svg"></a>
