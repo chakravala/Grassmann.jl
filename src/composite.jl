@@ -7,7 +7,7 @@ export exph, log_fast, logh_fast
 ## exponential & logarithm function
 
 @inline Base.expm1(t::SubManifold{V,0}) where V = Simplex{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
@@ -56,14 +56,14 @@ end
 @inline unabs!(t) = t
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
-function Base.exp(t::T) where T<:TensorGraded{V,G} where {V,G}
+function Base.exp(t::T) where T<:TensorGraded
     S = T<:SubManifold
     i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return 1+t)
-        G==0 && (return Simplex{V}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
@@ -71,13 +71,13 @@ function Base.exp(t::T) where T<:TensorGraded{V,G} where {V,G}
     end
 end
 
-function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V,G} where {V,G,hint}
+function Base.exp(t::T,::Val{hint}) where T<:TensorGraded where hint
     S = T<:SubManifold
     i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
         isnull(hint) && (return 1+t)
-        G==0 && (return Simplex{V}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
@@ -178,7 +178,7 @@ end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.cosh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
@@ -228,7 +228,7 @@ end
     end
 end
 
-@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.sinh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
