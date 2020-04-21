@@ -4,18 +4,18 @@
 
 ### Product Algebra Constructor
 
-@eval function generate_loop_multivector(V,term,b,MUL,product!,preproduct!,d=nothing)
+@eval function generate_loop_multivector(V,a,b,MUL,product!,preproduct!,d=nothing)
     if ndims(V)<cache_limit/2
         $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
         for g ∈ 1:N+1
-            Y = indexbasis(N,g-1)
+            X = indexbasis(N,g-1)
             @inbounds for i ∈ 1:bn[g]
-                @inbounds val = nothing≠d ? :($b[$(bs[g]+i)]/$d) : :($b[$(bs[g]+i)])
+                @inbounds val = nothing≠d ? :($a[$(bs[g]+i)]/$d) : :($a[$(bs[g]+i)])
                 for G ∈ 1:N+1
                     @inbounds R = bs[G]
-                    X = indexbasis(N,G-1)
+                    Y = indexbasis(N,G-1)
                     @inbounds for j ∈ 1:bn[G]
-                        @inbounds preproduct!(V,out,X[j],Y[i],derive_pre(V,X[j],Y[i],:($term[$(R+j)]),val,MUL))
+                        @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:($b[$(R+j)]),MUL))
                     end
                 end
             end
@@ -24,16 +24,16 @@
     else
         (:N,:t,:out,:bs,:bn,:μ), quote
             for g ∈ 1:N+1
-                Y = indexbasis(N,g-1)
+                X = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    @inbounds val = $(nothing≠d ? :($b[bs[g]+i]/$d) : :($b[bs[g]+i]))
+                    @inbounds val = $(nothing≠d ? :($a[bs[g]+i]/$d) : :($a[bs[g]+i]))
                     val≠0 && for G ∈ 1:N+1
                         @inbounds R = bs[G]
-                        X = indexbasis(N,G-1)
+                        Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]
-                            if @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],$term[R+j],val,$MUL))&μ
+                            if @inbounds $product!(V,out,X[i],Y[j],derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL))&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $product!(V,out,X[j],Y[i],derive_mul(V,X[j],Y[i],$term[R+j],val,$MUL))
+                                @inbounds $product!(V,out,X[i],Y[j],derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL))
                             end
                         end
                     end
@@ -359,7 +359,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         @generated function contraction(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,L,T<:$Field,S<:$Field}
             G<L && (!istangent(V)) && (return g_zero(V))
             if binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)
-                $(insert_expr((:N,:t,:bng,:bnl,:μ),:svec)...)
+                $(insert_expr((:N,:t,:bng,:bnl),:svec)...)
+                μ = istangent(V)|DirectSum.hasconformal(V)
                 ia = indexbasis(N,G)
                 ib = indexbasis(N,L)
                 out = zeros(μ ? svec(N,Any) : svec(N,G-L,Any))
@@ -369,7 +370,6 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         if μ
                             @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
                         else
-                            #print(length(out))
                             @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),$(QuoteNode(MUL))))
                         end
                     end

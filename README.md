@@ -230,10 +230,10 @@ streamplot(vectorfield(v1*exp((π/4)*v12/2)),-1.5..1.5,-1.5..1.5)
 using Grassmann, Makie
 @basis S"∞+++"
 f(t) = (↓(exp(π*t*((3/7)*v12+v∞3))>>>↑(v1+v2+v3)))
-lines(points(f,V(2,3,4)))
+lines(V(2,3,4).(points(f)))
 @basis S"∞∅+++"
 f(t) = (↓(exp(π*t*((3/7)*v12+v∞3))>>>↑(v1+v2+v3)))
-lines(points(f,V(3,4,5)))
+lines(V(3,4,5).(points(f)))
 ```
 ![paper/img/torus.png](paper/img/torus.png) ![paper/img/helix.png](paper/img/helix.png)
 
@@ -246,14 +246,14 @@ streamplot(vectorfield(exp((π/4)*(v12+v∞3)),V(2,3,4)),-1.5..1.5,-1.5..1.5,-1.
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
 f(t) = ↓(exp(t*v∞*(sin(3t)*3v1+cos(2t)*7v2-sin(5t)*4v3)/2)>>>↑(v1+v2-v3))
-lines(points(f,V(2,3,4)))
+lines(V(2,3,4).(points(f)))
 ```
 ![paper/img/orb.png](paper/img/orbit-2.png)
 
 ```Julia
 using Grassmann, Makie; @basis S"∞+++"
 f(t) = ↓(exp(t*(v12+0.07v∞*(sin(3t)*3v1+cos(2t)*7v2-sin(5t)*4v3)/2))>>>↑(v1+v2-v3))
-lines(points(f,V(2,3,4)))
+lines(V(2,3,4).(points(f)))
 ```
 ![paper/img/orb.png](paper/img/orbit-4.png)
 

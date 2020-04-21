@@ -35,7 +35,7 @@ include("forms.jl")
 
 ## fundamentals
 
-export hyperplanes
+export hyperplanes, TensorAlgebra
 
 @pure hyperplanes(V::Manifold{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffvars(V))
 
@@ -306,7 +306,7 @@ function __init__()
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
         export points, vectorfield
-        points(f::F,V=identity;r=-2π:0.0001:2π) where F<:Function = [GeometryTypes.Point(V(vector(f(t)))) for t ∈ r]
+        points(f::F,V=identity;r=-2π:0.0001:2π) where F<:Function = [V(vector(f(t))) for t ∈ r]
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
@@ -317,6 +317,7 @@ function __init__()
         AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
         AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
+        AbstractPlotting.lines(p::Vector{T},args...) where T<:TensorAlgebra = AbstractPlotting.lines(GeometryTypes.Point.(p),args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
                 AbstractPlotting.plot(submesh(p)[:,1],args[:color])
