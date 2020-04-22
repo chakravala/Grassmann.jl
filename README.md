@@ -99,9 +99,9 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [AbstractAlgebra.jl](https://github.com/wbhart/AbstractAlgebra.jl),
 [Nemo.jl](https://github.com/wbhart/Nemo.jl),
 [GaloisFields.jl](https://github.com/tkluck/GaloisFields.jl),
-[LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl),
+[LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl),
 [Compose.jl](https://github.com/GiovineItalia/Compose.jl),
-[GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
+[GeometryTypes.jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl).
 
 ## Grassmann for enterprise
@@ -201,7 +201,7 @@ Alternatively, if you do not wish to assign these variables to your local worksp
 
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 
-Together with [LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
+Together with [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
 ```Julia
 using Grassmann, Compose # environment: LightGraphs, GraphPlot
 x = Λ(ℝ^7).v123
@@ -210,7 +210,7 @@ draw(PDF("simplex.pdf",16cm,16cm),x+!x)
 ```
 ![paper/img/triangle-tetrahedron.png](paper/img/triangle-tetrahedron.png)
 
-Due to [GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Point` interoperability, plotting and visualizing with [Makie.jl](https://github.com/JuliaPlots/Makie.jl) is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
+Due to [GeometryTypes.jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Point` interoperability, plotting and visualizing with [Makie.jl](https://github.com/JuliaPlots/Makie.jl) is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
 ```Julia
 using Grassmann, Makie
 basis"2" # Euclidean
