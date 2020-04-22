@@ -27,9 +27,9 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [AbstractAlgebra.jl](https://github.com/wbhart/AbstractAlgebra.jl),
 [Nemo.jl](https://github.com/wbhart/Nemo.jl),
 [GaloisFields.jl](https://github.com/tkluck/GaloisFields.jl),
-[LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl),
+[LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl),
 [Compose.jl](https://github.com/GiovineItalia/Compose.jl),
-[GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
+[GeometryTypes.jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl).
 
 ## Grassmann for enterprise

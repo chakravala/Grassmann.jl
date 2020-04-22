@@ -161,7 +161,7 @@ then ``\star : \Lambda^pV\rightarrow\Lambda^{n-p}V``.
 
 **Remark**. While ``\star\omega`` is `complementrighthodge` of ``\omega``, the `complementlefthodge` would be ``I\ast'\omega``. The ``\star`` symbol was added to the Julia language as unary operator for ease of use with `Grassmann` on Julia's v1.2 release.
 
-With [LightGraphs,jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
+With [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
 ```julia
 using Grassmann, Compose # environment: LightGraphs, GraphPlot
 x = Λ(ℝ^7).v123
@@ -260,7 +260,7 @@ e^{\theta\omega} = \sum_k \frac{(\theta\omega)^{\ominus k}}{k!} = \begin{cases} 
 ```
 Note that ``\nabla\oslash e^{\theta\omega/2} = \nabla \ominus e^{\theta\omega}`` is a double covering when using the complex numbers in the Euclidean plane.
 
-Due to [GeometryTypes,jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Point` interoperability, plotting and visualizing with [Makie.jl](https://github.com/JuliaPlots/Makie.jl) is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
+Due to [GeometryTypes.jl](https://github.com/JuliaGeometry/GeometryTypes.jl) `Point` interoperability, plotting and visualizing with [Makie.jl](https://github.com/JuliaPlots/Makie.jl) is easily possible. For example, the `vectorfield` method creates an anonymous `Point` function that applies a versor outermorphism:
 ```julia
 using Grassmann, Makie
 basis"2" # Euclidean
