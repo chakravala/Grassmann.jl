@@ -1,9 +1,4 @@
-if VERSION ≤ v"1.2"
-    using Grassmann
-else
-    using Reduce,Grassmann
-end
-using Test
+using Grassmann, Test
 
 # write your own tests here
 @test (@basis "++++" s e; e124 * e23 == e134)
@@ -15,9 +10,10 @@ using Test
 !Sys.iswindows() && @test Λ(62).v32a87Ng == -1Λ(62).v2378agN
 @test Λ.V3 == Λ.C3'
 @test Λ(14) + Λ(14)' == Λ(Manifold(14)+Manifold(14)')
-if VERSION > v"1.2"
+
+#= Reduce
 @test ((a,b) = (:a*Λ(2).v1 + :b*Λ(2).v2,:c*Λ(2).v1 + :d*Λ(2).v2); Algebra.:+(a∧b,a⋅b)==a*b)
-end
+=#
 
 include("issuestests.jl")
 include("generictests.jl")
