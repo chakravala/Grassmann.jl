@@ -804,7 +804,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
     elseif Field ∈ (SymField,:(SymPy.Sym))
         generate_mutators(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
-    PAR && (DirectSum.extend_field(Field); global parsym = (parsym...,Field))
+    PAR && (DirectSum.extend_field(eval(Field)); global parsym = (parsym...,eval(Field)))
     TF = Field ∉ Fields ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     Field ∉ Fields && @eval begin
