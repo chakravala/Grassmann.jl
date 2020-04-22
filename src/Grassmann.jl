@@ -35,13 +35,15 @@ include("forms.jl")
 
 ## fundamentals
 
-export hyperplanes, TensorAlgebra
+export hyperplanes, points, TensorAlgebra
 
 @pure hyperplanes(V::Manifold{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffvars(V))
 
 for M ∈ (:Signature,:DiagonalForm)
     @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{V,Int}(ones(Int,1<<ndims(V)))
 end
+
+points(f::F,r=-2π:0.0001:2π) where F<:Function = vector.(f.(r))
 
 using Leibniz
 import Leibniz: ∇, Δ, d # ∂
@@ -305,9 +307,18 @@ function __init__()
         Base.convert(::Type{GeometryTypes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
         GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
         @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
-        export points, vectorfield
-        points(f::F,V=identity;r=-2π:0.0001:2π) where F<:Function = [V(vector(f(t))) for t ∈ r]
+        export vectorfield
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
+    end
+    @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
+        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = GeometryBasics.Point(value(Chain{V,valuetype(t)}(vector(t))))
+        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),ndims(V))...)
+        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorAlgebra = GeometryBasics.Point(value(vector(t)))
+        Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,ndims(V))...)
+        GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
+        @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
+        export vectorfield
+        vectorfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
         AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)
