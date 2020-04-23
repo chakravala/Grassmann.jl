@@ -267,16 +267,12 @@ function __init__()
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
         generate_algebra(:SymPy,:Sym,:diff,:symbols)
-        generate_symbolic_methods(
-            :SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs)
-        )
-
+        generate_symbolic_methods(:SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs))
         for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
                     MultiVector{V,SymPy.Sym} where V,
                     Simplex{V,G,SymPy.Sym} where {V,G} )
             SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
         end
-
     end
     @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" begin
         generate_algebra(:SymEngine,:Basic,:diff,:symbols)
