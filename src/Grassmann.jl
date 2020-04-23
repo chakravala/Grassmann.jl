@@ -255,7 +255,7 @@ function __init__()
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
         generate_algebra(:SymPy,:Sym,:diff,:symbols)
-        T = Union{TensorTerm, TensorMixed}
+        T = Union{TensorGraded, TensorMixed}
         symbolic = v -> typeof(v) == SymPy.Sym
         SymPy.expand(x::T) = map(v -> symbolic(v) ? SymPy.expand(v) : v, x)
         SymPy.factor(x::T) = map(v -> symbolic(v) ? SymPy.factor(v) : v, x)
@@ -269,7 +269,7 @@ function __init__()
     end
     @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" begin
         generate_algebra(:SymEngine,:Basic,:diff,:symbols)
-        T = Union{TensorTerm, TensorMixed}
+        T = Union{TensorGraded, TensorMixed}
         symbolic = v -> typeof(v) == SymEngine.Basic
         SymEngine.expand(x::T) = map(v -> symbolic(v) ? SymEngine.expand(v) : v, x)
         SymEngine.subs(x::T, args...) = map(v -> symbolic(v) ? SymEngine.subs(v, args...) : v, x)
