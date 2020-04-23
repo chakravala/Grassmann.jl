@@ -230,10 +230,22 @@ function generate_algebra(m,t,d=nothing,c=nothing)
     generate_inverses(m,t)
     !isnothing(d) && generate_derivation(m,t,d,c)
 end
-
-Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
-Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
-Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
+function generate_symbolic_methods(mod, symtype, methods_noargs, methods_args)
+    for method ∈ methods_noargs
+        @eval begin
+            local apply_symbolic(x) = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v) : v, x)
+            $mod.$method(x::T) where T<:TensorGraded = apply_symbolic(x)
+            $mod.$method(x::T) where T<:TensorMixed = apply_symbolic(x)
+        end
+    end
+    for method ∈ methods_args
+        @eval begin
+            local apply_symbolic(x, args...) = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v, args...) : v, x)
+            $mod.$method(x::T, args...) where T<:TensorGraded = apply_symbolic(x, args...)
+            $mod.$method(x::T, args...) where T<:TensorMixed = apply_symbolic(x, args...)
+        end
+    end
+end
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
@@ -255,30 +267,20 @@ function __init__()
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
         generate_algebra(:SymPy,:Sym,:diff,:symbols)
-        T = Union{TensorGraded, TensorMixed}
-        symbolic = v -> typeof(v) == SymPy.Sym
-        SymPy.expand(x::T) = map(v -> symbolic(v) ? SymPy.expand(v) : v, x)
-        SymPy.factor(x::T) = map(v -> symbolic(v) ? SymPy.factor(v) : v, x)
-        SymPy.together(x::T) = map(v -> symbolic(v) ? SymPy.together(v) : v, x)
-        SymPy.apart(x::T) = map(v -> symbolic(v) ? SymPy.apart(v) : v, x)
-        SymPy.cancel(x::T) = map(v -> symbolic(v) ? SymPy.cancel(v) : v, x)
-        # SymPy.expand_trig(x::T) = map(v -> symbolic(v) ? SymPy.expand_trig(v) : v, x)
-        SymPy.N(x::T, args...) = map(v -> symbolic(v) ? SymPy.N(v, args...) : v, x)
-        # SymPy.evalf(X::T, args...) = map(v -> symbolic(v) ? SymPy.evalf(v, args...) : v, x)
-        SymPy.convert(X::T, args...) = map(v -> symbolic(v) ? SymPy.convert(v, args...) : v, x)
-        SymPy.subs(x::T, args...) = map(v -> symbolic(v) ? SymPy.subs(v, args...) : v, x)
-        SymPy.collect(x::T, args...) = map(v -> symbolic(v) ? SymPy.collect(v, args...) : v, x)
+        generate_symbolic_methods(
+            :SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs)
+        )
+
+        for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
+                    MultiVector{V,SymPy.Sym} where V,
+                    Simplex{V,G,SymPy.Sym} where {V,G} )
+            SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
+        end
 
     end
     @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" begin
         generate_algebra(:SymEngine,:Basic,:diff,:symbols)
-        T = Union{TensorGraded, TensorMixed}
-        symbolic = v -> typeof(v) == SymEngine.Basic
-        SymEngine.expand(x::T) = map(v -> symbolic(v) ? SymEngine.expand(v) : v, x)
-        SymEngine.subs(x::T, args...) = map(v -> symbolic(v) ? SymEngine.subs(v, args...) : v, x)
-        SymEngine.N(x::T) = map(v -> symbolic(v) ? SymEngine.N(v) : v, x)
-        SymEngine.evalf(X::T, args...) = map(v -> symbolic(v) ? SymEngine.evalf(v, args...) : v, x)
-        SymEngine.convert(X::T, args...) = map(v -> symbolic(v) ? SymEngine.convert(v, args...) : v, x)
+        generate_symbolic_methods(:SymEngine,:Basic, (:expand,:N), (:subs,:evalf))
     end
     @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_algebra(:AbstractAlgebra,:SetElem)
     @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_algebra(:GaloisFields,:AbstractGaloisField)
