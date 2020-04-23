@@ -231,6 +231,10 @@ function generate_algebra(m,t,d=nothing,c=nothing)
     !isnothing(d) && generate_derivation(m,t,d,c)
 end
 
+Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
+Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
+Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
+
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
         *(a::Reduce.RExpr,b::SubManifold{V}) where V = Simplex{V}(a,b)
@@ -249,8 +253,27 @@ function __init__()
             generate_derivation(:(Reduce.Algebra),T,:df,:RExpr)
         end
     end
-    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" generate_algebra(:SymPy,:Sym,:diff,:symbols)
-    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" generate_algebra(:SymEngine,:Basic,:diff,:symbols)
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
+        generate_algebra(:SymPy,:Sym,:diff,:symbols)
+        T = Union{TensorTerm, TensorMixed}
+        symbolic = v -> typeof(v) == SymPy.Sym
+        SymPy.expand(x::T) = map(v -> symbolic(v) ? SymPy.expand(v) : v, x)
+        SymPy.factor(x::T) = map(v -> symbolic(v) ? SymPy.factor(v) : v, x)
+        SymPy.together(x::T) = map(v -> symbolic(v) ? SymPy.together(v) : v, x)
+        SymPy.apart(x::T) = map(v -> symbolic(v) ? SymPy.apart(v) : v, x)
+        SymPy.cancel(x::T) = map(v -> symbolic(v) ? SymPy.cancel(v) : v, x)
+        # SymPy.expand_trig(x::T) = map(v -> symbolic(v) ? SymPy.expand_trig(v) : v, x)
+        SymPy.subs(x::T, args...) = map(v -> symbolic(v) ? SymPy.subs(v, args...) : v, x)
+        SymPy.collect(x::T, args...) = map(v -> symbolic(v) ? SymPy.collect(v, args...) : v, x)
+
+    end
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" begin
+        generate_algebra(:SymEngine,:Basic,:diff,:symbols)
+        T = Union{TensorTerm, TensorMixed}
+        symbolic = v -> typeof(v) == SymEngine.Basic
+        SymEngine.expand(x::T) = map(v -> symbolic(v) ? SymEngine.expand(v) : v, x)
+        SymEngine.subs(x::T, args...) = map(v -> symbolic(v) ? SymEngine.subs(v, args...) : v, x)
+    end
     @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_algebra(:AbstractAlgebra,:SetElem)
     @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_algebra(:GaloisFields,:AbstractGaloisField)
     @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
