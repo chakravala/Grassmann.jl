@@ -447,3 +447,7 @@ end
         @inbounds return similar_type(a, T, Size($Snew))(tuple($(exprs...)))
     end
 end
+
+Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
+Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
+Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
