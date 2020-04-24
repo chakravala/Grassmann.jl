@@ -543,7 +543,7 @@ for X ∈ TAG, Y ∈ TAG
 end
 
 @doc """
-    ⊘(ω::TensorAlgebra,η::TensorAlgebra)
+    >>>(ω::TensorAlgebra,η::TensorAlgebra)
 
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """ Grassmann.:>>>
