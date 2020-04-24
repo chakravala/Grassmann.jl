@@ -535,7 +535,7 @@ end
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
-Sandwich product: ω⊘η = (~ω)⊖η⊖ω
+Sandwich product: ω⊘η = (~η)⊖ω⊖η
 """ Grassmann.:⊘
 
 for X ∈ TAG, Y ∈ TAG
