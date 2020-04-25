@@ -535,7 +535,8 @@ end
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
-Sandwich product: ω⊘η = (~η)⊖ω⊖η
+General sandwich product: ω⊘η = involute(η)\\ω⊖η
+For normalized even grade η it is ω⊘η = (~η)⊖ω⊖η
 """ Grassmann.:⊘
 
 for X ∈ TAG, Y ∈ TAG
