@@ -333,6 +333,7 @@ barycenter(m::SVector{N,Chain{V,G,T,X}} where {V,G,T,X}) where N = (s=sum(m);s/s
 barycenter(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (s=sum(m);s/s[1])
 curl(m::SVector{N,Chain{V,G,T,X}} where {N,G,T,X}) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
+LinearAlgebra.det(t::Chain{V,1,T}) where {V,T<:Chain} = ∧(t)
 LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
 ∧(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = LinearAlgebra.det(V,m)
 ∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
