@@ -466,6 +466,11 @@ export ⨼, ⨽
 Interior (right) contraction product: ω⋅η = ω∨⋆η
 """ dot
 
+# dyadic products
+
+contraction(a::Chain{W,G,S},b::Chain{V,1,T}) where {W,G,V,S<:Chain,T<:Chain} = Chain{V,1}(a.⋅value(b))
+Base.:(:)(a::Chain{V,1,T},b::Chain{V,1,T}) where {V,T<:Chain} = sum(value(a).⋅value(b))
+
 ## cross product
 
 import LinearAlgebra: cross, ×
