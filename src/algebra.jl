@@ -178,7 +178,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,s))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? $SUB(v) : v) : $MUL(parityinner(A,B,V),v)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B) ? $SUB(v) : v) : $MUL(parityinner(V,A,B),v)
                         if diffvars(V)≠0
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
@@ -190,7 +190,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,spre))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V) ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$v))
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B) ? :($$SUB($v)) : v) : :($$MUL($(parityinner(V,A,B)),$v))
                         if diffvars(V)≠0
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                             val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
@@ -202,8 +202,8 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:geom,s))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(A,B,V),pcc ? $SUB(v) : v)
+                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B)⊻pcc ? $SUB(v) : v) : $MUL(parityinner(V,A,B),pcc ? $SUB(v) : v)
                         if istangent(V)
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
@@ -216,8 +216,8 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:geom,spre))(V::W,m::$M,a::UInt,b::UInt,v::S) where W<:Manifold{N} where {N,T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
-                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(A,B,V)⊻pcc ? :($$SUB($v)) : v) : :($$MUL($(parityinner(A,B,V)),$(pcc ? :($$SUB($v)) : v)))
+                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
+                        val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B)⊻pcc ? :($$SUB($v)) : v) : :($$MUL($(parityinner(V,A,B)),$(pcc ? :($$SUB($v)) : v)))
                         if istangent(V)
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                             val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
@@ -239,7 +239,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @eval begin
                     @inline function $(Symbol(prod,s))(V::W,m::$M,A::UInt,B::UInt,val::T) where W<:Manifold{N} where {N,T,M}
                         if val ≠ 0
-                            g,C,t,Z = $uct(A,B,V)
+                            g,C,t,Z = $uct(V,A,B)
                             v = val
                             if istangent(V)
                                 if !iszero(Z)
@@ -255,7 +255,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     @inline function $(Symbol(prod,spre))(V::W,m::$M,A::UInt,B::UInt,val::T) where W<:Manifold{N} where {N,T,M}
                         if val ≠ 0
-                            g,C,t,Z = $uct(A,B,V)
+                            g,C,t,Z = $uct(V,A,B)
                             v = val
                             if istangent(V)
                                 if !iszero(Z)
@@ -281,14 +281,10 @@ function generate_mutators(M,F,set_val,SUB,MUL)
 end
 
 @inline exterbits(V,α,β) = diffvars(V)≠0 ? ((a,b)=symmetricmask(V,α,β);count_ones(a&b)==0) : count_ones(α&β)==0
-
 @inline exteraddmulti!(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddmulti!(V,out,α,β,γ)
-
-@inline outeraddblade!(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
-
+@inline exteraddblade!(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
 @inline exteraddmulti!_pre(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddmulti!_pre(V,out,α,β,γ)
-
-@inline outeraddblade!_pre(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
+@inline exteraddblade!_pre(V::W,out,α,β,γ) where W<:Manifold = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
 
 ## geometric product
 
@@ -304,9 +300,9 @@ function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b
     ba,bb = bits(a),bits(b)
     (diffcheck(V,ba,bb) || iszero(der)) && (return g_zero(V))
     A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
-    pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(A,B,V) : (false,A⊻B,false)
+    pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
-    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(A,B,V),d)
+    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
     diffvars(V)≠0 && !iszero(Z) && (out = Simplex{V}(getbasis(loworder(V),Z),out))
     return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
 end
@@ -391,7 +387,7 @@ end
     (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
     istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return p ? Simplex{V}(-1,d) : d
+    return isone(p) ? d : Simplex{V}(p,d)
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -404,7 +400,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
-    return Simplex{V}(p ? -v : v,getbasis(V,C))
+    return Simplex{V}(isone(p) ? v : p*v,getbasis(V,C))
 end
 
 """
@@ -447,7 +443,7 @@ end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = bits(basis(a)),bits(basis(b))
-    g,C,t,Z = interior(ba,bb,V)
+    g,C,t,Z = interior(V,ba,bb)
     !t && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
@@ -830,8 +826,8 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b)))
         *(a::Simplex{V,0,B,F},b::Chain{V,G,T}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a.v),b.v))
         *(a::Chain{V,G,T},b::Simplex{V,0,B,F}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b.v)))
-        *(a::SubManifold{V,0},b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = b
-        *(a::Chain{V,G,T},b::SubManifold{V,0}) where {F<:$Field,V,G,T<:$Field} = a
+        *(a::SubManifold{V,0},b::Chain{W,G,T}) where {V,W,G,T<:$Field} = b
+        *(a::Chain{V,G,T},b::SubManifold{W,0}) where {V,W,G,T<:$Field} = a
         *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,Ref(a),b.v))
         *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,a.v,Ref(b)))
         *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))

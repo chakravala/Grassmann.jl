@@ -47,7 +47,7 @@ end
         pcc,bas = if skew
             A3,β3,i2o,o2i,xor = conformalcheck(V,A,β)
             cx,bas = cc || xor, complement(N,C,D)
-            cx && parity(A3,β3,V)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
+            cx && parity(V,A3,β3)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
         else
             false, A+B≠0 ? complement(N,C,D) : g_zero(UInt)
         end
@@ -59,7 +59,7 @@ end
 end
 
 @pure function parityregressive(V::M,A,B) where M<:Manifold
-    p,C,t,Z = regressive(A,B,Signature(V))
+    p,C,t,Z = parityregressive(Signature(V),A,B)
     return p ? -1 : 1, C, t, Z
 end
 
@@ -78,10 +78,10 @@ end=#
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
 end
 
-@pure function parityinner(a::Bits,b::Bits,V::M) where M<:Manifold
+@pure function parityinner(V::M,a::Bits,b::Bits) where M<:Manifold
     A,B = symmetricmask(V,a,b)
     g = abs(prod(V[indices(A&B,ndims(V))]))
-    parity(A,B,Signature(V)) ? -(g) : g
+    parity(Signature(V),A,B) ? -(g) : g
 end
 
 ### parity cache
@@ -113,13 +113,13 @@ const parity_extra = Dict{UInt,Dict{UInt,Dict{UInt,Bool}}}[]
         @inbounds parity_cache[n][s][a1][b+1]
     end
 end
-@pure function parity(a::UInt,b::UInt,v::Signature)
+@pure function parity(v::Signature,a::UInt,b::UInt)
     d=diffmask(v)
     D=isdyadic(v) ? |(d...) : d
     parity(ndims(v),metric(v),(a&~D),(b&~D))
 end
-@pure parity(a::UInt,b::UInt,v::Manifold) = parity(a,b,Signature(v))
-@pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(bits(a),bits(b),V)
+@pure parity(v::Manifold,a::UInt,b::UInt) = parity(Signature(v),a,b)
+@pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(V,bits(a),bits(b))
 
 ### parity product caches
 
@@ -131,7 +131,7 @@ for par ∈ (:conformal,:regressive,:interior)
     @eval begin
         const $cache = Dict{UInt,Vector{Dict{UInt,Vector{Vector{$T}}}}}[]
         const $extra = Dict{UInt,Vector{Dict{UInt,Dict{UInt,Dict{UInt,$T}}}}}[]
-        @pure function ($par(a,b,V::W)::$T) where W<:SubManifold{M,NN,s} where {M,NN,s}
+        @pure function ($par(V::W,a,b)::$T) where W<:SubManifold{M,NN,s} where {M,NN,s}
             n,m,S = ndims(M),DirectSum.options(M),metric(M)
             m1 = m+1
             if n > sparse_limit
@@ -171,14 +171,14 @@ for par ∈ (:conformal,:regressive,:interior)
             end
         end
     end
-    @eval @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(bits(a),bits(b),V)
+    @eval @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,bits(a),bits(b))
 end
 
 import Base: signbit, imag, real
 export odd, even, angular, radial, ₊, ₋, ǂ
 
-@pure signbit(V::T) where T<:Manifold{N} where N = (ib=indexbasis(N); parity.(ib,ib,Ref(V)))
-@pure signbit(V::T,G) where T<:Manifold{N} where N = (ib=indexbasis(N,G); parity.(ib,ib,Ref(V)))
+@pure signbit(V::T) where T<:Manifold{N} where N = (ib=indexbasis(N); parity.(Ref(V),ib,ib))
+@pure signbit(V::T,G) where T<:Manifold{N} where N = (ib=indexbasis(N,G); parity.(Ref(V),ib,ib))
 @pure angular(V::T) where T<:Manifold = SVector(findall(signbit(V))...)
 @pure radial(V::T) where T<:Manifold = SVector(findall(.!signbit(V))...)
 @pure angular(V::T,G) where T<:Manifold = findall(signbit(V,G))
