@@ -2,8 +2,8 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-import DirectSum: parityreverse, parityinvolute, parityconj, parityright, parityleft, parityrighthodge, paritylefthodge, involute, grade_basis, odd, even
-import DirectSum: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement
+import DirectSum: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute, clifford
+import DirectSum: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
 
 ## complement
 
@@ -12,7 +12,7 @@ export complementleft, complementright, ⋆, complementlefthodge, complementrigh
 ## reverse
 
 import Base: reverse, conj, ~
-export involute
+export involute, clifford
 
 ## product parities
 

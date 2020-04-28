@@ -387,14 +387,14 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         ∧(a::$Field,b::MultiGrade{V,G}) where V = MultiGrade{V,G}(a.*b.v)
         ∧(a::MultiGrade{V,G},b::$Field) where V = MultiGrade{V,G}(a.v.*b)=#
     end
-    for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(abs(G-L)),:meet))
+    for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-ndims(V)),:meet))
         grassaddmulti! = Symbol(grass,:addmulti!)
         grassaddblade! = Symbol(grass,:addblade!)
         grassaddmulti!_pre = Symbol(grassaddmulti!,:_pre)
         grassaddblade!_pre = Symbol(grassaddblade!,:_pre)
         @eval begin
             @generated function $op(a::Chain{w,G,T},b::SubManifold{W,L}) where {w,G,T<:$Field,W,L}
-                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
                 $po(G+L,ndims(V)) && (!istangent(V)) && (return g_zero(V))
                 if binomial(ndims(w),G)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:μ),VEC,:T,Int)...)
@@ -435,7 +435,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end end
             end
             @generated function $op(a::SubManifold{w,G},b::Chain{W,L,T}) where {w,W,T<:$Field,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
                 $po(G+L,ndims(V)) && (!istangent(V)) && (return g_zero(V))
                 if binomial(ndims(W),L)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:μ),VEC,Int,:T)...)
@@ -516,7 +516,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end end
             end
             @generated function $op(a::Simplex{w,G,B,S},b::Chain{W,L,T}) where {T<:$Field,w,W,B,S<:$Field,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
                 $po(G+L,ndims(V)) && (!istangent(V)) && (return g_zero(V))
                 if binomial(ndims(W),L)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:μ),VEC,:S,:T)...)
@@ -556,7 +556,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 end end
             end
             @generated function $op(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}
-                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop(∧,a,b))))
+                V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
                 $po(G+L,ndims(V)) && (!istangent(V)) && (return g_zero(V))
                 if binomial(ndims(w),G)*binomial(ndims(W),L)<(1<<cache_limit)
                     $(insert_expr((:N,:t,:μ),VEC,:T,:S)...)
@@ -856,7 +856,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             end
         end
     end
-    for reverse ∈ (:reverse,:involute,:conj)
+    for reverse ∈ (:reverse,:involute,:conj,:clifford)
         p = Symbol(:parity,reverse)
         @eval begin
             @generated function $reverse(b::Chain{V,G,T}) where {V,G,T<:$Field}

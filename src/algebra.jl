@@ -392,7 +392,7 @@ end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = bits(basis(a)),bits(basis(b))
-    p,C,t,Z = regressive(ba,bb,V)
+    p,C,t,Z = regressive(V,ba,bb)
     !t  && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
@@ -529,9 +529,11 @@ Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(le
 export ⊘
 
 for X ∈ TAG, Y ∈ TAG
-    @eval ⊘(x::$X{V},y::$Y{V}) where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
+    @eval ⊘(x::X,y::Y) where {X<:$X{V},Y<:$Y{V}} where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
 end
-⊘(x::Chain{V,1},y::T) where {V,G,T<:TensorAlgebra} = diffvars(V)≠0 ? conj(y)*x*y : ((~y)*x*involute(y))(Val(G))/(y⊛y)
+for Z ∈ TAG
+    @eval ⊘(x::Chain{V,G},y::T) where {V,G,T<:$Z} = diffvars(V)≠0 ? conj(y)*x*y : ((~y)*x*involute(y))(Val(G))/abs2(y)
+end
 
 
 @doc """

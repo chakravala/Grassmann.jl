@@ -452,3 +452,13 @@ end
 Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
+
+import Random: SamplerType, AbstractRNG
+Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{Chain{V}}) where V = rand(Chain{V,rand(0:ndims(V))})
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G}}) where {V,G} = Chain{V,G}(DirectSum.orand(svec(ndims(V),G,Float64)))
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(rand(svec(ndims(V),G,T)))
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:ndims(V)),Float64})
+Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(ndims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(ndims(V),T)))
