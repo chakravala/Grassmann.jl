@@ -37,22 +37,28 @@ end
     return pcc, bas, cc, zero(UInt)
 end
 
+function paritycomplementinverse(N,G)#,S)
+    parityreverse(N-G)⊻parityreverse(G)⊻isodd(binomial(N,2))#⊻isodd(count_ones(S))
+end
+
 @pure function parityregressive(V::Signature{N,M,S},a,b,::Val{skew}=Val{false}()) where {N,M,S,skew}
     D = diffvars(V)
-    (A,B,Q,Z),NG = symmetricmask(V,a,b),N-D
+    A,B,Q,Z = symmetricmask(V,a,b)
     α,β = complement(N,A,D),complement(N,B,D)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
     if ((count_ones(α&β)==0) && !diffcheck(V,α,β)) || cc
         C,L = α ⊻ β, count_ones(A)+count_ones(B)
+        bas = complement(N,C,D)
         pcc,bas = if skew
             A3,β3,i2o,o2i,xor = conformalcheck(V,A,β)
-            cx,bas = cc || xor, complement(N,C,D)
+            cx = cc || xor
             cx && parity(V,A3,β3)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
         else
-            false, A+B≠0 ? complement(N,C,D) : g_zero(UInt)
+            false, A+B≠0 ? bas : g_zero(UInt)
         end
-        par = parityrighthodge(S,A,N)⊻parityrighthodge(S,B,N)⊻parityrighthodge(S,C,N)
-        return (isodd(L*(L-grade(V)))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
+        par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
+        invert = paritycomplementinverse(N-D,count_ones(C))#,UInt(0))
+        return (invert⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
         return false, g_zero(UInt), false, Z
     end

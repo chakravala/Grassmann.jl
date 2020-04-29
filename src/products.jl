@@ -58,10 +58,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         @generated function *(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,L,T<:$Field}
             if G == 0
                 return :(a[1]*b)
-            elseif L == ndims(V) && !istangent(V) && !DirectSum.hasconformal(V)
+            elseif L == ndims(V) && !istangent(V)
                 return :(⋆(~a))
             elseif G == ndims(V) && !istangent(V)
-                return :(a[1]*⋆(~involute(b)))
+                return :(a[1]*complementlefthodge(~b))
             elseif binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 for i ∈ 1:binomial(N,G)
@@ -84,8 +84,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return :(a*b[1])
             elseif G == ndims(V) && !istangent(V)
                 return :(⋆(~a)*b[1])
-            #=elseif L == ndims(V) && !istangent(V)
-                return :(⋆(~involute(b)))=#
+            elseif L == ndims(V) && !istangent(V)
+                return :(complementlefthodge(~b))
             elseif binomial(ndims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 for i ∈ 1:binomial(N,G)
@@ -106,10 +106,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         @generated function *(a::Chain{V,G,T},b::Simplex{V,L,B,S}) where {V,G,T<:$Field,L,B,S<:$Field}
             if G == 0
                 return :(a[1]*b)
-            elseif L == ndims(V) && !istangent(V) && !DirectSum.hasconformal(V)
+            elseif L == ndims(V) && !istangent(V)
                 return :(⋆(~a)*value(b))
             elseif G == ndims(V) && !istangent(V)
-                return :(a[1]*⋆(~involute(b)))
+                return :(a[1]*complementlefthodge(~b))
             elseif ndims(V)<cache_limit
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 X = bits(B)
@@ -134,8 +134,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return :(a*b[1])
             elseif G == ndims(V) && !istangent(V)
                 return :(⋆(~a)*b[1])
-            #=elseif L == ndims(V) && !istangent(V)
-                return :(value(a)*⋆(~involute(b)))=#
+            elseif L == ndims(V) && !istangent(V)
+                return :(value(a)*complementlefthodge(~b))
             elseif ndims(V)<cache_limit
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 A = bits(B)
@@ -161,7 +161,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             elseif L == 0
                 return :(Chain{V,G}(broadcast($$MUL,a.v,Ref(b[1]))))
             elseif G == ndims(V) && !istangent(V)
-                return :(a[1]*⋆(~involute(b)))
+                return :(a[1]*complementlefthodge(~b))
             elseif L == ndims(V) && !istangent(V)
                 return :(⋆(~a)*b[1])
             elseif binomial(ndims(V),G)*binomial(ndims(V),L)<(1<<cache_limit)

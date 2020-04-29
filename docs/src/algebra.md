@@ -102,9 +102,9 @@ The first part of the book focused on anti-symmetric exterior algebra, while the
 Elements ``\omega_k`` in the space ``\Lambda V`` of anti-symmetric algebra are often studied as unit quantum state vectors in a unitary probability space, where ``\sum_k\omega_k\neq\bigotimes_k\omega_k`` is entanglement.
 
 **Definition** (Reverse, involute, conjugate).
-The `reverse` of ``\langle\omega\rangle_r`` is defined as ``\langle\tilde\omega\rangle_r = (-1)^{(r-1)r/2}\langle\omega\rangle_r``, while the `involute` is ``\langle\omega\rangle_r^\times=(-1)^r\langle\omega\rangle_r`` and Clifford `conj`  ``\langle\omega\rangle_r^\ddagger`` is the composition of `involute` and `reverse`.
+The `reverse` of ``\langle\omega\rangle_r`` is defined as ``\langle\tilde\omega\rangle_r = (-1)^{(r-1)r/2}\langle\omega\rangle_r``, while the `involute` is ``\langle\omega\rangle_r^\times=(-1)^r\langle\omega\rangle_r`` and `clifford`  ``\langle\omega\rangle_r^\ddagger`` is the composition of `involute` and `reverse`.
 ```@repl ga
-conj(v234) == involute(~v234)
+clifford(v234) == involute(~v234)
 ```
 **Definition** (Reversed product).
 Define the index reversed product ``\ast`` which yields a Hilbert space structure:
