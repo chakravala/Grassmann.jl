@@ -352,7 +352,11 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     end
                 end
                 return if μ
-                    insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
+                    if !istangent(V)
+                        insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N,:t),out...)))))
+                    else
+                        insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
+                    end
                 else
                     insert_t(:(value_diff(Chain{$V,G-L}($(Expr(:call,tvec(N,G-L,:t),out...))))))
                 end
