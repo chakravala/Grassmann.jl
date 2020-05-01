@@ -325,23 +325,23 @@ end=#
 
 export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
-detsimplex(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ∧(m)/factorial(ndims(V)-1)
+detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
-mean(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = sum(m)/length(m)
+mean(m::Vector{<:Chain}) = sum(m)/length(m)
 mean(m::T) where T<:SVector = sum(m)/length(m)
-barycenter(m::SVector{N,Chain{V,G,T,X}} where {V,G,T,X}) where N = (s=sum(m);s/s[1])
-barycenter(m::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = (s=sum(m);s/s[1])
-curl(m::SVector{N,Chain{V,G,T,X}} where {N,G,T,X}) where V = curl(Chain{V,1}(m))
+barycenter(m::SVector{N,<:Chain}) where N = (s=sum(m);s/s[1])
+barycenter(m::Vector{<:Chain}) = (s=sum(m);s/s[1])
+curl(m::SVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,T}) where {V,T<:Chain} = ∧(t)
 LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
-∧(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = LinearAlgebra.det(V,m)
+∧(m::Vector{<:Chain{V}}) where V = LinearAlgebra.det(V,m)
 ∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
 for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
         export $op, $ops
-        $ops(m::Vector{Chain{p,G,T,X}} where {G,T,X}) where p = $ops(m,p)
+        $ops(m::Vector{<:Chain{p}}) where p = $ops(m,p)
         @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
         @pure $ops(m,::SubManifold{p}) where p = $ops(m,p)
         @pure $ops(m,p) = $op.(getindex.(Ref(p),value.(value(m))))
@@ -429,7 +429,7 @@ if VERSION >= v"1.4"
         (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(B, T, (size(transA, 1), size(B, 2))), transA, B, 1, 0))
 end
 
-@generated function StaticArrays._diff(::Size{S}, a::SVector{Q,Chain{V,G,W,X}}, ::Val{D}) where {S,D,Q,V,G,W,X}
+@generated function StaticArrays._diff(::Size{S}, a::SVector{Q,<:Chain}, ::Val{D}) where {S,D,Q}
     N = length(S)
     Snew = ([n==D ? S[n]-1 : S[n] for n = 1:N]...,)
 
@@ -458,7 +458,7 @@ Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Chain{V}}) where V = rand(Chain{V,rand(0:ndims(V))})
 Base.rand(::AbstractRNG,::SamplerType{Chain{V,G}}) where {V,G} = Chain{V,G}(DirectSum.orand(svec(ndims(V),G,Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(rand(svec(ndims(V),G,T)))
-Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:ndims(V)),Float64})
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:ndims(V)),T})
 Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(ndims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(ndims(V),T)))

@@ -41,6 +41,10 @@ function paritycomplementinverse(N,G)#,S)
     parityreverse(N-G)⊻parityreverse(G)⊻isodd(binomial(N,2))#⊻isodd(count_ones(S))
 end
 
+function cga(V,A,B)
+    (hasinforigin(V,A,B) || hasorigininf(V,A,B)) && iszero(getbasis(V,A)∨⋆(getbasis(V,B)))
+end
+
 @pure function parityregressive(V::Signature{N,M,S},a,b,::Val{skew}=Val{false}()) where {N,M,S,skew}
     D = diffvars(V)
     A,B,Q,Z = symmetricmask(V,a,b)
@@ -57,8 +61,7 @@ end
             false, A+B≠0 ? bas : g_zero(UInt)
         end
         par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
-        invert = paritycomplementinverse(N-D,count_ones(C))#,UInt(0))
-        return (invert⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
+        return (isodd(L*(L-grade(V)))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
         return false, g_zero(UInt), false, Z
     end
@@ -78,13 +81,13 @@ end=#
 
 @pure function parityinterior(V::M,a,b) where M<:Manifold{N} where N
     A,B,Q,Z = symmetricmask(V,a,b)
-    diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
+    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,g_zero(UInt),false,Z)
     p,C,t = parityregressive(Signature(V),A,complement(N,B,diffvars(V)),Val{true}())
     ind = indices(B,N); g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
 end
 
-@pure function parityinner(V::M,a::Bits,b::Bits) where M<:Manifold
+@pure function parityinner(V::M,a::UInt,b::UInt) where M<:Manifold
     A,B = symmetricmask(V,a,b)
     g = abs(prod(V[indices(A&B,ndims(V))]))
     parity(Signature(V),A,B) ? -(g) : g

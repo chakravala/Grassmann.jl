@@ -347,7 +347,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 @generated ∧(t::T) where T<:SVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
-∧(t::Chain{V,1,T}) where {V,T<:Chain} = ∧(value(t))
+∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 
 export ∧, ∨, ⊗
@@ -464,7 +464,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 
 # dyadic products
 
-contraction(a::Chain{W,G,S},b::Chain{V,1,T}) where {W,G,V,S<:Chain,T<:Chain} = Chain{V,1}(a.⋅value(b))
+contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(a.⋅value(b))
 Base.:(:)(a::Chain{V,1,T},b::Chain{V,1,T}) where {V,T<:Chain} = sum(value(a).⋅value(b))
 
 ## cross product
