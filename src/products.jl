@@ -792,7 +792,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 @generated function $c(b::Chain{V,G,T}) where {V,G,T<:$Field}
                     isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                     if binomial(ndims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:ib,:D,:P),:svec)...)
+                        $(insert_expr((:N,:ib,:D),:svec)...)
+                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                         out = zeros(svec(N,G,Any))
                         D = diffvars(V)
                         for k ∈ 1:binomial(N,G)
@@ -804,7 +805,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                         return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
                     else return quote
-                        $(insert_expr((:N,:ib,:D,:P),$(QuoteNode(VEC)))...)
+                        $(insert_expr((:N,:ib,:D),$(QuoteNode(VEC)))...)
+                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                         out = zeros($$VEC(N,G,T))
                         D = diffvars(V)
                         for k ∈ 1:binomial(N,G)
@@ -822,7 +824,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 @generated function $c(m::MultiVector{V,T}) where {V,T<:$Field}
                     isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                     if ndims(V)<cache_limit
-                        $(insert_expr((:N,:bs,:bn,:P),:svec)...)
+                        $(insert_expr((:N,:bs,:bn),:svec)...)
+                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                         out = zeros(svec(N,Any))
                         D = diffvars(V)
                         for g ∈ 1:N+1
@@ -836,7 +839,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                         end
                         return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
                     else return quote
-                        $(insert_expr((:N,:bs,:bn,:P),$(QuoteNode(VEC)))...)
+                        $(insert_expr((:N,:bs,:bn),$(QuoteNode(VEC)))...)
+                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                         out = zeros($$VEC(N,T))
                         D = diffvars(V)
                         for g ∈ 1:N+1

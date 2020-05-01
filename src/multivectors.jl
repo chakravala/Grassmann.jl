@@ -396,9 +396,9 @@ valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @inline value(m::MultiGrade,T) = m
 for T ∈ (:Chain,:MultiVector)
-    @eval @inline value(m::$T,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
+    @eval @inline value(m::$T,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 end
-@inline value(m::SparseChain,T::DataType=valuetype(m)) = T∉(valuetype(m),Any) ? convert(SparseVector{T,Int},m.v) : m.v
+@inline value(m::SparseChain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(SparseVector{T,Int},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
 
