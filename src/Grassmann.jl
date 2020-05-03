@@ -327,16 +327,6 @@ function __init__()
             viewer = run(cmd,(devnull,stdout,stderr),wait=false)
         end
     end
-    @require GeometryTypes="4d00f742-c7ba-57c2-abde-4428a4b178cb" begin
-        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V} where V = GeometryTypes.Point(value(Chain{V,valuetype(t)}(vector(t))))
-        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryTypes.Point(zeros(valuetype(t),ndims(V))...)
-        Base.convert(::Type{GeometryTypes.Point},t::T) where T<:TensorAlgebra = GeometryTypes.Point(value(vector(t)))
-        Base.convert(::Type{GeometryTypes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryTypes.Point(value(vector(t))) : GeometryTypes.Point(zeros(T,ndims(V))...)
-        GeometryTypes.Point(t::T) where T<:TensorAlgebra = convert(GeometryTypes.Point,t)
-        @pure ptype(::GeometryTypes.Point{N,T} where N) where T = T
-        export vectorfield
-        vectorfield(t,V=Manifold(t),W=V) = p->GeometryTypes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
-    end
     @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = GeometryBasics.Point(value(Chain{V,valuetype(t)}(vector(t))))
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),ndims(V))...)
@@ -350,12 +340,12 @@ function __init__()
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
         AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)
         AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
-        AbstractPlotting.arrows(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
-        AbstractPlotting.arrows!(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows!(GeometryTypes.Point.(V(2:ndims(V)...).(p)),GeometryTypes.Point.(value(v));args...)
+        AbstractPlotting.arrows(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(V(2:ndims(V)...).(p)),GeometryBasics.Point.(value(v));args...)
+        AbstractPlotting.arrows!(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(V(2:ndims(V)...).(p)),GeometryBasics.Point.(value(v));args...)
         AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
         AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
-        AbstractPlotting.lines(p::Vector{T},args...) where T<:TensorAlgebra = AbstractPlotting.lines(GeometryTypes.Point.(p),args...)
+        AbstractPlotting.lines(p::Vector{T},args...) where T<:TensorAlgebra = AbstractPlotting.lines(GeometryBasics.Point.(p),args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
                 AbstractPlotting.plot(submesh(p)[:,1],args[:color])

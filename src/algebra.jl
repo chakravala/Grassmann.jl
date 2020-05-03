@@ -465,7 +465,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 # dyadic products
 
 contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(a.⋅value(b))
-Base.:(:)(a::Chain{V,1,T},b::Chain{V,1,T}) where {V,T<:Chain} = sum(value(a).⋅value(b))
+Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
 
 ## cross product
 

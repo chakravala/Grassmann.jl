@@ -50,12 +50,14 @@ end
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
+getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = getindex.(m[i],j)
 setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
 @pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
 @pure Base.length(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
 Base.zero(::Type{<:Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(zeros(svec(ndims(V),G,T)))
 Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(ndims(V),G,T)))
+StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}} where {V,W}) = hcat(value.(value(m))...)
 
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
     Simplex{V,G,SubManifold{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
