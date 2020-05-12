@@ -123,7 +123,7 @@ function ↑(ω::T) where T<:TensorAlgebra
     !(hasinf(V)||hasorigin(V)) && (return ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        ((G.v∞/2)*ω^2+G.v∅)+ω
+        ((G.v∞*(one(valuetype(ω))/2))*ω^2+G.v∅)+ω
     else
         ω2 = ω^2
         iω2 = inv(ω2+1)
@@ -146,7 +146,7 @@ function ↓(ω::T) where T<:TensorAlgebra
     !(hasinf(V)||hasorigin(V)) && (return ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        inv(G.v∞∅)*(G.v∞∅∧ω)/(-ω⋅G.v∞)
+        inv(one(valuetype(ω))*G.v∞∅)*(G.v∞∅∧ω)/(-ω⋅G.v∞)
     else
         b = hasinf(V) ? G.v∞ : G.v∅
         ((ω∧b)*b)/(1-b⋅ω)
