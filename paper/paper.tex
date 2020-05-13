@@ -82,11 +82,11 @@ The \textit{DirectSum.jl} package is a work in progress providing the necessary 
 Although intended for use with the \textit{Grassmann.jl} package, \verb`DirectSum` can be used independently.
 
 \begin{definition}[Vector bundle of submanifolds]
-	Let $M = T^\mu V\in\text{Vect}_{\mb K}$ be a \verb`VectorBundle<:Manifold` of rank $n$,
+	Let $M = T^\mu V\in\text{Vect}_{\mb K}$ be a \verb`TensorBundle<:Manifold` of rank $n$,
 	\begin{align*}
 		T^\mu V &= (n,\mb P,g,\nu,\mu), & \mb P &\subseteq\gen{v_\infty,v_\emptyset}, & g &:V\times V\ra\mb K
 	\end{align*}
-	The type \verb+VectorBundle{n,+$\mb P$\verb+,g,+$\nu,\mu$\verb+}+ uses \textit{byte-encoded} data available at pre-compilation, where
+	The type \verb+TensorBundle{n,+$\mb P$\verb+,g,+$\nu,\mu$\verb+}+ uses \textit{byte-encoded} data available at pre-compilation, where
 	$\mb P$ specifies the basis for up and down projection,
 	$g$ is a bilinear form that specifies the metric of the space,
 	and $\mu$ is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, $\nu$ is the number of tangent variables.
@@ -113,8 +113,8 @@ Given \verb`M(s::Int...)` one can encode \verb+SubManifold{+$|s|,M,s$\verb+}+ wi
 $$T^eV \subset T^\mu W \iff \exists Z\in\text{Vect}_{\mb K}(T^e(V\oplus Z) = T^{e\leq \mu}W,\,V\perp Z),$$
 such that computing unions of submanifolds is done by inspecting the parameter $s\in V\subseteq W$ and $s\notin Z$. Operations on \verb`Manifold` types is automatically handled at compile time.
 
-The metric signature of the \verb+Basis{V,1}+ elements of a vector space \verb+V+ can be specified with the \verb+V"..."+ constructor by using \verb-+- and \verb+-+ to specify whether the \verb+Basis{V,1}+ element of the corresponding index squares to \verb`+1` or \verb`-1`.
-For example, \verb`S"+++"` constructs a positive definite 3-dimensional \verb`VectorBundle`.
+The metric signature of the \verb+SubManifold{V,1}+ elements of a vector space \verb+V+ can be specified with the \verb+V"..."+ constructor by using \verb-+- and \verb+-+ to specify whether the element of the corresponding index squares to \verb`+1` or \verb`-1`.
+For example, \verb`S"+++"` constructs a positive definite 3-dimensional \verb`TensorBundle`.
 It is also possible to specify an arbitrary \verb`DiagonalForm` having numerical values for the basis with degenracy \verb`D"1,1,1,0"`, although the $\pm$ format has a more compact representation.
 Further development will result in more metric types.
 
@@ -127,18 +127,18 @@ The \verb`tangent(V,`$\mu$\verb`,`$\nu$\verb`)` map can be used to specify $\mu$
 \section{Tensor basis equivalence classes}% of Leibniz and Grassmann}
 
 The \verb`AbstractTensors` package is intended for universal interoperability of the abstract \verb`TensorAlgebra` type system.
-All \verb`TensorAlgebra{V}` subtypes have type parameter \verb`V`, used to store a \verb`VectorBundle` value obtained from \textit{DirectSum.jl}.
-By itself, this package does not impose any specifications or structure on the \verb`TensorAlgebra{V}` subtypes and elements, aside from requiring $V$ to be a \verb`VectorBundle`.
-Hence all tensor types share a common underlying \verb`VectorBundle` structure.
+All \verb`TensorAlgebra{V}` subtypes have type parameter \verb`V`, used to store a \verb`TensorBundle` value obtained from \textit{DirectSum.jl}.
+By itself, this package does not impose any specifications or structure on the \verb`TensorAlgebra{V}` subtypes and elements, aside from requiring $V$ to be a \verb`Manifold`.
+Hence all tensor types share a common underlying \verb`Manifold` structure.
 The macro \verb`@basis V` declares a local basis in Julia.
 
 \begin{definition}
-	Let $V\in\text{Vect}_{\mb k}$ be a \verb`VectorBundle` with dual space $V'$ and the basis elements $w_k:V\ra\mb K$, then for all $x\in V,c\in\mb K$ the properties $(w_i+w_j)(x) = w_i(x)+w_j(x)$ and $(cw_k)(x) = cw_k(x)$ hold.
+	Let $V\in\text{Vect}_{\mb k}$ be a \verb`TensorBundle` with dual space $V'$ and the basis elements $w_k:V\ra\mb K$, then for all $x\in V,c\in\mb K$ the properties $(w_i+w_j)(x) = w_i(x)+w_j(x)$ and $(cw_k)(x) = cw_k(x)$ hold.
 	An element of a mixed-symmetry \verb`TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
 	$(\bigotimes_k \omega_k)(v_1,\dots,v_{\sum_k p_k}) = \prod_k \omega_k(v_1,\dots,v_{p_k})$.
 \end{definition}
 \begin{definition}[Mixed-symmetry basis]
-	Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor \verb`Basis` $\langle w_{p_1}\otimes\dots\otimes w_{p_k}\rangle_k$, where \verb`grade` $k$ is determined by the number of $w_i$ basis elements in its tensor product decomposition.
+	Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) \verb`SubManifold` $\langle w_{p_1}\otimes\dots\otimes w_{p_k}\rangle_k$, where \verb`rank` $k$ is determined by the number of $w_i$ basis elements in its tensor product decomposition.
 	The algebra partitions into symmetric and anti-symmetric tensor equivalence classes.
 	For any pair, %of tensors, either
 	\begin{align*}
@@ -163,7 +163,7 @@ Anti-symmetric indices $\Lambda X\subseteq\Lambda V$ have two orientations and h
 %Symmetric tensors have an ambiguous multiplicity of nilpotence; decide that $\epsilon_k^{\mu+1}=0$, so $\mu_k\leq\mu$ can be non-trivial, negative, or unbounded.
 The Leibniz-Taylor algebra \cite{taylor-algebra} is a quotient polynomial ring $LV\cong R[x_1,\dots,x_n]/\{\prod_{k=1}^{\mu+1} x_{p_k}\}$, so that $\epsilon_k^{\mu+1}=0$. % is $\mu$ truncated % (e.g. Jacobian and Hessian).
 
-The Grassmann \verb`Basis` elements $v_k\in\Lambda_1V$ and $w^k\in\Lambda^1V$ are linearly independent vector and covector elements of $V$, while the Leibniz \verb`Operator` elements $\partial_k\in L_1V$ are partial tangent derivations and $\epsilon_k(x)\in L^1V$ are dependent functions of the \verb`tangent` manifold. 
+The Grassmann basis elements $v_k\in\Lambda_1V$ and $w^k\in\Lambda^1V$ are linearly independent vector and covector elements of $V$, while the Leibniz \verb`Operator` elements $\partial_k\in L_1V$ are partial tangent derivations and $\epsilon_k(x)\in L^1V$ are dependent functions of the \verb`tangent` manifold.
 Higher \verb`grade` elements of $\Lambda V$ correspond to \verb`SubManifold` spaces, while higher \verb`order` function elements of $LV$ become homogenous polynomials and Taylor series.
 
 %Grassmann's exterior algebra is fundamentally simpler in structure than the symmetric generated algebra,
@@ -201,7 +201,7 @@ Both symmetry classes can be characterized by the same geometric product, which 
 \end{definition}
 
 \begin{remark}
-	The product symbol $\ominus$ will be used to denote explicitly usage of the geometric algebraic product, altough the standard number product \verb`*` notation could also be used.
+	The product symbol $\ominus$ will be used to denote explicitly usage of the geometric algebraic product, although the standard number product \verb`*` notation could also be used.
 	The $\ominus$ choice helps emphasize that the geometric algebraic product is characterized by symmetric differencing of anti-symmetric indices.
 \end{remark}
 
@@ -277,7 +277,7 @@ For example, $$\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \ra 
 \end{definition}
 \begin{remark}
 	Observe that $\ast$ and $\ast'$ could both be exchanged in \verb`abs`, \verb`abs2`, and \verb`norm`; however, these are different products.
-	The \textit{scalar product} $\circledast$ is the scalar part, so $\eta\circledast\omega = \gen{\eta\ast\omega}$.
+	The \textit{scalar product} $\circledast$ is the \verb`scalar` part, so $\eta\circledast\omega = \gen{\eta\ast\omega}$.
 	In general $\sqrt\omega = e^{(\log\omega)/2}$ is valid for invertible $\omega$.
 \end{remark}
 \begin{definition}[Inverse]
@@ -307,7 +307,7 @@ The \verb`radial` and \verb`angular` components in a multivector exponential are
 \section{Leibniz operators and Grassmann's Hodge-DeRahm theory}
 
 A universal unit volume element can be specified in terms of \verb`LinearAlgebra.UniformScaling`, which is independent of $V$ and has its interpretation only instantiated by the context of the \verb`TensorAlgebra{V}` element being operated on.
-Universal interoperability of \verb`LinearAlgebra.UniformScaling` as the pseudoscalar element which takes on the \verb`VectorBundle` form of any other \verb`TensorAlgebra` element is handled globally.
+Universal interoperability of \verb`LinearAlgebra.UniformScaling` as the pseudoscalar element which takes on the \verb`TensorBundle` form of any other \verb`TensorAlgebra` element is handled globally.
 This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseudoscalar element defined at every point $x$ of a \verb`Manifold`, which is mathematically denoted by $I=I(x)$ and specified by the $g(x)$ bilinear tensor field of $TM$.
 
 \begin{definition}[Poincare-Hodge dual complement]
@@ -315,7 +315,7 @@ This enables the usage of \verb`I` from \verb`LinearAlgebra` as a universal pseu
 	 then $\star : \Lambda^pV\ra\Lambda^{n-p}V$.
 \end{definition}
 \begin{remark}
-	While $\star\omega$ is \verb`complementright` of $\omega$, the \verb`complementleft` would be $I\ast'\omega$. The $\star$ symbol was added to the Julia language as unary operator for ease of use with \verb`Grassmann` on Julia's v1.2 release.
+	While $\star\omega$ is \verb`complementright` of $\omega$, the \verb`complementleft` would be $I\ast'\omega$ and $!\omega$ denotes the non-metric variant the complement. The $\star$ symbol was added to the Julia language as unary operator on Julia's v1.2 release.
 \end{remark}
 \begin{lstlisting}[language = Julia]
 using Grassmann, Compose
@@ -389,7 +389,7 @@ where DeMorgan's law is used to derive tensor contractions.
 	\begin{align*}
 		\nabla^2\omega &= \nabla\wedge(\omega\cdot\nabla) + (\nabla\wedge\omega)\cdot\nabla) = \mp(\mp\omega\ominus\nabla)\ominus\nabla).
 	\end{align*}
-	Elements $\omega$ are \textit{harmonic} if $\nabla\omega = 0$ and both \textit{exact} $d\omega=0$ and \textit{coexact} $\delta\omega=0$, such that $\mc H^p M = \setc{\nabla\omega = 0}{\omega\in \Omega^pM}$.
+	Elements $\omega$ are \textit{harmonic} if $\nabla\omega = 0$ and both \textit{closed} $d\omega=0$ and \textit{coclosed} $\delta\omega=0$, such that $\mc H^p M = \setc{\nabla\omega = 0}{\omega\in \Omega^pM}$.
 	Hodge \cite{ivancevic}:
 	$\Omega^pM=\mc H^pM\oplus\im{d\Omega^{p-1}M}\oplus\im{\partial\Omega^{p+1}M}$.
 	Note: $\nabla\omega=-\omega\nabla, \nabla^2\omega=\omega\nabla^2$ for higher-order tensor fields!
