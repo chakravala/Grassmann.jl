@@ -352,6 +352,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 
 export ∧, ∨, ⊗
 
+@inline ∧(t) = t
+
 @pure function ∧(a::SubManifold{V},b::SubManifold{V}) where V
     ba,bb = bits(a),bits(b)
     A,B,Q,Z = symmetricmask(V,ba,bb)
@@ -378,7 +380,7 @@ end
 #∧(a::SubManifold{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
 #∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
-⊗(a::TensorAlgebra{V},b::TensorAlgebra{V}) where V = a∧b
+⊗(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = a∧b
 
 ## regressive product: (L = grade(a) + grade(b); (-1)^(L*(L-ndims(V)))*⋆(⋆(a)∧⋆(b)))
 
@@ -804,6 +806,8 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     end
 end
 
+const FieldsBig = (Fields...,BigFloat,BigInt,Complex{BigFloat},Complex{BigInt},Rational{BigInt})
+
 function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
     if Field == Grassmann.Field
         generate_mutators(:(MArray{Tuple{M},T,1,M}),Number,Expr,SUB,MUL)
@@ -811,7 +815,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         generate_mutators(:(SizedArray{Tuple{M},T,1,1}),Field,set_val,SUB,MUL)
     end
     PAR && (DirectSum.extend_field(eval(Field)); global parsym = (parsym...,eval(Field)))
-    TF = Field ∉ Fields ? :Any : :T
+    TF = Field ∉ FieldsBig ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     Field ∉ Fields && @eval begin
         Base.:*(a::F,b::SubManifold{V}) where {F<:$EF,V} = Simplex{V}(a,b)

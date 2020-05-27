@@ -46,7 +46,7 @@ end
 insert_t(x) = Expr(:block,:(t=promote_type(valuetype(a),valuetype(b))),x)
 
 function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
-    TF = Field ∉ Fields ? :Any : :T
+    TF = Field ∉ FieldsBig ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     generate_sums(Field,VEC,MUL,ADD,SUB,CONJ,PAR)
     @eval begin
