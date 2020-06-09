@@ -342,7 +342,7 @@ These methods can be applied to any `MultiVector` simplicial complex.
 Let ``v_\pm^2 = \pm1`` be a basis with ``v_\infty = v_++v_-`` and ``v_\emptyset = (v_--v_+)/2``
 An embedding space ``\mathbb R^{p+1,q+1}`` carrying the action from the group ``O(p+1,q+1)`` then has
 ``v_\infty^2 =0``, ``v_\emptyset^2 =0``,
-``v_\infty \cdot v_\emptyset = 1``,  and ``v_{\infty\emptyset}^2 = 1`` with
+``v_\infty \cdot v_\emptyset = -1``,  and ``v_{\infty\emptyset}^2 = 1`` with
 Minkowski plane ``v_{\infty\emptyset}`` having the Hestenes-Dirac-Clifford product properties,
 ```@repl ga
 using Grassmann; @basis S"∞∅++"

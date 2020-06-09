@@ -57,10 +57,12 @@ end
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
 function Base.exp(t::T) where T<:TensorGraded
-    S = T<:SubManifold
-    i = T<:TensorTerm ? basis(t) : t
+    S,B = T<:SubManifold,T<:TensorTerm
+    i = B ? basis(t) : t
     sq = i*i
-    if isscalar(sq)
+    if B && isnull(t)
+        return one(V)
+    elseif isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return 1+t)
         grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))

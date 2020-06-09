@@ -63,6 +63,11 @@ function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
     Simplex{V,G,SubManifold{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
 end
 
+Chain{V,1}(m::SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
+Chain{V,1,Chain{W,1}}(m::SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
+
+Base.inv(m::Chain{V,1,<:Chain{W,1}}) where {V,W} = Chain{V,1,Chain{W,1}}(inv(SMatrix(m)))
+
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(ndims(V),G)
     @inbounds tmv = typeof(m.v[1])
@@ -123,7 +128,9 @@ function clearbundlecache!()
 end
 @pure bundle(::ChainBundle{V,G,T,P} where {V,G,T}) where P = P
 @pure deletebundle!(V) = deletebundle!(bundle(V))
-@pure deletebundle!(P::Int) = (bundle_cache[P] = [Chain{ℝ^0,0,Int}(SVector(0))])
+@pure function deletebundle!(P::Int)
+    bundle_cache[P] = [Chain{ℝ^0,0,Int}(SVector(0))]
+end
 @pure isbundle(::ChainBundle) = true
 @pure isbundle(t) = false
 @pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(Manifold(t))
