@@ -1,9 +1,101 @@
 # Dyadic tensor product ⊗
 
-Dyadic tensors are represented with the Grassmann’s exterior product algebra, generating a ``2^{2n}``-dimensional mother algebra with the direct sum of the ``n``-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the ``n^2``-dimensional bivector subspace of the full ``\frac{(2n)!}{2(2n−2)!}``-dimensional bivector sub-algebra.
-The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the dyadic (1,1)-tensor bivector algebra.
+Dyadic tensors are represented with the Grassmann’s exterior product algebra or nested `Chain{V,1,Chain{V,1}}` elements, generating a ``2^{2n}``-dimensional mother algebra with the direct sum of the ``n``-dimensional vector space and its dual vector space.
+The product of the vector basis and covector basis elements form the ``n^2``-dimensional bivector subspace of the full ``\frac{(2n)!}{2(2n−2)!}``-dimensional bivector sub-algebra.
+The package `Grassmann` is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the dyadic (1,1)-tensor bivector algebra or mother algebra.
 
-## Constructing linear transformations
+## Nested dyadic algebra
+
+In this algebra, it's possible to compute on a mesh of arbitrary 5 dimensional conformal geometric algebra simplices, which can be represented by a bundle of  nested dyadic tensors.
+
+```@repl ga5
+using Grassmann, StaticArrays; basis"+-+++"
+value(rand(Chain{V,1,Chain{V,1}}))
+A = Chain{V,1}(rand(SMatrix{5,5}))
+```
+
+Additionally, in Grassmann.jl we prefer the nested usage of pure `ChainBundle` parametric types for large re-usable global cell geometries, from which local dyadics can be selected.
+
+Programming the `A\b` method is straight forward with some Julia language metaprogramming and Grassmann.jl by first instantiating some Cramer symbols
+
+```@repl ga5
+Base.@pure function Grassmann.Cramer(N::Int)
+    x,y = SVector{N}([Symbol(:x,i) for i ∈ 1:N]),SVector{N}([Symbol(:y,i) for i ∈ 1:N])
+    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧t[$(1+i)],t[end-$i]∧$(y[i]))) for i ∈ 1:N-1]
+    return x,y,xy
+end
+```
+
+These are exterior product variants of the Cramer determinant symbols (N! times N-simplex hypervolumes), which can be combined to directly solve a linear system:
+
+```@repl ga5
+@generated function Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V
+    N = ndims(V)-1 # paste this into the REPL for faster eval
+    x,y,xy = Grassmann.Cramer(N)
+    mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
+    out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,
+        :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
+end
+```
+
+Which results in the following highly efficient `@generated` code for solving the linear system,
+
+```Julia
+(x1, y1) = (t[1], t[end])
+(x2, y2) = (x1 ∧ t[2], t[end - 1] ∧ y1)
+(x3, y3) = (x2 ∧ t[3], t[end - 2] ∧ y2)
+(x4, y4) = (x3 ∧ t[4], t[end - 3] ∧ y3)
+Chain{V, 1}(getindex.(SVector(v ∧ y4, (x1 ∧ v) ∧ y3, (x2 ∧ v) ∧ y2, (x3 ∧ v) ∧ y1, x4 ∧ v) ./ (t[1] ∧ y4), 1))
+```
+
+Benchmarks with that algebra indicate a $3\times$ faster performance than `SMatrix` for applying `A\b` to bundles of dyadic elements.
+
+```Julia
+julia> @btime $(rand(SMatrix{5,5},10000)).\Ref($(SVector(1,2,3,4,5)));
+  2.588 ms (29496 allocations: 1.44 MiB)
+
+julia> @btime $(Chain{V,1}.(rand(SMatrix{5,5},10000))).\$(v1+2v2+3v3+4v4+5v5);
+  808.631 μs (2 allocations: 390.70 KiB)
+
+julia> @btime $(SMatrix(A))\$(SVector(1,2,3,4,5))
+  150.663 ns (0 allocations: 0 bytes)
+5-element SArray{Tuple{5},Float64,1,5} with indices SOneTo(5):
+ -4.783720495603508
+  6.034887114999602
+  1.017847212237964
+  6.379374861538397
+ -4.158116538111051
+
+julia> @btime $A\$(v1+2v2+3v3+4v4+5v5)
+  72.405 ns (0 allocations: 0 bytes)
+-4.783720495603519v₁ + 6.034887114999605v₂ + 1.017847212237964v₃ + 6.379374861538393v₄ - 4.1581165381110505v₅
+```
+
+Such a solution is not only more efficient than Julia's [StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl) method for `SMatrix`, but is also useful to minimize allocations in Grassmann.jl finite element assembly.
+
+Similarly, the Cramer symbols can also be manipulated to invert the linear system or for determining whether a point is within a simplex.
+
+```@setup ga3
+using StaticArrays
+```
+
+```@repl ga3
+using Grassmann; basis"3"
+T = Chain{V,1}(Chain(v1),v1+v2,v1+v3)
+barycenter(T) ∈ T, (v1+v2+v3) ∈ T
+```
+
+Of course, there are multiple equivalent ways of computing the same results using the `⋅` and `:` dyadic products.
+
+```@repl ga3
+T\barycenter(T) == inv(T)⋅barycenter(T)
+sqrt(T:T) == norm(SMatrix(T))
+```
+It is possible to generate a [Makie.jl](https://github.com/JuliaPlots/Makie.jl) `streamplot` diagrams with the `Grassmann.Cramer` method for interpolated data of finite element solutions.
+
+
+## Mother algebra formalism
 
 Note that `Λ(3)` gives the vector basis, and `Λ(3)'` gives the covector basis:
 ```@setup ga
@@ -33,7 +125,7 @@ which is a computation equivalent to a matrix computation.
 
 The `TensorAlgebra` evalution is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.
 
-## Importing the Leech lattice generator
+### Importing the Leech lattice generator
 
 In the example below, we define a constant `Leech` which can be used to obtain linear combinations of the Leech lattice,
 ```julia

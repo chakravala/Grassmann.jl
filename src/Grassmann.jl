@@ -334,8 +334,21 @@ function __init__()
         Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,ndims(V))...)
         GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
         @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
-        export vectorfield
+        export vectorfield, chainfield
         vectorfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
+        function chainfield(t,ϕ)
+            M = Manifold(t)
+            V = Manifold(M)
+            p->begin
+                P = Chain{V,1}(one(ptype(p)),p.data...)
+                for i ∈ 1:length(t)
+                    ti = value(t[i])
+                    Pi = Chain{V,1}(M[ti])
+                    P ∈ Pi && (return GeometryBasics.Point((Pi\P)⋅Chain{V,1}(ϕ[ti])))
+                end
+                return GeometryBasics.Point(0.0,0.0)
+            end
+        end
     end
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
         AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)

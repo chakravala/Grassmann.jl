@@ -331,11 +331,13 @@ detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{<:Chain}) = sum(m)/length(m)
 mean(m::T) where T<:SVector = sum(m)/length(m)
+mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
 barycenter(m::SVector{N,<:Chain}) where N = (s=sum(m);s/s[1])
 barycenter(m::Vector{<:Chain}) = (s=sum(m);s/s[1])
+barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::SVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
-LinearAlgebra.det(t::Chain{V,1,T}) where {V,T<:Chain} = ∧(t)
+LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = ∧(t)
 LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
 ∧(m::Vector{<:Chain{V}}) where V = LinearAlgebra.det(V,m)
 ∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
@@ -378,7 +380,7 @@ function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(array_cache):B
         push!(array_cache,Array{Any,2}(undef,0,0))
     end
-    isempty(array_cache[B]) && (array_cache[B] = [m[i][j] for i∈1:length(m),j∈1:ndims(Manifold(m))])
+    isempty(array_cache[B]) && (array_cache[B] = [m[i][j] for i∈1:length(m),j∈1:ndims(m)])
     return array_cache[B]
 end
 function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B

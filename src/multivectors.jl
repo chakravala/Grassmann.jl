@@ -30,7 +30,12 @@ end
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
 """
 Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,𝕂}(val)
-Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(args...))
+#Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G)}(args...))
+@generated function Chain{V,G}(args::𝕂...) where {V,G,𝕂}
+    bg = binomial(ndims(V),G)
+    ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
+    :(Chain{V,G}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
+end
 function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
     N = ndims(V)
     Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val{N}()))
@@ -66,7 +71,46 @@ end
 Chain{V,1}(m::SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
 Chain{V,1,Chain{W,1}}(m::SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
 
-Base.inv(m::Chain{V,1,<:Chain{W,1}}) where {V,W} = Chain{V,1,Chain{W,1}}(inv(SMatrix(m)))
+transpose_row(t::SVector{N,<:Chain{V}},i) where {N,V} = Chain{V,1}(getindex.(t,i))
+transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i)
+@generated _transpose(t::SVector{N,<:Chain{V,1}}) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(indices(V))))))
+Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
+
+@pure function Cramer(N::Int)
+    x,y = SVector{N}([Symbol(:x,i) for i ∈ 1:N]),SVector{N}([Symbol(:y,i) for i ∈ 1:N])
+    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧t[$(1+i)],t[end-$i]∧$(y[i]))) for i ∈ 1:N-1]
+    return x,y,xy
+end
+
+@generated function Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V
+    N = ndims(V)-1 # pase this into the REPL for faster eval
+    x,y,xy = Grassmann.Cramer(N)
+    mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
+    out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,
+        :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
+end
+
+@generated function Base.in(v::Chain{V,1},t::Chain{V,1,<:Chain{V,1}}) where V
+    N = ndims(V)-1
+    x,y,xy = Grassmann.Cramer(N)
+    out = Expr(:call,:SVector,:(s==signbit((v∧$(y[end]))[1])),[:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-1]...,:(s==signbit(($(x[end])∧v)[1])))
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(s=signbit((t[1]∧$(y[end]))[1])),
+        Expr(:call,:prod,out))
+end
+
+@generated function Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V
+    N = ndims(V)-1
+    x,y,xy = Grassmann.Cramer(N)
+    out = if iseven(N)
+        Expr(:call,:SVector,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+    else
+        Expr(:call,:SVector,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
+    end
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))))))
+end
+
+INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(ndims(V),G)
@@ -94,7 +138,7 @@ end
 
 function ==(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
     i = bladeindex(ndims(V),bits(basis(b)))
-    @inbounds a[i] == value(b) && (isempty(a[1:i-1]) ? true : (prod(a[1:i-1].==0) && prod(a[i+1:end].==0)))
+    @inbounds a[i] == value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
 end
 ==(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
 ==(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
@@ -138,19 +182,18 @@ end
 @pure iscell(t) = isbundle(t) && islocal(Manifold(t))
 
 @pure Manifold(::ChainBundle{V}) where V = V
-@pure Manifold(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = V
+@pure Manifold(::Vector{<:Chain{V}}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
 @pure Base.ndims(::ChainBundle{V}) where V = ndims(V)
-@pure Base.ndims(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = ndims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
-@pure Base.parent(::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = isbundle(V) ? parent(V) : V
+@pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
-@pure DirectSum.supermanifold(m::Vector{Chain{V,G,T,X}} where {G,T,X}) where V = V
+@pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
-@pure points(t::Vector{Chain{p,G,T,X}} where {G,T,X}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
+@pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
-value(c::Vector{Chain{V,G,T,X}} where {V,G,T,X}) = c
+value(c::Vector{<:Chain}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
 AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 

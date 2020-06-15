@@ -708,6 +708,8 @@ end
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}
 
+-(t::SubManifold) = Simplex(-value(t),t)
+
 for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     for Term ∈ (:TensorGraded,:TensorMixed)
         @eval begin
@@ -716,7 +718,6 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
         end
     end
     @eval begin
-        $op(a::SubManifold{V,G,B} where G) where {V,B} = Simplex($op(value(a)),a)
         function $op(a::SubManifold{V,A},b::SubManifold{V,B}) where {V,A,B}
             if a == b
                 return Simplex{V,A}($op(value(a),value(b)),basis(a))
@@ -895,6 +896,11 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
             end end
         end
     end
+    @eval begin
+        -(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}(SUB(value(a)))
+        -(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(SUB,:(value(a),))))
+        -(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(SUB,:(value(a),))))
+    end
     for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
         @eval begin
             function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
@@ -915,7 +921,6 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                     return MultiVector{V}(out)
                 end
             end
-            $op(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($bop(value(a)))
             function $op(a::Simplex{V,A,X,T},b::SubManifold{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
                 if X == b
                     return Simplex{V,A}($bop(value(a),value(b)),b)
@@ -964,7 +969,6 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
                 return MultiVector{V}(out)
             end
-            $op(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(bop,:(value(a),))))
             function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
                 $(insert_expr((:N,:t),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
@@ -1072,7 +1076,6 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
                 return MultiVector{V}(out)
             end
-            $op(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(bop,:(value(a),))))
             function $op(a::$Chain{V,G,T},b::SubManifold{V,G}) where {V,G,T<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
                 out = copy(value(a,$VEC(N,G,t)))
