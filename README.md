@@ -270,7 +270,7 @@ v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 ```
 Full `MultiVector` allocations are only possible for `N≤22`, but sparse operations are also available at higher dimensions.
 While `DirectSum.Basis{V}` is a container for the `TensorAlgebra` generators of `V`, the `DirectSum.Basis` is only cached for `N≤8`.
-For the range of dimensions `8<N≤22`$, the `DirectSum.SparseBasis` type is used.
+For the range of dimensions `8<N≤22`, the `DirectSum.SparseBasis` type is used.
 ```Julia
 julia> Λ(22)
 DirectSum.SparseBasis{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)
