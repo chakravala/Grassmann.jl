@@ -26,7 +26,7 @@ Base.@pure function Grassmann.Cramer(N::Int)
 end
 ```
 
-These are exterior product variants of the Cramer determinant symbols (N! times N-simplex hypervolumes), which can be combined to directly solve a linear system:
+These are exterior product variants of the Cramer determinant symbols ($N!$ times $N$-simplex hypervolumes), which can be combined to directly solve a linear system:
 
 ```@repl ga5
 @generated function Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V

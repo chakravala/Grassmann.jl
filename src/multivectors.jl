@@ -76,42 +76,6 @@ transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i)
 @generated _transpose(t::SVector{N,<:Chain{V,1}}) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(indices(V))))))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 
-@pure function Cramer(N::Int)
-    x,y = SVector{N}([Symbol(:x,i) for i ∈ 1:N]),SVector{N}([Symbol(:y,i) for i ∈ 1:N])
-    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧t[$(1+i)],t[end-$i]∧$(y[i]))) for i ∈ 1:N-1]
-    return x,y,xy
-end
-
-@generated function Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V
-    N = ndims(V)-1 # pase this into the REPL for faster eval
-    x,y,xy = Grassmann.Cramer(N)
-    mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
-    out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,
-        :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
-end
-
-@generated function Base.in(v::Chain{V,1},t::Chain{V,1,<:Chain{V,1}}) where V
-    N = ndims(V)-1
-    x,y,xy = Grassmann.Cramer(N)
-    out = Expr(:call,:SVector,:(s==signbit((v∧$(y[end]))[1])),[:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-1]...,:(s==signbit(($(x[end])∧v)[1])))
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(s=signbit((t[1]∧$(y[end]))[1])),
-        Expr(:call,:prod,out))
-end
-
-@generated function Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V
-    N = ndims(V)-1
-    x,y,xy = Grassmann.Cramer(N)
-    out = if iseven(N)
-        Expr(:call,:SVector,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
-    else
-        Expr(:call,:SVector,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
-    end
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))))))
-end
-
-INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
-
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(ndims(V),G)
     @inbounds tmv = typeof(m.v[1])
