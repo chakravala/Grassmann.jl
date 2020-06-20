@@ -73,7 +73,7 @@ Chain{V,1,Chain{W,1}}(m::SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(
 
 transpose_row(t::SVector{N,<:Chain{V}},i) where {N,V} = Chain{V,1}(getindex.(t,i))
 transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i)
-@generated _transpose(t::SVector{N,<:Chain{V,1}}) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(indices(V))))))
+@generated _transpose(t::SVector{N,<:Chain{V,1}}) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(1:ndims(V))))))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}

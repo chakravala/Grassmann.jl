@@ -340,9 +340,7 @@ end
         :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
 end
 
-Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
-
-@generated function Base.in(v::Chain{V,1},t::Chain{V,1,<:Chain{V,1}}) where V
+@generated function Base.in(v::Chain{V,1},t::SVector{N,<:Chain{V,1}} where N) where V
     N = ndims(V)-1
     x,y,xy = Grassmann.Cramer(N)
     out = Expr(:call,:SVector,:(s==signbit((v∧$(y[end]))[1])),[:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-1]...,:(s==signbit(($(x[end])∧v)[1])))
@@ -350,7 +348,7 @@ Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
         Expr(:call,:prod,out))
 end
 
-@generated function Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V
+@generated function Base.inv(t::SVector{N,<:Chain{V,1}} where N) where V
     N = ndims(V)-1
     x,y,xy = Grassmann.Cramer(N)
     out = if iseven(N)
@@ -361,6 +359,9 @@ end
     return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))))))
 end
 
+Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
+Base.in(v::Chain{V,1},t::Chain{V,1,<:Chain{V,1}}) where V = v ∈ value(t)
+Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
 INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
 export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh

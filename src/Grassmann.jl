@@ -368,6 +368,12 @@ function __init__()
         end
     end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
+    @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
+        function MiniQhull.delaunay(p::ChainBundle)
+            T = MiniQhull.delaunay(Matrix(submesh(p)'))
+            ChainBundle([Chain{p,1,Int}(Int.(T[1:3,k])) for k ∈ 1:size(T,2)])
+        end
+    end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
         const matlab_cache = (Array{T,2} where T)[]
         function matlab(p::Array{T,2} where T,B)
