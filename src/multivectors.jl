@@ -163,6 +163,8 @@ AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 
 getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
 getindex(m::ChainBundle,i) = getindex(value(m),i)
+getindex(m::ChainBundle{V},i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
+getindex(m::ChainBundle{V},i::ChainBundle) where V = getindex.(m,value(i))
 setindex!(m::ChainBundle,k,i) = setindex!(value(m),k,i)
 Base.firstindex(m::ChainBundle) = 1
 Base.lastindex(m::ChainBundle) = length(value(m))

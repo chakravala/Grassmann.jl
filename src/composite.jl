@@ -325,9 +325,10 @@ end
     return sum(terms[1:end-1])
 end=#
 
-function Cramer(N::Int)
+function Cramer(N::Int,j=0)
+    t = j ≠ 0 ? :T : :t
     x,y = SVector{N}([Symbol(:x,i) for i ∈ 1:N]),SVector{N}([Symbol(:y,i) for i ∈ 1:N])
-    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧t[$(1+i)],t[end-$i]∧$(y[i]))) for i ∈ 1:N-1]
+    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧$t[$(1+i-j)],$t[end-$i]∧$(y[i]))) for i ∈ 1:N-1-j]
     return x,y,xy
 end
 
@@ -340,12 +341,19 @@ end
         :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
 end
 
-@generated function Base.in(v::Chain{V,1},t::SVector{N,<:Chain{V,1}} where N) where V
-    N = ndims(V)-1
-    x,y,xy = Grassmann.Cramer(N)
-    out = Expr(:call,:SVector,:(s==signbit((v∧$(y[end]))[1])),[:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-1]...,:(s==signbit(($(x[end])∧v)[1])))
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(s=signbit((t[1]∧$(y[end]))[1])),
-        Expr(:call,:prod,out))
+@generated function Base.in(v::Chain{V,1},t::SVector{N,<:Chain{V,1}}) where {V,N}
+    if N == ndims(V)
+        x,y,xy = Grassmann.Cramer(N-1)
+        mid = [:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-2]
+        out = SVector(:(s==signbit((v∧$(y[end]))[1])),mid...,:(s==signbit(($(x[end])∧v)[1])))
+        return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(s=signbit((t[1]∧$(y[end]))[1])),ands(out))
+    else
+        x,y,xy = Grassmann.Cramer(N-1,1)
+        mid = [:(signscalar(($(x[i])∧(v-x1)∧$(y[end-i]))/d)) for i ∈ 1:N-2]
+        out = SVector(:(signscalar((v∧∧(vectors(t,v)))/d)),mid...,:(signscalar(($(x[end])∧(v-x1))/d)))
+        return Expr(:block,:(T=vectors(t)),:((x1,y1)=(t[1],T[end])),xy...,
+            :($(x[end])=$(x[end-1])∧T[end-1];d=$(x[end])∧T[end]),ands(out))
+    end
 end
 
 @generated function Base.inv(t::SVector{N,<:Chain{V,1}} where N) where V
@@ -360,9 +368,49 @@ end
 end
 
 Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
-Base.in(v::Chain{V,1},t::Chain{V,1,<:Chain{V,1}}) where V = v ∈ value(t)
+Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
 INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
+
+@pure list(a,b) = SVector(a:b...)
+vectors(x::SVector{N},y=x[1]) where N = x[list(2,N)].-y
+vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
+#point(x,y=x[1]) = y∧∧(vectors(x))
+signscalar(x::SubManifold{V,0} where V) = true
+signscalar(x::Simplex{V,0} where V) = !signbit(value(x))
+signscalar(x::Simplex) = false
+signscalar(x::Chain) = false
+signscalar(x::Chain{V,0} where V) = !signbit(x[1])
+signscalar(x::MultiVector) = isscalar(x) && !signbit(value(scalar(x)))
+ands(x,i=length(x)-1) = i ≠ 0 ? Expr(:&&,x[end-i],ands(x,i-1)) : x[end-i]
+
+function Base.findfirst(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
+    for i ∈ 1:length(t)
+        P ∈ t[i] && (return i)
+    end
+    return 0
+end
+function Base.findfirst(P,t::ChainBundle)
+    p = points(t)
+    for i ∈ 1:length(t)
+        P ∈ p[t[i]] && (return i)
+    end
+    return 0
+end
+function Base.findlast(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
+    for i ∈ length(t):-1:1
+        P ∈ t[i] && (return i)
+    end
+    return 0
+end
+function Base.findlast(P,t::ChainBundle)
+    p = points(t)
+    for i ∈ length(t):-1:1
+        P ∈ p[t[i]] && (return i)
+    end
+    return 0
+end
+Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
 export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 

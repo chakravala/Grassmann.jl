@@ -1,7 +1,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the GPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using Documenter, AbstractTensors, DirectSum, Leibniz, Grassmann, Adapode
+using Documenter, AbstractTensors, DirectSum, Leibniz, Grassmann, Adapode, StaticArrays
 
 makedocs(
     # options
