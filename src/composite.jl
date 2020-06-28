@@ -425,7 +425,7 @@ Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
 export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
-volumes(m) = abs.(.⋆(detsimplex(m)))
+volumes(m,dets=detsimplex(m)) = abs.(.⋆(dets))
 detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{<:Chain}) = sum(m)/length(m)
