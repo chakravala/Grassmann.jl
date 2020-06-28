@@ -55,7 +55,11 @@ end
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
+getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
+getindex(m::Chain,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
 getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = getindex.(m[i],j)
+getindex(m::Chain{V,G},i::SubManifold{V,G}) where {V,G} = m[bladeindex(ndims(V),UInt(i))]
+getindex(m::Chain{V,G,T},i::SubManifold{V}) where {V,G,T} = zero(T)
 setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
 @pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
@@ -220,6 +224,10 @@ function getindex(m::MultiVector{V,T},i::Int) where {V,T}
     return @view m.v[r+1:r+binomial(N,i)]
 end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
+getindex(m::MultiVector,i::UnitRange{Int}) = m.v[i]
+getindex(m::MultiVector,i::T) where T<:AbstractVector = m.v[i]
+getindex(m::MultiVector,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
+getindex(m::MultiVector{V},i::SubManifold{V}) where V = m[basisindex(ndims(V),UInt(i))]
 setindex!(m::MultiVector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
 Base.lastindex(m::MultiVector{V,T} where T) where V = ndims(V)
