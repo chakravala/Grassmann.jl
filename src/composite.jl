@@ -367,6 +367,17 @@ end
     return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))))))
 end
 
+@generated function grad(T::SVector{N,<:Chain{V,1}} where N,W=V) where V
+    N = ndims(V)-1
+    x,y,xy = Grassmann.Cramer(N)
+    out = if iseven(N)
+        Expr(:call,:SVector,[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+    else
+        Expr(:call,:SVector,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
+    end
+    return Expr(:block,:(t=_transpose(T,W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))),$(V(2:ndims(V)...)))))
+end
+
 Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
@@ -414,6 +425,7 @@ Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
 export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
+volumes(m) = abs.(.⋆(detsimplex(m)))
 detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{<:Chain}) = sum(m)/length(m)
@@ -426,6 +438,7 @@ curl(m::SVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = ∧(t)
 LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
+LinearAlgebra.det(V::SubManifold,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
 ∧(m::Vector{<:Chain{V}}) where V = LinearAlgebra.det(V,m)
 ∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
 for op ∈ (:mean,:barycenter,:curl)

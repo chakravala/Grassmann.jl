@@ -80,6 +80,7 @@ end
     isodd(O) ? sum([(x*getbasis(V,1<<(k+G)))*getbasis(V,1<<k) for k ∈ 0:G2]) : x
 end
 
+@generated ∂(ω::Chain{V,1,<:Chain{W,1}}) where {V,W} = :(∧(ω)⋅$(Λ(W).v1))
 ∂(ω::T) where T<:TensorAlgebra = ω⋅Manifold(ω)(∇)
 d(ω::T) where T<:TensorAlgebra = Manifold(ω)(∇)∧ω
 δ(ω::T) where T<:TensorAlgebra = -∂(ω)
@@ -118,16 +119,18 @@ function betti(t::T) where T<:TensorAlgebra
     return SVector(out)
 end
 
-function ↑(ω::T) where T<:TensorAlgebra
+@generated function ↑(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
-    !(hasinf(V)||hasorigin(V)) && (return ω)
+    !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        ((G.v∞*(one(valuetype(ω))/2))*ω^2+G.v∅)+ω
+        :((($G.v∞*(one(valuetype(ω))/2))*ω^2+$G.v∅)+ω)
     else
-        ω2 = ω^2
-        iω2 = inv(ω2+1)
-        (hasinf(V) ? G.v∞ : G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
+        quote
+            ω2 = ω^2
+            iω2 = inv(ω2+1)
+            (hasinf($V) ? $G.v∞ : $G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
+        end
     end
 end
 function ↑(ω,b)
@@ -141,15 +144,17 @@ function ↑(ω,p,m)
     2*iω2*ω + (ω2-1)*iω2*p + (ω2+1)*iω2*m
 end
 
-function ↓(ω::T) where T<:TensorAlgebra
+@generated function ↓(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
-    !(hasinf(V)||hasorigin(V)) && (return ω)
+    !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        inv(one(valuetype(ω))*G.v∞∅)*(G.v∞∅∧ω)/(-ω⋅G.v∞)
+        :(inv(one(valuetype(ω))*$G.v∞∅)*($G.v∞∅∧ω)/(-ω⋅$G.v∞))
     else
-        b = hasinf(V) ? G.v∞ : G.v∅
-        ((ω∧b)*b)/(1-b⋅ω)
+        quote
+            b = hasinf($V) ? $G.v∞ : $G.v∅
+            ((ω∧b)*b)/(1-b⋅ω)
+        end
     end
 end
 ↓(ω,b) = ((b∧ω)*b)/(1-ω⋅b)
@@ -334,11 +339,11 @@ function __init__()
         Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,ndims(V))...)
         GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
         function initmesh(m::GeometryBasics.Mesh)
-            c,f = coordinates(m),faces(m)
+            c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
             s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s)
             n = size(eltype(f))[1]
             p = ChainBundle([Chain{V,1}(SVector{s,Float64}(1.0,k...)) for k ∈ c])
-            M = p(s-n+1:s...)
+            M = s ≠ n ? p(s-n+1:s...) : p
             t = ChainBundle([Chain{M,1}(SVector{n,Int}(k)) for k ∈ f])
             return (p,t)
         end
