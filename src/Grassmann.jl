@@ -121,6 +121,7 @@ end
 
 @generated function ↑(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
+    T<:SubManifold && !isbasis(ω) && (return DirectSum.supermanifold(V))
     !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
@@ -133,6 +134,7 @@ end
         end
     end
 end
+↑(ω::ChainBundle) = ω
 function ↑(ω,b)
     ω2 = ω^2
     iω2 = inv(ω2+1)
@@ -145,18 +147,21 @@ function ↑(ω,p,m)
 end
 
 @generated function ↓(ω::T) where T<:TensorAlgebra
-    V = Manifold(ω)
-    !(hasinf(V)||hasorigin(V)) && (return :ω)
+    V,M = Manifold(ω),T<:SubManifold && !isbasis(ω)
+    !(hasinf(V)||hasorigin(V)) && (return M ? V(2:ndims(V)) : :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
+        M && (return ω(3:ndims(V)))
         :(inv(one(valuetype(ω))*$G.v∞∅)*($G.v∞∅∧ω)/(-ω⋅$G.v∞))
     else
+        M && (return V(2:ndims(V)))
         quote
             b = hasinf($V) ? $G.v∞ : $G.v∅
             ((ω∧b)*b)/(1-b⋅ω)
         end
     end
 end
+↓(ω::ChainBundle) = ω(list(2,ndims(ω)))
 ↓(ω,b) = ((b∧ω)*b)/(1-ω⋅b)
 ↓(ω,∞,∅) = (m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
@@ -217,6 +222,31 @@ function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
         end
     end
     return g
+end
+
+function pointset(e)
+    ndims(e) == 1 && (return column(e))
+    out = Int[]
+    for i ∈ value(e)
+        for k ∈ value(i)
+            k ∉ out && push!(out,k)
+        end
+    end
+    return out
+end
+
+column(t,i=1) = getindex.(value(t),i)
+columns(t,i=1,j=ndims(t)) = column.(Ref(value(t)),list(i,j))
+
+function edges(t,cols=columns(t))
+    ndims(t) == 2 && (return t)
+    np,N = length(points(t)),ndims(Manifold(t))
+    A = spzeros(np,np),points(t)(list(N-1,N)...)
+    for c ∈ combo(N,2)
+        A += sparse(cols[c[1]],cols[c[2]],1,np,np)
+    end
+    f = findall(x->x>0,triu(A+transpose(A)))
+    [Chain{M,1}(SVector{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
 
 generate_products()
@@ -338,12 +368,13 @@ function __init__()
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorAlgebra = GeometryBasics.Point(value(vector(t)))
         Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,ndims(V))...)
         GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
+        pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
         function initmesh(m::GeometryBasics.Mesh)
             c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
             s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s)
             n = size(eltype(f))[1]
             p = ChainBundle([Chain{V,1}(SVector{s,Float64}(1.0,k...)) for k ∈ c])
-            M = s ≠ n ? p(s-n+1:s...) : p
+            M = s ≠ n ? p(list(s-n+1,s)) : p
             t = ChainBundle([Chain{M,1}(SVector{n,Int}(k)) for k ∈ f])
             return (p,t)
         end
@@ -367,12 +398,18 @@ function __init__()
     @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
         AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)
         AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
-        AbstractPlotting.arrows(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(V(2:ndims(V)...).(p)),GeometryBasics.Point.(value(v));args...)
-        AbstractPlotting.arrows!(p::Vector{Chain{V,G,T,X}} where {G,T,X},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(V(2:ndims(V)...).(p)),GeometryBasics.Point.(value(v));args...)
+        AbstractPlotting.arrows(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
+        AbstractPlotting.arrows!(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
         AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter!(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
         AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
-        AbstractPlotting.lines(p::Vector{T},args...) where T<:TensorAlgebra = AbstractPlotting.lines(GeometryBasics.Point.(p),args...)
+        AbstractPlotting.lines(p::Vector{<:TensorAlgebra},args...) = AbstractPlotting.lines(GeometryBasics.Point.(p),args...)
+        AbstractPlotting.linesegments(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.linesegments!(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.linesegments(e::ChainBundle,args...) = AbstractPlotting.linesegments(value(e),args...)
+        AbstractPlotting.linesegments!(e::ChainBundle,args...) = AbstractPlotting.linesegments!(value(e),args...)
         function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
             if ndims(p) == 2
                 AbstractPlotting.plot(submesh(p)[:,1],args[:color])
@@ -408,10 +445,10 @@ function __init__()
         initmeshall(g::Matrix{Int},args...) = initmeshall(Matrix{Float64}(g),args...)
         function initmeshall(g,args...)
             P,E,T = MATLAB.mxcall(:initmesh,3,g,args...)
-            s = size(P,1)+1; V = SubManifold(ℝ^s)
+            s = size(P,1)+1; V = SubManifold(ℝ^s); el,tl = list(1,s-1),list(1,s)
             p = ChainBundle([Chain{V,1,Float64}(vcat(1.0,P[:,k])) for k ∈ 1:size(P,2)])
-            e = ChainBundle([Chain{p(2:s...),1,Int}(Int.(E[1:s-1,k])) for k ∈ 1:size(E,2)])
-            t = ChainBundle([Chain{p,1,Int}(Int.(T[1:s,k])) for k ∈ 1:size(T,2)])
+            e = ChainBundle([Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)])
+            t = ChainBundle([Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)])
             return (p,e,t,T,E,P)
         end
         function initmeshes(g,args...)
@@ -438,10 +475,10 @@ function __init__()
         function refinemesh!(g,p::ChainBundle{V},e,t,s...) where V
             P,E,T = refinemesh(g,p,e,t,s...); l = size(P,1)+1
             matlab(P,bundle(p)); matlab(E,bundle(e)); matlab(T,bundle(t))
-            submesh!(p); array!(t)
+            submesh!(p); array!(t); el,tl = list(1,l-1),list(1,l)
             bundle_cache[bundle(p)] = [Chain{V,1,Float64}(vcat(1,P[:,k])) for k ∈ 1:size(P,2)]
-            bundle_cache[bundle(e)] = [Chain{p(2:l...),1,Int}(Int.(E[1:l-1,k])) for k ∈ 1:size(E,2)]
-            bundle_cache[bundle(t)] = [Chain{p,1,Int}(Int.(T[1:l,k])) for k ∈ 1:size(T,2)]
+            bundle_cache[bundle(e)] = [Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)]
+            bundle_cache[bundle(t)] = [Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)]
             return (p,e,t)
         end
     end

@@ -9,35 +9,40 @@
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
-(W::SubManifold)(V::ChainBundle) = ChainBundle(W.(value(V)))
+(W::SubManifold)(V::ChainBundle) = W.(value(V))
 (M::ChainBundle)(b::Int...) = SubManifold{M}(b)
+(M::ChainBundle)(b::Tuple) = SubManifold{M}(b)
+(M::ChainBundle)(b::UnitRange) = SubManifold{M}(b)
+(M::ChainBundle)(b::T) where T<:AbstractVector = SubManifold{M}(b)
 
 (W::Signature)(b::Chain{V,G,T}) where {V,G,T} = SubManifold(W)(b)
-function (W::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
+@generated function (w::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
+    W = Manifold(w)
     if isbasis(W)
         if Q == V
             if G == M == 1
-                x = bits(a)
+                x = bits(W)
                 X = isdyadic(V) ? x>>Int(ndims(V)/2) : x
                 Y = 0≠X ? X : x
-                @inbounds out = b.v[bladeindex(ndims(V),Y)]
-                return Simplex{V}((V[intlog(Y)+1] ? -(out) : out),SubManifold{V}())
+                out = :(@inbounds b.v[bladeindex($(ndims(V)),Y)])
+                return :(Simplex{V}(V[intlog(Y)+1] ? -($out) : $out,SubManifold{V}()))
             elseif G == 1 && M == 2
-                (!isdyadic(V)) && throw(error("wrong basis"))
+                (!isdyadic(V)) && :(throw(error("wrong basis")))
                 ib,(m1,m2) = indexbasis(N,1),DirectSum.eval_shift(W)
-                @inbounds ((V[m2] ? -(b.v[m2]) : b.v[m2])*getbasis(V,ib[m1]))
+                :(@inbounds $(V[m2] ? :(-(b.v[m2])) : :(b.v[m2]))*getbasis(V,ib[m1]))
             else
-                throw(error("not yet possible"))
+                :(throw(error("not yet possible")))
             end
         else
-            interform(W,b)
+            :(interform(w,b))
         end
     elseif V==W
-        return b
+        return :b
     elseif W⊆V
         if G == 1
-            Chain{W,1,T}(b.v[indices(bits(W),ndims(V))])
-        else
+            ind = SVector{ndims(W),Int}(indices(bits(W),ndims(V)))
+            :(@inbounds Chain{w,1,T}(b.v[$ind]))
+        else quote
             out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
             ib,S = indexbasis(N,G),bits(W)
             for k ∈ 1:length(ib)
@@ -47,29 +52,31 @@ function (W::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
                     end
                 end
             end
-            return Chain{W,G}(out)
-        end
+            return Chain{w,G}(out)
+        end end
     elseif V⊆W
-        WC,VC,N = isdyadic(W),isdyadic(V),ndims(V)
-        #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
-        #    return V0
-        out = zeros(choicevec(M,G,valuetype(b)))
-        ib = indexbasis(N,G)
-        for k ∈ 1:length(ib)
-            @inbounds if b[k] ≠ 0
-                @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
-                if WC && (!VC)
-                    @inbounds setblade!(out,b[k],mixed(V,B),Val{M}())
-                elseif (!WC) && (!VC)
-                    @inbounds setblade!(out,b[k],B,Val{M}())
-                else
-                    throw(error("arbitrary Manifold intersection not yet implemented."))
+        quote
+            WC,VC,N = isdyadic(w),isdyadic(V),ndims(V)
+            #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
+            #    return V0
+            out = zeros(choicevec(M,G,valuetype(b)))
+            ib = indexbasis(N,G)
+            for k ∈ 1:length(ib)
+                @inbounds if b[k] ≠ 0
+                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
+                    if WC && (!VC)
+                        @inbounds setblade!(out,b[k],mixed(V,B),Val{M}())
+                    elseif (!WC) && (!VC)
+                        @inbounds setblade!(out,b[k],B,Val{M}())
+                    else
+                        throw(error("arbitrary Manifold intersection not yet implemented."))
+                    end
                 end
             end
+            return Chain{w,G}(out)
         end
-        return Chain{W,G}(out)
     else
-        throw(error("cannot convert from $(V) to $(W)"))
+        :(throw(error("cannot convert from $V to $w")))
     end
 end
 

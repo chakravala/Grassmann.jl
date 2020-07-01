@@ -155,12 +155,14 @@ end
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
 @pure Base.ndims(::ChainBundle{V}) where V = ndims(V)
+@pure Base.ndims(::Type{T}) where T<:ChainBundle{V} where V = ndims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
 @pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
+@pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
 value(c::Vector{<:Chain}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
@@ -169,7 +171,8 @@ AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
 getindex(m::ChainBundle,i) = getindex(value(m),i)
 getindex(m::ChainBundle,i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
-getindex(m::ChainBundle{V},i::ChainBundle) where V = getindex.(Ref(m),value(i))
+getindex(m::ChainBundle{V},i::ChainBundle) where V = m[value(i)]
+getindex(m::ChainBundle{V},i::T) where {V,T<:AbstractVector{<:Chain}} = getindex.(Ref(m),i)
 setindex!(m::ChainBundle,k,i) = setindex!(value(m),k,i)
 Base.firstindex(m::ChainBundle) = 1
 Base.lastindex(m::ChainBundle) = length(value(m))

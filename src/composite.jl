@@ -375,18 +375,28 @@ end
     else
         Expr(:call,:SVector,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
-    return Expr(:block,:(t=_transpose(T,W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))),$(V(2:ndims(V)...)))))
+    return Expr(:block,:(t=_transpose(T,W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))),↓(V))))
 end
 
 Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
+grad(t::Chain{V,1,<:Chain{V,1}}) where V = grad(value(t))
 INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
+@generated function vectors(t,c=columns(t))
+    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ 2:ndims(t)]...)
+    quote
+        p = points(t)
+        M,A = ↓(Manifold(p)),p[c[1]]
+        Chain{M,1}.($(Expr(:.,:SVector,v)))
+    end
+end
 @pure list(a,b) = SVector(a:b...)
-vectors(x::SVector{N},y=x[1]) where N = x[list(2,N)].-y
+vectors(x::SVector{N,<:Chain{V}},y=x[1]) where {N,V} = ↓(V).(x[list(2,N)].-y)
 vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
 #point(x,y=x[1]) = y∧∧(vectors(x))
+
 signscalar(x::SubManifold{V,0} where V) = true
 signscalar(x::Simplex{V,0} where V) = !signbit(value(x))
 signscalar(x::Simplex) = false
@@ -423,9 +433,11 @@ function Base.findlast(P,t::ChainBundle)
 end
 Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
-export detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
+export volumes, detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
-volumes(m,dets=detsimplex(m)) = abs.(.⋆(dets))
+edgelength(e) = (v=points(e)[value(e)]; value(abs(v[2]-v[1])))
+volumes(m,dets) = value.(abs.(.⋆(dets)))
+volumes(m) = ndims(Manifold(m))≠2 ? volumes(m,detsimplex(m)) : edgelength.(value(m))
 detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{<:Chain}) = sum(m)/length(m)
@@ -437,10 +449,10 @@ barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::SVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = ∧(t)
-LinearAlgebra.det(V::ChainBundle,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
-LinearAlgebra.det(V::SubManifold,m::Vector) = .∧(getindex.(Ref(V),value.(m)))
-∧(m::Vector{<:Chain{V}}) where V = LinearAlgebra.det(V,m)
-∧(m::ChainBundle) = LinearAlgebra.det(Manifold(m),value(m))
+LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = ∧(m)
+LinearAlgebra.det(m::ChainBundle) = ∧(m)
+∧(m::Vector{<:Chain{V}}) where V = .∧(points(m)[m])
+∧(m::ChainBundle) = ∧(value(m))
 for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
@@ -455,7 +467,7 @@ end
 function initmesh(r::R) where R<:AbstractRange
     G = Λ(ℝ^2)
     p = ChainBundle(collect(r).*G.v2.+G.v1)
-    e = ChainBundle(Chain{p(2),1,Int}.([(1,),(length(p),)]))
+    e = ChainBundle(Chain{↓(p),1,Int}.([(1,),(length(p),)]))
     t = ChainBundle(Chain{p,1,Int}.([(i,i+1) for i ∈ 1:length(p)-1]))
     return p,e,t
 end
