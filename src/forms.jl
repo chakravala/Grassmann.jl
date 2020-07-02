@@ -44,7 +44,7 @@
             :(@inbounds Chain{w,1,T}(b.v[$ind]))
         else quote
             out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
-            ib,S = indexbasis(N,G),bits(W)
+            ib,S = indexbasis(N,G),bits(w)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     @inbounds if count_ones(ib[k]&S) == G

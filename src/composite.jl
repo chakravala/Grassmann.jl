@@ -392,7 +392,7 @@ INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
         Chain{M,1}.($(Expr(:.,:SVector,v)))
     end
 end
-@pure list(a,b) = SVector(a:b...)
+@pure list(a::Int,b::Int) = SVector{max(0,b-a+1),Int}(a:b...)
 vectors(x::SVector{N,<:Chain{V}},y=x[1]) where {N,V} = ↓(V).(x[list(2,N)].-y)
 vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
 #point(x,y=x[1]) = y∧∧(vectors(x))
@@ -451,8 +451,15 @@ curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = ∧(t)
 LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = ∧(m)
 LinearAlgebra.det(m::ChainBundle) = ∧(m)
-∧(m::Vector{<:Chain{V}}) where V = .∧(points(m)[m])
 ∧(m::ChainBundle) = ∧(value(m))
+function ∧(m::Vector{<:Chain{V}}) where V
+    p = points(m); pm = p[m]
+    if ndims(p)>ndims(V)
+        .∧(vectors.(pm))
+    else
+        Chain{↓(Manifold(V)),ndims(V)-1}.(value.(.∧(pm)))
+    end
+end
 for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
@@ -488,11 +495,12 @@ function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:Abstrac
 end
 
 const array_cache = (Array{T,2} where T)[]
+array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈1:ndims(Manifold(m))]
 function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(array_cache):B
         push!(array_cache,Array{Any,2}(undef,0,0))
     end
-    isempty(array_cache[B]) && (array_cache[B] = [m[i][j] for i∈1:length(m),j∈1:ndims(m)])
+    isempty(array_cache[B]) && (array_cache[B] = array(value(m)))
     return array_cache[B]
 end
 function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B

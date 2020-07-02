@@ -348,6 +348,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 @generated ∧(t::T) where T<:SVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
 @generated ∧(t::T) where T<:SizedVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
+∧(::SVector{0,<:Chain{V}}) where V = one(V) # ∧() = 1
+∧(::SizedVector{0,<:Chain{V}}) where V = one(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 

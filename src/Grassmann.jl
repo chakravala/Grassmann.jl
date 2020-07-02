@@ -167,7 +167,7 @@ end
 
 ## skeleton / subcomplex
 
-export skeleton, 𝒫, collapse, subcomplex, chain, path
+export skeleton, 𝒫, collapse, subcomplex, chain, path, pointset, column, columns
 
 absym(t) = abs(t)
 absym(t::SubManifold) = t
@@ -241,7 +241,7 @@ columns(t,i=1,j=ndims(t)) = column.(Ref(value(t)),list(i,j))
 function edges(t,cols=columns(t))
     ndims(t) == 2 && (return t)
     np,N = length(points(t)),ndims(Manifold(t))
-    A = spzeros(np,np),points(t)(list(N-1,N)...)
+    A,M = spzeros(np,np),points(t)(list(N-1,N)...)
     for c ∈ combo(N,2)
         A += sparse(cols[c[1]],cols[c[2]],1,np,np)
     end
@@ -401,20 +401,33 @@ function __init__()
         AbstractPlotting.arrows(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
         AbstractPlotting.arrows!(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
         AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter!(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
         AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
+        AbstractPlotting.scatter(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter!(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
+        AbstractPlotting.lines(p::ChainBundle,args...) = AbstractPlotting.lines(value(p),args...)
+        AbstractPlotting.lines!(p::ChainBundle,args...) = AbstractPlotting.lines!(value(p),args...)
         AbstractPlotting.lines(p::Vector{<:TensorAlgebra},args...) = AbstractPlotting.lines(GeometryBasics.Point.(p),args...)
-        AbstractPlotting.linesegments(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p))),args...))
-        AbstractPlotting.linesegments!(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.lines!(p::Vector{<:TensorAlgebra},args...) = AbstractPlotting.lines!(GeometryBasics.Point.(p),args...)
         AbstractPlotting.linesegments(e::ChainBundle,args...) = AbstractPlotting.linesegments(value(e),args...)
         AbstractPlotting.linesegments!(e::ChainBundle,args...) = AbstractPlotting.linesegments!(value(e),args...)
-        function AbstractPlotting.mesh(p::ChainBundle,t::ChainBundle;args...)
+        AbstractPlotting.linesegments(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.linesegments!(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
+        AbstractPlotting.mesh!(t::ChainBundle;args...) = AbstractPlotting.mesh!(points(t),t;args...)
+        AbstractPlotting.mesh(t::Vector{<:Chain};args...) = AbstractPlotting.mesh(points(t),t;args...)
+        AbstractPlotting.mesh!(t::Vector{<:Chain};args...) = AbstractPlotting.mesh!(points(t),t;args...)
+        function AbstractPlotting.mesh(p::ChainBundle,t;args...)
             if ndims(p) == 2
                 AbstractPlotting.plot(submesh(p)[:,1],args[:color])
             else
                 AbstractPlotting.mesh(submesh(p),array(t);args...)
+            end
+        end
+        function AbstractPlotting.mesh!(p::ChainBundle,t;args...)
+            if ndims(p) == 2
+                AbstractPlotting.plot!(submesh(p)[:,1],args[:color])
+            else
+                AbstractPlotting.mesh!(submesh(p),array(t);args...)
             end
         end
     end
