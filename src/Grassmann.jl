@@ -236,7 +236,7 @@ function pointset(e)
 end
 
 column(t,i=1) = getindex.(value(t),i)
-columns(t,i=1,j=ndims(t)) = column.(Ref(value(t)),list(i,j))
+columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
 
 function edges(t,cols=columns(t))
     ndims(t) == 2 && (return t)
@@ -245,7 +245,7 @@ function edges(t,cols=columns(t))
     for c ∈ combo(N,2)
         A += sparse(cols[c[1]],cols[c[2]],1,np,np)
     end
-    f = findall(x->x>0,triu(A+transpose(A)))
+    f = findall(x->x>0,LinearAlgebra.triu(A+transpose(A)))
     [Chain{M,1}(SVector{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
 
