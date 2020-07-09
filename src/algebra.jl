@@ -355,9 +355,6 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 
 export ∧, ∨, ⊗
 
-@inline ∧(t) = t
-@inline ∧() = 1
-
 @pure function ∧(a::SubManifold{V},b::SubManifold{V}) where V
     ba,bb = bits(a),bits(b)
     A,B,Q,Z = symmetricmask(V,ba,bb)
@@ -423,12 +420,6 @@ Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(�
 ∨(::SizedVector{0,<:Chain{V}}) where V = SubManifold(V)
 ∨(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∨(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∨(a∨b,c...)
-
-export ∧, ∨, ⊗
-
-@inline ∨(t) = t
-@inline ∨() = I
-
 
 for X ∈ TAG, Y ∈ TAG
     @eval Base.:&(a::$X{V},b::$Y{V}) where V = a∨b

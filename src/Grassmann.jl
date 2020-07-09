@@ -167,7 +167,7 @@ end
 
 ## skeleton / subcomplex
 
-export skeleton, 𝒫, collapse, subcomplex, chain, path, pointset, column, columns
+export skeleton, 𝒫, collapse, subcomplex, chain, path
 
 absym(t) = abs(t)
 absym(t::SubManifold) = t
@@ -224,6 +224,10 @@ function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
     return g
 end
 
+# mesh
+
+export pointset, edges, incidence, adjacency, degrees, column, columns
+
 function pointset(e)
     ndims(e) == 1 && (return column(e))
     out = Int[]
@@ -238,14 +242,29 @@ end
 column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
 
-function edges(t,cols=columns(t))
-    ndims(t) == 2 && (return t)
+degrees(t,A=incidence(t)) = sum(A,dims=2)[:]
+function incidence(t)
+    np,nt = length(points(t)),length(t)
+    A = spzeros(Int,np,nt)
+    for i ∈ Grassmann.list(1,ndims(Manifold(t)))
+        A += sparse(column(t,i),1:nt,1,np,nt)
+    end
+    return A
+end # node-element incidence, A[i,j]=1 -> i∈t[j]
+
+function adjacency(t,cols=columns(t))
     np,N = length(points(t)),ndims(Manifold(t))
-    A,M = spzeros(np,np),points(t)(list(N-1,N)...)
+    A = spzeros(Int,np,np)
     for c ∈ combo(N,2)
         A += sparse(cols[c[1]],cols[c[2]],1,np,np)
     end
-    f = findall(x->x>0,LinearAlgebra.triu(A+transpose(A)))
+    return A+transpose(A)
+end
+
+function edges(t,cols=columns(t))
+    ndims(t) == 2 && (return t)
+    N = ndims(Manifold(t)); M = points(t)(list(N-1,N)...)
+    f = findall(x->x>0,LinearAlgebra.triu(adjacency(t,cols)))
     [Chain{M,1}(SVector{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
 
@@ -412,6 +431,10 @@ function __init__()
         AbstractPlotting.linesegments!(e::ChainBundle,args...) = AbstractPlotting.linesegments!(value(e),args...)
         AbstractPlotting.linesegments(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p))),args...))
         AbstractPlotting.linesegments!(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.wireframe(t::ChainBundle;args...) = AbstractPlotting.linesegments(edges(t);args...)
+        AbstractPlotting.wireframe!(t::ChainBundle;args...) = AbstractPlotting.linesegments!(edges(t);args...)
+        AbstractPlotting.wireframe(t::Vector{<:Chain};args...) = AbstractPlotting.linesegments(edges(t);args...)
+        AbstractPlotting.wireframe!(t::Vector{<:Chain};args...) = AbstractPlotting.linesegments!(edges(t);args...)
         AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
         AbstractPlotting.mesh!(t::ChainBundle;args...) = AbstractPlotting.mesh!(points(t),t;args...)
         AbstractPlotting.mesh(t::Vector{<:Chain};args...) = AbstractPlotting.mesh(points(t),t;args...)
