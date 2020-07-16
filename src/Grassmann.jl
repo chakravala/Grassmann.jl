@@ -85,20 +85,21 @@ end
 d(ω::T) where T<:TensorAlgebra = Manifold(ω)(∇)∧ω
 δ(ω::T) where T<:TensorAlgebra = -∂(ω)
 
-function boundary_rank(t::T,d=gdims(t)) where T<:TensorAlgebra
+function boundary_rank(t,d=gdims(t))
     out = gdims(∂(t))
     out[1] = 0
-    for k ∈ 2:ndims(t)
+    for k ∈ 2:length(out)-1
         @inbounds out[k] = min(out[k],d[k+1])
     end
     return SVector(out)
 end
 
-function boundary_null(t::T) where T<:TensorAlgebra
+function boundary_null(t)
     d = gdims(t)
     r = boundary_rank(t,d)
-    out = zeros(MVector{ndims(t)+1,Int})
-    for k ∈ 1:ndims(V)
+    l = length(d)
+    out = zeros(MVector{l,Int})
+    for k ∈ 1:l-1
         @inbounds out[k] = d[k+1] - r[k]
     end
     return SVector(out)
@@ -112,8 +113,9 @@ Compute the Betti numbers.
 function betti(t::T) where T<:TensorAlgebra
     d = gdims(t)
     r = boundary_rank(t,d)
-    out = zeros(MVector{ndims(t),Int})
-    for k ∈ 1:ndims(V)
+    l = length(d)-1
+    out = zeros(MVector{l,Int})
+    for k ∈ 1:l
         @inbounds out[k] = d[k+1] - r[k] - r[k+1]
     end
     return SVector(out)
@@ -226,10 +228,10 @@ end
 
 # mesh
 
-export pointset, edges, incidence, adjacency, degrees, column, columns
+export pointset, edges, facets, incidence, adjacency, degrees, column, columns
 
 function pointset(e)
-    ndims(e) == 1 && (return column(e))
+    ndims(Manifold(e)) == 1 && (return column(e))
     out = Int[]
     for i ∈ value(e)
         for k ∈ value(i)
@@ -243,30 +245,104 @@ column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
 
 degrees(t,A=incidence(t)) = sum(A,dims=2)[:]
-function incidence(t)
+function incidence(t,cols=columns(t))
     np,nt = length(points(t)),length(t)
     A = spzeros(Int,np,nt)
     for i ∈ Grassmann.list(1,ndims(Manifold(t)))
-        A += sparse(column(t,i),1:nt,1,np,nt)
+        A += sparse(cols[i],1:nt,1,np,nt)
     end
     return A
 end # node-element incidence, A[i,j]=1 -> i∈t[j]
 
-function adjacency(t,cols=columns(t))
+antiadjacency(t::ChainBundle,cols=columns(t)) = (A = sparse(t,cols); A-transpose(A))
+adjacency(t,cols=columns(t)) = (A = sparse(t,cols); A+transpose(A))
+function SparseArrays.sparse(t,cols=columns(t))
     np,N = length(points(t)),ndims(Manifold(t))
     A = spzeros(Int,np,np)
     for c ∈ combo(N,2)
         A += sparse(cols[c[1]],cols[c[2]],1,np,np)
     end
-    return A+transpose(A)
+    return A
 end
 
-function edges(t,cols=columns(t))
+edges(t,cols::SVector) = edges(t,adjacency(t,cols))
+function edges(t,adj=adjacency(t))
     ndims(t) == 2 && (return t)
     N = ndims(Manifold(t)); M = points(t)(list(N-1,N)...)
-    f = findall(x->x>0,LinearAlgebra.triu(adjacency(t,cols)))
+    f = findall(x->!iszero(x),LinearAlgebra.triu(adj))
     [Chain{M,1}(SVector{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
+
+function facetsinterior(t::Vector{<:Chain{V}}) where V
+    N = ndims(Manifold(t))-1
+    W = V(list(2,N+1))
+    N == 0 && (return [Chain{W,1}(list(2,1))],Int[])
+    out = Chain{W,1,Int,N}[]
+    bnd = Int[]
+    for i ∈ t
+        for w ∈ Chain{W,1}.(DirectSum.combinations(sort(value(i)),N))
+            j = findfirst(isequal(w),out)
+            isnothing(j) ? push!(out,w) : push!(bnd,j)
+        end
+    end
+    return out,bnd
+end
+facets(t) = faces(t,Val(ndims(Manifold(t))-1))
+facets(t,h) = faces(t,h,Val(ndims(Manifold(t))-1))
+faces(t,v::Val) = faces(value(t),v)
+faces(t,h,v,g=identity) = faces(value(t),h,v,g)
+faces(t::Tuple,v,g=identity) = faces(t[1],t[2],v,g)
+function faces(t::Vector{<:Chain{V}},::Val{N}) where {V,N}
+    N == ndims(V) && (return t)
+    N == 2 && (return edges(t))
+    W = V(list(2,N+1))
+    N == 1 && (return Chain{W,1}.(pointset(t)))
+    N == 0 && (return Chain{W,1}(list(2,1)))
+    out = Chain{W,1,Int,N}[]
+    for i ∈ value(t)
+        for w ∈ Chain{W,1}.(combinations(sort(value(i)),N))
+            w ∉ out && push!(out,w)
+        end
+    end
+    return out
+end
+function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
+    W = V(list(1,N))
+    N == 0 && (return [Chain{W,1}(list(1,N))],Int[sum(h)])
+    out = Chain{W,1,Int,N}[]
+    bnd = Int[]
+    vec = zeros(MVector{ndims(V),Int})
+    val = N+1==ndims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(SVector{binomial(ndims(V),N)})
+    for i ∈ 1:length(t)
+        vec[:] = value(t[i])
+        par = indexparity!(vec)
+        w = Chain{W,1}.(combinations(par[2],N))
+        for k ∈ 1:binomial(ndims(V),N)
+            j = findfirst(isequal(w[k]),out)
+            v = h[i]*(par[1] ? -val[k] : val[k])
+            if isnothing(j)
+                push!(out,w[k])
+                push!(bnd,g(v))
+            else
+                bnd[j] += g(v)
+            end
+        end
+    end
+    return out,bnd
+end
+
+∂(t::ChainBundle) = ∂(value(t))
+∂(t::SVector{N,<:Tuple}) where N = ∂.(t)
+∂(t::SVector{N,<:Vector}) where N = ∂.(t)
+∂(t::Tuple{Vector{<:Chain},Vector{Int}}) = ∂(t[1],t[2])
+∂(t::Vector{<:Chain},u::Vector{Int}) = (f=facets(t,u); f[1][findall(x->!iszero(x),f[2])])
+∂(t::Vector{<:Chain}) = ndims(t)≠3 ? (f=facetsinterior(t); f[1][setdiff(1:length(f[1]),f[2])]) : edges(t,adjacency(t).%2)
+#∂(t::Vector{<:Chain}) = (f=facets(t,ones(Int,length(t))); f[1][findall(x->!iszero(x),f[2])])
+
+skeleton(t::ChainBundle,v) = skeleton(value(t),v)
+@inline (::Leibniz.Derivation)(x::Vector{<:Chain},v=Val{true}()) = skeleton(x,v)
+@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),Ref(ones(Int,length(t))),$(Val.(list(1,ndims(V)))),abs))
+#@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),$(Val.(list(1,ndims(V))))))
 
 generate_products()
 generate_products(Complex)
@@ -395,7 +471,7 @@ function __init__()
             p = ChainBundle([Chain{V,1}(SVector{s,Float64}(1.0,k...)) for k ∈ c])
             M = s ≠ n ? p(list(s-n+1,s)) : p
             t = ChainBundle([Chain{M,1}(SVector{n,Int}(k)) for k ∈ f])
-            return (p,t)
+            return (p,ChainBundle(∂(t)),t)
         end
         @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
         export vectorfield, chainfield
@@ -419,18 +495,22 @@ function __init__()
         AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
         AbstractPlotting.arrows(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
         AbstractPlotting.arrows!(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        AbstractPlotting.scatter(p::ChainBundle,x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter!(p::ChainBundle,x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter!(p::Vector{<:Chain},x,;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.lines(p::ChainBundle,args...) = AbstractPlotting.lines(value(p),args...)
-        AbstractPlotting.lines!(p::ChainBundle,args...) = AbstractPlotting.lines!(value(p),args...)
-        AbstractPlotting.lines(p::Vector{<:TensorAlgebra},args...) = AbstractPlotting.lines(GeometryBasics.Point.(p),args...)
-        AbstractPlotting.lines!(p::Vector{<:TensorAlgebra},args...) = AbstractPlotting.lines!(GeometryBasics.Point.(p),args...)
-        AbstractPlotting.linesegments(e::ChainBundle,args...) = AbstractPlotting.linesegments(value(e),args...)
-        AbstractPlotting.linesegments!(e::ChainBundle,args...) = AbstractPlotting.linesegments!(value(e),args...)
-        AbstractPlotting.linesegments(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p))),args...))
-        AbstractPlotting.linesegments!(e::Vector{<:Chain},args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p))),args...))
+        AbstractPlotting.scatter(p::ChainBundle,x;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter!(p::ChainBundle,x;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter(p::Vector{<:Chain},x;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter!(p::Vector{<:Chain},x;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
+        AbstractPlotting.scatter(p::ChainBundle;args...) = AbstractPlotting.scatter(submesh(p);args...)
+        AbstractPlotting.scatter!(p::ChainBundle;args...) = AbstractPlotting.scatter!(submesh(p);args...)
+        AbstractPlotting.scatter(p::Vector{<:Chain};args...) = AbstractPlotting.scatter(submesh(p);args...)
+        AbstractPlotting.scatter!(p::Vector{<:Chain};args...) = AbstractPlotting.scatter!(submesh(p);args...)
+        AbstractPlotting.lines(p::ChainBundle;args...) = AbstractPlotting.lines(value(p);args...)
+        AbstractPlotting.lines!(p::ChainBundle;args...) = AbstractPlotting.lines!(value(p);args...)
+        AbstractPlotting.lines(p::Vector{<:TensorAlgebra};args...) = AbstractPlotting.lines(GeometryBasics.Point.(p);args...)
+        AbstractPlotting.lines!(p::Vector{<:TensorAlgebra};args...) = AbstractPlotting.lines!(GeometryBasics.Point.(p);args...)
+        AbstractPlotting.linesegments(e::ChainBundle;args...) = AbstractPlotting.linesegments(value(e);args...)
+        AbstractPlotting.linesegments!(e::ChainBundle;args...) = AbstractPlotting.linesegments!(value(e);args...)
+        AbstractPlotting.linesegments(e::Vector{<:Chain};args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p)));args...))
+        AbstractPlotting.linesegments!(e::Vector{<:Chain};args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p)));args...))
         AbstractPlotting.wireframe(t::ChainBundle;args...) = AbstractPlotting.linesegments(edges(t);args...)
         AbstractPlotting.wireframe!(t::ChainBundle;args...) = AbstractPlotting.linesegments!(edges(t);args...)
         AbstractPlotting.wireframe(t::Vector{<:Chain};args...) = AbstractPlotting.linesegments(edges(t);args...)
@@ -460,6 +540,7 @@ function __init__()
             T = MiniQhull.delaunay(Matrix(submesh(p)'))
             ChainBundle([Chain{p,1,Int}(Int.(T[1:3,k])) for k ∈ 1:size(T,2)])
         end
+        initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),t))
     end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
         const matlab_cache = (Array{T,2} where T)[]

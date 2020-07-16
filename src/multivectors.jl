@@ -460,6 +460,30 @@ function DirectSum.gdims(t::MultiVector{V}) where V
     return out
 end
 
+DirectSum.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
+function DirectSum.gdims(t::Vector{<:Chain})
+    out = zeros(MVector{ndims(Manifold(points(t)))+1,Int})
+    out[ndims(Manifold(t))+1] = length(t)
+    return out
+end
+function DirectSum.gdims(t::SVector{N,<:Vector}) where N
+    out = zeros(MVector{ndims(points(t[1]))+1,Int})
+    for i ∈ 1:N
+        out[ndims(Manifold(t[i]))+1] = length(t[i])
+    end
+    return out
+end
+function DirectSum.gdims(t::SVector{N,<:Tuple}) where N
+    out = zeros(MVector{ndims(points(t[1][1]))+1,Int})
+    for i ∈ 1:N
+        out[ndims(Manifold(t[i][1]))+1] = length(t[i][1])
+    end
+    return out
+end
+
+DirectSum.χ(t::SVector{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+DirectSum.χ(t::SVector{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+
 ## Adjoint
 
 import Base: adjoint # conj
