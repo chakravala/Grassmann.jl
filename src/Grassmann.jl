@@ -228,7 +228,10 @@ end
 
 # mesh
 
-export pointset, edges, facets, incidence, adjacency, degrees, column, columns
+export pointset, edges, facets, adjacency, column, columns
+
+column(t,i=1) = getindex.(value(t),i)
+columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
 
 function pointset(e)
     ndims(Manifold(e)) == 1 && (return column(e))
@@ -240,19 +243,6 @@ function pointset(e)
     end
     return out
 end
-
-column(t,i=1) = getindex.(value(t),i)
-columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
-
-degrees(t,A=incidence(t)) = sum(A,dims=2)[:]
-function incidence(t,cols=columns(t))
-    np,nt = length(points(t)),length(t)
-    A = spzeros(Int,np,nt)
-    for i ∈ Grassmann.list(1,ndims(Manifold(t)))
-        A += sparse(cols[i],1:nt,1,np,nt)
-    end
-    return A
-end # node-element incidence, A[i,j]=1 -> i∈t[j]
 
 antiadjacency(t::ChainBundle,cols=columns(t)) = (A = sparse(t,cols); A-transpose(A))
 adjacency(t,cols=columns(t)) = (A = sparse(t,cols); A+transpose(A))
@@ -479,6 +469,7 @@ function __init__()
         function chainfield(t,ϕ)
             M = Manifold(t)
             V = Manifold(M)
+            z = ndims(V) ≠ 4 ? GeometryBasics(0.0,0.0) : GeometryBasics.Point(0.0,0.0,0.0)
             p->begin
                 P = Chain{V,1}(one(ptype(p)),p.data...)
                 for i ∈ 1:length(t)
@@ -486,7 +477,7 @@ function __init__()
                     Pi = Chain{V,1}(M[ti])
                     P ∈ Pi && (return GeometryBasics.Point((Pi\P)⋅Chain{V,1}(ϕ[ti])))
                 end
-                return GeometryBasics.Point(0.0,0.0)
+                return z
             end
         end
     end
@@ -536,11 +527,11 @@ function __init__()
     end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
     @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
-        function MiniQhull.delaunay(p::ChainBundle)
-            T = MiniQhull.delaunay(Matrix(submesh(p)'))
-            ChainBundle([Chain{p,1,Int}(Int.(T[1:3,k])) for k ∈ 1:size(T,2)])
+        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p))
+            T = MiniQhull.delaunay(Matrix(submesh(length(n)==length(p) ? p : p[n])'))
+            l = list(1,ndims(p)); [Chain{p,1,Int}(Int.(T[l,k])) for k ∈ 1:size(T,2)]
         end
-        initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),t))
+        initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),ChainBundle(t)))
     end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
         const matlab_cache = (Array{T,2} where T)[]
