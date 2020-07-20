@@ -101,7 +101,12 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [GaloisFields.jl](https://github.com/tkluck/GaloisFields.jl),
 [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl),
 [Compose.jl](https://github.com/GiovineItalia/Compose.jl),
-[GeometryTypes.jl](https://github.com/JuliaGeometry/GeometryTypes.jl),
+[AbstractPlotting.jl](https://github.com/JuliaPlots/AbstractPlotting.jl),
+[GeometryBasics.jl](https://github.com/JuliaGeometry/GeometryBasics.jl),
+[MATLAB.jl](https://github.com/JuliaInterop/MATLAB.jl),
+[MiniQhull.jl](https://github.com/gridap/MiniQhull.jl),
+[Triangulate.jl](https://github.com/JuliaGeometry/Triangulate.jl),
+[TetGen.jl](https://github.com/JuliaGeometry/TetGen.jl),
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl).
 
 ## Grassmann for enterprise

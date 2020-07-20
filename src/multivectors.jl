@@ -146,6 +146,7 @@ end
 end
 @pure isbundle(::ChainBundle) = true
 @pure isbundle(t) = false
+@pure ispoints(t::SubManifold{V}) where V = isbundle(V) && rank(V) == 1 && !isbundle(Manifold(V))
 @pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(Manifold(t))
 @pure islocal(t) = isbundle(t) && rank(t)==1 && valuetype(t)==Int && ispoints(Manifold(t))
 @pure iscell(t) = isbundle(t) && islocal(Manifold(t))

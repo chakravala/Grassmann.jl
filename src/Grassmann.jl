@@ -228,6 +228,23 @@ end
 
 # mesh
 
+function initpoints(P)
+    V = SubManifold(ℝ^(size(P,1)+1))
+    p = [Chain{V,1,Float64}(vcat(1.0,P[:,k])) for k ∈ 1:size(P,2)]
+end
+
+function initpointsdata(P,E)
+    p = ChainBundle(initpoints(P)); el = list(1,size(P,1))
+    e = [Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)]
+    return p,e
+end
+
+function initmeshdata(P,E,T)
+    p,e = initpointsdata(P,E); tl = list(1,size(P,1)+1)
+    t = [Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)]
+    return p,ChainBundle(e),ChainBundle(t)
+end
+
 export pointset, edges, facets, adjacency, column, columns
 
 column(t,i=1) = getindex.(value(t),i)
@@ -290,7 +307,7 @@ function faces(t::Vector{<:Chain{V}},::Val{N}) where {V,N}
     N == 0 && (return Chain{W,1}(list(2,1)))
     out = Chain{W,1,Int,N}[]
     for i ∈ value(t)
-        for w ∈ Chain{W,1}.(combinations(sort(value(i)),N))
+        for w ∈ Chain{W,1}.(DirectSum.combinations(sort(value(i)),N))
             w ∉ out && push!(out,w)
         end
     end
@@ -306,7 +323,7 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
     for i ∈ 1:length(t)
         vec[:] = value(t[i])
         par = indexparity!(vec)
-        w = Chain{W,1}.(combinations(par[2],N))
+        w = Chain{W,1}.(DirectSum.combinations(par[2],N))
         for k ∈ 1:binomial(ndims(V),N)
             j = findfirst(isequal(w[k]),out)
             v = h[i]*(par[1] ? -val[k] : val[k])
@@ -527,11 +544,78 @@ function __init__()
     end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
     @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
-        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p))
+        MiniQhull.delaunay(p::Vector{<:Chain},n=1:length(p)) = MiniQhull.delaunay(ChainBundle(p),n)
+        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p)); l = list(1,ndims(p))
             T = MiniQhull.delaunay(Matrix(submesh(length(n)==length(p) ? p : p[n])'))
-            l = list(1,ndims(p)); [Chain{p,1,Int}(Int.(T[l,k])) for k ∈ 1:size(T,2)]
+            [Chain{p,1,Int}(getindex.(Ref(n),Int.(T[l,k]))) for k ∈ 1:size(T,2)]
         end
-        initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),ChainBundle(t)))
+        #initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),ChainBundle(t)))
+    end
+    @require Triangulate = "f7e6ffb2-c36d-4f8f-a77e-16e897189344" begin
+        const triangle_cache = (Array{T,2} where T)[]
+        function triangle(p::Array{T,2} where T,B)
+            for k ∈ length(triangle_cache):B
+                push!(triangle_cache,Array{Any,2}(undef,0,0))
+            end
+            triangle_cache[B] = p
+        end
+        function triangle(p::ChainBundle{V,G,T,B} where {V,G,T}) where B
+            if length(triangle_cache)<B || isempty(triangle_cache[B])
+                ap = array(p)'
+                triangle(islocal(p) ? Cint.(ap) : ap[2:end,:],B)
+            else
+                return triangle_cache[B]
+            end
+        end
+        function triangle(p::Vector{<:Chain{V,1,T} where V}) where T
+            ap = array(p)'
+            T<:Int ? Cint.(ap) : ap[2:end,:]
+        end
+        function Triangulate.TriangulateIO(e,h=nothing)
+            triin=Triangulate.TriangulateIO()
+            triin.pointlist=triangle(points(e))
+            triin.segmentlist=triangle(e)
+            !isnothing(h) && (triin.holelist=triangle(h))
+            return triin
+        end
+        function Triangulate.triangulate(p,e,h=nothing;area=0.001,angle=20)
+            i = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
+            triout,vorout = Triangulate.triangulate(i,Triangulate.TriangulateIO(e,h))
+            initmesh(triout)
+        end
+        initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist)
+    end
+    @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
+        function TetGen.TetGenIO(mesh::ChainBundle;
+                marker = :markers, holes = TetGen.Point{3,Float64}[])
+            TetGen.TetGenIO(value(mesh); marker=marker, holes=holes)
+        end
+        function TetGen.TetGenIO(mesh::Vector{<:Chain};
+                marker = :markers, holes = TetGen.Point{3, Float64}[])
+            f = TetGen.TriangleFace{Cint}.(value.(mesh))
+            kw_args = Any[:facets => TetGen.metafree(f),:holes => holes]
+            if hasproperty(f, marker)
+                push!(kw_args, :facetmarkers => getproperty(f, marker))
+            end
+            pm = points(mesh); V = Manifold(pm)
+            TetGen.TetgenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
+        end
+        function initmesh(tio::TetGen.TetGenIO, command = "Qp")
+            r = TetGen.tetrahedralize(tio, command)
+            p = ChainBundle([Chain{V,1}(SVector{4,Float64}(1.0,k...)) for k ∈ r.points])
+            t = Chain{p,1}.(SVector{4,Int}.(r.tetrahedra))
+            e = Chain{p(2,3,4),1}.(SVector{3,Int}.(r.trifaces))
+            # Chain{p(2,3),1}.(SVector{2,Int}.(r.edges)
+            return p,ChainBundle(e),ChainBundle(t)
+        end
+        function TetGen.tetrahedralize(mesh::ChainBundle, command = "Qp";
+                marker = :markers, holes = TetGen.Point{3,Float64}[])
+            TetGen.tetrahedralize(value(mesh), command; marker=marker, holes=holes)
+        end
+        function TetGen.tetrahedralize(mesh::Vector{<:Chain}, command = "Qp";
+                marker = :markers, holes = TetGen.Point{3, Float64}[])
+            initmesh(TetGen.TetGenIO(mesh;marker=marker,holes=holes),command)
+        end
     end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
         const matlab_cache = (Array{T,2} where T)[]
@@ -553,10 +637,7 @@ function __init__()
         initmeshall(g::Matrix{Int},args...) = initmeshall(Matrix{Float64}(g),args...)
         function initmeshall(g,args...)
             P,E,T = MATLAB.mxcall(:initmesh,3,g,args...)
-            s = size(P,1)+1; V = SubManifold(ℝ^s); el,tl = list(1,s-1),list(1,s)
-            p = ChainBundle([Chain{V,1,Float64}(vcat(1.0,P[:,k])) for k ∈ 1:size(P,2)])
-            e = ChainBundle([Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)])
-            t = ChainBundle([Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)])
+            p,e,t = initmeshdata(P,E,T)
             return (p,e,t,T,E,P)
         end
         function initmeshes(g,args...)
