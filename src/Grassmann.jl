@@ -322,7 +322,7 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
     val = N+1==ndims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(SVector{binomial(ndims(V),N)})
     for i ∈ 1:length(t)
         vec[:] = value(t[i])
-        par = indexparity!(vec)
+        par = DirectSum.indexparity!(vec)
         w = Chain{W,1}.(DirectSum.combinations(par[2],N))
         for k ∈ 1:binomial(ndims(V),N)
             j = findfirst(isequal(w[k]),out)
@@ -586,11 +586,11 @@ function __init__()
         initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist)
     end
     @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
-        function TetGen.TetGenIO(mesh::ChainBundle;
+        function TetGen.TetgenIO(mesh::ChainBundle;
                 marker = :markers, holes = TetGen.Point{3,Float64}[])
-            TetGen.TetGenIO(value(mesh); marker=marker, holes=holes)
+            TetGen.TetgenIO(value(mesh); marker=marker, holes=holes)
         end
-        function TetGen.TetGenIO(mesh::Vector{<:Chain};
+        function TetGen.TetgenIO(mesh::Vector{<:Chain};
                 marker = :markers, holes = TetGen.Point{3, Float64}[])
             f = TetGen.TriangleFace{Cint}.(value.(mesh))
             kw_args = Any[:facets => TetGen.metafree(f),:holes => holes]
@@ -600,8 +600,8 @@ function __init__()
             pm = points(mesh); V = Manifold(pm)
             TetGen.TetgenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
         end
-        function initmesh(tio::TetGen.TetGenIO, command = "Qp")
-            r = TetGen.tetrahedralize(tio, command)
+        function initmesh(tio::TetGen.TetgenIO, command = "Qp")
+            r = TetGen.tetrahedralize(tio, command); V = SubManifold(ℝ^4)
             p = ChainBundle([Chain{V,1}(SVector{4,Float64}(1.0,k...)) for k ∈ r.points])
             t = Chain{p,1}.(SVector{4,Int}.(r.tetrahedra))
             e = Chain{p(2,3,4),1}.(SVector{3,Int}.(r.trifaces))
@@ -614,7 +614,7 @@ function __init__()
         end
         function TetGen.tetrahedralize(mesh::Vector{<:Chain}, command = "Qp";
                 marker = :markers, holes = TetGen.Point{3, Float64}[])
-            initmesh(TetGen.TetGenIO(mesh;marker=marker,holes=holes),command)
+            initmesh(TetGen.TetgenIO(mesh;marker=marker,holes=holes),command)
         end
     end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
