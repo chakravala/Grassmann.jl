@@ -543,6 +543,11 @@ function __init__()
         end
     end
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
+    @require Delaunay="07eb4e4e-0c6d-46ef-bc4e-83d5e5d860a9" begin
+        Delaunay.delaunay(p::ChainBundle) = Delaunay.delaunay(value(p))
+        Delaunay.delaunay(p::Vector{<:Chain}) = initmesh(Delaunay.delaunay(Matrix(submesh(p))))
+        initmesh(t::Delaunay.Triangulation) = initmeshdata(t.points',t.convex_hull',t.simplices)
+    end
     @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
         MiniQhull.delaunay(p::Vector{<:Chain},n=1:length(p)) = MiniQhull.delaunay(ChainBundle(p),n)
         function MiniQhull.delaunay(p::ChainBundle,n=1:length(p)); l = list(1,ndims(p))
@@ -571,19 +576,18 @@ function __init__()
             ap = array(p)'
             T<:Int ? Cint.(ap) : ap[2:end,:]
         end
-        function Triangulate.TriangulateIO(e,h=nothing)
+        function Triangulate.TriangulateIO(e::Vector{<:Chain},h=nothing)
             triin=Triangulate.TriangulateIO()
             triin.pointlist=triangle(points(e))
             triin.segmentlist=triangle(e)
             !isnothing(h) && (triin.holelist=triangle(h))
             return triin
         end
-        function Triangulate.triangulate(p,e,h=nothing;area=0.001,angle=20)
-            i = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
-            triout,vorout = Triangulate.triangulate(i,Triangulate.TriangulateIO(e,h))
-            initmesh(triout)
+        function Triangulate.triangulate(i,e::Vector{<:Chain};holes=nothing)
+            initmesh(Triangulate.triangulate(i,Triangulate.TriangulateIO(e,holes))[1])
         end
         initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist)
+        #aran(area=0.001,angle=20) = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
     end
     @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
         function TetGen.TetgenIO(mesh::ChainBundle;
