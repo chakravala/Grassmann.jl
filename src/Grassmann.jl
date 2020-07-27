@@ -545,8 +545,16 @@ function __init__()
     #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
     @require Delaunay="07eb4e4e-0c6d-46ef-bc4e-83d5e5d860a9" begin
         Delaunay.delaunay(p::ChainBundle) = Delaunay.delaunay(value(p))
-        Delaunay.delaunay(p::Vector{<:Chain}) = initmesh(Delaunay.delaunay(Matrix(submesh(p))))
-        initmesh(t::Delaunay.Triangulation) = initmeshdata(t.points',t.convex_hull',t.simplices)
+        Delaunay.delaunay(p::Vector{<:Chain}) = initmesh(Delaunay.delaunay(submesh(p)))
+        initmesh(t::Delaunay.Triangulation) = initmeshdata(t.points',t.convex_hull',t.simplices')
+    end
+    @require QHull="a8468747-bd6f-53ef-9e5c-744dbc5c59e7" begin
+        QHull.chull(p::Vector{<:Chain},n=1:length(p)) = QHull.chull(ChainBundle(p),n)
+        function QHull.chull(p::ChainBundle,n=1:length(p)); l = list(1,ndims(p))
+            T = QHull.chull(submesh(length(n)==length(p) ? p : p[n])); V = p(list(2,ndims(p)))
+            [Chain{V,1}(getindex.(Ref(n),k)) for k ∈ T.simplices]
+        end
+        initmesh(t::Chull) = (p=ChainBundle(initpoints(t.points')); Chain{p(list(2,ndims(p))),1}.(t.simplices))
     end
     @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
         MiniQhull.delaunay(p::Vector{<:Chain},n=1:length(p)) = MiniQhull.delaunay(ChainBundle(p),n)
@@ -554,7 +562,6 @@ function __init__()
             T = MiniQhull.delaunay(Matrix(submesh(length(n)==length(p) ? p : p[n])'))
             [Chain{p,1,Int}(getindex.(Ref(n),Int.(T[l,k]))) for k ∈ 1:size(T,2)]
         end
-        #initmesh(p::ChainBundle) = (t=delaunay(p); (p,ChainBundle(∂(t)),ChainBundle(t)))
     end
     @require Triangulate = "f7e6ffb2-c36d-4f8f-a77e-16e897189344" begin
         const triangle_cache = (Array{T,2} where T)[]
