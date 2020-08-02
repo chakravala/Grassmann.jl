@@ -228,20 +228,21 @@ end
 
 # mesh
 
-function initpoints(P)
-    V = SubManifold(ℝ^(size(P,1)+1))
-    p = [Chain{V,1,Float64}(vcat(1.0,P[:,k])) for k ∈ 1:size(P,2)]
+initpoints(P::T) where T<:AbstractVector = Chain{SubManifold(ℝ^2),1}.(1.0,P)
+initpoints(P::T) where T<:AbstractRange = Chain{SubManifold(ℝ^2),1}.(1.0,P)
+@generated function initpoints(P,::Val{n}=Val(size(P,1))) where n
+    Expr(:.,:(Chain{$(SubManifold(ℝ^(n+1))),1}),
+         Expr(:tuple,1.0,[:(P[$k,:]) for k ∈ 1:n]...))
 end
 
-function initpointsdata(P,E)
-    p = ChainBundle(initpoints(P)); el = list(1,size(P,1))
-    e = [Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)]
-    return p,e
+function initpointsdata(P,E,N::Val{n}=Val(size(P,1))) where n
+    p = ChainBundle(initpoints(P,N)); l = list(1,n)
+    p,[Chain{↓(p),1}(Int.(E[l,k])) for k ∈ 1:size(E,2)]
 end
 
-function initmeshdata(P,E,T)
-    p,e = initpointsdata(P,E); tl = list(1,size(P,1)+1)
-    t = [Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)]
+function initmeshdata(P,E,T,N::Val{n}=Val(size(P,1))) where n
+    p,e = initpointsdata(P,E,N); l = list(1,n+1)
+    t = [Chain{p,1}(Int.(T[l,k])) for k ∈ 1:size(T,2)]
     return p,ChainBundle(e),ChainBundle(t)
 end
 
@@ -249,6 +250,8 @@ export pointset, edges, facets, adjacency, column, columns
 
 column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
+
+rows(a::T) where T<:AbstractMatrix = getindex.(Ref(a),list(1,3),:)
 
 function pointset(e)
     ndims(Manifold(e)) == 1 && (return column(e))
@@ -593,7 +596,7 @@ function __init__()
         function Triangulate.triangulate(i,e::Vector{<:Chain};holes=nothing)
             initmesh(Triangulate.triangulate(i,Triangulate.TriangulateIO(e,holes))[1])
         end
-        initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist)
+        initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist,Val(2))
         #aran(area=0.001,angle=20) = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
     end
     @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
@@ -648,7 +651,7 @@ function __init__()
         initmeshall(g::Matrix{Int},args...) = initmeshall(Matrix{Float64}(g),args...)
         function initmeshall(g,args...)
             P,E,T = MATLAB.mxcall(:initmesh,3,g,args...)
-            p,e,t = initmeshdata(P,E,T)
+            p,e,t = initmeshdata(P,E,T,Val(2))
             return (p,e,t,T,E,P)
         end
         function initmeshes(g,args...)

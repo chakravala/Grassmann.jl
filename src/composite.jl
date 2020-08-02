@@ -471,12 +471,13 @@ for op ∈ (:mean,:barycenter,:curl)
     end
 end
 
-function initmesh(r::R) where R<:AbstractRange
-    G = Λ(ℝ^2)
-    p = ChainBundle(collect(r).*G.v2.+G.v1)
-    e = ChainBundle(Chain{↓(p),1,Int}.([(1,),(length(p),)]))
-    t = ChainBundle(Chain{p,1,Int}.([(i,i+1) for i ∈ 1:length(p)-1]))
-    return p,e,t
+function initedges(r::R) where R<:AbstractVector
+    p = ChainBundle(initpoints(r))
+    Chain{p,1}.(1:length(p)-1,2:length(p))
+end
+function initmesh(r::R) where R<:AbstractVector
+    t = initedges(r); p = points(t)
+    p,ChainBundle(Chain{↓(p),1}.([(1,),(length(p),)])),t
 end
 
 select(η,ϵ=sqrt(norm(η)^2/length(η))) = sort!(findall(x->x>ϵ,η))
