@@ -101,6 +101,7 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [GaloisFields.jl](https://github.com/tkluck/GaloisFields.jl),
 [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl),
 [Compose.jl](https://github.com/GiovineItalia/Compose.jl),
+[UnicodePlots.jl](https://github.com/Evizero/UnicodePlots.jl),
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl),
 [AbstractPlotting.jl](https://github.com/JuliaPlots/AbstractPlotting.jl),
 [GeometryBasics.jl](https://github.com/JuliaGeometry/GeometryBasics.jl),
@@ -292,7 +293,7 @@ Full `MultiVector` elements are not representable when `ExtendedBasis` is used, 
 The sparse representations are a work in progress to be improved with time.
 
 ## References
-* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf) (2019)
+* Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf), JuliaCon (2019)
 * Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp) (1957)
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)

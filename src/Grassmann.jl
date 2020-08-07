@@ -354,6 +354,46 @@ skeleton(t::ChainBundle,v) = skeleton(value(t),v)
 @generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),Ref(ones(Int,length(t))),$(Val.(list(1,ndims(V)))),abs))
 #@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),$(Val.(list(1,ndims(V))))))
 
+export scalarfield, vectorfield, chainfield, rectanglefield # rectangle
+
+function pointfield end; const vectorfield = pointfield # deprecate ?
+
+chainfield(t,V=Manifold(t),W=V) = p->V(vector(↓(↑((V∪Manifold(t))(p))⊘t)))
+function scalarfield(t,ϕ::T) where T<:AbstractVector
+    M = Manifold(t)
+    V = Manifold(M)
+    P->begin
+        for i ∈ 1:length(t)
+            ti = value(t[i])
+            Pi = Chain{V,1}(M[ti])
+            P ∈ Pi && (return ((Pi\P)⋅Chain{V,1}(ϕ[ti]))[1])
+        end
+        return 0.0
+    end
+end
+function chainfield(t,ϕ::T) where T<:AbstractVector
+    M = Manifold(t)
+    V = Manifold(M)
+    z = ndims(V) ≠ 4 ? Chain{V,1}(1.0,0.0,0.0) : Chain{V,1}(1.0,0.0,0.0,0.0)
+    P->begin
+        for i ∈ 1:length(t)
+            ti = value(t[i])
+            Pi = Chain{V,1}(M[ti])
+            P ∈ Pi && (return (Pi\P)⋅Chain{V,1}(ϕ[ti]))
+        end
+        return z
+    end
+end
+
+function rectangle(p,nx=100,ny=nx)
+    px,py = column(p,2),column(p,3)
+    x = range(minimum(px),maximum(px),length=nx)
+    y = range(minimum(py),maximum(py),length=ny)
+    z = x' .+ im*y
+    Chain{Manifold(p),1}.(1.0,real.(z),imag.(z))
+end
+rectanglefield(t,ϕ,nx=100,ny=nx) = chainfield(t,ϕ).(rectangle(points(t),nx,ny))
+
 generate_products()
 generate_products(Complex)
 generate_products(Rational{BigInt},:svec)
@@ -484,9 +524,9 @@ function __init__()
             return (p,ChainBundle(∂(t)),t)
         end
         @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
-        export vectorfield, chainfield
-        vectorfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
-        function chainfield(t,ϕ)
+        export pointfield
+        pointfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
+        function pointfield(t,ϕ::T) where T<:AbstractVector
             M = Manifold(t)
             V = Manifold(M)
             z = ndims(V) ≠ 4 ? GeometryBasics(0.0,0.0) : GeometryBasics.Point(0.0,0.0,0.0)
@@ -545,7 +585,30 @@ function __init__()
             end
         end
     end
-    #@require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" nothing
+    @require UnicodePlots="b8865327-cd53-5732-bb35-84acbb429228" begin
+        UnicodePlots.scatterplot(p::ChainBundle,x;args...) = UnicodePlots.scatterplot(submesh(p)[:,1],x;args...)
+        UnicodePlots.scatterplot!(P,p::ChainBundle,x;args...) = UnicodePlots.scatterplot!(P,submesh(p)[:,1],x;args...)
+        UnicodePlots.scatterplot(p::Vector{<:Chain},x;args...) = UnicodePlots.scatterplot(submesh(p)[:,1],x;args...)
+        UnicodePlots.scatterplot!(P,p::Vector{<:Chain},x;args...) = UnicodePlots.scatterplot!(P,submesh(p)[:,1],x;args...)
+        UnicodePlots.scatterplot(p::ChainBundle;args...) = (s=submesh(p); UnicodePlots.scatterplot(s[:,1],s[:,2];args...))
+        UnicodePlots.scatterplot!(P,p::ChainBundle;args...) = (s=submesh(p); UnicodePlots.scatterplot!(P,s[:,1],s[:,2];args...))
+        UnicodePlots.scatterplot(p::Vector{<:Chain};args...) = (s=submesh(p); UnicodePlots.scatterplot(s[:,1],s[:,2];args...))
+        UnicodePlots.scatterplot!(P,p::Vector{<:Chain};args...) = (s=submesh(p); UnicodePlots.scatterplot!(P,s[:,1],s[:,2];args...))
+        UnicodePlots.densityplot(p::ChainBundle,x;args...) = UnicodePlots.densityplot(submesh(p)[:,1],x;args...)
+        UnicodePlots.densityplot!(P,p::ChainBundle,x;args...) = UnicodePlots.densityplot!(P,submesh(p)[:,1],x;args...)
+        UnicodePlots.densityplot(p::Vector{<:Chain},x;args...) = UnicodePlots.densityplot(submesh(p)[:,1],x;args...)
+        UnicodePlots.densityplot!(P,p::Vector{<:Chain},x;args...) = UnicodePlots.densityplot!(P,submesh(p)[:,1],x;args...)
+        UnicodePlots.densityplot(p::ChainBundle;args...) = (s=submesh(p); UnicodePlots.densityplot(s[:,1],s[:,2];args...))
+        UnicodePlots.densityplot!(P,p::ChainBundle;args...) = (s=submesh(p); UnicodePlots.densityplot!(P,s[:,1],s[:,2];args...))
+        UnicodePlots.densityplot(p::Vector{<:Chain};args...) = (s=submesh(p); UnicodePlots.densityplot(s[:,1],s[:,2];args...))
+        UnicodePlots.densityplot!(P,p::Vector{<:Chain};args...) = (s=submesh(p); UnicodePlots.densityplot!(P,s[:,1],s[:,2];args...))
+        UnicodePlots.lineplot(p::ChainBundle;args...) = UnicodePlots.lineplot(value(p);args...)
+        UnicodePlots.lineplot!(P,p::ChainBundle;args...) = UnicodePlots.lineplot!(P,value(p);args...)
+        UnicodePlots.lineplot(p::Vector{<:TensorAlgebra};args...) = (s=submesh(p); UnicodePlots.lineplot(s[:,1],s[:,2];args...))
+        UnicodePlots.lineplot!(P,p::Vector{<:TensorAlgebra};args...) = (s=submesh(p); UnicodePlots.lineplot!(P,s[:,1],s[:,2];args...))
+        UnicodePlots.spy(p::ChainBundle) = UnicodePlots.spy(antiadjacency(p))
+        UnicodePlots.spy(p::Vector{<:Chain}) = UnicodePlots.spy(antiadjacency(p))
+    end
     @require Delaunay="07eb4e4e-0c6d-46ef-bc4e-83d5e5d860a9" begin
         Delaunay.delaunay(p::ChainBundle) = Delaunay.delaunay(value(p))
         Delaunay.delaunay(p::Vector{<:Chain}) = initmesh(Delaunay.delaunay(submesh(p)))
