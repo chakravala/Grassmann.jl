@@ -332,7 +332,7 @@ function Cramer(N::Int,j=0)
     return x,y,xy
 end
 
-@generated function Base.:\(t::SVector{N,<:Chain{V,1}} where N,v::Chain{V,1}) where V
+@generated function Base.:\(t::SVector{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
     N = ndims(V)-1 # paste this into the REPL for faster eval
     x,y,xy = Grassmann.Cramer(N)
     mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
@@ -358,6 +358,7 @@ end
 
 @generated function Base.inv(t::SVector{N,<:Chain{V,1}} where N) where V
     N = ndims(V)-1
+    N<1 && (return :(_transpose(SVector(inv(t[1])))))
     x,y,xy = Grassmann.Cramer(N)
     out = if iseven(N)
         Expr(:call,:SVector,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
@@ -379,10 +380,43 @@ end
 end
 
 Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
+Base.:\(t::Chain{M,1,<:Chain{V,1}},v::Chain{V,1}) where {M,V} = ndims(M) < ndims(V) ? (tt=transpose(t); ((inv(tt⋅t))⋅tt)⋅v) : value(t)\v
+Base.:\(t::Chain{V,1,<:Chain{M,1}},v::Chain{V,1}) where {M,V} = ndims(M) < ndims(V) ? ((inv(t⋅transpose(t)))⋅t)⋅v : value(transpose(t))\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
 grad(t::Chain{V,1,<:Chain{V,1}}) where V = grad(value(t))
 INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
+
+export vandermonde
+
+@generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(ndims(V))))⋅y)
+approx(x,y::SVector{N}) where N = value(polynom(x,Val(N)))⋅y
+approx(x,y::AbstractVector) = [x^i for i ∈ 0:length(y)-1]⋅y
+
+vandermonde(x::Array,y::Array,N::Int) = vandermonde(x,N)\y[:] # compute ((inv(X'*X))*X')*y
+function vandermonde(x::Array,N)
+    V = zeros(length(x),N)
+    for d ∈ 0:N-1
+        V[:,d+1] = x.^d
+    end
+    return V # Vandermonde
+end
+
+vandermonde(x,y,V) = (length(x)≠ndims(V) ? _vandermonde(x,V) : vandermonde(x,V))\y
+vandermonde(x,V) = transpose(_vandermonde(x,V))
+_vandermonde(x::Chain,V) = _vandermonde(value(x),V)
+@generated _vandermonde(x::SVector{N},V) where N = :(Chain{$(SubManifold(Manifold(N))),1}(polynom.(x,$(Val(ndims(V))))))
+@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(SubManifold(Manifold(N))),1}),Expr(:call,:SVector,[:(x^$i) for i ∈ 0:N-1]...))
+
+function vandermondeinterp(x,y,V,grid) # grid=384
+    coef = vandermonde(x,y,V) # Vandermonde ((inv(X'*X))*X')*y
+    xp=[minimum(x):(maximum(x)-minimum(x))/grid:maximum(x)...]
+    yp=zeros(length(xp)).+coef[1]
+    for d ∈ 1:length(coef)-1
+        yp += coef[d+1].*xp.^d
+    end # fill in polynomial terms
+    return coef,xp,yp # coefficients, interpolation
+end
 
 @generated function vectors(t,c=columns(t))
     v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ 2:ndims(t)]...)
