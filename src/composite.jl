@@ -53,16 +53,26 @@ end
     end
 end
 
+@pure isR301(V::DiagonalForm) = DirectSum.diagonalform(V) == SVector(1,1,1,0)
+@pure isR301(::SubManifold{V}) where V = isR301(V)
+@pure isR301(V) = false
+
 @inline unabs!(t) = t
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
 function Base.exp(t::T) where T<:TensorGraded
     S,B = T<:SubManifold,T<:TensorTerm
-    i = B ? basis(t) : t
-    sq = i*i
     if B && isnull(t)
         return one(V)
-    elseif isscalar(sq)
+    elseif isR301(Manifold(t)) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
+        u = sqrt(abs(abs2(t)[1]))
+        u<1e-5 && (return 1+t)
+        v,cu,su = (t∧t)*(-0.5/u),cos(u),sin(u)
+        return (cu-v*su)+((su+v*cu)*t)*(inv(u)-v/u^2)
+    end # need general inv(u+v) ~ inv(u)-v/u^2
+    i = B ? basis(t) : t
+    sq = i*i
+    if isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return 1+t)
         grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
