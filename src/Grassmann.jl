@@ -8,6 +8,7 @@ using DirectSum, AbstractTensors, Requires
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
+export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9
 
 import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
 import DirectSum: hasinf, hasorigin, dyadmode, dual, value, V0, ⊕, pre, vsn

@@ -36,6 +36,19 @@ Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,�
     ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
     :(Chain{V,G}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
 end
+
+@generated function Chain{V}(args::𝕂...) where {V,𝕂}
+    bg = ndims(V); ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
+    :(Chain{V,1}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
+end
+
+@generated function Chain(args::𝕂...) where 𝕂
+    V = SubManifold(Manifold(length(args))); bg = ndims(V)
+    ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
+    :(Chain{$V,1}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
+end
+
+
 function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
     N = ndims(V)
     Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val{N}()))
@@ -76,8 +89,10 @@ Chain{V,1}(m::SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m
 Chain{V,1,Chain{W,1}}(m::SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
 
 transpose_row(t::SVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
+transpose_row(t::SizedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
 @generated _transpose(t::SVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(1:ndims(V))),W)))
+@generated _transpose(t::SizedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(1:ndims(V))),W)))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 

@@ -346,12 +346,14 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
-@generated ∧(t::T) where T<:SVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
-@generated ∧(t::T) where T<:SizedVector = Expr(:call,:∧,[:(t[$k]) for k ∈ 1:length(t)]...)
+@generated ∧(t::T) where T<:SVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
+@generated ∧(t::T) where T<:SizedVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
 ∧(::SVector{0,<:Chain{V}}) where V = one(V) # ∧() = 1
 ∧(::SizedVector{0,<:Chain{V}}) where V = one(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
+
+wedges(x,i=length(x)-1) = i ≠ 0 ? Expr(:call,:∧,wedges(x,i-1),x[1+i]) : x[1+i]
 
 export ∧, ∨, ⊗
 

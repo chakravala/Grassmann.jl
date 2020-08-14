@@ -343,12 +343,38 @@ function Cramer(N::Int,j=0)
 end
 
 @generated function Base.:\(t::SVector{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
-    N = ndims(V)-1 # paste this into the REPL for faster eval
-    x,y,xy = Grassmann.Cramer(N)
+    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = M-1
+    if M == 1 && V === ℝ1
+        return :(Chain{V,1}(SVector(v[1]/t[1][1])))
+    elseif M == 2 && V === ℝ2
+        return quote
+            (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
+            x1 = (c-C*(b/B))/(a-A*(b/B))
+            return Chain{V,1}(x1,(C-A*x1)/B)
+        end
+    elseif M == 3 && V === ℝ3
+        return quote
+            dv = v/∧(t)[1]; c1,c2,c3 = value(t)
+            return Chain{V,1}(
+                (c2[2]*c3[3] - c3[2]*c2[3])*dv[1] +
+                    (c3[1]*c2[3] - c2[1]*c3[3])*dv[2] +
+                    (c2[1]*c3[2] - c3[1]*c2[2])*dv[3],
+                (c3[2]*c1[3] - c1[2]*c3[3])*dv[1] +
+                    (c1[1]*c3[3] - c3[1]*c1[3])*dv[2] +
+                    (c3[1]*c1[2] - c1[1]*c3[2])*dv[3],
+                (c1[2]*c2[3] - c2[2]*c1[3])*dv[1] +
+                    (c2[1]*c1[3] - c1[1]*c2[3])*dv[2] +
+                    (c1[1]*c2[2] - c2[1]*c1[2])*dv[3])
+        end
+    end
+    N<1 && (return :(inv(t)⋅v))
+    M > ndims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
+    x,y,xy = Grassmann.Cramer(N) # paste this into the REPL for faster eval
     mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
     out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,
-        :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
+    detx = :(detx = (t[1]∧$(y[end])))
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,detx,
+        :(Chain{$W,1}(column($(Expr(:call,:.⋅,out,:detx))./abs2(detx)))))
 end
 
 @generated function Base.in(v::Chain{V,1},t::SVector{N,<:Chain{V,1}}) where {V,N}
@@ -366,35 +392,62 @@ end
     end
 end
 
-@generated function Base.inv(t::SVector{N,<:Chain{V,1}} where N) where V
-    N = ndims(V)-1
-    N<1 && (return :(_transpose(SVector(inv(t[1])))))
+@generated function Base.inv(t::SVector{M,<:Chain{V,1}}) where {M,V}
+    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = M-1
+    N<1 && (return :(_transpose(SVector(inv(t[1])),$W)))
+    M > ndims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
-    out = if iseven(N)
+    val = if iseven(N)
         Expr(:call,:SVector,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+    elseif M≠ndims(V)
+        Expr(:call,:SVector,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
     else
         Expr(:call,:SVector,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))))))
+    out = if M≠ndims(V)
+        :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
+    else
+        :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
+    end
+    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
 
-@generated function grad(T::SVector{N,<:Chain{V,1}} where N,W=V) where V
-    N = ndims(V)-1
+@generated function grad(T::SVector{M,<:Chain{V,1}}) where {M,V}
+    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = ndims(V)-1
+    M < ndims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
-    out = if iseven(N)
+    val = if iseven(N)
         Expr(:call,:SVector,[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+    elseif M≠ndims(V)
+        Expr(:call,:SVector,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
     else
         Expr(:call,:SVector,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
-    return Expr(:block,:(t=_transpose(T,W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose(.⋆($(Expr(:call,:./,out,:((t[1]∧$(y[end]))[1])))),↓(V))))
+    out = if M≠ndims(V)
+        :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
+    else
+        :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
+    end
+    return Expr(:block,:(t=_transpose(T,$W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose($out,↓(V))))
 end
 
-Base.:\(t::Chain{V,1,<:Chain{V,1}},v::Chain{V,1}) where V = value(t)\v
-Base.:\(t::Chain{M,1,<:Chain{V,1}},v::Chain{V,1}) where {M,V} = ndims(M) < ndims(V) ? (tt=transpose(t); ((inv(tt⋅t))⋅tt)⋅v) : value(t)\v
-Base.:\(t::Chain{V,1,<:Chain{M,1}},v::Chain{V,1}) where {M,V} = ndims(M) < ndims(V) ? ((inv(t⋅transpose(t)))⋅t)⋅v : value(transpose(t))\v
+@generated function Base.:\(t::SVector{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
+    W = M≠ndims(V) ? SubManifold(Manifold(N)) : V
+    if ndims(M) > ndims(V)
+        :(ct=Chain{$W,1}(t); ct⋅(inv(_transpose(t,$W)⋅ct)⋅v))
+    else # ndims(M) < ndims(V) ? inv(tt⋅t)⋅(tt⋅v) : tt⋅(inv(t⋅tt)⋅v)
+        :(_transpose(t,$W)\v)
+    end
+end
+function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
+    tt = transpose(t)
+    ndims(M) < ndims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
+end
+
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
-Base.inv(t::Chain{V,1,<:Chain{V,1}}) where V = inv(value(t))
-grad(t::Chain{V,1,<:Chain{V,1}}) where V = grad(value(t))
+Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
+grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
 INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
 export vandermonde
@@ -420,8 +473,8 @@ _vandermonde(x::Chain,V) = _vandermonde(value(x),V)
 
 function vandermondeinterp(x,y,V,grid) # grid=384
     coef = vandermonde(x,y,V) # Vandermonde ((inv(X'*X))*X')*y
-    xp=[minimum(x):(maximum(x)-minimum(x))/grid:maximum(x)...]
-    yp=zeros(length(xp)).+coef[1]
+    minx,maxx = minimum(x),maximum(x)
+    xp,yp = [minx:(maxx-minx)/grid:maxx...],coef[1]*ones(grid+1)
     for d ∈ 1:length(coef)-1
         yp += coef[d+1].*xp.^d
     end # fill in polynomial terms
