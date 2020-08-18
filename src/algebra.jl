@@ -3,7 +3,7 @@
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
-import AbstractTensors: ∧, ∨, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction, TAG
+import AbstractTensors: ∧, ∨, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction, TAG, SUB
 import DirectSum: diffcheck, diffmode, tangent, hasinforigin, hasorigininf, symmetricsplit
 export tangent
 
