@@ -682,3 +682,47 @@ Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(
 Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(ndims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(ndims(V),T)))
+
+export Orthotope, Orthogrid
+
+struct Orthotope{V,T}
+    min::Chain{V,1,T}
+    max::Chain{V,1,T}
+end
+
+struct Orthogrid{V,T}
+    x::Orthotope{V,T}
+    n::Chain{V,1,Int}
+    s::Chain{V,1,Float64}
+end
+
+Orthogrid{V,T}(x,n) where {V,T} = Orthogrid{V,T}(x,n,Chain{V,1}(value(x.max-x.min)./(value(n)-1)))
+
+Base.show(io::IO,t::Orthogrid) = println('(',t.x.min,"):(",t.s,"):(",t.x.max,')')
+
+zeroinf(f) = iszero(f) ? Inf : f
+
+(::Base.Colon)(min::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthotope{V,T}(min,max)
+(::Base.Colon)(min::Chain{V,1,T},step::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthogrid{V,T}(min:max,Chain{V,1}(Int.(round.(value(max-min)./zeroinf.(value(step))))+1),step)
+
+Base.iterate(t::Orthogrid) = (getindex(t,1),1)
+Base.iterate(t::Orthogrid,state) = (s=state+1; s≤length(t) ? (getindex(t,s),s) : nothing)
+@pure Base.eltype(::Type{Orthogrid{V,T}}) where {V,T} = Chain{V,1,T,ndims(V)}
+@pure Base.step(t::Orthogrid) = value(t.s)
+@pure Base.size(t::Orthogrid) = value(t.n).data
+@pure Base.length(t::Orthogrid) = prod(size(t))
+@pure Base.lastindex(t::Orthogrid) = length(t)
+@pure Base.lastindex(t::Orthogrid,i::Int) = size(t)[i]
+@pure Base.getindex(t::Orthogrid,i::CartesianIndex) = getindex(t,i.I...)
+@pure Base.getindex(t::Orthogrid{V},i::Vararg{Int}) where V = Chain{V,1}(value(t.x.min)+(SVector(i)-1).*step(t))
+
+Base.IndexStyle(::Orthogrid) = IndexCartesian()
+function Base.getindex(A::Orthogrid, I::Int)
+    Base.@_inline_meta
+    @inbounds getindex(A, Base._to_subscript_indices(A, I)...)
+end
+Base._to_subscript_indices(A::Orthogrid, i::Integer) = (Base.@_inline_meta; Base._unsafe_ind2sub(A, i))
+function Base._ind2sub(A::Orthogrid, ind)
+    Base.@_inline_meta
+    Base._ind2sub(axes(A), ind)
+end
