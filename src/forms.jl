@@ -22,9 +22,9 @@
         if Q == V
             if G == M == 1
                 x = bits(W)
-                X = isdyadic(V) ? x>>Int(ndims(V)/2) : x
+                X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
                 Y = 0≠X ? X : x
-                out = :(@inbounds b.v[bladeindex($(ndims(V)),Y)])
+                out = :(@inbounds b.v[bladeindex($(mdims(V)),Y)])
                 return :(Simplex{V}(V[intlog(Y)+1] ? -($out) : $out,SubManifold{V}()))
             elseif G == 1 && M == 2
                 (!isdyadic(V)) && :(throw(error("wrong basis")))
@@ -40,10 +40,10 @@
         return :b
     elseif W⊆V
         if G == 1
-            ind = SVector{ndims(W),Int}(indices(bits(W),ndims(V)))
+            ind = SVector{mdims(W),Int}(indices(bits(W),mdims(V)))
             :(@inbounds Chain{w,1,T}(b.v[$ind]))
         else quote
-            out,N = zeros(choicevec(M,G,valuetype(b))),ndims(V)
+            out,N = zeros(choicevec(M,G,valuetype(b))),mdims(V)
             ib,S = indexbasis(N,G),bits(w)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
@@ -56,7 +56,7 @@
         end end
     elseif V⊆W
         quote
-            WC,VC,N = isdyadic(w),isdyadic(V),ndims(V)
+            WC,VC,N = isdyadic(w),isdyadic(V),mdims(V)
             #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
             #    return V0
             out = zeros(choicevec(M,G,valuetype(b)))
@@ -87,7 +87,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
     elseif V==W
         return b
     elseif W⊆V
-        out,N = zeros(choicevec(M,valuetype(m))),ndims(V)
+        out,N = zeros(choicevec(M,valuetype(m))),mdims(V)
         bs = binomsum_set(N)
         for i ∈ 1:N+1
             ib = indexbasis(N,i-1)
@@ -102,7 +102,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
         end
         return MultiVector{W}(out)
     elseif V⊆W
-        WC,VC,N = isdyadic(W),isdyadic(V),ndims(V)
+        WC,VC,N = isdyadic(W),isdyadic(V),mdims(V)
         #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
         #    return V0
         out = zeros(choicevec(M,valuetype(m)))
@@ -181,11 +181,41 @@ end
 ## Chain forms
 
 (a::Chain)(b::T) where {T<:TensorAlgebra} = interform(a,b)
+@eval begin
+    function (a::Chain{V,2})(b::Chain{V,1}) where V
+        (!isdyadic(V)) && throw(error("wrong basis"))
+        $(insert_expr((:N,:t,:df,:di))...)
+        out = zero(mvec(N,1,t))
+        for Q ∈ 1:Int(N/2)
+            @inbounds m,val = df[Q][1],df[Q][2]*b.v[Q]
+            val≠0 && for i ∈ 1:N
+                @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,UInt(1)<<(i-1),Val{N}())
+            end
+        end
+        return Chain{V,1}(out)
+    end
+    function Chain{V,T}(b::Matrix{T}) where {V,T}
+        (!isdyadic(V)) && throw(error("$V does not support this conversion"))
+        $(insert_expr((:N,:M))...)
+        size(b) ≠ (M,M) && throw(error("dimension mismatch"))
+        out = zeros(mvec(N,2,T))
+        for i ∈ 1:M
+            x = UInt(1)<<(i-1)
+            for j ∈ 1:M
+                @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(UInt(1)<<(M+j-1)),Val{N}())
+            end
+        end
+        return Chain{V,2}(out)
+    end
+end
+
+# more forms
+
 function (a::Chain{V,1})(b::SubManifold{V,1}) where V
     x = bits(b)
-    X = isdyadic(V) ? x<<Int(ndims(V)/2) : x
-    Y = X>2^ndims(V) ? x : X
-    @inbounds out = a.v[bladeindex(ndims(V),Y)]
+    X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
+    Y = X>2^mdims(V) ? x : X
+    @inbounds out = a.v[bladeindex(mdims(V),Y)]
     Simplex{V}((V[intlog(x)+1]*out),SubManifold{V}())
 end
 @eval begin
@@ -203,17 +233,17 @@ end
     function (a::Chain{V,1})(b::Simplex{V,1}) where V
         $(insert_expr((:t,))...)
         x = bits(b)
-        X = isdyadic(V) ? x<<Int(ndims(V)/2) : x
-        Y = X>2^ndims(V) ? x : X
-        @inbounds out = a.v[bladeindex(ndims(V),Y)]
+        X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
+        Y = X>2^mdims(V) ? x : X
+        @inbounds out = a.v[bladeindex(mdims(V),Y)]
         Simplex{V}((V[intlog(x)+1]*out*b.v)::t,SubManifold{V}())
     end
     function (a::Simplex{V,1})(b::Chain{V,1}) where V
         $(insert_expr((:t,))...)
         x = bits(a)
-        X = isdyadic(V) ? x>>Int(ndims(V)/2) : x
+        X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
         Y = 0≠X ? X : x
-        @inbounds out = b.v[bladeindex(ndims(V),Y)]
+        @inbounds out = b.v[bladeindex(mdims(V),Y)]
         Simplex{V}((a.v*V[intlog(Y)+1]*out)::t,SubManifold{V}())
     end
     function (a::Simplex{V,2})(b::Chain{V,1}) where V
@@ -241,32 +271,5 @@ end
         end
         return Simplex{V}(out::t,SubManifold{V}())
     end
-    function (a::Chain{V,2})(b::Chain{V,1}) where V
-        (!isdyadic(V)) && throw(error("wrong basis"))
-        $(insert_expr((:N,:t,:df,:di))...)
-        out = zero(mvec(N,1,t))
-        for Q ∈ 1:Int(N/2)
-            @inbounds m,val = df[Q][1],df[Q][2]*b.v[Q]
-            val≠0 && for i ∈ 1:N
-                @inbounds i≠m && addblade!(out,a.v[di[Q][i]]*val,UInt(1)<<(i-1),Val{N}())
-            end
-        end
-        return Chain{V,1}(out)
-    end
 end
 
-@eval begin
-    function Chain{V,T}(b::Matrix{T}) where {V,T}
-        (!isdyadic(V)) && throw(error("$V does not support this conversion"))
-        $(insert_expr((:N,:M))...)
-        size(b) ≠ (M,M) && throw(error("dimension mismatch"))
-        out = zeros(mvec(N,2,T))
-        for i ∈ 1:M
-            x = UInt(1)<<(i-1)
-            for j ∈ 1:M
-                @inbounds b[j,i]≠0 && setblade!(out,b[j,i],x⊻(UInt(1)<<(M+j-1)),Val{N}())
-            end
-        end
-        return Chain{V,2}(out)
-    end
-end

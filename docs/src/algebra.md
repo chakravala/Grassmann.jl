@@ -333,7 +333,7 @@ Let's obtain the full `skeleton` of a simplical complex ``\Delta(\omega)=\mathca
 ```
 Compute the value ``\chi(\Delta(\omega))=1`` and ``\chi(\Delta(\partial(\omega))) = \, ?`` for any `Simplex` ``\omega``. As an exercise, also compute the corresponding `betti` numbers..
 ```@repl ga
-[(χ(Δ(ω)),χ(Δ(∂(ω)))) for ω ∈ (Λ(5).v12,Λ(5).v123,Λ(5).v1234,Λ(5).v12345)]
+[(χ(Δ(ω)),χ(Δ(∂(ω)))) for ω ∈ (Λ(ℝ5).v12,Λ(ℝ5).v123,Λ(ℝ5).v1234,Λ(ℝ5).v12345)]
 ```
 These methods can be applied to any `MultiVector` simplicial complex.
 

@@ -53,6 +53,33 @@ end
     end
 end
 
+function Base.exp(t::MultiVector)
+    st = scalar(t)
+    mt = t-scalar(t)
+    sq = mt*mt
+    if isscalar(sq)
+        hint = value(scalar(sq))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::MultiVector,::Val{hint}) where hint
+    st = scalar(t)
+    mt = t-scalar(t)
+    sq = mt*mt
+    if isscalar(sq)
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+    else
+        return 1+expm1(t)
+    end
+end
+
 @pure isR301(V::DiagonalForm) = DirectSum.diagonalform(V) == SVector(1,1,1,0)
 @pure isR301(::SubManifold{V}) where V = isR301(V)
 @pure isR301(V) = false
@@ -92,33 +119,6 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded where hint
         grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
-    else
-        return 1+expm1(t)
-    end
-end
-
-function Base.exp(t::MultiVector)
-    st = scalar(t)
-    mt = t-scalar(t)
-    sq = mt*mt
-    if isscalar(sq)
-        hint = value(scalar(sq))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
-        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
-    else
-        return 1+expm1(t)
-    end
-end
-
-function Base.exp(t::MultiVector,::Val{hint}) where hint
-    st = scalar(t)
-    mt = t-scalar(t)
-    sq = mt*mt
-    if isscalar(sq)
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
-        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
         return 1+expm1(t)
     end
@@ -180,11 +180,11 @@ end
 
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
-        @inline Base.$qrt(t::SubManifold{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
+        @inline Base.$qrt(t::SubManifold{V,0} where V) = t
+        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end
 end
 
@@ -343,16 +343,16 @@ function Cramer(N::Int,j=0)
 end
 
 @generated function Base.:\(t::SVector{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
-    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = M-1
-    if M == 1 && V === ℝ1
-        return :(Chain{V,1}(SVector(v[1]/t[1][1])))
-    elseif M == 2 && V === ℝ2
+    W = M≠mdims(V) ? M : V; N = M-1
+    if M == 1 && (V === ℝ1 || V == 1)
+        return :(Chain{V,1}(Values(v[1]/t[1][1])))
+    elseif M == 2 && (V === ℝ2 || V == 2)
         return quote
             (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
             x1 = (c-C*(b/B))/(a-A*(b/B))
             return Chain{V,1}(x1,(C-A*x1)/B)
         end
-    elseif M == 3 && V === ℝ3
+    elseif M == 3 && (V === ℝ3 || V == 3)
         return quote
             dv = v/∧(t)[1]; c1,c2,c3 = value(t)
             return Chain{V,1}(
@@ -368,17 +368,17 @@ end
         end
     end
     N<1 && (return :(inv(t)⋅v))
-    M > ndims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
+    M > mdims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
     x,y,xy = Grassmann.Cramer(N) # paste this into the REPL for faster eval
     mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
-    out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
+    out = Expr(:call,:Values,:(v∧$(y[end])),mid...,:($(x[end])∧v))
     detx = :(detx = (t[1]∧$(y[end])))
     return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,detx,
-        :(Chain{$W,1}(column($(Expr(:call,:.⋅,out,:detx))./abs2(detx)))))
+        :(Chain{$W,1}(column($(Expr(:call,:.⋅,out,:(Ref(detx))))./abs2(detx)))))
 end
 
 @generated function Base.in(v::Chain{V,1},t::SVector{N,<:Chain{V,1}}) where {V,N}
-    if N == ndims(V)
+    if N == mdims(V)
         x,y,xy = Grassmann.Cramer(N-1)
         mid = [:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-2]
         out = SVector(:(s==signbit((v∧$(y[end]))[1])),mid...,:(s==signbit(($(x[end])∧v)[1])))
@@ -392,19 +392,19 @@ end
     end
 end
 
-@generated function Base.inv(t::SVector{M,<:Chain{V,1}}) where {M,V}
-    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = M-1
-    N<1 && (return :(_transpose(SVector(inv(t[1])),$W)))
-    M > ndims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
+@generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
+    W = M≠mdims(V) ? SubManifold(Manifold(M)) : V; N = M-1
+    N<1 && (return :(_transpose(Values(inv(t[1])),$W)))
+    M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
         Expr(:call,:SVector,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
-    elseif M≠ndims(V)
+    elseif M≠mdims(V)
         Expr(:call,:SVector,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
     else
         Expr(:call,:SVector,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
-    out = if M≠ndims(V)
+    out = if M≠mdims(V)
         :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
     else
         :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
@@ -413,17 +413,17 @@ end
 end
 
 @generated function grad(T::SVector{M,<:Chain{V,1}}) where {M,V}
-    W = M≠ndims(V) ? SubManifold(Manifold(M)) : V; N = ndims(V)-1
-    M < ndims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
+    W = M≠mdims(V) ? SubManifold(Manifold(M)) : V; N = mdims(V)-1
+    M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
         Expr(:call,:SVector,[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
-    elseif M≠ndims(V)
+    elseif M≠mdims(V)
         Expr(:call,:SVector,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
     else
         Expr(:call,:SVector,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
-    out = if M≠ndims(V)
+    out = if M≠mdims(V)
         :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
     else
         :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
@@ -432,16 +432,16 @@ end
 end
 
 @generated function Base.:\(t::SVector{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
-    W = M≠ndims(V) ? SubManifold(Manifold(N)) : V
-    if ndims(M) > ndims(V)
+    W = M≠mdims(V) ? SubManifold(Manifold(N)) : V
+    if mdims(M) > mdims(V)
         :(ct=Chain{$W,1}(t); ct⋅(inv(_transpose(t,$W)⋅ct)⋅v))
-    else # ndims(M) < ndims(V) ? inv(tt⋅t)⋅(tt⋅v) : tt⋅(inv(t⋅tt)⋅v)
+    else # mdims(M) < mdims(V) ? inv(tt⋅t)⋅(tt⋅v) : tt⋅(inv(t⋅tt)⋅v)
         :(_transpose(t,$W)\v)
     end
 end
 function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
     tt = transpose(t)
-    ndims(M) < ndims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
+    mdims(M) < mdims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
 end
 
 Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
@@ -452,7 +452,7 @@ INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
 export vandermonde
 
-@generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(ndims(V))))⋅y)
+@generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(mdims(V))))⋅y)
 approx(x,y::SVector{N}) where N = value(polynom(x,Val(N)))⋅y
 approx(x,y::AbstractVector) = [x^i for i ∈ 0:length(y)-1]⋅y
 
@@ -465,10 +465,10 @@ function vandermonde(x::Array,N)
     return V # Vandermonde
 end
 
-vandermonde(x,y,V) = (length(x)≠ndims(V) ? _vandermonde(x,V) : vandermonde(x,V))\y
+vandermonde(x,y,V) = (length(x)≠mdims(V) ? _vandermonde(x,V) : vandermonde(x,V))\y
 vandermonde(x,V) = transpose(_vandermonde(x,V))
 _vandermonde(x::Chain,V) = _vandermonde(value(x),V)
-@generated _vandermonde(x::SVector{N},V) where N = :(Chain{$(SubManifold(Manifold(N))),1}(polynom.(x,$(Val(ndims(V))))))
+@generated _vandermonde(x::SVector{N},V) where N = :(Chain{$(SubManifold(Manifold(N))),1}(polynom.(x,$(Val(mdims(V))))))
 @generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(SubManifold(Manifold(N))),1}),Expr(:call,:SVector,[:(x^$i) for i ∈ 0:N-1]...))
 
 function vandermondeinterp(x,y,V,grid) # grid=384
@@ -482,7 +482,7 @@ function vandermondeinterp(x,y,V,grid) # grid=384
 end
 
 @generated function vectors(t,c=columns(t))
-    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ 2:ndims(t)]...)
+    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ 2:mdims(t)]...)
     quote
         p = points(t)
         M,A = ↓(Manifold(p)),p[c[1]]
@@ -534,8 +534,8 @@ export volumes, detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
 
 edgelength(e) = (v=points(e)[value(e)]; value(abs(v[2]-v[1])))
 volumes(m,dets) = value.(abs.(.⋆(dets)))
-volumes(m) = ndims(Manifold(m))≠2 ? volumes(m,detsimplex(m)) : edgelength.(value(m))
-detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(ndims(V)-1)
+volumes(m) = mdims(Manifold(m))≠2 ? volumes(m,detsimplex(m)) : edgelength.(value(m))
+detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(mdims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::Vector{<:Chain}) = sum(m)/length(m)
 mean(m::T) where T<:SVector = sum(m)/length(m)
@@ -551,10 +551,10 @@ LinearAlgebra.det(m::ChainBundle) = ∧(m)
 ∧(m::ChainBundle) = ∧(value(m))
 function ∧(m::Vector{<:Chain{V}}) where V
     p = points(m); pm = p[m]
-    if ndims(p)>ndims(V)
+    if mdims(p)>mdims(V)
         .∧(vectors.(pm))
     else
-        Chain{↓(Manifold(V)),ndims(V)-1}.(value.(.∧(pm)))
+        Chain{↓(Manifold(V)),mdims(V)-1}.(value.(.∧(pm)))
     end
 end
 for op ∈ (:mean,:barycenter,:curl)
@@ -591,7 +591,7 @@ function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:Abstrac
 end
 
 const array_cache = (Array{T,2} where T)[]
-array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈1:ndims(Manifold(m))]
+array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈1:mdims(Manifold(m))]
 function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(array_cache):B
         push!(array_cache,Array{Any,2}(undef,0,0))
@@ -604,7 +604,7 @@ function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
 end
 
 const submesh_cache = (Array{T,2} where T)[]
-submesh(m) = [m[i][j] for i∈1:length(m),j∈2:ndims(Manifold(m))]
+submesh(m) = [m[i][j] for i∈1:length(m),j∈2:mdims(Manifold(m))]
 function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(submesh_cache):B
         push!(submesh_cache,Array{Any,2}(undef,0,0))
@@ -649,7 +649,7 @@ if VERSION >= v"1.4"
         (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(B, T, (size(transA, 1), size(B, 2))), transA, B, 1, 0))
 end
 
-@generated function StaticArrays._diff(::Size{S}, a::SVector{Q,<:Chain}, ::Val{D}) where {S,D,Q}
+#=@generated function StaticArrays._diff(::Size{S}, a::SVector{Q,<:Chain}, ::Val{D}) where {S,D,Q}
     N = length(S)
     Snew = ([n==D ? S[n]-1 : S[n] for n = 1:N]...,)
 
@@ -667,7 +667,7 @@ end
         T = eltype(a)
         @inbounds return similar_type(a, T, Size($Snew))(tuple($(exprs...)))
     end
-end
+end=#
 
 Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
@@ -675,13 +675,13 @@ Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
 
 import Random: SamplerType, AbstractRNG
 Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{Chain{V}}) where V = rand(Chain{V,rand(0:ndims(V))})
-Base.rand(::AbstractRNG,::SamplerType{Chain{V,G}}) where {V,G} = Chain{V,G}(DirectSum.orand(svec(ndims(V),G,Float64)))
-Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(rand(svec(ndims(V),G,T)))
-Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:ndims(V)),T})
+Base.rand(::AbstractRNG,::SamplerType{Chain{V}}) where V = rand(Chain{V,rand(0:mdims(V))})
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G}}) where {V,G} = Chain{V,G}(DirectSum.orand(svec(mdims(V),G,Float64)))
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(rand(svec(mdims(V),G,T)))
+Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:mdims(V)),T})
 Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(ndims(V),Float64)))
-Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(ndims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(mdims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(mdims(V),T)))
 
 export Orthotope, Orthogrid
 
@@ -690,7 +690,9 @@ struct Orthotope{V,T}
     max::Chain{V,1,T}
 end
 
-struct Orthogrid{V,T}
+(::Base.Colon)(min::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthotope{V,T}(min,max)
+
+struct Orthogrid{V,T} # <: TensorGraded{V,1} mess up collect?
     x::Orthotope{V,T}
     n::Chain{V,1,Int}
     s::Chain{V,1,Float64}
@@ -702,12 +704,11 @@ Base.show(io::IO,t::Orthogrid) = println('(',t.x.min,"):(",t.s,"):(",t.x.max,')'
 
 zeroinf(f) = iszero(f) ? Inf : f
 
-(::Base.Colon)(min::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthotope{V,T}(min,max)
 (::Base.Colon)(min::Chain{V,1,T},step::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthogrid{V,T}(min:max,Chain{V,1}(Int.(round.(value(max-min)./zeroinf.(value(step))))+1),step)
 
 Base.iterate(t::Orthogrid) = (getindex(t,1),1)
 Base.iterate(t::Orthogrid,state) = (s=state+1; s≤length(t) ? (getindex(t,s),s) : nothing)
-@pure Base.eltype(::Type{Orthogrid{V,T}}) where {V,T} = Chain{V,1,T,ndims(V)}
+@pure Base.eltype(::Type{Orthogrid{V,T}}) where {V,T} = Chain{V,1,T,mdims(V)}
 @pure Base.step(t::Orthogrid) = value(t.s)
 @pure Base.size(t::Orthogrid) = value(t.n).data
 @pure Base.length(t::Orthogrid) = prod(size(t))

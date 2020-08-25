@@ -3,29 +3,30 @@ module Grassmann
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-using StaticArrays, SparseArrays, ComputedFieldTypes
-using DirectSum, AbstractTensors, Requires
+using SparseArrays, ComputedFieldTypes
+using AbstractTensors, Leibniz, DirectSum, Requires
+import AbstractTensors: SVector, MVector, SizedVector, clifford
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
-export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9
+export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent
 
-import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims
-import DirectSum: hasinf, hasorigin, dyadmode, dual, value, V0, ⊕, pre, vsn
-import DirectSum: generate, basis, dual, getalgebra, getbasis, metric
-import DirectSum: Bits, bit2int, doc2m, indexbits, indices, diffvars, diffmask, symmetricmask, indexstring, indexsymbol, combo
+import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims, adjoint
+import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual
+import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
+import Leibniz: Bits, bit2int, indexbits, indices, diffvars, diffmask
+import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
+
+import Leibniz: hasconformal, hasinf2origin, hasorigin2inf, g_zero, g_one, bits
+import AbstractTensors: valuetype, scalar, isscalar
+import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 
 ## cache
 
-import DirectSum: algebra_limit, sparse_limit, cache_limit, fill_limit
-import DirectSum: binomial, binomial_set, binomsum, binomsum_set, lowerbits, expandbits
-import DirectSum: bladeindex, basisindex, indexbasis, indexbasis_set, loworder, intlog
-import DirectSum: promote_type, mvec, svec, intlog, insert_expr
-
-#=import Multivectors: TensorTerm, TensorGraded, Basis, MultiVector, SparseChain, MultiGrade, Fields, parval, parsym, Simplex, Chain, terms, valuetype, value_diff, basis, grade, order, bits, χ, gdims, rank, null, betti, isapprox, scalar, vector, volume, isscalar, isvector, subvert, mixed, choicevec, subindex, TensorMixed
-import LinearAlgebra
-import LinearAlgebra: I, UniformScaling
-export UniformScaling, I=#
+import Leibniz: algebra_limit, sparse_limit, cache_limit, fill_limit
+import Leibniz: binomial, binomial_set, binomsum, binomsum_set, lowerbits, expandbits
+import Leibniz: bladeindex, basisindex, indexbasis, indexbasis_set, loworder, intlog
+import Leibniz: promote_type, mvec, svec, intlog, insert_expr
 
 include("multivectors.jl")
 include("parity.jl")
@@ -47,11 +48,11 @@ end
 points(f::F,r=-2π:0.0001:2π) where F<:Function = vector.(f.(r))
 
 using Leibniz
-import Leibniz: ∇, Δ, d # ∂
+import Leibniz: ∇, Δ, d, ∂
 export ∇, Δ, ∂, d, δ, ↑, ↓
 
-generate_products(:(Leibniz.Operator),:svec)
-for T ∈ (:(Simplex{V}),:(Chain{V}),:(MultiVector{V}))
+#generate_products(:(Leibniz.Operator),:svec)
+for T ∈ (:(Chain{V}),:(MultiVector{V}))
     @eval begin
         *(a::Derivation,b::$T) where V = V(a)*b
         *(a::$T,b::Derivation) where V = a*V(b)
@@ -124,7 +125,7 @@ end
 
 @generated function ↑(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
-    T<:SubManifold && !isbasis(ω) && (return DirectSum.supermanifold(V))
+    T<:SubManifold && !isbasis(ω) && (return Leibniz.supermanifold(V))
     !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
@@ -229,8 +230,8 @@ end
 
 # mesh
 
-initpoints(P::T) where T<:AbstractVector = Chain{SubManifold(ℝ^2),1}.(1.0,P)
-initpoints(P::T) where T<:AbstractRange = Chain{SubManifold(ℝ^2),1}.(1.0,P)
+initpoints(P::T) where T<:AbstractVector = Chain{ℝ2,1}.(1.0,P)
+initpoints(P::T) where T<:AbstractRange = Chain{ℝ2,1}.(1.0,P)
 @generated function initpoints(P,::Val{n}=Val(size(P,1))) where n
     Expr(:.,:(Chain{$(SubManifold(ℝ^(n+1))),1}),
          Expr(:tuple,1.0,[:(P[$k,:]) for k ∈ 1:n]...))
@@ -508,6 +509,11 @@ function __init__()
             viewer = run(cmd,(devnull,stdout,stderr),wait=false)
         end
     end
+    @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
+        StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}} where {V,W}) = hcat(value.(value(m))...)
+        Chain{V,1}(m::StaticArrays.SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+        Chain{V,1,Chain{W,1}}(m::StaticArrays.SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+    end
     @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = GeometryBasics.Point(value(Chain{V,valuetype(t)}(vector(t))))
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),ndims(V))...)
@@ -517,7 +523,7 @@ function __init__()
         pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
         function initmesh(m::GeometryBasics.Mesh)
             c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
-            s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s)
+            s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s) # s
             n = size(eltype(f))[1]
             p = ChainBundle([Chain{V,1}(SVector{s,Float64}(1.0,k...)) for k ∈ c])
             M = s ≠ n ? p(list(s-n+1,s)) : p

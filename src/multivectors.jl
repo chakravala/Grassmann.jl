@@ -4,12 +4,12 @@
 
 export TensorTerm, TensorGraded, TensorMixed, SubManifold, Simplex, MultiVector, SparseChain, MultiGrade, ChainBundle
 
-import DirectSum: TensorGraded, TensorTerm, grade
+import Leibniz: TensorGraded, TensorTerm, grade
 abstract type TensorMixed{V} <: TensorAlgebra{V} end
 
 # symbolic print types
 
-import DirectSum: Fields, parval, mixed
+import Leibniz: Fields, parval, mixed
 parsym = (Symbol,parval...)
 
 ## pseudoscalar
@@ -21,7 +21,7 @@ export UniformScaling, I, points
 ## Chain{V,G,𝕂}
 
 @computed struct Chain{V,G,𝕂} <: TensorGraded{V,G}
-    v::SVector{binomial(ndims(V),G),𝕂}
+    v::SVector{binomial(mdims(V),G),𝕂}
 end
 
 """
@@ -30,74 +30,49 @@ end
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
 """
 Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,𝕂}(val)
-#Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G)}(args...))
+#Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(mdims(V),G)}(args...))
 @generated function Chain{V,G}(args::𝕂...) where {V,G,𝕂}
-    bg = binomial(ndims(V),G)
+    bg = binomial(mdims(V),G)
     ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
     :(Chain{V,G}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
 end
 
 @generated function Chain{V}(args::𝕂...) where {V,𝕂}
-    bg = ndims(V); ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
+    bg = mdims(V); ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
     :(Chain{V,1}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
 end
 
 @generated function Chain(args::𝕂...) where 𝕂
-    V = SubManifold(Manifold(length(args))); bg = ndims(V)
-    ref = SVector{bg}([:(args[$i]) for i ∈ 1:bg])
-    :(Chain{$V,1}($(Expr(:call,:(SVector{$bg,𝕂}),ref...))))
+    V = length(args)
+    ref = SVector{V}([:(args[$i]) for i ∈ 1:V])
+    :(Chain{$V,1}($(Expr(:call,:(SVector{$V,𝕂}),ref...))))
 end
 
-
-function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
-    N = ndims(V)
-    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val{N}()))
-end
-Chain(v::SubManifold) = Chain(one(Int),v)
-Chain(v::Simplex) = Chain(v.v,basis(v))
-Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(v.v))
-Chain{𝕂}(v::SubManifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
-Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
-Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(ndims(V),G),𝕂}(v.v))
-Chain{V,G,T,X}(x::Simplex{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(ndims(V),G,T)))
-function Chain{V,0,T,X}(x::Simplex{V,0,v}) where {V,T,X,v}
-    N = ndims(V)
-    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),bits(v),Val{N}()))
-end
+Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(mdims(V),G),𝕂}(v.v))
+Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(mdims(V),G),𝕂}(v.v))
 
 export Chain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
-getindex(m::Chain,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
 getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = getindex.(m[i],j)
-getindex(m::Chain{V,G},i::SubManifold{V,G}) where {V,G} = m[bladeindex(ndims(V),UInt(i))]
-getindex(m::Chain{V,G,T},i::SubManifold{V}) where {V,G,T} = zero(T)
 setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
-@pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
-@pure Base.length(m::Chain{V,G}) where {V,G} = binomial(ndims(V),G)
-Base.zero(::Type{<:Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(zeros(svec(ndims(V),G,T)))
-Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(ndims(V),G,T)))
-StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}} where {V,W}) = hcat(value.(value(m))...)
-
-function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
-    Simplex{V,G,SubManifold{V}(indexbasis(ndims(V),G)[i]),T}(m[i])
-end
-
-Chain{V,1}(m::SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
-Chain{V,1,Chain{W,1}}(m::SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,SVector{N}(1:N))))
+@pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)
+@pure Base.length(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)
+Base.zero(::Type{<:Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V),G,T)))
+Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V),G,T)))
 
 transpose_row(t::SVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
-transpose_row(t::SizedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
+transpose_row(t::FixedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
-@generated _transpose(t::SVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(1:ndims(V))),W)))
-@generated _transpose(t::SizedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(SVector{ndims(V)}(1:ndims(V))),W)))
+@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),Ref(W))))
+@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),Ref(W))))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
-    ib = indexbasis(ndims(V),G)
+    ib = indexbasis(mdims(V),G)
     @inbounds tmv = typeof(m.v[1])
     if |(broadcast(<:,tmv,parsym)...)
         par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
@@ -105,7 +80,7 @@ function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     else
         @inbounds print(io,m.v[1])
     end
-    @inbounds DirectSum.printindices(io,V,ib[1])
+    @inbounds Leibniz.printindices(io,V,ib[1])
     for k ∈ 2:length(ib)
         @inbounds mvs = m.v[k]
         tmv = typeof(mvs)
@@ -116,16 +91,10 @@ function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
             sbm = signbit(mvs)
             print(io,sbm ? " - " : " + ",sbm ? abs(mvs) : mvs)
         end
-        @inbounds DirectSum.printindices(io,V,ib[k])
+        @inbounds Leibniz.printindices(io,V,ib[k])
     end
 end
 
-function ==(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
-    i = bladeindex(ndims(V),bits(basis(b)))
-    @inbounds a[i] == value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
-end
-==(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
-==(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
 for T ∈ Fields
     @eval begin
         ==(a::T,b::Chain{V,G} where V) where {T<:$T,G} = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
@@ -134,6 +103,35 @@ for T ∈ Fields
 end
 ==(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .== b.v)
 ==(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value(b))
+
+function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
+    N = mdims(V)
+    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val(N)))
+end
+Chain(v::SubManifold) = Chain(one(Int),v)
+Chain(v::Simplex) = Chain(v.v,basis(v))
+Chain{𝕂}(v::SubManifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
+Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
+Chain{V,G,T,X}(x::Simplex{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
+function Chain{V,0,T,X}(x::Simplex{V,0,v}) where {V,T,X,v}
+    N = mdims(V)
+    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),bits(v),Val(N)))
+end
+
+getindex(m::Chain,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
+getindex(m::Chain{V,G},i::SubManifold{V,G}) where {V,G} = m[bladeindex(mdims(V),UInt(i))]
+getindex(m::Chain{V,G,T},i::SubManifold{V}) where {V,G,T} = zero(T)
+
+function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
+    Simplex{V,G,SubManifold{V}(indexbasis(mdims(V),G)[i]),T}(m[i])
+end
+
+function ==(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
+    i = bladeindex(mdims(V),bits(basis(b)))
+    @inbounds a[i] == value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
+end
+==(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
+==(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
 
 """
     ChainBundle{V,G,P} <: Manifold{V} <: TensorAlgebra{V}
@@ -170,18 +168,21 @@ end
 @pure Manifold(::Vector{<:Chain{V}}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
-@pure Base.ndims(::ChainBundle{V}) where V = ndims(V)
-@pure Base.ndims(::Type{T}) where T<:ChainBundle{V} where V = ndims(V)
+@pure Base.ndims(::ChainBundle{V}) where V = mdims(V)
+@pure Base.ndims(::Type{T}) where T<:ChainBundle{V} where V = mdims(V)
+@pure AbstractTensors.mdims(::ChainBundle{V}) where V = mdims(V)
+@pure AbstractTensors.mdims(::Type{T}) where T<:ChainBundle{V} where V = mdims(V)
+@pure AbstractTensors.mdims(::Vector{<:Chain{V}}) where V = mdims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
-@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
-@pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
+#@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
+#@pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 
 value(c::Vector{<:Chain}) = c
-value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(ndims(V),G)}})
+value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(mdims(V),G)}})
 AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 
 getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
@@ -202,7 +203,7 @@ Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
 ## MultiVector{V,𝕂}
 
 @computed struct MultiVector{V,T} <: TensorMixed{V}
-    v::SVector{1<<ndims(V),T}
+    v::SVector{1<<mdims(V),T}
 end
 
 """
@@ -211,33 +212,18 @@ end
 Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
 """
 MultiVector{V}(v::S) where {V,S<:AbstractVector{T}} where T = MultiVector{V,T}(v)
-function MultiVector(val::T,v::SubManifold{V,G}) where {V,T,G}
-    N = ndims(V)
-    MultiVector{V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
-end
-MultiVector(v::SubManifold{V,G}) where {V,G} = MultiVector(one(Int),v)
-for var ∈ ((:V,:T),(:T,))
-    @eval function MultiVector{$(var...)}(v::SubManifold{V,G}) where {V,T,G}
-        return MultiVector(one(T),v)
-    end
-end
 for var ∈ ((:V,:T),(:T,),())
-    @eval begin
-        function MultiVector{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T}
-            return MultiVector(v.v,basis(v))
-        end
-        function MultiVector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
-            N = ndims(V)
-            out = zeros(mvec(N,T))
-            r = binomsum(N,G)
-            @inbounds out[r+1:r+binomial(N,G)] = v.v
-            return MultiVector{V}(out)
-        end
+    @eval function MultiVector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
+        N = mdims(V)
+        out = zeros(mvec(N,T))
+        r = binomsum(N,G)
+        @inbounds out[r+1:r+binomial(N,G)] = v.v
+        return MultiVector{V}(out)
     end
 end
 
 function getindex(m::MultiVector{V,T},i::Int) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     0 <= i <= N || throw(BoundsError(m, i))
     r = binomsum(N,i)
     return @view m.v[r+1:r+binomial(N,i)]
@@ -245,22 +231,20 @@ end
 getindex(m::MultiVector,i::Int,j::Int) = m[i][j]
 getindex(m::MultiVector,i::UnitRange{Int}) = m.v[i]
 getindex(m::MultiVector,i::T) where T<:AbstractVector = m.v[i]
-getindex(m::MultiVector,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
-getindex(m::MultiVector{V},i::SubManifold{V}) where V = m[basisindex(ndims(V),UInt(i))]
 setindex!(m::MultiVector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::MultiVector) = 0
-Base.lastindex(m::MultiVector{V,T} where T) where V = ndims(V)
+Base.lastindex(m::MultiVector{V,T} where T) where V = mdims(V)
 
 (m::MultiVector{V,T})(g::Int) where {T,V,B} = m(Val(g))
 function (m::MultiVector{V,T})(::Val{g}) where {V,T,g,B}
     Chain{V,g,T}(m[g])
 end
 function (m::MultiVector{V,T})(g::Int,i::Int) where {V,T,B}
-    Simplex{V,g,Basis{V}(indexbasis(ndims(V),g)[i]),T}(m[g][i])
+    Simplex{V,g,Basis{V}(indexbasis(mdims(V),g)[i]),T}(m[g][i])
 end
 
 function show(io::IO, m::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     basis_count = true
     print(io,m[0][1])
     bs = binomsum_set(N)
@@ -278,7 +262,7 @@ function show(io::IO, m::MultiVector{V,T}) where {V,T}
                     sba = signbit(mvs)
                     print(io,sba ? " - " : " + ",sba ? abs(mvs) : mvs)
                 end
-                @inbounds DirectSum.printindices(io,V,ib[k])
+                @inbounds Leibniz.printindices(io,V,ib[k])
                 basis_count = false
             end
         end
@@ -288,13 +272,13 @@ end
 
 ==(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T,S} = prod(a.v .== b.v)
 function ==(a::MultiVector{V,T},b::Chain{V,G,S}) where {V,T,G,S}
-    N = ndims(V)
+    N = mdims(V)
     r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 2^N+1
     @inbounds prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
 end
 ==(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,S,G,T} = b == a
 function ==(a::MultiVector{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
-    i = basisindex(ndims(V),bits(basis(b)))
+    i = basisindex(mdims(V),bits(basis(b)))
     @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
 end
 ==(a::T,b::MultiVector{V,S} where S) where T<:TensorTerm{V} where V = b==a
@@ -304,6 +288,27 @@ for T ∈ Fields
         ==(a::MultiVector{V,S,G} where {V,S},b::T) where {T<:$T,G} = b == a
     end
 end
+
+function MultiVector(val::T,v::SubManifold{V,G}) where {V,T,G}
+    N = mdims(V)
+    MultiVector{V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
+end
+MultiVector(v::SubManifold{V,G}) where {V,G} = MultiVector(one(Int),v)
+for var ∈ ((:V,:T),(:T,))
+    @eval function MultiVector{$(var...)}(v::SubManifold{V,G}) where {V,T,G}
+        return MultiVector(one(T),v)
+    end
+end
+for var ∈ ((:V,:T),(:T,),())
+    @eval begin
+        function MultiVector{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T}
+            return MultiVector(v.v,basis(v))
+        end
+    end
+end
+
+getindex(m::MultiVector,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
+getindex(m::MultiVector{V},i::SubManifold{V}) where V = m[basisindex(mdims(V),UInt(i))]
 
 ## SparseChain{V,G}
 
@@ -317,8 +322,6 @@ struct SparseChain{V,G,T} <: TensorGraded{V,G}
 end
 
 SparseChain{V,G}(v::SparseVector{T,Int}) where {V,G,T} = SparseChain{V,G,T}(v)
-SparseChain{V}(v::Vector{<:TensorTerm{V,G}}) where {V,G} = SparseChain{V,G}(sparsevec(bladeindex.(ndims(V),bits.(v)),value.(v),ndims(V)))
-SparseChain(v::T) where T <: TensorTerm = v
 
 for Vec ∈ (:(SVector{L,T}),:(SubArray{T,1,SVector{L,T}}))
     @eval function chainvalues(V::Manifold{N},m::$Vec,::Val{G}) where {N,G,L,T}
@@ -328,16 +331,18 @@ for Vec ∈ (:(SVector{L,T}),:(SubArray{T,1,SVector{L,T}}))
         for i ∈ 1:bng
             @inbounds m[i] ≠ 0 && (out[i] = m[i])
         end
-        length(out.nzval)≠1 ? SparseChain{V,G}(out) : Simplex{V,G,getbasis(V,@inbounds indexbasis(N,G)[out.nzind[1]]),T}(@inbounds m[out.nzind[1]])
+        SparseChain{V,G}(out) #Simplex{V,G,getbasis(V,@inbounds indexbasis(N,G)[out.nzind[1]]),T}(@inbounds m[out.nzind[1]])
     end
 end
 
 SparseChain{V,G}(m::Chain{V,G,T}) where {V,G,T} = chainvalues(V,value(m),Val{G}())
 SparseChain{V}(m::Chain{V,G,T}) where {V,G,T} = SparseChain{V,G}(m)
 SparseChain(m::Chain{V,G,T}) where {V,G,T} = SparseChain{V,G}(m)
+SparseChain{V}(v::Vector{<:TensorTerm{V,G}}) where {V,G} = SparseChain{V,G}(sparsevec(bladeindex.(mdims(V),bits.(v)),value.(v),mdims(V)))
+SparseChain(v::T) where T <: TensorTerm = v
 
 function show(io::IO, m::SparseChain{V,G,T}) where {V,G,T}
-    ib = indexbasis(ndims(V),G)
+    ib = indexbasis(mdims(V),G)
     o = m.v.nzind[1]
     @inbounds if T == Any && typeof(m.v[o]) ∈ parsym
         @inbounds tmv = typeof(m.v[o])
@@ -346,7 +351,7 @@ function show(io::IO, m::SparseChain{V,G,T}) where {V,G,T}
     else
         @inbounds print(io,m.v[o])
     end
-    @inbounds DirectSum.printindices(io,V,ib[o])
+    @inbounds Leibniz.printindices(io,V,ib[o])
     length(m.v.nzind)>1 && for k ∈ m.v.nzind[2:end]
         @inbounds mvs = m.v[k]
         tmv = typeof(mvs)
@@ -357,7 +362,7 @@ function show(io::IO, m::SparseChain{V,G,T}) where {V,G,T}
             sbm = signbit(mvs)
             print(io,sbm ? " - " : " + ",sbm ? abs(mvs) : mvs)
         end
-        @inbounds DirectSum.printindices(io,V,ib[k])
+        @inbounds Leibniz.printindices(io,V,ib[k])
     end
 end
 
@@ -387,7 +392,7 @@ MultiGrade(m::T) where T<:TensorAlgebra = m
 MultiGrade(m::Chain{T,V,G}) where {T,V,G} = chainvalues(V,value(m),Val{G}())
 
 function MultiGrade(m::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     sum(m.v .== 0)/(1<<N) < fill_limit && (return m)
     out = zeros(SizedArray{Tuple{N+1},TensorGraded{V},1,1})
     G = zero(UInt)
@@ -408,7 +413,7 @@ function show(io::IO, m::MultiGrade{V,G}) where {V,G}
 end
 
 #=function MultiVector{V,T}(v::MultiGrade{V}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     sigcheck(v.s,V)
     g = rank.(v.v)
     out = zeros(mvec(N,T))
@@ -424,26 +429,34 @@ MultiVector(v::MultiGrade{V}) where V = MultiVector{V,promote_type(typeval.(v.v)
 
 ==(a::MultiGrade{V,G},b::MultiGrade{V,G}) where {V,G} = prod(terms(a) .== terms(b))
 
+valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
+@inline value(m::MultiGrade,T) = m
+
+@inline scalar(t::MultiGrade{V,G}) where {V,G} = @inbounds 1 ∈ indices(G) ? terms(t)[1] : zero(V)
+@inline vector(t::MultiGrade{V,G}) where {V,G} = @inbounds (i=indices(G);2∈i ? terms(t)[findfirst(x->x==2,i)] : zero(V))
+@inline volume(t::MultiGrade{V,G}) where {V,G} = @inbounds mdims(V)+1∈indices(G) ? terms(t)[end] : zero(V)
+@inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
+@inline isvector(t::MultiGrade) = norm(t) ≈ norm(vector(t))
+
+adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b)))
+
 ## Generic
 
 import Base: isinf, isapprox
-import DirectSum: bits, basis, grade, order
+import Leibniz: basis, grade, order
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, unit, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
-export basis, grade, hasinf, hasorigin, isorigin, scalar, norm, gdims, betti, χ
+export basis, grade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices
 
-const VBV = Union{Simplex,Chain,MultiVector}
+#const VBV = Union{Simplex,Chain,MultiVector}
 
-valuetype(t::MultiGrade) = promote_type(valuetype.(terms(t))...)
-@pure valuetype(t::SparseChain{V,G,T} where {V,G}) where T = T
-@pure valuetype(::MultiVector{V,T} where V) where T = T
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
-@inline value(m::MultiGrade,T) = m
-for T ∈ (:Chain,:MultiVector)
-    @eval @inline value(m::$T,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
-end
+@pure valuetype(::MultiVector{V,T} where V) where T = T
+@pure valuetype(t::SparseChain{V,G,T} where {V,G}) where T = T
+@inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
+@inline value(m::MultiVector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::SparseChain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(SparseVector{T,Int},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
@@ -453,18 +466,33 @@ Base.isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = Manifold(a)==Ma
 @inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Simplex{V}(t.v[1])
 @inline scalar(t::SparseChain{V,0}) where V = @inbounds Simplex{V}(t.v[1])
 @inline scalar(t::MultiVector{V}) where V = @inbounds Simplex{V}(t.v[1])
-@inline scalar(t::MultiGrade{V,G}) where {V,G} = @inbounds 1 ∈ indices(G) ? terms(t)[1] : zero(V)
 @inline vector(t::MultiVector{V,T}) where {V,T} = @inbounds Chain{V,1,T}(t[1])
-@inline vector(t::MultiGrade{V,G}) where {V,G} = @inbounds (i=indices(G);2∈i ? terms(t)[findfirst(x->x==2,i)] : zero(V))
 @inline volume(t::MultiVector{V}) where V = @inbounds Simplex{V}(t.v[end])
-@inline volume(t::MultiGrade{V,G}) where {V,G} = @inbounds ndims(V)+1∈indices(G) ? terms(t)[end] : zero(V)
 @inline isscalar(t::MultiVector) = norm(t.v[2:end]) ≈ 0
-@inline isscalar(t::MultiGrade) = norm(t) ≈ scalar(t)
 @inline isvector(t::MultiVector) = norm(t) ≈ norm(vector(t))
-@inline isvector(t::MultiGrade) = norm(t) ≈ norm(vector(t))
 
-function DirectSum.gdims(t::MultiVector{V}) where V
-    N = ndims(V)
+Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
+function Leibniz.gdims(t::Vector{<:Chain})
+    out = zeros(MVector{mdims(Manifold(points(t)))+1,Int})
+    out[mdims(Manifold(t))+1] = length(t)
+    return out
+end
+function Leibniz.gdims(t::SVector{N,<:Vector}) where N
+    out = zeros(MVector{mdims(points(t[1]))+1,Int})
+    for i ∈ 1:N
+        out[mdims(Manifold(t[i]))+1] = length(t[i])
+    end
+    return out
+end
+function Leibniz.gdims(t::SVector{N,<:Tuple}) where N
+    out = zeros(MVector{mdims(points(t[1][1]))+1,Int})
+    for i ∈ 1:N
+        out[mdims(Manifold(t[i][1]))+1] = length(t[i][1])
+    end
+    return out
+end
+function Leibniz.gdims(t::MultiVector{V}) where V
+    N = mdims(V)
     out = zeros(MVector{N+1,Int})
     bs = binomsum_set(N)
     for G ∈ 0:N
@@ -476,36 +504,14 @@ function DirectSum.gdims(t::MultiVector{V}) where V
     return out
 end
 
-DirectSum.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
-function DirectSum.gdims(t::Vector{<:Chain})
-    out = zeros(MVector{ndims(Manifold(points(t)))+1,Int})
-    out[ndims(Manifold(t))+1] = length(t)
-    return out
-end
-function DirectSum.gdims(t::SVector{N,<:Vector}) where N
-    out = zeros(MVector{ndims(points(t[1]))+1,Int})
-    for i ∈ 1:N
-        out[ndims(Manifold(t[i]))+1] = length(t[i])
-    end
-    return out
-end
-function DirectSum.gdims(t::SVector{N,<:Tuple}) where N
-    out = zeros(MVector{ndims(points(t[1][1]))+1,Int})
-    for i ∈ 1:N
-        out[ndims(Manifold(t[i][1]))+1] = length(t[i][1])
-    end
-    return out
-end
-
-DirectSum.χ(t::SVector{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
-DirectSum.χ(t::SVector{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+Leibniz.χ(t::SVector{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+Leibniz.χ(t::SVector{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
 
 ## Adjoint
 
 import Base: adjoint # conj
 
 adjoint(b::SparseChain{V,G}) where {V,G} = SparseChain{dual(V),G}(adjoint.(terms(b)))
-adjoint(b::MultiGrade{V,G}) where {V,G} = MultiGrade{dual(V),G}(adjoint.(terms(b)))
 
 # Euclidean norm (unsplitter)
 

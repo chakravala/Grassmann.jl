@@ -2,8 +2,8 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-import DirectSum: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute, clifford
-import DirectSum: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
+import Leibniz: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute
+import Leibniz: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
 
 ## complement
 
@@ -17,19 +17,19 @@ export involute, clifford
 ## product parities
 
 @pure function parityjoin(N,S,a,b)
-    B = DirectSum.digits_fast(b<<1,N)
-    isodd(sum(DirectSum.digits_fast(a,N) .* cumsum(B))+count_ones((a & b) & S))
+    B = digits_fast(b<<1,N)
+    isodd(sum(digits_fast(a,N) .* cumsum(B))+count_ones((a & b) & S))
 end
 
-@pure conformalmask(V::M) where M<:Manifold = UInt(2)^(hasinf(V)&&hasorigin(V) ? 2 : 0)-1
+@pure conformalmask(V) = UInt(2)^(hasinf(V)&&hasorigin(V) ? 2 : 0)-1
 
-@pure function conformalcheck(V::M,A,B) where M<:Manifold
+@pure function conformalcheck(V,A,B)
     bt = conformalmask(V)
-    i2o,o2i = DirectSum.hasinf2origin(V,A,B),DirectSum.hasorigin2inf(V,A,B)
+    i2o,o2i = hasinf2origin(V,A,B),hasorigin2inf(V,A,B)
     A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
 end
 
-@pure function parityconformal(V::M,A,B) where M<:Manifold
+@pure function parityconformal(V,A,B)
     C,hio = A ⊻ B, hasinforigin(V,A,B)
     cc = hio || hasorigininf(V,A,B)
     A3,B3,i2o,o2i,xor = conformalcheck(V,A,B)
@@ -45,8 +45,10 @@ function cga(V,A,B)
     (hasinforigin(V,A,B) || hasorigininf(V,A,B)) && iszero(getbasis(V,A)∨⋆(getbasis(V,B)))
 end
 
-@pure function parityregressive(V::Signature{N,M,S},a,b,::Val{skew}=Val{false}()) where {N,M,S,skew}
-    D = diffvars(V)
+@pure parityregressive(V::Int,a,b,skew=Val(false)) = _parityregressive(V,a,b,skew)
+@pure function _parityregressive(V,a,b,::Val{skew}=Val(false)) where skew
+    N,M,S = mdims(V),options(V),metric(V)
+    D,G = diffvars(V),typeof(V)<:Int ? V : grade(V)
     A,B,Q,Z = symmetricmask(V,a,b)
     α,β = complement(N,A,D),complement(N,B,D)
     cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
@@ -61,15 +63,23 @@ end
             false, A+B≠0 ? bas : g_zero(UInt)
         end
         par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
-        return (isodd(L*(L-grade(V)))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
+        return (isodd(L*(L-G))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
         return false, g_zero(UInt), false, Z
     end
 end
 
+@pure parityregressive(V::Signature,a,b,skew=Val(false)) = _parityregressive(V,a,b,skew)
 @pure function parityregressive(V::M,A,B) where M<:Manifold
     p,C,t,Z = parityregressive(Signature(V),A,B)
     return p ? -1 : 1, C, t, Z
+end
+
+@pure function parityinterior(V::Int,a,b)
+    A,B,Q,Z = symmetricmask(V,a,b)
+    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,g_zero(UInt),false,Z)
+    p,C,t = parityregressive(V,A,complement(V,B,diffvars(V)),Val(true))
+    t ? (p⊻parityright(0,sum(indices(B,V)),count_ones(B)) ? -1 : 1) : 1, C|Q, t, Z
 end
 
 #=@pure function parityinterior(V::Signature{N,M,S},a,b) where {N,M,S}
@@ -87,9 +97,14 @@ end=#
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
 end
 
+@pure function parityinner(V::Int,a::UInt,b::UInt)
+    A,B = symmetricmask(V,a,b)
+    parity(V,A,B) ? -1 : 1
+end
+
 @pure function parityinner(V::M,a::UInt,b::UInt) where M<:Manifold
     A,B = symmetricmask(V,a,b)
-    g = abs(prod(V[indices(A&B,ndims(V))]))
+    g = abs(prod(V[indices(A&B,mdims(V))]))
     parity(Signature(V),A,B) ? -(g) : g
 end
 
@@ -125,9 +140,10 @@ end
 @pure function parity(v::Signature,a::UInt,b::UInt)
     d=diffmask(v)
     D=isdyadic(v) ? |(d...) : d
-    parity(ndims(v),metric(v),(a&~D),(b&~D))
+    parity(mdims(v),metric(v),(a&~D),(b&~D))
 end
-@pure parity(v::Manifold,a::UInt,b::UInt) = parity(Signature(v),a,b)
+@pure parity(v::Int,a::UInt,b::UInt) = parity(v,metric(v),a,b)
+@pure parity(v::T,a::UInt,b::UInt) where T<:Manifold = parity(Signature(v),a,b)
 @pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(V,bits(a),bits(b))
 
 ### parity product caches
@@ -140,8 +156,9 @@ for par ∈ (:conformal,:regressive,:interior)
     @eval begin
         const $cache = Dict{UInt,Vector{Dict{UInt,Vector{Vector{$T}}}}}[]
         const $extra = Dict{UInt,Vector{Dict{UInt,Dict{UInt,Dict{UInt,$T}}}}}[]
-        @pure function ($par(V::W,a,b)::$T) where W<:SubManifold{M,NN,s} where {M,NN,s}
-            n,m,S = ndims(M),DirectSum.options(M),metric(M)
+        @pure function ($par(V::TT,a,b)::$T) where TT
+            M,s = TT<:Int ? V : DirectSum.supermanifold(V),metric(V)
+            n,m,S = mdims(M),DirectSum.options(M),metric(M)
             m1 = m+1
             if n > sparse_limit
                 N = n-sparse_limit
@@ -179,8 +196,8 @@ for par ∈ (:conformal,:regressive,:interior)
                 @inbounds $cache[n][S][m1][s][a1][b+1]
             end
         end
+        @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,bits(a),bits(b))
     end
-    @eval @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,bits(a),bits(b))
 end
 
 import Base: signbit, imag, real
@@ -195,26 +212,19 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval begin
-        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(ndims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
+        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(mdims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
         function $op(t::Chain{V,G,T}) where {V,G,T}
-            out = copy(value(t,mvec(ndims(V),G,T)))
+            out = copy(value(t,mvec(mdims(V),G,T)))
             for k ∈ $other(V,G)
                 @inbounds out[k]≠0 && (out[k] = zero(T))
             end
             Chain{V,G}(out)
         end
-        function $op(t::MultiVector{V,T}) where {V,T}
-            out = copy(value(t,mvec(ndims(V),T)))
-            for k ∈ $other(V)
-                @inbounds out[k]≠0 && (out[k] = zero(T))
-            end
-            MultiVector{V}(out)
-        end
     end
 end
 
 function odd(t::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
@@ -226,7 +236,7 @@ function odd(t::MultiVector{V,T}) where {V,T}
     MultiVector{V}(out)
 end
 function even(t::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     for g ∈ 2:2:N+1
@@ -238,7 +248,7 @@ function even(t::MultiVector{V,T}) where {V,T}
 end
 
 function imag(t::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
@@ -250,7 +260,7 @@ function imag(t::MultiVector{V,T}) where {V,T}
     MultiVector{V}(out)
 end
 function real(t::MultiVector{V,T}) where {V,T}
-    N = ndims(V)
+    N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     for g ∈ 3:N+1

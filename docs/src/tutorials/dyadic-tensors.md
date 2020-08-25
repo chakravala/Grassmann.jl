@@ -81,7 +81,7 @@ using StaticArrays
 ```
 
 ```@repl ga3
-using Grassmann; basis"3"
+using Grassmann; @basis ℝ3
 T = Chain{V,1}(Chain(v1),v1+v2,v1+v3)
 barycenter(T) ∈ T, (v1+v2+v3) ∈ T
 ```
@@ -97,17 +97,17 @@ It is possible to generate a [Makie.jl](https://github.com/JuliaPlots/Makie.jl) 
 
 ## Mother algebra formalism
 
-Note that `Λ(3)` gives the vector basis, and `Λ(3)'` gives the covector basis:
+Note that `Λ(ℝ3)` gives the vector basis, and `Λ(ℝ3)'` gives the covector basis:
 ```@setup ga
 using Grassmann
 ```
 ```@repl ga
-Λ(3)
-Λ(3)'
+Λ(ℝ3)
+Λ(ℝ3)'
 ```
 The following command yields a local 2D vector and covector basis,
 ```@repl ga
-mixedbasis"2"
+@mixedbasis ℝ2
 w1+2w2
 ans(v1+v2)
 ```
