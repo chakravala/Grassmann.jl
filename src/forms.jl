@@ -87,7 +87,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
     if isbasis(W)
         throw(error("MultiVector forms not yet supported"))
     elseif V==W
-        return b
+        return m
     elseif W⊆V
         out,N = zeros(choicevec(M,valuetype(m))),mdims(V)
         bs = binomsum_set(N)
