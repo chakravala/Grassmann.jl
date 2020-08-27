@@ -43,9 +43,10 @@ end
 end
 
 @generated function Chain(args::𝕂...) where 𝕂
-    V = length(args)
-    ref = SVector{V}([:(args[$i]) for i ∈ 1:V])
-    :(Chain{$V,1}($(Expr(:call,:(SVector{$V,𝕂}),ref...))))
+    N = length(args)
+    V = SubManifold(N)
+    ref = SVector{N}([:(args[$i]) for i ∈ 1:N])
+    :(Chain{$V,1}($(Expr(:call,:(SVector{$N,𝕂}),ref...))))
 end
 
 Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(SVector{binomial(mdims(V),G),𝕂}(v.v))
@@ -55,7 +56,7 @@ export Chain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
-getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = getindex.(m[i],j)
+getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = m[i][j]
 setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
 @pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)
@@ -66,8 +67,8 @@ Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V),G,T)))
 transpose_row(t::SVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::FixedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
-@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),Ref(W))))
-@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),Ref(W))))
+@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),W)))
+@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),W)))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 
@@ -175,8 +176,8 @@ end
 @pure AbstractTensors.mdims(::Vector{<:Chain{V}}) where V = mdims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
-#@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
-#@pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
+@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
+@pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)

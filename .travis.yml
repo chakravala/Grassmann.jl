@@ -16,7 +16,7 @@ jobs:
       julia: 1.5
       os: linux
       script:
-        - julia --project=docs/ -e 'using Pkg; Pkg.add("Documenter"); Pkg.add("DirectSum"); Pkg.add("AbstractTensors"); Pkg.add("Leibniz"); Pkg.add("Adapode"); Pkg.add("StaticArrays"); Pkg.develop(PackageSpec(path=pwd()))'
+        - julia --project=docs/ -e 'using Pkg; Pkg.add("Documenter"); Pkg.add("DirectSum"); Pkg.add("AbstractTensors"); Pkg.add("Leibniz"); Pkg.add("StaticArrays"); Pkg.develop(PackageSpec(path=pwd()))'
         - julia --project=docs/ docs/make.jl
       after_success: skip
 notifications:

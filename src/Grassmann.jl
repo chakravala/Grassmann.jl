@@ -26,7 +26,7 @@ import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 import Leibniz: algebra_limit, sparse_limit, cache_limit, fill_limit
 import Leibniz: binomial, binomial_set, binomsum, binomsum_set, lowerbits, expandbits
 import Leibniz: bladeindex, basisindex, indexbasis, indexbasis_set, loworder, intlog
-import Leibniz: promote_type, mvec, svec, intlog, insert_expr
+import Leibniz: promote_type, mvec, svec, intlog, insert_expr, supermanifold
 
 include("multivectors.jl")
 include("parity.jl")
@@ -233,7 +233,7 @@ end
 initpoints(P::T) where T<:AbstractVector = Chain{ℝ2,1}.(1.0,P)
 initpoints(P::T) where T<:AbstractRange = Chain{ℝ2,1}.(1.0,P)
 @generated function initpoints(P,::Val{n}=Val(size(P,1))) where n
-    Expr(:.,:(Chain{$(SubManifold(ℝ^(n+1))),1}),
+    Expr(:.,:(Chain{$(SubManifold(n+1)),1}),
          Expr(:tuple,1.0,[:(P[$k,:]) for k ∈ 1:n]...))
 end
 
@@ -515,6 +515,8 @@ function __init__()
         Chain{V,1,Chain{W,1}}(m::StaticArrays.SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
     end
     @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
+        GeometryBasics.Point(t::Values) = GeometryBasics.Point(Tuple(t.v))
+        GeometryBasics.Point(t::Variables) = GeometryBasics.Point(Tuple(t.v))
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = GeometryBasics.Point(value(Chain{V,valuetype(t)}(vector(t))))
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),ndims(V))...)
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorAlgebra = GeometryBasics.Point(value(vector(t)))

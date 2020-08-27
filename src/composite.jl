@@ -343,7 +343,7 @@ function Cramer(N::Int,j=0)
 end
 
 @generated function Base.:\(t::SVector{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
-    W = M≠mdims(V) ? M : V; N = M-1
+    W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
     if M == 1 && (V === ℝ1 || V == 1)
         return :(Chain{V,1}(Values(v[1]/t[1][1])))
     elseif M == 2 && (V === ℝ2 || V == 2)
@@ -393,7 +393,7 @@ end
 end
 
 @generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
-    W = M≠mdims(V) ? SubManifold(Manifold(M)) : V; N = M-1
+    W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
     N<1 && (return :(_transpose(Values(inv(t[1])),$W)))
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
@@ -413,7 +413,7 @@ end
 end
 
 @generated function grad(T::SVector{M,<:Chain{V,1}}) where {M,V}
-    W = M≠mdims(V) ? SubManifold(Manifold(M)) : V; N = mdims(V)-1
+    W = M≠mdims(V) ? SubManifold(M) : V; N = mdims(V)-1
     M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
@@ -432,7 +432,7 @@ end
 end
 
 @generated function Base.:\(t::SVector{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
-    W = M≠mdims(V) ? SubManifold(Manifold(N)) : V
+    W = M≠mdims(V) ? SubManifold(N) : V
     if mdims(M) > mdims(V)
         :(ct=Chain{$W,1}(t); ct⋅(inv(_transpose(t,$W)⋅ct)⋅v))
     else # mdims(M) < mdims(V) ? inv(tt⋅t)⋅(tt⋅v) : tt⋅(inv(t⋅tt)⋅v)
@@ -468,8 +468,8 @@ end
 vandermonde(x,y,V) = (length(x)≠mdims(V) ? _vandermonde(x,V) : vandermonde(x,V))\y
 vandermonde(x,V) = transpose(_vandermonde(x,V))
 _vandermonde(x::Chain,V) = _vandermonde(value(x),V)
-@generated _vandermonde(x::SVector{N},V) where N = :(Chain{$(SubManifold(Manifold(N))),1}(polynom.(x,$(Val(mdims(V))))))
-@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(SubManifold(Manifold(N))),1}),Expr(:call,:SVector,[:(x^$i) for i ∈ 0:N-1]...))
+@generated _vandermonde(x::SVector{N},V) where N = :(Chain{$(SubManifold(N)),1}(polynom.(x,$(Val(mdims(V))))))
+@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(SubManifold(N)),1}),Expr(:call,:SVector,[:(x^$i) for i ∈ 0:N-1]...))
 
 function vandermondeinterp(x,y,V,grid) # grid=384
     coef = vandermonde(x,y,V) # Vandermonde ((inv(X'*X))*X')*y
@@ -537,7 +537,7 @@ volumes(m,dets) = value.(abs.(.⋆(dets)))
 volumes(m) = mdims(Manifold(m))≠2 ? volumes(m,detsimplex(m)) : edgelength.(value(m))
 detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(mdims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
-mean(m::Vector{<:Chain}) = sum(m)/length(m)
+mean(m::T) where T<:AbstractVector{<:Chain} = sum(m)/length(m)
 mean(m::T) where T<:SVector = sum(m)/length(m)
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
 barycenter(m::SVector{N,<:Chain}) where N = (s=sum(m);s/s[1])

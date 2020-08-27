@@ -75,6 +75,8 @@
             end
             return Chain{w,G}(out)
         end
+    elseif V == V''
+        return :(w(Chain{$(V''),G}(value(b))))
     else
         :(throw(error("cannot convert from $V to $w")))
     end
@@ -124,6 +126,8 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
             end
         end
         return MultiVector{W}(out)
+    elseif V == V''
+        return W((V'')(m))
     else
         throw(error("cannot convert from $(V) to $(W)"))
     end
