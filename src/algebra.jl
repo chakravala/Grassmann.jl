@@ -9,8 +9,8 @@ import Leibniz: loworder, isnull
 
 ## mutating operations
 
-@pure tvec(N,G,t::Symbol=:Any) = :(SVector{$(binomial(N,G)),$t})
-@pure tvec(N,t::Symbol=:Any) = :(SVector{$(1<<N),$t})
+@pure tvec(N,G,t::Symbol=:Any) = :(Values{$(binomial(N,G)),$t})
+@pure tvec(N,t::Symbol=:Any) = :(Values{$(1<<N),$t})
 @pure tvec(N,μ::Bool) = tvec(N,μ ? :Any : :t)
 
 import Leibniz: g_one, g_zero, Field, ExprField
@@ -353,10 +353,10 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
-@generated ∧(t::T) where T<:SVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
-@generated ∧(t::T) where T<:SizedVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
-∧(::SVector{0,<:Chain{V}}) where V = one(V) # ∧() = 1
-∧(::SizedVector{0,<:Chain{V}}) where V = one(V)
+@generated ∧(t::T) where T<:Values{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
+@generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
+∧(::Values{0,<:Chain{V}}) where V = one(V) # ∧() = 1
+∧(::FixedVector{0,<:Chain{V}}) where V = one(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 
@@ -423,10 +423,10 @@ Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(�
 @inline ∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
-@generated ∨(t::T) where T<:SVector = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
-@generated ∨(t::T) where T<:SizedVector = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
-∨(::SVector{0,<:Chain{V}}) where V = SubManifold(V) # ∨() = I
-∨(::SizedVector{0,<:Chain{V}}) where V = SubManifold(V)
+@generated ∨(t::T) where T<:Values = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
+@generated ∨(t::T) where T<:FixedVector = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
+∨(::Values{0,<:Chain{V}}) where V = SubManifold(V) # ∨() = I
+∨(::FixedVector{0,<:Chain{V}}) where V = SubManifold(V)
 ∨(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
 ∨(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∨(a∨b,c...)
 
@@ -481,8 +481,26 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 
 # dyadic products
 
-contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(a.⋅value(b))
+export outer
+
+outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
+outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
+outer(a::Chain{W},b::Chain{V,1}) where {W,V} = Chain{V,1}(a.*value(b))
+
+contraction(a::Chain{W,G},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(column(Ref(a).⋅value(b)))
+contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(Ref(a).⋅value(b))
 Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
+
+# dyadic identity element
+
+@generated Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).+$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
+@generated Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).+t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
+@generated Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
+@generated Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
+@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).-$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
+@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).-t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
+@generated Base.:-(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
+@generated Base.:-(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
 
 ## cross product
 
@@ -794,7 +812,7 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                 end
             end
             G = A|B
-            MultiGrade{V,G}(SVector{count_ones(G),TensorGraded{V}}(out))
+            MultiGrade{V,G}(Values{count_ones(G),TensorGraded{V}}(out))
         end
         function $op(a::MultiGrade{V,A},b::T) where T<:TensorGraded{V,B} where {V,A,B}
             N = mdims(V)
@@ -817,9 +835,9 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
                 end
             end
             G = A|(UInt(1)<<B)
-            MultiGrade{V,G}(SVector{count_ones(G),TensorGraded{V}}(out))
+            MultiGrade{V,G}(Values{count_ones(G),TensorGraded{V}}(out))
         end
-        $op(a::SparseChain{V,A},b::T) where T<:TensorGraded{V,B} where {V,A,B} = MultiGrade{V,(UInt(1)<<A)|(UInt(1)<<B)}(A<B ? SVector(a,b) : SVector(b,a))
+        $op(a::SparseChain{V,A},b::T) where T<:TensorGraded{V,B} where {V,A,B} = MultiGrade{V,(UInt(1)<<A)|(UInt(1)<<B)}(A<B ? Values(a,b) : Values(b,a))
     end
 end
 

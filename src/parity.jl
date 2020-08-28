@@ -205,8 +205,8 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 
 @pure signbit(V::T) where T<:Manifold{N} where N = (ib=indexbasis(N); parity.(Ref(V),ib,ib))
 @pure signbit(V::T,G) where T<:Manifold{N} where N = (ib=indexbasis(N,G); parity.(Ref(V),ib,ib))
-@pure angular(V::T) where T<:Manifold = SVector(findall(signbit(V))...)
-@pure radial(V::T) where T<:Manifold = SVector(findall(.!signbit(V))...)
+@pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
+@pure radial(V::T) where T<:Manifold = Values(findall(.!signbit(V))...)
 @pure angular(V::T,G) where T<:Manifold = findall(signbit(V,G))
 @pure radial(V::T,G) where T<:Manifold = findall(.!signbit(V,G))
 

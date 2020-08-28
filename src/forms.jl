@@ -40,7 +40,7 @@
         return :b
     elseif W⊆V
         if G == 1
-            ind = SVector{mdims(W),Int}(indices(bits(W),mdims(V)))
+            ind = Values{mdims(W),Int}(indices(bits(W),mdims(V)))
             :(@inbounds Chain{w,1,T}(b.v[$ind]))
         else quote
             out,N = zeros(choicevec(M,G,valuetype(b))),mdims(V)

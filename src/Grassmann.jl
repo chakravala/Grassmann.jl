@@ -5,7 +5,7 @@ module Grassmann
 
 using SparseArrays, ComputedFieldTypes
 using AbstractTensors, Leibniz, DirectSum, Requires
-import AbstractTensors: SVector, MVector, SizedVector, clifford
+import AbstractTensors: Values, Variables, FixedVector, clifford
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
@@ -18,7 +18,7 @@ import Leibniz: Bits, bit2int, indexbits, indices, diffvars, diffmask
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
 
 import Leibniz: hasconformal, hasinf2origin, hasorigin2inf, g_zero, g_one, bits
-import AbstractTensors: valuetype, scalar, isscalar
+import AbstractTensors: valuetype, scalar, isscalar, ⊗
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 
 ## cache
@@ -62,7 +62,7 @@ end
 ⊘(x::Derivation,y::T) where T<:TensorAlgebra{V} where V = V(x)⊘y
 
 @pure function (V::Signature{N})(d::Leibniz.Derivation{T,O}) where {N,T,O}
-    (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(ones(Int,N)))
+    (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(d.v.λ*ones(Values{N,Int})))
     G,D,C = grade(V),diffvars(V)==1,isdyadic(V)
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
@@ -73,7 +73,7 @@ end
 
 @pure function (M::SubManifold{W,N})(d::Leibniz.Derivation{T,O}) where {W,N,T,O}
     V = isbasis(M) ? W : M
-    (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(ones(Int,N)))
+    (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(d.v.λ*ones(Values{N,Int})))
     G,D,C = grade(V),diffvars(V)==1,isdyadic(V)
     G2 = (C ? Int(G/2) : G)-1
     ∇ = sum([getbasis(V,1<<(D ? G : k+G))*getbasis(V,1<<k) for k ∈ 0:G2])
@@ -93,18 +93,18 @@ function boundary_rank(t,d=gdims(t))
     for k ∈ 2:length(out)-1
         @inbounds out[k] = min(out[k],d[k+1])
     end
-    return SVector(out)
+    return Values(out)
 end
 
 function boundary_null(t)
     d = gdims(t)
     r = boundary_rank(t,d)
     l = length(d)
-    out = zeros(MVector{l,Int})
+    out = zeros(Variables{l,Int})
     for k ∈ 1:l-1
         @inbounds out[k] = d[k+1] - r[k]
     end
-    return SVector(out)
+    return Values(out)
 end
 
 """
@@ -116,11 +116,11 @@ function betti(t::T) where T<:TensorAlgebra
     d = gdims(t)
     r = boundary_rank(t,d)
     l = length(d)-1
-    out = zeros(MVector{l,Int})
+    out = zeros(Variables{l,Int})
     for k ∈ 1:l
         @inbounds out[k] = d[k+1] - r[k] - r[k+1]
     end
-    return SVector(out)
+    return Values(out)
 end
 
 @generated function ↑(ω::T) where T<:TensorAlgebra
@@ -277,12 +277,12 @@ function SparseArrays.sparse(t,cols=columns(t))
     return A
 end
 
-edges(t,cols::SVector) = edges(t,adjacency(t,cols))
+edges(t,cols::Values) = edges(t,adjacency(t,cols))
 function edges(t,adj=adjacency(t))
     ndims(t) == 2 && (return t)
     N = ndims(Manifold(t)); M = points(t)(list(N-1,N)...)
     f = findall(x->!iszero(x),LinearAlgebra.triu(adj))
-    [Chain{M,1}(SVector{2,Int}(f[n].I)) for n ∈ 1:length(f)]
+    [Chain{M,1}(Values{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
 
 function facetsinterior(t::Vector{<:Chain{V}}) where V
@@ -323,8 +323,8 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
     N == 0 && (return [Chain{W,1}(list(1,N))],Int[sum(h)])
     out = Chain{W,1,Int,N}[]
     bnd = Int[]
-    vec = zeros(MVector{ndims(V),Int})
-    val = N+1==ndims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(SVector{binomial(ndims(V),N)})
+    vec = zeros(Variables{ndims(V),Int})
+    val = N+1==ndims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(Values{binomial(ndims(V),N)})
     for i ∈ 1:length(t)
         vec[:] = value(t[i])
         par = DirectSum.indexparity!(vec)
@@ -344,8 +344,8 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
 end
 
 ∂(t::ChainBundle) = ∂(value(t))
-∂(t::SVector{N,<:Tuple}) where N = ∂.(t)
-∂(t::SVector{N,<:Vector}) where N = ∂.(t)
+∂(t::Values{N,<:Tuple}) where N = ∂.(t)
+∂(t::Values{N,<:Vector}) where N = ∂.(t)
 ∂(t::Tuple{Vector{<:Chain},Vector{Int}}) = ∂(t[1],t[2])
 ∂(t::Vector{<:Chain},u::Vector{Int}) = (f=facets(t,u); f[1][findall(x->!iszero(x),f[2])])
 ∂(t::Vector{<:Chain}) = ndims(t)≠3 ? (f=facetsinterior(t); f[1][setdiff(1:length(f[1]),f[2])]) : edges(t,adjacency(t).%2)
@@ -527,9 +527,9 @@ function __init__()
             c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
             s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s) # s
             n = size(eltype(f))[1]
-            p = ChainBundle([Chain{V,1}(SVector{s,Float64}(1.0,k...)) for k ∈ c])
+            p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k...)) for k ∈ c])
             M = s ≠ n ? p(list(s-n+1,s)) : p
-            t = ChainBundle([Chain{M,1}(SVector{n,Int}(k)) for k ∈ f])
+            t = ChainBundle([Chain{M,1}(Values{n,Int}(k)) for k ∈ f])
             return (p,ChainBundle(∂(t)),t)
         end
         @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
@@ -692,10 +692,10 @@ function __init__()
         end
         function initmesh(tio::TetGen.TetgenIO, command = "Qp")
             r = TetGen.tetrahedralize(tio, command); V = SubManifold(ℝ^4)
-            p = ChainBundle([Chain{V,1}(SVector{4,Float64}(1.0,k...)) for k ∈ r.points])
-            t = Chain{p,1}.(SVector{4,Int}.(r.tetrahedra))
-            e = Chain{p(2,3,4),1}.(SVector{3,Int}.(r.trifaces))
-            # Chain{p(2,3),1}.(SVector{2,Int}.(r.edges)
+            p = ChainBundle([Chain{V,1}(Values{4,Float64}(1.0,k...)) for k ∈ r.points])
+            t = Chain{p,1}.(Values{4,Int}.(r.tetrahedra))
+            e = Chain{p(2,3,4),1}.(Values{3,Int}.(r.trifaces))
+            # Chain{p(2,3),1}.(Values{2,Int}.(r.edges)
             return p,ChainBundle(e),ChainBundle(t)
         end
         function TetGen.tetrahedralize(mesh::ChainBundle, command = "Qp";
