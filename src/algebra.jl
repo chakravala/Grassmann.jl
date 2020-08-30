@@ -500,6 +500,8 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
     end
 end
 
+@inline swapper(a,b,swap) = swap ? (b,a) : (a,b)
+
 adder(a,b,left=:+,right=:+) = adder(typeof(a),typeof(b),left,right)
 adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
 
@@ -537,7 +539,7 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,swap}
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},left,right,VEC,swap=false) where {V,G,T}
         if binomial(mdims(V),G)<(1<<cache_limit)
             $(insert_expr((:N,:ib,:t),:svec)...)
             out = zeros(svec(N,G,Any))
@@ -561,7 +563,7 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return Chain{V,G}(out)
         end end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,L,swap}
+    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},left,right,VEC,swap=false) where {V,G,T,L}
         if mdims(V)<cache_limit
             $(insert_expr((:N,:ib,:bn,:t),:svec)...)
             out = zeros(svec(N,Any))
@@ -596,7 +598,7 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,swap}
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},left,right,VEC,swap=false) where {V,G,T}
         if mdims(V)<cache_limit
             $(insert_expr((:N,:bs,:bn,:t),:svec)...)
             out = zeros(svec(N,Any))
@@ -623,77 +625,140 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end end
     end
-    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,::Val{swap}=Val(false)) where S<:TensorTerm{V,L} where {V,G,L,T,swap}
-        pro = S<:Simplex ? MUL : false
+    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
         if G == 0
-            return swap ? :(b[1]*a) : :(a*b[1])
+            return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(b[1])))) : swap ? :(b[1]*a) : :(a*b[1])
+        elseif S<:Chain && L == 0
+            return :(Chain{V,G}(broadcast($MUL,Ref(a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(⋆(~a)*b[1])
+            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : S<:Chain ? :(a[1]*complementlefthodge(~b)) : :(⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
-            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : :(complementlefthodge(~b))
-        elseif binomial(mdims(V),G)<(1<<cache_limit)
-            $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
-            U = UInt(basis(a))
-            for i ∈ 1:binomial(N,G)
-                A,B = swap ? (ib[i],U) : (U,ib[i])
-                if S<:Simplex
-                    @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),pro))
-                else
-                    @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),pro))
+            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(⋆(~a)*b[1]) : :(complementlefthodge(~b))
+        elseif binomial(mdims(V),G)*(S<:Chain ? binomial(ndims(V),L) : 1)<(1<<cache_limit)
+            if S<:Chain
+                $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
+                out = zeros(svec(N,t))
+                B = indexbasis(N,L)
+                for i ∈ 1:binomial(N,L)
+                    @inbounds v,ibi = :(a[$i]),B[i]
+                    for j ∈ 1:bng
+                        @inbounds geomaddmulti!_pre(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(b[$j]),MUL))
+                    end
+                end
+            else
+                $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
+                U = UInt(basis(a))
+                for i ∈ 1:binomial(N,G)
+                    A,B = swap ? (ib[i],U) : (U,ib[i])
+                    if S<:Simplex
+                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                    else
+                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                    end
                 end
             end
             return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
-        else return quote
+        elseif S<:Chain; return quote
+            $(insert_expr((:N,:t,:bng,:ib,:μ),VEC)...)
+            out = zeros($VEC(N,t))
+            B = indexbasis(N,L)
+            for i ∈ 1:binomial(N,L)
+                @inbounds v,ibi = a[i],B[i]
+                v≠0 && for j ∈ 1:bng
+                    if @inbounds geomaddmulti!(V,out,ibi,ib[j],derive_mul(V,ibi,ib[j],v,b[j],$MUL))&μ
+                        $(insert_expr((:out,);mv=:out)...)
+                        @inbounds geomaddmulti!(V,out,ibi,ib[j],derive_mul(V,ibi,ib[j],v,b[j],$MUL))
+                    end
+                end
+            end
+            return MultiVector{V}(out)
+        end else return quote
             $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
             U = UInt(basis(a))
             for i ∈ 1:binomial(N,G)
                 A,B = swap ? (ib[i],U) : (U,ib[i])
                 $(if S<:Simplex
-                    :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$pro))&μ
+                    :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$MUL))&μ
                         $(insert_expr((:out,);mv=:out)...)
-                        @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$pro))
+                        @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$MUL))
                     end)
                 else
-                    :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))&μ
+                    :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],false))&μ
                         $(insert_expr((:out,);mv=:out)...)
-                        @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))
+                        @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],false))
                     end)
                 end)
             end
             return MultiVector{V}(out)
         end end
     end
-    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,::Val{swap}=Val(false)) where S<:TensorTerm{V,L} where {V,G,T,L,swap}
+    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,L} where {V,G,T,L}
         (swap ? G<L : L<G) && (!istangent(V)) && (return g_zero(V))
         GL = swap ? G-L : L-G
-        pro = S<:Simplex ? MUL : false
-        if binomial(mdims(V),G)<(1<<cache_limit)
-            $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
-            out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
-            U = UInt(basis(a))
-            for i ∈ 1:bng
-                A,B = swap ? (ib[i],U) : (U,ib[i])
-                if S<:Simplex
-                    if μ
-                        @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),pro))
-                    else
-                        @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),pro))
+        if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
+            if S<:Chain
+                $(insert_expr((:N,:t,:bng,:bnl),:svec)...)
+                μ = istangent(V)|hasconformal(V)
+                ia = indexbasis(N,L)
+                ib = indexbasis(N,G)
+                out = zeros(μ ? svec(N,Any) : svec(N,G-L,Any))
+                for i ∈ 1:bnl
+                    @inbounds v,iai = :(a[$i]),ia[i]
+                    for j ∈ 1:bng
+                        if μ
+                            @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),MUL))
+                        else
+                            @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),MUL))
+                        end
                     end
-                else
-                    if μ
-                        @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),pro))
+                end
+            else
+                $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
+                out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
+                U = UInt(basis(a))
+                for i ∈ 1:bng
+                    A,B = swap ? (ib[i],U) : (U,ib[i])
+                    if S<:Simplex
+                        if μ
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                        else
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                        end
                     else
-                        @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),pro))
+                        if μ
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        else
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        end
                     end
                 end
             end
             #return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
             return if μ
-                insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
+                insert_t(:(MultiVector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
             else
                 insert_t(:(Chain{$V,$GL}($(Expr(:call,tvec(N,GL,:t),out...)))))
             end
-        else return quote
+        elseif S<:Chain; return quote
+            $(insert_expr((:N,:t,:bng,:bnl,:μ),VEC)...)
+            ia = indexbasis(N,L)
+            ib = indexbasis(N,G)
+            out = zeros(μ ? $VEC(N,t) : $VEC(N,$GL,t))
+            for i ∈ 1:bnl
+                @inbounds v,iai = a[i],ia[i]
+                v≠0 && for j ∈ 1:bng
+                    if μ
+                        if @inbounds skewaddmulti!(V,out,iai,ib[j],derive_mul(V,iai,ib[j],v,b[j],$MUL))
+                            out,t = zeros(svec(N,Any)) .+ out,Any
+                            @inbounds skewaddmulti!(V,out,iai,ib[j],derive_mul(V,iai,ib[j],v,b[j],$MUL))
+                        end
+                    else
+                        @inbounds skewaddblade!(V,out,iai,ib[j],derive_mul(V,iai,ib[j],v,b[j],$MUL))
+                    end
+                end
+            end
+            return μ ? MultiVector{V}(out) : value_diff(Chain{V,G-L}(out))
+        end else return quote
             $(insert_expr((:N,:t,:ib,:bng,:μ),VEC)...)
             out = zeros(μ ? $VEC(N,t) : $VEC(N,$GL,t))
             U = UInt(basis(a))
@@ -701,16 +766,16 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
                 if μ
                     A,B = swap ? (ib[i],U) : (U,ib[i])
                     $(if S<:Simplex
-                        :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))
+                        :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$MUL))
                             #$(insert_expr((:out,);mv=:(value(mv)))...)
                             out,t = zeros(svec(N,Any)) .+ out,Any
-                            @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))
+                            @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$MUL))
                         end)
                     else
-                        :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))
+                        :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],false))
                             #$(insert_expr((:out,);mv=:(value(mv)))...)
                             out,t = zeros(svec(N,Any)) .+ out,Any
-                            @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$pro))
+                            @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],false))
                         end)
                     end)
                 else
@@ -728,43 +793,86 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
     grassaddmulti!_pre = Symbol(grassaddmulti!,:_pre)
     grassaddblade!_pre = Symbol(grassaddblade!,:_pre)
     prop = Symbol(:product_,op)
-    @eval @noinline function $prop(a::Type{S},b::Type{<:Chain{R,L,T}},MUL,VEC,::Val{swap}=Val(false)) where S<:TensorTerm{Q,G} where {Q,R,T,G,L,swap}
+    @eval @noinline function $prop(a::Type{S},b::Type{<:Chain{R,L,T}},MUL,VEC,swap=false) where S<:TensorGraded{Q,G} where {Q,R,T,G,L}
         w,W = swap ? (R,Q) : (Q,R)
         V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
         $po(G+L,mdims(V)) && (!istangent(V)) && (return g_zero(V))
-        if binomial(mdims(W),L)<(1<<cache_limit)
-            $(insert_expr((:N,:t,:μ),:mvec,Int,:T)...)
-            ib = indexbasis(mdims(R),L)
-            out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
-            C,x = isdual(R),isdual(Q) ? dual(V,UInt(a)) : UInt(a)
-            for i ∈ 1:binomial(mdims(W),L)
-                X = @inbounds C ? dual(V,ib[i]) : ib[i]
-                A,B = swap ? (X,x) : (x,X)
-                if S<:Simplex
-                    if μ
-                        $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
-                    else
-                        $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+        if binomial(mdims(W),L)*(S<:Chain ? binomial(mdims(w),G) : 1)<(1<<cache_limit)
+            if S<:Chain
+                $(insert_expr((:N,:t,:μ),:mvec,:T,:S)...)
+                ia = indexbasis(mdims(w),L)
+                ib = indexbasis(mdims(W),G)
+                out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
+                CA,CB = isdual(w),isdual(W)
+                for i ∈ 1:binomial(mdims(w),L)
+                    @inbounds v,iai = :(a[$i]),ia[i]
+                    x = CA ? dual(V,iai) : iai
+                    for j ∈ 1:binomial(mdims(W),G)
+                        X = @inbounds CB ? dual(V,ib[j]) : ib[j]
+                        if μ
+                            $grassaddmulti!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),MUL))
+                        else
+                            $grassaddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),MUL))
+                        end
                     end
-                else
-                    if μ
-                        $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                end
+            else
+                $(insert_expr((:N,:t,:μ),:mvec,Int,:T)...)
+                ib = indexbasis(mdims(R),L)
+                out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
+                C,x = isdual(R),isdual(Q) ? dual(V,UInt(basis(a))) : UInt(basis(a))
+                for i ∈ 1:binomial(mdims(W),L)
+                    X = @inbounds C ? dual(V,ib[i]) : ib[i]
+                    A,B = swap ? (X,x) : (x,X)
+                    if S<:Simplex
+                        if μ
+                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                        else
+                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                        end
                     else
-                        $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        if μ
+                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        else
+                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        end
                     end
                 end
             end
             return if μ
-                insert_t(:(MultiVector{$V}($(Expr(:call,tvec(N),out...)))))
+                insert_t(:(MultiVector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
             else
                 insert_t(:(Chain{$V,$$GL}($(Expr(:call,tvec(N,$GL,:t),out...)))))
             end
-        else return quote
+        elseif S<:Chain; return quote
+            V = $V
+            $(insert_expr((:N,:t,:μ),VEC)...)
+            ia = indexbasis(mdims(w),G)
+            ib = indexbasis(mdims(W),L)
+            out = zeros(μ $VEC(N,t) : $VEC(N,$$GL,t))
+            CA,CB = isdual(L),isdual(R)
+            for i ∈ 1:binomial(mdims(w),L)
+                @inbounds v,iai = a[i],ia[i]
+                x = CA ? dual(V,iai) : iai
+                v≠0 && for j ∈ 1:binomial(mdims(W),G)
+                    X = @inbounds CB ? dual(V,ib[j]) : ib[j]
+                    if μ
+                        if @inbounds $$grassaddmulti!(V,out,x,X,derive_mul(V,x,X,v,b[j],$MUL))
+                            out,t = zeros(svec(N,promote_type,Any)) .+ out,Any
+                            @inbounds $$grassaddmulti!(V,out,x,X,derive_mul(V,x,X,v,b[j],$MUL))
+                        end
+                    else
+                        @inbounds $$grassaddblade!(V,out,x,X,derive_mul(V,x,X,v,b[j],$MUL))
+                    end
+                end
+            end
+            return μ ? MultiVector{V}(out) : Chain{V,$$GL}(out)
+        end else return quote
             V = $V
             $(insert_expr((:N,:t,:μ),VEC)...)
             ib = indexbasis(mdims(R),L)
             out = zeros(μ ? $VEC(N,t) : $VEC(N,$$GL,t))
-            C,x = isdual(R),isdual(Q) ? dual(V,UInt(a)) : UInt(a)
+            C,x = isdual(R),isdual(Q) ? dual(V,UInt(basis(a))) : UInt(basis(a))
             for i ∈ 1:binomial(mdims(W),L)
                 X = @inbounds C ? dual(V,ib[i]) : ib[i]
                 A,B = (X,x) : (x,X)
@@ -797,39 +905,63 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                      (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
     preproduct! = Symbol(product!,:_pre)
     prop = op≠:* ? Symbol(:product_,op) : :product
-    @eval @noinline function $prop(a::Type{S},b::Type{<:MultiVector{V,T}},MUL,VEC,::Val{swap}=Val(false)) where S<:TensorTerm{V,G} where {V,G,T,swap}
-        U = UInt(basis(a))
-        pro = S<:Simplex ? MUL : false
+    @eval $prop(a,b,MUL=:+) = $prop(typeof(a),typeof(b),MUL)
+    @eval $prop(a::Type,b::Type,MUL=:+) = $prop(a,b,MUL,:mvec)
+    @eval @noinline function $prop(a::Type{S},b::Type{<:MultiVector{V,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,G} where {V,G,T}
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:t,:out,:bs,:bn,:μ),:svec)...)
+            $(insert_expr((:N,:t,:out,:ib,:bs,:bn,:μ),:svec)...)
             for g ∈ 1:N+1
-                ib = indexbasis(N,g-1)
+                ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    A,B = swap ? (ib[i],U) : (U,ib[i])
-                    if S<:Simplex
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b.v[$(bs[g]+i)]),pro))
+                    if S<:Chain
+                        @inbounds val = :(b.v[$(bs[g]+i)])
+                        for j ∈ 1:bn[G+1]
+                            A,B = swapper(ib[j],ia[i],swap)
+                            X,Y = swapper(:(a[$j]),val,swap)
+                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        end
                     else
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(b.v[$(bs[g]+i)]),pro))
+                        U = UInt(basis(a))
+                        A,B = swapper(U,ia[i],swap)
+                        if S<:Simplex
+                            X,Y = swapper(:(a.v),:(b.v[$(bs[g]+i)]),swap)
+                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        else
+                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(b.v[$(bs[g]+i)]),false))
+                        end
                     end
                 end
             end
             return insert_t(:(MultiVector{V}($(Expr(:call,tvec(N,μ),out...)))))
         else return quote
-            $(insert_expr((:N,:t,:out,:bs,:bn,:μ),VEC)...)
+            $(insert_expr((:N,:t,:out,:ib,:bs,:bn,:μ),VEC)...)
             for g ∈ 1:N+1
-                ib = indexbasis(N,g-1)
+                ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    A,B = swap ? (ib[i],U) : (U,ib[i])
-                    $(if S<:Simplex
-                        :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,a.v,b.v[bs[g]+i],$pro))&μ
-                            $(insert_expr((:out,);mv=:out)...)
-                            @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,a.b,b.v[bs[g]+i],$pro))
-                        end)
-                    else
-                        :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],$pro))&μ
-                            $(insert_expr((:out,);mv=:out)...)
-                            @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],$pro))
-                        end)
+                    $(if S<:Chain; quote
+                        @inbounds val = b.v[bs[g]+i]
+                        val≠0 && for j ∈ 1:bn[G+1]
+                            A,B = $(swap ? :((ia[i],ib[j])) : :((ib[j],ia[i])))
+                            X,Y = $(swap ? :((val,a[j])) : :((a[j],val)))
+                            if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))
+                            end
+                        end end
+                    else quote
+                        A,B = $(swap ? :((ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),ia[i])))
+                        $(if S<:Simplex; quote
+                            X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,b.v[bs[g]+1])))
+                            if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))
+                            end end
+                        else
+                            :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],false))&μ
+                                $(insert_expr((:out,);mv=:out)...)
+                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],false))
+                            end)
+                        end) end
                     end)
                 end
             end
