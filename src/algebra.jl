@@ -493,12 +493,12 @@ Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).�
 
 # dyadic identity element
 
-@generated Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).+$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
-@generated Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).+t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
+Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = t+g
+Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
+Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = t+g
+Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
 @generated Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
 @generated Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).-$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).-t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
 @generated Base.:-(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
 @generated Base.:-(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
 
@@ -769,23 +769,8 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
         @eval $op(a::T,b::SparseChain{V,A}) where {T<:$Tens} where {V,A,B} = b+a
     end
     @eval begin
-        function $op(a::SubManifold{V,A},b::SubManifold{V,B}) where {V,A,B}
-            if a == b
-                return Simplex{V,A}($op(value(a),value(b)),basis(a))
-            elseif A == B
-                $(insert_expr((:N,:t))...)
-                out = zeros(mvec(N,A,t))
-                setblade!(out,value(a,t),bits(a),Val{N}())
-                setblade!(out,$op(value(b,t)),bits(b),Val{N}())
-                return Chain{V,A}(out)
-            else
-                #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                #return MultiGrade{V}(a,b)
-                $(insert_expr((:N,:t,:out))...)
-                setmulti!(out,value(a,t),bits(a),Val{N}())
-                setmulti!(out,$op(value(b,t)),bits(b),Val{N}())
-                return MultiVector{V}(out)
-            end
+        @generated function $op(a::SubManifold{V,A},b::SubManifold{V,B}) where {V,A,B}
+            adder(a,b,$(QuoteNode(op)),:mvec)
         end
         function $op(a::MultiGrade{V,A},b::MultiGrade{V,B}) where {V,A,B}
             at,bt = terms(a),terms(b)
@@ -994,84 +979,6 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
                 return MultiVector{V}(out)
             end
-            function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
-                if X == Y
-                    return Simplex{V,A}($bop(value(a),value(b)),X)
-                elseif A == B
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = zeros($VEC(N,A,t))
-                    setblade!(out,value(a,t),bits(X),Val{N}())
-                    setblade!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return Chain{V,A}(out)
-                else
-                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                    #return MultiGrade{V}(a,b)
-                    $(insert_expr((:N,:t,:out),VEC)...)
-                    setmulti!(out,value(a,t),bits(X),Val{N}())
-                    setmulti!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return MultiVector{V}(out)
-                end
-            end
-            function $op(a::Simplex{V,A,X,T},b::SubManifold{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
-                if X == b
-                    return Simplex{V,A}($bop(value(a),value(b)),b)
-                elseif A == B
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = zeros($VEC(N,A,t))
-                    setblade!(out,value(a,t),bits(X),Val{N}())
-                    setblade!(out,$bop(value(b,t)),Y,Val{N}())
-                    return Chain{V,A}(out)
-                else
-                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                    #return MultiGrade{V}(a,b)
-                    $(insert_expr((:N,:t,:out),VEC)...)
-                    setmulti!(out,value(a,t),bits(X),Val{N}())
-                    setmulti!(out,$bop(value(b,t)),Y,Val{N}())
-                    return MultiVector{V}(out)
-                end
-            end
-            function $op(a::SubManifold{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
-                if a == Y
-                    return Simplex{V,A}($bop(value(a),value(b)),a)
-                elseif A == B
-                    $(insert_expr((:N,:t),VEC)...)
-                    out = zeros($VEC(N,A,t))
-                    setblade!(out,value(a,t),X,Val{N}())
-                    setblade!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return Chain{V,A}(out)
-                else
-                    #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                    #return MultiGrade{V}(a,b)
-                    $(insert_expr((:N,:t,:out),VEC)...)
-                    setmulti!(out,value(a,t),X,Val{N}())
-                    setmulti!(out,$bop(value(b,t)),bits(Y),Val{N}())
-                    return MultiVector{V}(out)
-                end
-            end
-            function $op(a::Simplex{V,G,A,S} where A,b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
-                addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V}(out)
-            end
-            function $op(a::MultiVector{V,T},b::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VEC(N,t))
-                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V}(out)
-            end
-            function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
-                $(insert_expr((:N,:t),VEC)...)
-                out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
-                addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V}(out)
-            end
-            function $op(a::MultiVector{V,T},b::SubManifold{V,G}) where {V,T<:$Field,G}
-                $(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VEC(N,t))
-                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V}(out)
-            end
             function $op(a::MultiGrade{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
                 $(insert_expr((:N,),VEC)...)
                 at = terms(a)
@@ -1112,54 +1019,184 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 end
                 return MultiVector{V}(out)
             end
-            function $op(a::Chain{V,G,T},b::Simplex{V,G,B,S} where B) where {V,G,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VEC(N,G,t))
-                addblade!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return Chain{V,G}(out)
+            @generated function $op(a::SubManifold{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
+                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::Simplex{V,G,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = convert($VEC(N,G,t),$(bcast(bop,:(value(b,$VEC(N,G,t)),))))
-                addblade!(out,value(a,t),basis(a),Val{N}())
-                return Chain{V,G}(out)
+            @generated function $op(a::Simplex{V,A,X,T},b::SubManifold{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
+                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::Chain{V,G,T},b::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field}
-                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V}(out)
+            @generated function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
+                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::Simplex{V,L,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,L,S<:$Field}
-                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
-                addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V}(out)
+            @generated function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::$Chain{V,G,T},b::SubManifold{V,G}) where {V,G,T<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VEC(N,G,t))
-                addblade!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return Chain{V,G}(out)
+            @generated function $op(a::Simplex{V,G,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,S<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                out = convert($VEC(N,G,t),$(bcast(bop,:(value(b,$VEC(N,G,t)),))))
-                addblade!(out,value(a,t),basis(a),Val{N}())
-                return Chain{V,G}(out)
+            @generated function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::Chain{V,G,T},b::SubManifold{V,L}) where {V,G,T<:$Field,L}
-                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-                addmulti!(out,$bop(value(b,t)),bits(basis(b)),Val{N}())
-                return MultiVector{V}(out)
+            @generated function $op(a::Simplex{V,L,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,L,S<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
-                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = $(bcast(bop,:(value(b,$VEC(N,G,t)),)))
-                addmulti!(out,value(a,t),bits(basis(a)),Val{N}())
-                return MultiVector{V}(out)
+            @generated function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
+            end
+            @generated function $op(a::Simplex{V,G,A,S} where A,b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
         end
+    end
+    @eval begin
+        +(b::Chain{V,G,T},a::SubManifold{V,G}) where {V,G,T<:$Field} = a+b
+        +(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,T<:$Field,L} = a+b
+        +(b::Chain{V,G,T},a::Simplex{V,G,B,S} where B) where {V,G,T<:$Field,S<:$Field} = a+b
+        +(b::Chain{V,G,T},a::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field} = a+b
+        +(b::MultiVector{V,T},a::SubManifold{V,G}) where {V,T<:$Field,G} = a+b
+        +(b::MultiVector{V,T},a::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field} = a+b
+        @generated function -(b::Chain{V,G,T},a::SubManifold{V,G}) where {V,G,T<:$Field}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+        @generated function -(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,T<:$Field,L}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+        @generated function -(b::Chain{V,G,T},a::Simplex{V,G,B,S} where B) where {V,G,T<:$Field,S<:$Field}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+        @generated function -(b::Chain{V,G,T},a::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+        @generated function -(b::MultiVector{V,T},a::SubManifold{V,G}) where {V,T<:$Field,G}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+        @generated function -(b::MultiVector{V,T},a::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field}
+            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),Val(true))
+        end
+    end
+end
+
+adder(a,b,left=:+,right=:+) = adder(typeof(a),typeof(b),left,right)
+adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
+
+@eval begin
+    function adder(a::Type{<:TensorTerm{V,A}},b::Type{<:TensorTerm{V,B}},bop=:+,VEC=:mvec) where {V,A,B}
+        if basis(a) == basis(b)
+            :(Simplex{V,A}($bop(value(a),value(b)),basis(a)))
+        elseif A == B; G = A
+            if binomial(mdims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:ib),:svec)...)
+                out = zeros(svec(N,G,Any))
+                X,Y = UInt(basis(a)),UInt(basis(b))
+                for k ∈ 1:binomial(N,G)
+                    C = ib[k]
+                    if C ∈ (X,Y)
+                        val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
+                        @inbounds setblade!_pre(out,val,C,Val{N}())
+                    end
+                end
+                return Expr(:block,insert_expr((:t,),VEC)...,
+                    :(Chain{V,A}($(Expr(:call,tvec(N,G,:t),out...)))))
+            else return quote
+                $(insert_expr((:N,:t))...)
+                out = zeros($VEC(N,A,t))
+                setblade!(out,value(a,t),UInt(basis(a)),Val{N}())
+                setblade!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+                return Chain{V,A}(out)
+            end end
+        else quote
+            #@warn("sparse MultiGrade{V} objects not properly handled yet")
+            #return MultiGrade{V}(a,b)
+            $(insert_expr((:N,:t,:out))...)
+            setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
+            setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+            return MultiVector{V}(out)
+        end end
+    end
+    function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,swap}
+        if binomial(mdims(V),G)<(1<<cache_limit)
+            $(insert_expr((:N,:ib,:t),:svec)...)
+            out = zeros(svec(N,G,Any))
+            X = UInt(basis(a))
+            for k ∈ 1:binomial(N,G)
+                B = ib[k]
+                val = :($right(b.v[$k]))
+                val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                @inbounds setblade!_pre(out,val,ib[k],Val{N}())
+            end
+            return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
+        else return if !swap; quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = convert($VEC(N,G,t),$(bcast(right,:(value(b,$VEC(N,G,t)),))))
+            addblade!(out,value(a,t),basis(a),Val{N}())
+            return Chain{V,G}(out)
+        end; else quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = value(b,$VEC(N,G,t))
+            addblade!(out,$left(value(a,t)),bits(basis(a)),Val{N}())
+            return Chain{V,G}(out)
+        end end end
+    end
+    function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,L,swap}
+        if mdims(V)<cache_limit
+            $(insert_expr((:N,:ib,:bn,:t),:svec)...)
+            out = zeros(svec(N,Any))
+            X = UInt(basis(a))
+            for k ∈ 1:binomial(N,G)
+                B = ib[k]
+                val = :($right(b.v[$k]))
+                val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                @inbounds setmulti!_pre(out,val,B,Val(N))
+            end
+            for g ∈ 1:N+1
+                g-1 == G && continue
+                ib = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    B = ib[i]
+                    if B == X
+                        val = :($left(value(a,$t)))
+                        @inbounds setmulti!_pre(out,val,B,Val(N))
+                    end
+                end
+            end
+            return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
+        else return if !swap; quote
+            $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+            @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
+            addmulti!(out,value(a,t),bits(basis(a)),Val(N))
+            return MultiVector{V}(out)
+        end; else quote
+            $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+            @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
+            addmulti!(out,$left(value(b,t)),bits(basis(b)),Val(N))
+            return MultiVector{V}(out)
+        end end end
+    end
+    function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},left,right,VEC,::Val{swap}=Val(false)) where {V,G,T,swap}
+        if mdims(V)<cache_limit
+            $(insert_expr((:N,:bs,:bn,:t),:svec)...)
+            out = zeros(svec(N,Any))
+            X = UInt(basis(a))
+            for g ∈ 1:N+1
+                ib = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    B = ib[i]
+                    val = :($right(b.v[$(bs[g]+i)]))
+                    val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                    @inbounds setmulti!_pre(out,val,B,Val(N))
+                end
+            end
+            return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
+        else return if !swap; quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = convert($VEC(N,t),$(bcast(right,:(value(b,$VEC(N,t)),))))
+            addmulti!(out,value(a,t),bits(basis(a)),Val(N))
+            return MultiVector{V}(out)
+        end; else quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = value(a,$VEC(N,t))
+            addmulti!(out,$left(value(b,t)),bits(basis(b)),Val(N))
+            return MultiVector{V}(out)
+        end end end
     end
 end
