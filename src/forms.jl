@@ -137,8 +137,8 @@ end
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
 const dualformC_cache = Vector{Tuple{Int,Bool}}[]
-@pure function dualform(V::Manifold{N}) where N
-    C = isdyadic(V)
+@pure function dualform(V::Manifold)
+    N,C = rank(V),isdyadic(V)
     for n ∈ 2length(C ? dualformC_cache : dualform_cache)+2:2:N
         push!(C ? dualformC_cache : dualform_cache,Tuple{Int,Any}[])
     end
@@ -159,8 +159,8 @@ end
 
 const dualindex_cache = Vector{Vector{Int}}[]
 const dualindexC_cache = Vector{Vector{Int}}[]
-@pure function dualindex(V::Manifold{N}) where N
-    C = isdyadic(V)
+@pure function dualindex(V::Manifold)
+    N,C = rank(V),isdyadic(V)
     for n ∈ 2length(C ? dualindexC_cache : dualindex_cache)+2:2:N
         push!(C ? dualindexC_cache : dualindex_cache,Vector{Int}[])
     end

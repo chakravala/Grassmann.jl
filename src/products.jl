@@ -286,42 +286,20 @@ end
 
 # algebra
 
-@eval begin
-    *(a::F,b::MultiVector{V,T}) where {F<:Number,V,T} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.:∏,Ref(a),b.v))
-    *(a::MultiVector{V,T},b::F) where {F<:Number,V,T} = MultiVector{V,promote_type(T,F)}(broadcast($Sym.:∏,a.v,Ref(b)))
-    *(a::F,b::Chain{V,G,T}) where {F<:Number,V,G,T} = Chain{V,G,promote_type(T,F)}(broadcast($Sym.:∏,Ref(a),b.v))
-    *(a::Chain{V,G,T},b::F) where {F<:Number,V,G,T,} = Chain{V,G,promote_type(T,F)}(broadcast($Sym.:∏,a.v,Ref(b)))
-    *(a::F,b::Simplex{V,G,B,T} where B) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
-    *(a::Simplex{V,G,B,T} where B,b::F) where {F<:Number,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
-end
-
 for F ∈ Fields
     @eval begin
-        *(a::F,b::MultiVector{V,T}) where {F<:$F,V,T<:Number} = MultiVector{V,promote_type(T,F)}(broadcast(*,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$F,V,T<:Number} = MultiVector{V,promote_type(T,F)}(broadcast(*,a.v,Ref(b)))
-        *(a::F,b::Chain{V,G,T}) where {F<:$F,V,G,T<:Number} = Chain{V,G,promote_type(T,F)}(broadcast(*,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$F,V,G,T<:Number} = Chain{V,G,promote_type(T,F)}(broadcast(*,a.v,Ref(b)))
+        *(a::F,b::MultiVector{V,T}) where {F<:$F,V,T} = MultiVector{V}(broadcast($Sym.:∏,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::F) where {F<:$F,V,T} = MultiVector{V}(broadcast($Sym.:∏,a.v,Ref(b)))
+        *(a::F,b::Chain{V,G,T}) where {F<:$F,V,G,T} = Chain{V,G}(broadcast($Sym.:∏,Ref(a),b.v))
+        *(a::Chain{V,G,T},b::F) where {F<:$F,V,G,T,} = Chain{V,G}(broadcast($Sym.:∏,a.v,Ref(b)))
+        *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$F,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
+        *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
+        *(a::F,b::MultiVector{V,T}) where {F<:$F,V,T<:Number} = MultiVector{V}(broadcast(*,Ref(a),b.v))
+        *(a::MultiVector{V,T},b::F) where {F<:$F,V,T<:Number} = MultiVector{V}(broadcast(*,a.v,Ref(b)))
+        *(a::F,b::Chain{V,G,T}) where {F<:$F,V,G,T<:Number} = Chain{V,G}(broadcast(*,Ref(a),b.v))
+        *(a::Chain{V,G,T},b::F) where {F<:$F,V,G,T<:Number} = Chain{V,G}(broadcast(*,a.v,Ref(b)))
         *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a,b.v),basis(b))
         *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a.v,b),basis(a))
-    end
-end
-
-for A ∈ (SubManifold,Simplex,Chain,MultiVector)
-    for B ∈ (SubManifold,Simplex,Chain,MultiVector)
-        @eval @inline *(a::$A,b::$B) = interop(*,a,b)
-    end
-end
-
-for un ∈ (:complementleft,:complementright)
-    @eval begin
-        $un(t::SparseChain{V,G}) where {V,G} = SparseChain{V,mdims(V)-G}($un.(terms(t)))
-        $un(t::MultiGrade{V,G}) where {V,G} = SparseChain{V,G⊻(UInt(1)<<mdims(V)-1)}(reverse($un.(terms(t))))
-    end
-end
-for un ∈ (:reverse,:involute,:conj,:+,:-)
-    @eval begin
-        $un(t::SparseChain{V,G}) where {V,G} = SparseChain{V,G}($un.(terms(t)))
-        $un(t::MultiGrade{V,G}) where {V,G} = SparseChain{V,G}($un.(terms(t)))
     end
 end
 
@@ -339,26 +317,18 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
     Field ∉ Fields && @eval begin
         *(a::F,b::SubManifold{V}) where {F<:$EF,V} = Simplex{V}(a,b)
         *(a::SubManifold{V},b::F) where {F<:$EF,V} = Simplex{V}(b,a)
-        *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a,b.v),basis(b))
-        *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$Field,V,G,T<:$Field} = Simplex{V,G}($MUL(a.v,b),basis(a))
         adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
         Base.promote_rule(::Type{Simplex{V,G,B,T}},::Type{S}) where {V,G,T,B,S<:$Field} = Simplex{V,G,B,promote_type(T,S)}
         Base.promote_rule(::Type{Chain{V,G,T,B}},::Type{S}) where {V,G,T,B,S<:$Field} = Chain{V,G,promote_type(T,S),B}
         Base.promote_rule(::Type{MultiVector{V,T,B}},::Type{S}) where {V,T,B,S<:$Field} = MultiVector{V,promote_type(T,S),B}
     end
     @eval begin
-        *(a::F,b::Chain{V,G,T}) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$Field,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b)))
-        *(a::F,b::MultiVector{V,T}) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$Field,T,V} = MultiVector{V}(broadcast($Sym.∏,a.v,Ref(b)))
         -(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(SUB,:(value(a),))))
         -(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(SUB,:(value(a),))))
         *(a::Simplex{V,0,B,F},b::Chain{V,G,T}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a.v),b.v))
         *(a::Chain{V,G,T},b::Simplex{V,0,B,F}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b.v)))
         *(a::SubManifold{V,0},b::Chain{W,G,T}) where {V,W,G,T<:$Field} = b
         *(a::Chain{V,G,T},b::SubManifold{W,0}) where {V,W,G,T<:$Field} = a
-        *(a::F,b::MultiGrade{V,G}) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,Ref(a),b.v))
-        *(a::MultiGrade{V,G},b::F) where {F<:$EF,V,G} = MultiGrade{V,G}(broadcast($MUL,a.v,Ref(b)))
         Base.:-(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}(SUB(value(a)))
         @generated function Base.adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
             if binomial(mdims(V),G)<(1<<cache_limit)
@@ -432,100 +402,30 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
             end
             function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
-                out = copy(value(a,$VEC(N,t)))
+                out = value(a,$VEC(N,t))
                 $(add_val(eop,:out,:(value(b,$VEC(N,t))),bop))
                 return MultiVector{V}(out)
             end
-            function $op(a::SparseChain{V,G,S},b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
-                $(insert_expr((:N,:t),VEC)...)
-                at = value(a)
-                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
-                addmulti!(out,at.nzval,binomsum(N,G).+at.nzind)
-                return MultiVector{V}(out)
-            end
-            function $op(a::MultiVector{V,T},b::SparseChain{V,G}) where {V,T<:$Field,G}
-                $(insert_expr((:N,:t),VEC)...)
-                bt = value(b)
-                out = copy(value(a,$VEC(N,t)))
-                addmulti!(out,$bop.(bt.nzval),binomsum(N,G).+bt.nzind)
-                return MultiVector{V}(out)
-            end
-            function $op(a::Chain{V,G,T},b::SparseChain{V,G}) where {V,G,T<:$Field}
-                $(insert_expr((:N,),VEC)...)
-                bt = terms(b)
-                t = promote_type(T,valuetype.(bt)...)
-                out = copy(value(a,$VEC(N,G,t)))
-                addmulti!(out,bt.nzval,bt.nzind)
-                return Chain{V,G}(out)
-            end
-            function $op(a::SparseChain{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
-                $(insert_expr((:N,),VEC)...)
-                at = terms(a)
-                t = promote_type(T,valuetype.(at)...)
-                out = convert($VEC(N,G,t),$(bcast(bop,:(copy(value(b,$VEC(N,G,t))),))))
-                addmulti!(out,at.nzval,at.nzind)
-                return Chain{V,G}(out)
-            end
             function $op(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,G,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                out = convert($VEC(N,t),$(bcast(bop,:(copy(value(b,$VEC(N,t))),))))
+                out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
                 @inbounds $(add_val(:(+=),:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),ADD))
                 return MultiVector{V}(out)
             end
             function $op(a::MultiVector{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                out = copy(value(a,$VEC(N,t)))
+                out = value(a,$VEC(N,t))
                 @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
                 return MultiVector{V}(out)
             end
-            function $op(a::MultiGrade{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
-                $(insert_expr((:N,),VEC)...)
-                at = terms(a)
-                t = promote_type(T,valuetype.(at)...)
-                out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
-                for A ∈ at
-                    TA = typeof(A)
-                    if TA <: TensorTerm
-                        addmulti!(out,value(A,t),bits(A),Val{N}())
-                    elseif TA <: SparseChain
-                        vA = value(A,t)
-                        addmulti!(out,vA.nzval,vA.nzind)
-                    else
-                        g = rank(A)
-                        r = binomsum(N,g)
-                        @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(A,$VEC(N,g,t))),bop))
-                    end
-                end
-                return MultiVector{V}(out)
+            @generated function $op(a::SubManifold{V,L,X},b::Simplex{V,G,Y,T}) where {V,L,X,G,Y,T<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            function $op(a::MultiVector{V,T},b::MultiGrade{V,G}) where {V,T<:$Field,G}
-                $(insert_expr((:N,),VEC)...)
-                bt = terms(b)
-                t = promote_type(T,valuetype.(bt)...)
-                out = value(a,$VEC(N,t))
-                for B ∈ bt
-                    TB = typeof(B)
-                    if TB <: TensorTerm
-                        addmulti!(out,$bop(value(B,t)),bits(B),Val{N}())
-                    elseif TB <: SparseChain
-                        vB = value(B,t)
-                        addmulti!(out,vB.nzval,vB.nzind)
-                    else
-                        g = rank(B)
-                        r = binomsum(N,g)
-                        @inbounds $(add_val(eop,:(out[r+1:r+binomial(N,g)]),:(value(B,$VEC(N,g,t))),bop))
-                    end
-                end
-                return MultiVector{V}(out)
+            @generated function $op(a::Simplex{V,L,X,S},b::SubManifold{V,G,Y}) where {V,L,X,S<:$Field,G,Y}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
-            @generated function $op(a::SubManifold{V,A,X},b::Simplex{V,B,Y,S}) where {V,A,X,B,Y,S<:$Field}
-                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,A,X,T},b::SubManifold{V,B,Y}) where {V,A,X,T<:$Field,B,Y}
-                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,A,X,T},b::Simplex{V,B,Y,S}) where {V,A,X,T<:$Field,B,Y,S<:$Field}
-                adder(a,b,$(QuoteNode(bop)),$(QuoteNode(VEC)))
+            @generated function $op(a::Simplex{V,L,X,S},b::Simplex{V,G,Y,T}) where {V,L,X,T<:$Field,G,Y,S<:$Field}
+                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
             end
             @generated function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
                 adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
@@ -584,68 +484,39 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     EF = Field ≠ Any ? Field : ExprField
     generate_sums(Field,VEC,MUL,ADD,SUB,CONJ,PAR)
     @eval begin
-        #=function *(a::Chain{V,1,T},b::Chain{W,1,S}) where {V,T<:$Field,W,S<:$Field}
-            !(V == dual(W) && V ≠ W) && throw(error())
-            $(insert_expr((:N,:t,:bnl,:ib),VEC)...)
-            out = zeros($VEC(N,2,t))
-            B = indexbasis(N,L)
-            for i ∈ 1:binomial(N,G)
-                for j ∈ 1:bnl
-                    @inbounds geomaddmulti!(V,out,ib[i],B[j],$MUL(a[i],b[j]))
-                end
-            end
-            return MultiVector{V}(out)
-        end=#
         function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
             Simplex(v,mul(ba,bb,v))
         end
-        @generated function *(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,L,T<:$Field}
-            product(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-        end
-        @generated function *(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,L,T<:$Field}
-            product(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
-        @generated function *(b::Chain{V,G,T},a::Simplex{V,L,B,S}) where {V,G,T<:$Field,L,B,S<:$Field}
-            product(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-        end
-        @generated function *(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,L,B,S<:$Field}
-            product(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
-        @generated function *(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
-            product(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
-        @generated function contraction(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,T<:$Field,L}
-            product_contraction(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-        end
-        @generated function contraction(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
-            product_contraction(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
-        @generated function contraction(b::Chain{V,G,T},a::Simplex{V,L,B,S}) where {V,G,T<:$Field,B,S<:$Field,L}
-            product_contraction(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-        end
-        @generated function contraction(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,B,S<:$Field,L}
-            product_contraction(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
-        @generated function contraction(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,L,T<:$Field,S<:$Field}
-            product_contraction(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-        end
         ∧(a::$Field,b::$Field) = $MUL(a,b)
         ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
         ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
-        #=∧(a::$Field,b::MultiGrade{V,G}) where V = MultiGrade{V,G}(a.*b.v)
-        ∧(a::MultiGrade{V,G},b::$Field) where V = MultiGrade{V,G}(a.v.*b)=#
         #=∧(a::$Field,b::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,T}(a.*b.v)
         ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
         ∧(a::$Field,b::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,T}(a.*b.v)
         ∧(a::MultiVector{V,T},b::$Field) where {V,T<:$Field} = MultiVector{V,T}(a.v.*b)=#
     end
-    for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet))
-        grassaddmulti! = Symbol(grass,:addmulti!)
-        grassaddblade! = Symbol(grass,:addblade!)
-        grassaddmulti!_pre = Symbol(grassaddmulti!,:_pre)
-        grassaddblade!_pre = Symbol(grassaddblade!,:_pre)
+    for (op,prop) ∈ ((:*,:product),(:contraction,:product_contraction))
+        @eval begin
+            @generated function $op(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,L,T<:$Field}
+                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
+            end
+            @generated function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,L,T<:$Field}
+                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
+            end
+            @generated function $op(b::Chain{V,G,T},a::Simplex{V,L,B,S}) where {V,G,T<:$Field,L,B,S<:$Field}
+                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
+            end
+            @generated function $op(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,L,B,S<:$Field}
+                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
+            end
+            @generated function $op(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
+                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
+            end
+        end
+    end
+    for op ∈ (:∧,:∨)
         prop = Symbol(:product_,op)
         @eval begin
             @generated function $op(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}

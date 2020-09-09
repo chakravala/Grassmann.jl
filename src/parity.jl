@@ -89,8 +89,8 @@ end
     return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
 end=#
 
-@pure function parityinterior(V::M,a,b) where M<:Manifold{N} where N
-    A,B,Q,Z = symmetricmask(V,a,b)
+@pure function parityinterior(V::M,a,b) where M<:Manifold
+    A,B,Q,Z = symmetricmask(V,a,b); N = rank(V)
     (diffcheck(V,A,B) || cga(V,A,B)) && (return false,g_zero(UInt),false,Z)
     p,C,t = parityregressive(Signature(V),A,complement(N,B,diffvars(V)),Val{true}())
     ind = indices(B,N); g = prod(V[ind])
@@ -203,8 +203,8 @@ end
 import Base: signbit, imag, real
 export odd, even, angular, radial, ₊, ₋, ǂ
 
-@pure signbit(V::T) where T<:Manifold{N} where N = (ib=indexbasis(N); parity.(Ref(V),ib,ib))
-@pure signbit(V::T,G) where T<:Manifold{N} where N = (ib=indexbasis(N,G); parity.(Ref(V),ib,ib))
+@pure signbit(V::T) where T<:Manifold = (ib=indexbasis(rank(V)); parity.(Ref(V),ib,ib))
+@pure signbit(V::T,G) where T<:Manifold = (ib=indexbasis(rank(V),G); parity.(Ref(V),ib,ib))
 @pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
 @pure radial(V::T) where T<:Manifold = Values(findall(.!signbit(V))...)
 @pure angular(V::T,G) where T<:Manifold = findall(signbit(V,G))

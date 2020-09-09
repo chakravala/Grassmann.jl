@@ -448,7 +448,6 @@ Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
 grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
-INV(m::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1,Chain{V,1}}(inv(SMatrix(m)))
 
 export vandermonde
 
@@ -619,8 +618,8 @@ end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin
-        Base.$op(a::Chain{V,G,T},m::S) where {V,G,T,S} = Chain{V,G}($op.(value(a),m))
-        Base.$op(a::MultiVector{V,T},m::S) where {T,V,S} = MultiVector{V}($op.(value(a),m))
+        Base.$op(a::Chain{V,G,T},m) where {V,G,T} = Chain{V,G}($op.(value(a),m))
+        Base.$op(a::MultiVector{V,T},m) where {T,V} = MultiVector{V}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)

@@ -11,7 +11,7 @@ export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, Diago
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent
 
-import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, ndims, adjoint
+import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, adjoint
 import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
 import Leibniz: Bits, bit2int, indexbits, indices, diffvars, diffmask
@@ -39,10 +39,10 @@ include("forms.jl")
 
 export hyperplanes, points, TensorAlgebra
 
-@pure hyperplanes(V::Manifold{N}) where N = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:N-1-diffvars(V))
+@pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 
 for M ∈ (:Signature,:DiagonalForm)
-    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{V,Int}(ones(Int,1<<ndims(V)))
+    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{V,Int}(ones(Int,1<<mdims(V)))
 end
 
 points(f::F,r=-2π:0.0001:2π) where F<:Function = vector.(f.(r))
@@ -152,20 +152,20 @@ end
 
 @generated function ↓(ω::T) where T<:TensorAlgebra
     V,M = Manifold(ω),T<:SubManifold && !isbasis(ω)
-    !(hasinf(V)||hasorigin(V)) && (return M ? V(2:ndims(V)) : :ω)
+    !(hasinf(V)||hasorigin(V)) && (return M ? V(2:mdims(V)) : :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        M && (return ω(3:ndims(V)))
+        M && (return ω(3:mdims(V)))
         :(inv(one(valuetype(ω))*$G.v∞∅)*($G.v∞∅∧ω)/(-ω⋅$G.v∞))
     else
-        M && (return V(2:ndims(V)))
+        M && (return V(2:mdims(V)))
         quote
             b = hasinf($V) ? $G.v∞ : $G.v∅
             ((ω∧b)*b)/(1-b⋅ω)
         end
     end
 end
-↓(ω::ChainBundle) = ω(list(2,ndims(ω)))
+↓(ω::ChainBundle) = ω(list(2,mdims(ω)))
 ↓(ω,b) = ((b∧ω)*b)/(1-ω⋅b)
 ↓(ω,∞,∅) = (m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
@@ -182,7 +182,7 @@ absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V}(absym.(value(t)))
 collapse(a,b) = a⋅absym(∂(b))
 
 function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
-    N,B,v = ndims(V),bits(basis(t)),value(t)
+    N,B,v = mdims(V),bits(basis(t)),value(t)
     C = symmetricmask(V,B,B)[1]
     G = count_ones(C)
     G < 2 && (return t)
@@ -205,7 +205,7 @@ function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
 end
 function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
-    N,G,g = ndims(V),rank(x),0
+    N,G,g = mdims(V),rank(x),0
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
         if !iszero(x.v[k]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
@@ -215,7 +215,7 @@ function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
     return g
 end
 function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
-    N,g = ndims(V),0
+    N,g = mdims(V),0
     for i ∈ 0:N
         R = binomsum(N,i)
         ib = indexbasis(N,i)
@@ -251,12 +251,12 @@ end
 export pointset, edges, facets, adjacency, column, columns
 
 column(t,i=1) = getindex.(value(t),i)
-columns(t,i=1,j=ndims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
+columns(t,i=1,j=mdims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
 
 rows(a::T) where T<:AbstractMatrix = getindex.(Ref(a),list(1,3),:)
 
 function pointset(e)
-    ndims(Manifold(e)) == 1 && (return column(e))
+    mdims(Manifold(e)) == 1 && (return column(e))
     out = Int[]
     for i ∈ value(e)
         for k ∈ value(i)
@@ -269,7 +269,7 @@ end
 antiadjacency(t::ChainBundle,cols=columns(t)) = (A = sparse(t,cols); A-transpose(A))
 adjacency(t,cols=columns(t)) = (A = sparse(t,cols); A+transpose(A))
 function SparseArrays.sparse(t,cols=columns(t))
-    np,N = length(points(t)),ndims(Manifold(t))
+    np,N = length(points(t)),mdims(Manifold(t))
     A = spzeros(Int,np,np)
     for c ∈ combo(N,2)
         A += sparse(cols[c[1]],cols[c[2]],1,np,np)
@@ -279,14 +279,14 @@ end
 
 edges(t,cols::Values) = edges(t,adjacency(t,cols))
 function edges(t,adj=adjacency(t))
-    ndims(t) == 2 && (return t)
-    N = ndims(Manifold(t)); M = points(t)(list(N-1,N)...)
+    mdims(t) == 2 && (return t)
+    N = mdims(Manifold(t)); M = points(t)(list(N-1,N)...)
     f = findall(x->!iszero(x),LinearAlgebra.triu(adj))
     [Chain{M,1}(Values{2,Int}(f[n].I)) for n ∈ 1:length(f)]
 end
 
 function facetsinterior(t::Vector{<:Chain{V}}) where V
-    N = ndims(Manifold(t))-1
+    N = mdims(Manifold(t))-1
     W = V(list(2,N+1))
     N == 0 && (return [Chain{W,1}(list(2,1))],Int[])
     out = Chain{W,1,Int,N}[]
@@ -299,13 +299,13 @@ function facetsinterior(t::Vector{<:Chain{V}}) where V
     end
     return out,bnd
 end
-facets(t) = faces(t,Val(ndims(Manifold(t))-1))
-facets(t,h) = faces(t,h,Val(ndims(Manifold(t))-1))
+facets(t) = faces(t,Val(mdims(Manifold(t))-1))
+facets(t,h) = faces(t,h,Val(mdims(Manifold(t))-1))
 faces(t,v::Val) = faces(value(t),v)
 faces(t,h,v,g=identity) = faces(value(t),h,v,g)
 faces(t::Tuple,v,g=identity) = faces(t[1],t[2],v,g)
 function faces(t::Vector{<:Chain{V}},::Val{N}) where {V,N}
-    N == ndims(V) && (return t)
+    N == mdims(V) && (return t)
     N == 2 && (return edges(t))
     W = V(list(2,N+1))
     N == 1 && (return Chain{W,1}.(pointset(t)))
@@ -323,13 +323,13 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
     N == 0 && (return [Chain{W,1}(list(1,N))],Int[sum(h)])
     out = Chain{W,1,Int,N}[]
     bnd = Int[]
-    vec = zeros(Variables{ndims(V),Int})
-    val = N+1==ndims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(Values{binomial(ndims(V),N)})
+    vec = zeros(Variables{mdims(V),Int})
+    val = N+1==mdims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(Values{binomial(mdims(V),N)})
     for i ∈ 1:length(t)
         vec[:] = value(t[i])
         par = DirectSum.indexparity!(vec)
         w = Chain{W,1}.(DirectSum.combinations(par[2],N))
-        for k ∈ 1:binomial(ndims(V),N)
+        for k ∈ 1:binomial(mdims(V),N)
             j = findfirst(isequal(w[k]),out)
             v = h[i]*(par[1] ? -val[k] : val[k])
             if isnothing(j)
@@ -348,13 +348,13 @@ end
 ∂(t::Values{N,<:Vector}) where N = ∂.(t)
 ∂(t::Tuple{Vector{<:Chain},Vector{Int}}) = ∂(t[1],t[2])
 ∂(t::Vector{<:Chain},u::Vector{Int}) = (f=facets(t,u); f[1][findall(x->!iszero(x),f[2])])
-∂(t::Vector{<:Chain}) = ndims(t)≠3 ? (f=facetsinterior(t); f[1][setdiff(1:length(f[1]),f[2])]) : edges(t,adjacency(t).%2)
+∂(t::Vector{<:Chain}) = mdims(t)≠3 ? (f=facetsinterior(t); f[1][setdiff(1:length(f[1]),f[2])]) : edges(t,adjacency(t).%2)
 #∂(t::Vector{<:Chain}) = (f=facets(t,ones(Int,length(t))); f[1][findall(x->!iszero(x),f[2])])
 
 skeleton(t::ChainBundle,v) = skeleton(value(t),v)
 @inline (::Leibniz.Derivation)(x::Vector{<:Chain},v=Val{true}()) = skeleton(x,v)
-@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),Ref(ones(Int,length(t))),$(Val.(list(1,ndims(V)))),abs))
-#@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),$(Val.(list(1,ndims(V))))))
+@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),Ref(ones(Int,length(t))),$(Val.(list(1,mdims(V)))),abs))
+#@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),$(Val.(list(1,mdims(V))))))
 
 export scalarfield, vectorfield, chainfield, rectanglefield # rectangle
 
@@ -376,7 +376,7 @@ end
 function chainfield(t,ϕ::T) where T<:AbstractVector
     M = Manifold(t)
     V = Manifold(M)
-    z = ndims(V) ≠ 4 ? Chain{V,1}(1.0,0.0,0.0) : Chain{V,1}(1.0,0.0,0.0,0.0)
+    z = mdims(V) ≠ 4 ? Chain{V,1}(1.0,0.0,0.0) : Chain{V,1}(1.0,0.0,0.0,0.0)
     P->begin
         for i ∈ 1:length(t)
             ti = value(t[i])
@@ -435,12 +435,12 @@ function __init__()
         *(a::SubManifold{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
         *(a::Reduce.RExpr,b::MultiVector{V,T}) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::MultiVector{V,T},b::Reduce.RExpr) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
-        *(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        *(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
+        #*(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
+        #*(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
         ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(a,b)
         ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(b,a)
-        DirectSum.extend_field(Reduce.RExpr)
+        Leibniz.extend_field(Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)
         for T ∈ (:RExpr,:Symbol,:Expr)
             generate_inverses(:(Reduce.Algebra),T)
@@ -469,7 +469,7 @@ function __init__()
            return g
         end
         function LightGraphs.SimpleDiGraph(x::Chain{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
-            N,G = ndims(V),rank(x)
+            N,G = mdims(V),rank(x)
             ib = indexbasis(N,G)
             for k ∈ 1:binomial(N,G)
                 if !iszero(x.v[k])
@@ -480,7 +480,7 @@ function __init__()
             return g
         end
         function LightGraphs.SimpleDiGraph(x::MultiVector{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
-           N = ndims(V)
+           N = mdims(V)
            for i ∈ 2:N
                 R = binomsum(N,i)
                 ib = indexbasis(N,i)
@@ -518,9 +518,9 @@ function __init__()
         GeometryBasics.Point(t::Values) = GeometryBasics.Point(Tuple(t.v))
         GeometryBasics.Point(t::Variables) = GeometryBasics.Point(Tuple(t.v))
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = GeometryBasics.Point(value(Chain{V,valuetype(t)}(vector(t))))
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),ndims(V))...)
+        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),mdims(V))...)
         Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorAlgebra = GeometryBasics.Point(value(vector(t)))
-        Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,ndims(V))...)
+        Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,mdims(V))...)
         GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
         pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
         function initmesh(m::GeometryBasics.Mesh)
@@ -538,7 +538,7 @@ function __init__()
         function pointfield(t,ϕ::T) where T<:AbstractVector
             M = Manifold(t)
             V = Manifold(M)
-            z = ndims(V) ≠ 4 ? GeometryBasics(0.0,0.0) : GeometryBasics.Point(0.0,0.0,0.0)
+            z = mdims(V) ≠ 4 ? GeometryBasics(0.0,0.0) : GeometryBasics.Point(0.0,0.0,0.0)
             p->begin
                 P = Chain{V,1}(one(ptype(p)),p.data...)
                 for i ∈ 1:length(t)
@@ -580,14 +580,14 @@ function __init__()
         AbstractPlotting.mesh(t::Vector{<:Chain};args...) = AbstractPlotting.mesh(points(t),t;args...)
         AbstractPlotting.mesh!(t::Vector{<:Chain};args...) = AbstractPlotting.mesh!(points(t),t;args...)
         function AbstractPlotting.mesh(p::ChainBundle,t;args...)
-            if ndims(p) == 2
+            if mdims(p) == 2
                 AbstractPlotting.plot(submesh(p)[:,1],args[:color])
             else
                 AbstractPlotting.mesh(submesh(p),array(t);args...)
             end
         end
         function AbstractPlotting.mesh!(p::ChainBundle,t;args...)
-            if ndims(p) == 2
+            if mdims(p) == 2
                 AbstractPlotting.plot!(submesh(p)[:,1],args[:color])
             else
                 AbstractPlotting.mesh!(submesh(p),array(t);args...)
@@ -629,15 +629,15 @@ function __init__()
     end
     @require QHull="a8468747-bd6f-53ef-9e5c-744dbc5c59e7" begin
         QHull.chull(p::Vector{<:Chain},n=1:length(p)) = QHull.chull(ChainBundle(p),n)
-        function QHull.chull(p::ChainBundle,n=1:length(p)); l = list(1,ndims(p))
-            T = QHull.chull(submesh(length(n)==length(p) ? p : p[n])); V = p(list(2,ndims(p)))
+        function QHull.chull(p::ChainBundle,n=1:length(p)); l = list(1,mdims(p))
+            T = QHull.chull(submesh(length(n)==length(p) ? p : p[n])); V = p(list(2,mdims(p)))
             [Chain{V,1}(getindex.(Ref(n),k)) for k ∈ T.simplices]
         end
-        initmesh(t::Chull) = (p=ChainBundle(initpoints(t.points')); Chain{p(list(2,ndims(p))),1}.(t.simplices))
+        initmesh(t::Chull) = (p=ChainBundle(initpoints(t.points')); Chain{p(list(2,mdims(p))),1}.(t.simplices))
     end
     @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
         MiniQhull.delaunay(p::Vector{<:Chain},n=1:length(p)) = MiniQhull.delaunay(ChainBundle(p),n)
-        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p)); l = list(1,ndims(p))
+        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p)); l = list(1,mdims(p))
             T = MiniQhull.delaunay(Matrix(submesh(length(n)==length(p) ? p : p[n])'))
             [Chain{p,1,Int}(getindex.(Ref(n),Int.(T[l,k]))) for k ∈ 1:size(T,2)]
         end
