@@ -443,8 +443,8 @@ for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
         @eval $op(a::T,b::SparseChain{V,A}) where {T<:$Tens} where {V,A,B} = b+a
     end
     @eval begin
-        @generated function $op(a::SubManifold{V,A},b::SubManifold{V,B}) where {V,A,B}
-            adder(a,b,$(QuoteNode(op)),:mvec)
+        @generated function $op(a::SubManifold{V,L},b::SubManifold{V,G}) where {V,L,G}
+            adder(a,b,nothing,$(QuoteNode(op)),:mvec)
         end
         function $op(a::MultiGrade{V,A},b::MultiGrade{V,B}) where {V,A,B}
             at,bt = terms(a),terms(b)
@@ -506,10 +506,10 @@ adder(a,b,left=:+,right=:+) = adder(typeof(a),typeof(b),left,right)
 adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
 
 @eval begin
-    @noinline function adder(a::Type{<:TensorTerm{V,A}},b::Type{<:TensorTerm{V,B}},bop=:+,VEC=:mvec) where {V,A,B}
+    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},left,bop,VEC) where {V,L,G}
         if basis(a) == basis(b)
-            :(Simplex{V,A}($bop(value(a),value(b)),basis(a)))
-        elseif A == B; G = A
+            :(Simplex{V,L}($bop(value(a),value(b)),basis(a)))
+        elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
@@ -522,13 +522,13 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
                     end
                 end
                 return Expr(:block,insert_expr((:t,),VEC)...,
-                    :(Chain{V,A}($(Expr(:call,tvec(N,G,:t),out...)))))
+                    :(Chain{V,L}($(Expr(:call,tvec(N,G,:t),out...)))))
             else return quote
                 $(insert_expr((:N,:t))...)
-                out = zeros($VEC(N,A,t))
+                out = zeros($VEC(N,L,t))
                 setblade!(out,value(a,t),UInt(basis(a)),Val{N}())
                 setblade!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-                return Chain{V,A}(out)
+                return Chain{V,L}(out)
             end end
         else quote
             #@warn("sparse MultiGrade{V} objects not properly handled yet")
@@ -634,7 +634,7 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : S<:Chain ? :(a[1]*complementlefthodge(~b)) : :(⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
             return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(⋆(~a)*b[1]) : :(complementlefthodge(~b))
-        elseif binomial(mdims(V),G)*(S<:Chain ? binomial(ndims(V),L) : 1)<(1<<cache_limit)
+        elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
                 out = zeros(svec(N,t))
@@ -800,14 +800,14 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
         if binomial(mdims(W),L)*(S<:Chain ? binomial(mdims(w),G) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:μ),:mvec,:T,:S)...)
-                ia = indexbasis(mdims(w),L)
-                ib = indexbasis(mdims(W),G)
+                ia = indexbasis(mdims(w),G)
+                ib = indexbasis(mdims(W),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
                 CA,CB = isdual(w),isdual(W)
-                for i ∈ 1:binomial(mdims(w),L)
+                for i ∈ 1:binomial(mdims(w),G)
                     @inbounds v,iai = :(a[$i]),ia[i]
                     x = CA ? dual(V,iai) : iai
-                    for j ∈ 1:binomial(mdims(W),G)
+                    for j ∈ 1:binomial(mdims(W),L)
                         X = @inbounds CB ? dual(V,ib[j]) : ib[j]
                         if μ
                             $grassaddmulti!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),MUL))
