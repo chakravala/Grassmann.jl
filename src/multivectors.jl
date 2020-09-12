@@ -58,7 +58,7 @@ export Chain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
-getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = m[i][j]
+getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = m[j][i]
 setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
 @pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)

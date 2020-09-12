@@ -667,7 +667,7 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return if μ
                 insert_t(:(MultiVector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
             else
-                insert_t(:(Chain{$V,$GL}($(Expr(:call,tvec(N,GL,:t),out...)))))
+                insert_t(:(value_diff(Chain{$V,$GL}($(Expr(:call,tvec(N,GL,:t),out...))))))
             end
         elseif S<:Chain; return quote
             $(insert_expr((:N,:t,:bng,:bnl,:μ),VEC)...)

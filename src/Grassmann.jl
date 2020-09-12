@@ -581,14 +581,18 @@ function __init__()
         AbstractPlotting.mesh!(t::Vector{<:Chain};args...) = AbstractPlotting.mesh!(points(t),t;args...)
         function AbstractPlotting.mesh(p::ChainBundle,t;args...)
             if mdims(p) == 2
-                AbstractPlotting.plot(submesh(p)[:,1],args[:color])
+                sm = submesh(p)[:,1]
+                AbstractPlotting.lines(sm,args[:color])
+                AbstractPlotting.plot!(sm,args[:color])
             else
                 AbstractPlotting.mesh(submesh(p),array(t);args...)
             end
         end
         function AbstractPlotting.mesh!(p::ChainBundle,t;args...)
             if mdims(p) == 2
-                AbstractPlotting.plot!(submesh(p)[:,1],args[:color])
+                sm = submesh(p)[:,1]
+                AbstractPlotting.lines!(sm,args[:color])
+                AbstractPlotting.plot!(sm,args[:color])
             else
                 AbstractPlotting.mesh!(submesh(p),array(t);args...)
             end
