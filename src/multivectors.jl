@@ -331,6 +331,9 @@ export valuetype, scalar, isscalar, vector, isvector, indices
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::MultiVector{V,T} where V) where T = T
+@pure valuetype(::Type{<:Chain{V,G,T} where {V,G}}) where T = T
+@pure valuetype(::Type{<:MultiVector{V,T} where V}) where T = T
+
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::MultiVector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)

@@ -286,26 +286,124 @@ end
 
 # algebra
 
+const FieldsBig = (Fields...,BigFloat,BigInt,Complex{BigFloat},Complex{BigInt},Rational{BigInt})
+
++(b::Chain{V,G},a::SubManifold{V,G}) where {V,G} = a+b
++(b::Chain{V,G},a::SubManifold{V,L}) where {V,G,L} = a+b
++(b::Chain{V,G},a::Simplex{V,G}) where {V,G} = a+b
++(b::Chain{V,G},a::Simplex{V,L}) where {V,G,L} = a+b
++(b::MultiVector{V},a::SubManifold{V,G}) where {V,G} = a+b
++(b::MultiVector{V},a::Simplex{V,G}) where {V,G} = a+b
+-(t::SubManifold) = Simplex(-value(t),t)
+-(a::Chain{V,G}) where {V,G} = Chain{V,G}(-value(a))
+-(a::MultiVector{V,T}) where {V,T} = MultiVector{V}(-value(a))
+*(a::Simplex{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
+*(a::Chain{V,G},b::Simplex{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
+*(a::SubManifold{V,0},b::Chain{W,G}) where {V,W,G} = b
+*(a::Chain{V,G},b::SubManifold{W,0}) where {V,W,G} = a
+
 for F ∈ Fields
     @eval begin
-        *(a::F,b::MultiVector{V,T}) where {F<:$F,V,T} = MultiVector{V}(broadcast($Sym.:∏,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$F,V,T} = MultiVector{V}(broadcast($Sym.:∏,a.v,Ref(b)))
-        *(a::F,b::Chain{V,G,T}) where {F<:$F,V,G,T} = Chain{V,G}(broadcast($Sym.:∏,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$F,V,G,T,} = Chain{V,G}(broadcast($Sym.:∏,a.v,Ref(b)))
+        *(a::F,b::MultiVector{V}) where {F<:$F,V} = MultiVector{V}(a*b.v)
+        *(a::MultiVector{V},b::F) where {F<:$F,V} = MultiVector{V}(a.v*b)
+        *(a::F,b::Chain{V,G}) where {F<:$F,V,G} = Chain{V,G}(a*b.v)
+        *(a::Chain{V,G},b::F) where {F<:$F,V,G} = Chain{V,G}(a.v*b)
         *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$F,V,G,T} = Simplex{V,G}($Sym.:∏(a,b.v),basis(b))
         *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T} = Simplex{V,G}($Sym.:∏(a.v,b),basis(a))
-        *(a::F,b::MultiVector{V,T}) where {F<:$F,V,T<:Number} = MultiVector{V}(broadcast(*,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::F) where {F<:$F,V,T<:Number} = MultiVector{V}(broadcast(*,a.v,Ref(b)))
-        *(a::F,b::Chain{V,G,T}) where {F<:$F,V,G,T<:Number} = Chain{V,G}(broadcast(*,Ref(a),b.v))
-        *(a::Chain{V,G,T},b::F) where {F<:$F,V,G,T<:Number} = Chain{V,G}(broadcast(*,a.v,Ref(b)))
         *(a::F,b::Simplex{V,G,B,T} where B) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a,b.v),basis(b))
         *(a::Simplex{V,G,B,T} where B,b::F) where {F<:$F,V,G,T<:Number} = Simplex{V,G}(*(a.v,b),basis(a))
     end
 end
+for op ∈ (:+,:-)
+    for Term ∈ (:TensorGraded,:TensorMixed)
+        @eval begin
+            $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*g_one(Manifold(a)))
+            $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*g_one(Manifold(b)),b)
+        end
+    end
+    @eval begin
+        @generated function $op(a::TensorTerm{V,L},b::TensorTerm{V,G}) where {V,L,G}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $op(a::TensorTerm{V,G},b::Chain{V,G,T}) where {V,G,T}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $op(a::TensorTerm{V,L},b::Chain{V,G,T}) where {V,G,T,L}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $op(a::TensorTerm{V,G},b::MultiVector{V,T}) where {V,G,T}
+            adder(a,b,$(QuoteNode(op)))
+        end
+    end
+end
+@generated -(b::Chain{V,G,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
+@generated -(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,T,L} = adder(a,b,:-,true)
+@generated -(b::MultiVector{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 
-const FieldsBig = (Fields...,BigFloat,BigInt,Complex{BigFloat},Complex{BigInt},Rational{BigInt})
+@eval begin
+    @generated function Base.adjoint(m::Chain{V,G,T}) where {V,G,T}
+        CONJ,VEC = conjvec(m)
+        TF = T ∉ FieldsBig ? :Any : :T
+        if binomial(mdims(V),G)<(1<<cache_limit)
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:ib),:svec)...)
+                out = zeros(svec(N,G,Any))
+                for i ∈ 1:binomial(N,G)
+                    @inbounds setblade!_pre(out,:($CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
+                end
+                return :(Chain{$(dual(V)),G}($(Expr(:call,tvec(N,TF),out...))))
+            else
+                return :(Chain{$(dual(V)),G}($CONJ.(value(m))))
+            end
+        else return quote
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:ib),:svec)...)
+                out = zeros($VEC(N,G,$TF))
+                for i ∈ 1:binomial(N,G)
+                    @inbounds setblade!(out,$CONJ(m.v[i]),dual(V,ib[i],M),Val{N}())
+                end
+            else
+                out = $CONJ.(value(m))
+            end
+            Chain{dual(V),G}(out)
+        end end
+    end
+    @generated function Base.adjoint(m::MultiVector{V,T}) where {V,T}
+        CONJ,VEC = conjvec(m)
+        TF = T ∉ FieldsBig ? :Any : :T
+        if mdims(V)<cache_limit
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:bs,:bn),:svec)...)
+                out = zeros(svec(N,Any))
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds setmulti!_pre(out,:($CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
+                    end
+                end
+                return :(MultiVector{$(dual(V))}($(Expr(:call,tvec(N,TF),out...))))
+            else
+                return :(MultiVector{$(dual(V))}($CONJ.(value(m))))
+            end
+        else return quote
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:bs,:bn),:svec)...)
+                out = zeros($VEC(N,$TF))
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds setmulti!(out,$CONJ(m.v[bs[g]+i]),dual(V,ib[i],M))
+                    end
+                end
+            else
+                out = $CONJ.(value(m))
+            end
+            MultiVector{dual(V)}(out)
+        end end
+    end
+end
 
-function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
+function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
     if Field == Grassmann.Field
         generate_mutators(:(Variables{M,T}),Number,Expr,SUB,MUL)
     elseif Field ∈ (SymField,:(SymPy.Sym))
@@ -323,69 +421,19 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
         Base.promote_rule(::Type{MultiVector{V,T,B}},::Type{S}) where {V,T,B,S<:$Field} = MultiVector{V,promote_type(T,S),B}
     end
     @eval begin
-        -(a::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,$TF}($(bcast(SUB,:(value(a),))))
-        -(a::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,$TF}($(bcast(SUB,:(value(a),))))
-        *(a::Simplex{V,0,B,F},b::Chain{V,G,T}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,Ref(a.v),b.v))
-        *(a::Chain{V,G,T},b::Simplex{V,0,B,F}) where {F<:$Field,B,V,G,T<:$Field} = Chain{V,G}(broadcast($MUL,a.v,Ref(b.v)))
-        *(a::SubManifold{V,0},b::Chain{W,G,T}) where {V,W,G,T<:$Field} = b
-        *(a::Chain{V,G,T},b::SubManifold{W,0}) where {V,W,G,T<:$Field} = a
-        Base.:-(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}(SUB(value(a)))
-        @generated function Base.adjoint(m::Chain{V,G,T}) where {V,G,T<:$Field}
-            if binomial(mdims(V),G)<(1<<cache_limit)
-                if isdyadic(V)
-                    $(insert_expr((:N,:M,:ib),:svec)...)
-                    out = zeros(svec(N,G,Any))
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds setblade!_pre(out,:($$CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
-                    end
-                    return :(Chain{$(dual(V)),G}($(Expr(:call,tvec(N,TF),out...))))
-                else
-                    return :(Chain{$(dual(V)),G}($$CONJ.(value(m))))
-                end
-            else return quote
-                if isdyadic(V)
-                    $(insert_expr((:N,:M,:ib),VEC)...)
-                    out = zeros($$VEC(N,G,$$TF))
-                    for i ∈ 1:binomial(N,G)
-                        @inbounds setblade!(out,$$CONJ(m.v[i]),dual(V,ib[i],M),Val{N}())
-                    end
-                else
-                    out = $$CONJ.(value(m))
-                end
-                Chain{dual(V),G}(out)
-            end end
+        Base.:-(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($SUB(value(a)))
+        function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
+            ba,bb = basis(a),basis(b)
+            v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
+            Simplex(v,mul(ba,bb,v))
         end
-        @generated function Base.adjoint(m::MultiVector{V,T}) where {V,T<:$Field}
-            if mdims(V)<cache_limit
-                if isdyadic(V)
-                    $(insert_expr((:N,:M,:bs,:bn),:svec)...)
-                    out = zeros(svec(N,Any))
-                    for g ∈ 1:N+1
-                        ib = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds setmulti!_pre(out,:($$CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
-                        end
-                    end
-                    return :(MultiVector{$(dual(V))}($(Expr(:call,tvec(N,TF),out...))))
-                else
-                    return :(MultiVector{$(dual(V))}($$CONJ.(value(m))))
-                end
-            else return quote
-                if isdyadic(V)
-                    $(insert_expr((:N,:M,:bs,:bn),VEC)...)
-                    out = zeros($$VEC(N,$$TF))
-                    for g ∈ 1:N+1
-                        ib = indexbasis(N,g-1)
-                        @inbounds for i ∈ 1:bn[g]
-                            @inbounds setmulti!(out,$$CONJ(m.v[bs[g]+i]),dual(V,ib[i],M))
-                        end
-                    end
-                else
-                    out = $$CONJ.(value(m))
-                end
-                MultiVector{dual(V)}(out)
-            end end
-        end
+        ∧(a::$Field,b::$Field) = $MUL(a,b)
+        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
+        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
+        #=∧(a::$Field,b::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,T}(a.*b.v)
+        ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
+        ∧(a::$Field,b::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,T}(a.*b.v)
+        ∧(a::MultiVector{V,T},b::$Field) where {V,T<:$Field} = MultiVector{V,T}(a.v.*b)=#
     end
     for (op,eop,bop) ∈ ((:+,:(+=),ADD),(:-,:(-=),SUB))
         @eval begin
@@ -398,7 +446,7 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 return MultiVector{V}(out)
             end
             function $op(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T<:$Field,S<:$Field}
-                return Chain{V,G,promote_type(valuetype(a),valuetype(b))}($(bcast(bop,:(a.v,b.v))))
+                return Chain{V,G}($(bcast(bop,:(a.v,b.v))))
             end
             function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t),VEC)...)
@@ -418,309 +466,213 @@ function generate_sums(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR
                 @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
                 return MultiVector{V}(out)
             end
-            @generated function $op(a::SubManifold{V,L,X},b::Simplex{V,G,Y,T}) where {V,L,X,G,Y,T<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,L,X,S},b::SubManifold{V,G,Y}) where {V,L,X,S<:$Field,G,Y}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,L,X,S},b::Simplex{V,G,Y,T}) where {V,L,X,T<:$Field,G,Y,S<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::SubManifold{V,G},b::Chain{V,G,T}) where {V,G,T<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,G,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,S<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,T<:$Field,L}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,L,A,S} where A,b::Chain{V,G,T}) where {V,G,T<:$Field,L,S<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::SubManifold{V,G},b::MultiVector{V,T}) where {V,T<:$Field,G}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Simplex{V,G,A,S} where A,b::MultiVector{V,T}) where {V,T<:$Field,G,S<:$Field}
-                adder(a,b,$(QuoteNode(ADD)),$(QuoteNode(bop)),$(QuoteNode(VEC)))
-            end
-        end
-    end
-    @eval begin
-        +(b::Chain{V,G,T},a::SubManifold{V,G}) where {V,G,T<:$Field} = a+b
-        +(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,T<:$Field,L} = a+b
-        +(b::Chain{V,G,T},a::Simplex{V,G,B,S} where B) where {V,G,T<:$Field,S<:$Field} = a+b
-        +(b::Chain{V,G,T},a::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field} = a+b
-        +(b::MultiVector{V,T},a::SubManifold{V,G}) where {V,T<:$Field,G} = a+b
-        +(b::MultiVector{V,T},a::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field} = a+b
-        @generated function -(b::Chain{V,G,T},a::SubManifold{V,G}) where {V,G,T<:$Field}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
-        end
-        @generated function -(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,T<:$Field,L}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
-        end
-        @generated function -(b::Chain{V,G,T},a::Simplex{V,G,B,S} where B) where {V,G,T<:$Field,S<:$Field}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
-        end
-        @generated function -(b::Chain{V,G,T},a::Simplex{V,L,B,S} where B) where {V,G,T<:$Field,L,S<:$Field}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
-        end
-        @generated function -(b::MultiVector{V,T},a::SubManifold{V,G}) where {V,T<:$Field,G}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
-        end
-        @generated function -(b::MultiVector{V,T},a::Simplex{V,G,B,S} where B) where {V,T<:$Field,G,S<:$Field}
-            adder(a,b,$(QuoteNode(SUB)),$(QuoteNode(ADD)),$(QuoteNode(VEC)),true)
         end
     end
 end
 
-### Product Algebra Constructor
+### Product Algebra
 
-insert_t(x) = Expr(:block,:(t=promote_type(valuetype(a),valuetype(b))),x)
-
-function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
-    TF = Field ∉ FieldsBig ? :Any : :T
-    EF = Field ≠ Any ? Field : ExprField
-    generate_sums(Field,VEC,MUL,ADD,SUB,CONJ,PAR)
+for (op,prop) ∈ ((:*,:product),(:contraction,:product_contraction))
     @eval begin
-        function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
-            ba,bb = basis(a),basis(b)
-            v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
-            Simplex(v,mul(ba,bb,v))
+        @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,L,T}
+            $prop(a,b,true)
         end
-        ∧(a::$Field,b::$Field) = $MUL(a,b)
-        ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(a,b)
-        ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Simplex{V,G}(b,a)
-        #=∧(a::$Field,b::Chain{V,G,T}) where {V,G,T<:$Field} = Chain{V,G,T}(a.*b.v)
-        ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
-        ∧(a::$Field,b::MultiVector{V,T}) where {V,T<:$Field} = MultiVector{V,T}(a.*b.v)
-        ∧(a::MultiVector{V,T},b::$Field) where {V,T<:$Field} = MultiVector{V,T}(a.v.*b)=#
+        @generated function $op(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
+            $prop(a,b)
+        end
     end
-    for (op,prop) ∈ ((:*,:product),(:contraction,:product_contraction))
+end
+for op ∈ (:∧,:∨)
+    prop = Symbol(:product_,op)
+    @eval begin
+        @generated function $op(a::Chain{w,G,T},b::Chain{W,L,S}) where {T,w,S,W,G,L}
+            $prop(a,b)
+        end
+        @generated function $op(b::Chain{Q,G,T},a::TensorTerm{R,L}) where {Q,G,T,R,L}
+            $prop(a,b,true)
+        end
+        @generated function $op(a::TensorTerm{Q,G},b::Chain{R,L,T}) where {Q,R,T,G,L}
+            $prop(a,b)
+        end
+    end
+end
+for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
+                     (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
+    preproduct! = Symbol(product!,:_pre)
+    prop = op≠:* ? Symbol(:product_,op) : :product
+    @eval begin
+        @generated function $op(b::MultiVector{V,T},a::TensorGraded{V,G}) where {V,T,G}
+            $prop(a,b,true)
+        end
+        @generated function $op(a::TensorGraded{V,G},b::MultiVector{V,S}) where {V,G,S}
+            $prop(a,b)
+        end
+        @generated function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T,S}
+            MUL,VEC = mulvec(a,b)
+            loop = generate_loop_multivector(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            if mdims(V)<cache_limit/2
+                return insert_t(:(MultiVector{V}($(loop[2].args[2]))))
+            else return quote
+                $(insert_expr(loop[1],VEC)...)
+                $(loop[2])
+                return MultiVector{V,t}(out)
+            end end
+        end
+    end
+end
+
+for side ∈ (:left,:right)
+    c,p = Symbol(:complement,side),Symbol(:parity,side)
+    h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
+    pnp = :(Leibniz.$(Symbol(pn,:pre)))
+    for (c,p) ∈ ((c,p),(h,pg))
         @eval begin
-            @generated function $op(b::Chain{V,G,T},a::SubManifold{V,L}) where {V,G,L,T<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::SubManifold{V,L},b::Chain{V,G,T}) where {V,G,L,T<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(b::Chain{V,G,T},a::Simplex{V,L,B,S}) where {V,G,T<:$Field,L,B,S<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::Simplex{V,L,B,S},b::Chain{V,G,T}) where {V,G,T<:$Field,L,B,S<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-        end
-    end
-    for op ∈ (:∧,:∨)
-        prop = Symbol(:product_,op)
-        @eval begin
-            @generated function $op(a::Chain{w,G,T},b::Chain{W,L,S}) where {T<:$Field,w,S<:$Field,W,G,L}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(b::Chain{Q,G,T},a::SubManifold{R,L}) where {Q,G,T<:$Field,R,L}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::SubManifold{Q,G},b::Chain{R,L,T}) where {Q,R,T<:$Field,G,L}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(b::Chain{Q,G,T},a::Simplex{R,L,B,S}) where {Q,G,T<:$Field,R,B,S<:$Field,L}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::Simplex{Q,G,B,S},b::Chain{R,L,T}) where {T<:$Field,Q,R,B,S<:$Field,G,L}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-        end
-    end
-    for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
-                         (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
-        preproduct! = Symbol(product!,:_pre)
-        prop = op≠:* ? Symbol(:product_,op) : :product
-        @eval begin
-            @generated function $op(b::MultiVector{V,T},a::SubManifold{V,G,B}) where {V,T<:$Field,G,B}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::SubManifold{V,G,A},b::MultiVector{V,T}) where {V,G,A,T<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(b::MultiVector{V,T},a::Simplex{V,G,B,S}) where {V,T<:$Field,G,B,S<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::Simplex{V,G,B,T},b::MultiVector{V,S}) where {V,G,B,T<:$Field,S<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(b::MultiVector{V,T},a::Chain{V,G,S}) where {V,T<:$Field,S<:$Field,G}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)),true)
-            end
-            @generated function $op(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,G,S<:$Field,T<:$Field}
-                $prop(a,b,$(QuoteNode(MUL)),$(QuoteNode(VEC)))
-            end
-            @generated function $op(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T<:$Field,S<:$Field}
-                loop = generate_loop_multivector(V,:(a.v),:(b.v),$(QuoteNode(MUL)),$product!,$preproduct!)
-                if mdims(V)<cache_limit/2
-                    return insert_t(:(MultiVector{V}($(loop[2].args[2]))))
-                else return quote
-                    $(insert_expr(loop[1],VEC)...)
-                    $(loop[2])
-                    return MultiVector{V,t}(out)
-                end end
-            end
-        end
-    end
-    for side ∈ (:left,:right)
-        c,p = Symbol(:complement,side),Symbol(:parity,side)
-        h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
-        pnp = :(Leibniz.$(Symbol(pn,:pre)))
-        for (c,p) ∈ ((c,p),(h,pg))
-            @eval begin
-                @generated function $c(b::Chain{V,G,T}) where {V,G,T<:$Field}
-                    isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                    if binomial(mdims(V),G)<(1<<cache_limit)
-                        $(insert_expr((:N,:ib,:D),:svec)...)
-                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
-                        out = zeros(svec(N,G,Any))
-                        D = diffvars(V)
-                        for k ∈ 1:binomial(N,G)
-                            val = :(b.v[$k])
-                            @inbounds p = $p(V,ib[k])
-                            v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
-                            v = typeof(V)<:Signature ? (p ? :($$SUB($v)) : v) : Expr(:call,$MUL,p,v)
-                            @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
-                        end
-                        return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
-                    else return quote
-                        $(insert_expr((:N,:ib,:D),VEC)...)
-                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
-                        out = zeros($$VEC(N,G,T))
-                        D = diffvars(V)
-                        for k ∈ 1:binomial(N,G)
-                            @inbounds val = b.v[k]
-                            if val≠0
-                                @inbounds p = $$p(V,ib[k])
-                                v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
-                                v = typeof(V)<:Signature ? (p ? $$SUB(v) : v) : $$MUL(p,v)
-                                @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
-                            end
-                        end
-                        return Chain{V,N-G}(out)
-                    end end
-                end
-                @generated function $c(m::MultiVector{V,T}) where {V,T<:$Field}
-                    isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                    if mdims(V)<cache_limit
-                        $(insert_expr((:N,:bs,:bn),:svec)...)
-                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
-                        out = zeros(svec(N,Any))
-                        D = diffvars(V)
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                val = :(m.v[$(bs[g]+i)])
-                                v = $(c≠h ? :($pnp(V,ib[i],val)) : :val)
-                                v = typeof(V)<:Signature ? ($p(V,ib[i]) ? :($$SUB($v)) : v) : Expr(:call,:*,$p(V,ib[i]),v)
-                                @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())
-                            end
-                        end
-                        return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
-                    else return quote
-                        $(insert_expr((:N,:bs,:bn),VEC)...)
-                        P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
-                        out = zeros($$VEC(N,T))
-                        D = diffvars(V)
-                        for g ∈ 1:N+1
-                            ib = indexbasis(N,g-1)
-                            @inbounds for i ∈ 1:bn[g]
-                                @inbounds val = m.v[bs[g]+i]
-                                if val≠0
-                                    v = $(c≠h ? :($$pn(V,ib[i],val)) : :val)
-                                    v = typeof(V)<:Signature ? ($$p(V,ib[i]) ? $$SUB(v) : v) : $$p(V,ib[i])*v
-                                    @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Val{N}())
-                                end
-                            end
-                        end
-                        return MultiVector{V}(out)
-                    end end
-                end
-            end
-        end
-    end
-    for reverse ∈ (:reverse,:involute,:conj,:clifford)
-        p = Symbol(:parity,reverse)
-        @eval begin
-            @generated function $reverse(b::Chain{V,G,T}) where {V,G,T<:$Field}
+            @generated function $c(b::Chain{V,G,T}) where {V,G,T}
+                isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                SUB,VEC,MUL = subvec(b)
                 if binomial(mdims(V),G)<(1<<cache_limit)
-                    D = diffvars(V)
-                    D==0 && !$p(G) && (return :b)
-                    $(insert_expr((:N,:ib),:svec)...)
+                    $(insert_expr((:N,:ib,:D),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros(svec(N,G,Any))
-                    for k ∈ 1:binomial(N,G)
-                        @inbounds v = :(b.v[$k])
-                        if D==0
-                            @inbounds setblade!_pre(out,:($$SUB($v)),ib[k],Val{N}())
-                        else
-                            @inbounds B = ib[k]
-                            setblade!_pre(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Val{N}())
-                        end
-                    end
-                    return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
-                else return quote
                     D = diffvars(V)
-                    D==0 && !$$p(G) && (return b)
-                    $(insert_expr((:N,:ib),VEC)...)
-                    out = zeros($$VEC(N,G,T))
                     for k ∈ 1:binomial(N,G)
-                        @inbounds v = b.v[k]
-                        v≠0 && if D==0
-                            @inbounds setblade!(out,$$SUB(v),ib[k],Val{N}())
-                        else
-                            @inbounds B = ib[k]
-                            setblade!(out,$$p(grade(V,B)) ? $$SUB(v) : v,B,Val{N}())
+                        val = :(b.v[$k])
+                        @inbounds p = $p(V,ib[k])
+                        v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
+                        v = typeof(V)<:Signature ? (p ? :($SUB($v)) : v) : Expr(:call,MUL,p,v)
+                        @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
+                    end
+                    return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
+                else return quote
+                    $(insert_expr((:N,:ib,:D),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    out = zeros($VEC(N,G,T))
+                    D = diffvars(V)
+                    for k ∈ 1:binomial(N,G)
+                        @inbounds val = b.v[k]
+                        if val≠0
+                            @inbounds p = $$p(V,ib[k])
+                            v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
+                            v = typeof(V)<:Signature ? (p ? $SUB(v) : v) : $MUL(p,v)
+                            @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
                         end
                     end
-                    return Chain{V,G}(out)
+                    return Chain{V,N-G}(out)
                 end end
             end
-            @generated function $reverse(m::MultiVector{V,T}) where {V,T<:$Field}
+            @generated function $c(m::MultiVector{V,T}) where {V,T}
+                isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                SUB,VEC = subvec(m)
                 if mdims(V)<cache_limit
-                    $(insert_expr((:N,:bs,:bn,:D),:svec)...)
+                    $(insert_expr((:N,:bs,:bn),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros(svec(N,Any))
+                    D = diffvars(V)
                     for g ∈ 1:N+1
-                        pg = $p(g-1)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds v = :(m.v[$(bs[g]+i)])
-                            if D==0
-                                @inbounds setmulti!(out,pg ? :($$SUB($v)) : v,ib[i],Val{N}())
-                            else
-                                @inbounds B = ib[i]
-                                setmulti!(out,$p(grade(V,B)) ? :($$SUB($v)) : v,B,Val{N}())
-                            end
+                            val = :(m.v[$(bs[g]+i)])
+                            v = $(c≠h ? :($pnp(V,ib[i],val)) : :val)
+                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? :($SUB($v)) : v) : Expr(:call,:*,$p(V,ib[i]),v)
+                            @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())
                         end
                     end
                     return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
                 else return quote
-                    $(insert_expr((:N,:bs,:bn,:D),VEC)...)
-                    out = zeros($$VEC(N,T))
+                    $(insert_expr((:N,:bs,:bn),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    out = zeros($VEC(N,T))
+                    D = diffvars(V)
                     for g ∈ 1:N+1
-                        pg = $$p(g-1)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            @inbounds v = m.v[bs[g]+i]
-                            v≠0 && if D==0
-                                @inbounds setmulti!(out,pg ? $$SUB(v) : v,ib[i],Val{N}())
-                            else
-                                @inbounds B = ib[i]
-                                setmulti!(out,$$p(grade(V,B)) ? $$SUB(v) : v,B,Val{N}())
+                            @inbounds val = m.v[bs[g]+i]
+                            if val≠0
+                                v = $(c≠h ? :($$pn(V,ib[i],val)) : :val)
+                                v = typeof(V)<:Signature ? ($$p(V,ib[i]) ? $SUB(v) : v) : $$p(V,ib[i])*v
+                                @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Val{N}())
                             end
                         end
                     end
                     return MultiVector{V}(out)
                 end end
             end
+        end
+    end
+end
+for reverse ∈ (:reverse,:involute,:conj,:clifford)
+    p = Symbol(:parity,reverse)
+    @eval begin
+        @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
+            SUB,VEC = subvec(b)
+            if binomial(mdims(V),G)<(1<<cache_limit)
+                D = diffvars(V)
+                D==0 && !$p(G) && (return :b)
+                $(insert_expr((:N,:ib),:svec)...)
+                out = zeros(svec(N,G,Any))
+                for k ∈ 1:binomial(N,G)
+                    @inbounds v = :(b.v[$k])
+                    if D==0
+                        @inbounds setblade!_pre(out,:($SUB($v)),ib[k],Val{N}())
+                    else
+                        @inbounds B = ib[k]
+                        setblade!_pre(out,$p(grade(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                    end
+                end
+                return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
+            else return quote
+                D = diffvars(V)
+                D==0 && !$$p(G) && (return b)
+                $(insert_expr((:N,:ib),:svec)...)
+                out = zeros($VEC(N,G,T))
+                for k ∈ 1:binomial(N,G)
+                    @inbounds v = b.v[k]
+                    v≠0 && if D==0
+                        @inbounds setblade!(out,$SUB(v),ib[k],Val{N}())
+                    else
+                        @inbounds B = ib[k]
+                        setblade!(out,$$p(grade(V,B)) ? $SUB(v) : v,B,Val{N}())
+                    end
+                end
+                return Chain{V,G}(out)
+            end end
+        end
+        @generated function $reverse(m::MultiVector{V,T}) where {V,T}
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:bs,:bn,:D),:svec)...)
+                out = zeros(svec(N,Any))
+                for g ∈ 1:N+1
+                    pg = $p(g-1)
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds v = :(m.v[$(bs[g]+i)])
+                        if D==0
+                            @inbounds setmulti!(out,pg ? :($SUB($v)) : v,ib[i],Val{N}())
+                        else
+                            @inbounds B = ib[i]
+                            setmulti!(out,$p(grade(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                        end
+                    end
+                end
+                return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:bs,:bn,:D),:svec)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 1:N+1
+                    pg = $$p(g-1)
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds v = m.v[bs[g]+i]
+                        v≠0 && if D==0
+                            @inbounds setmulti!(out,pg ? $SUB(v) : v,ib[i],Val{N}())
+                        else
+                            @inbounds B = ib[i]
+                            setmulti!(out,$$p(grade(V,B)) ? $SUB(v) : v,B,Val{N}())
+                        end
+                    end
+                end
+                return MultiVector{V}(out)
+            end end
         end
     end
 end

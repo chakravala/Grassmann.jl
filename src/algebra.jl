@@ -410,33 +410,36 @@ for T ∈ (:Real,:Complex)
     generate_inverses(Base,T)
 end
 
-### Sum Algebra Constructor
+### Algebra Constructors
+
+insert_t(x) = Expr(:block,:(t=promote_type(valuetype(a),valuetype(b))),x)
+
+addvec(a,b,s,o) = o ≠ :+ ? subvec(a,b,s) : addvec(a,b,s)
+addvec(a,b,s) = isfixed(a,b) ? (:($Sym.:∑),:($Sym.:∑),:svec) : (:+,:+,:mvec)
+subvec(a,b,s) = isfixed(a,b) ? (s ? (:($Sym.:-),:($Sym.:∑),:svec) : (:($Sym.:∑),:($Sym.:-),:svec)) : (s ? (:-,:+,:mvec) : (:+,:-,:mvec))
+
+subvec(b) = isfixed(valuetype(b)) ? (:($Sym.:-),:svec,:($Sym.:∏)) : (:-,:mvec,:*)
+conjvec(b) = isfixed(valuetype(b)) ? (:($Sym.conj),:svec) : (:conj,:mvec)
+
+mulvec(a,b) = isfixed(a,b) ? (:($Sym.:∏),:svec) : (:*,:mvec)
+isfixed(a,b) = isfixed(valuetype(a))&&isfixed(valuetype(b))
+isfixed(::Type{Rational{BigInt}}) = true
+isfixed(::Type{BigFloat}) = true
+isfixed(::Type{BigInt}) = true
+isfixed(::Type{Complex{BigFloat}}) = true
+isfixed(::Type{Complex{BigInt}}) = true
+isfixed(::Type{<:Number}) = false
+isfixed(::Type{<:Any}) = true
 
 const NSE = Union{Symbol,Expr,<:Real,<:Complex}
 
-Base.:-(t::SubManifold) = Simplex(-value(t),t)
-
-for (op,eop) ∈ ((:+,:(+=)),(:-,:(-=)))
-    for Term ∈ (:TensorGraded,:TensorMixed)
-        @eval begin
-            $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*g_one(Manifold(a)))
-            $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*g_one(Manifold(b)),b)
-        end
-    end
-    @eval begin
-        @generated function $op(a::SubManifold{V,L},b::SubManifold{V,G}) where {V,L,G}
-            adder(a,b,nothing,$(QuoteNode(op)),:mvec)
-        end
-    end
-end
-
 @inline swapper(a,b,swap) = swap ? (b,a) : (a,b)
 
-adder(a,b,left=:+,right=:+) = adder(typeof(a),typeof(b),left,right)
-adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
+adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
 
 @eval begin
-    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},left,bop,VEC) where {V,L,G}
+    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
+        left,bop,VEC = addvec(a,b,false,op)
         if basis(a) == basis(b)
             :(Simplex{V,L}($bop(value(a),value(b)),basis(a)))
         elseif L == G
@@ -469,7 +472,8 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},left,right,VEC,swap=false) where {V,G,T}
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T}
+        left,right,VEC = addvec(a,b,swap,op)
         if binomial(mdims(V),G)<(1<<cache_limit)
             $(insert_expr((:N,:ib,:t),:svec)...)
             out = zeros(svec(N,G,Any))
@@ -493,7 +497,8 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return Chain{V,G}(out)
         end end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},left,right,VEC,swap=false) where {V,G,T,L}
+    @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T,L}
+        left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:ib,:bn,:t),:svec)...)
             out = zeros(svec(N,Any))
@@ -528,7 +533,8 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},left,right,VEC,swap=false) where {V,G,T}
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},op,swap=false) where {V,G,T}
+        left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:bs,:bn,:t),:svec)...)
             out = zeros(svec(N,Any))
@@ -555,7 +561,8 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end end
     end
-    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
+    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
+        MUL,VEC = mulvec(a,b)
         if G == 0
             return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(b[1])))) : swap ? :(b[1]*a) : :(a*b[1])
         elseif S<:Chain && L == 0
@@ -622,7 +629,8 @@ adder(a::Type,b::Type,left=:+,right=:+) = adder(a,b,left,right,:mvec)
             return MultiVector{V}(out)
         end end
     end
-    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,L} where {V,G,T,L}
+    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,T,L}
+        MUL,VEC = mulvec(a,b)
         (swap ? G<L : L<G) && (!istangent(V)) && (return g_zero(V))
         GL = swap ? G-L : L-G
         if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
@@ -723,7 +731,8 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
     grassaddmulti!_pre = Symbol(grassaddmulti!,:_pre)
     grassaddblade!_pre = Symbol(grassaddblade!,:_pre)
     prop = Symbol(:product_,op)
-    @eval @noinline function $prop(a::Type{S},b::Type{<:Chain{R,L,T}},MUL,VEC,swap=false) where S<:TensorGraded{Q,G} where {Q,R,T,G,L}
+    @eval @noinline function $prop(a::Type{S},b::Type{<:Chain{R,L,T}},swap=false) where S<:TensorGraded{Q,G} where {Q,R,T,G,L}
+        MUL,VEC = mulvec(a,b)
         w,W = swap ? (R,Q) : (Q,R)
         V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
         $po(G+L,mdims(V)) && (!istangent(V)) && (return g_zero(V))
@@ -835,9 +844,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                      (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
     preproduct! = Symbol(product!,:_pre)
     prop = op≠:* ? Symbol(:product_,op) : :product
-    @eval $prop(a,b,MUL=:+) = $prop(typeof(a),typeof(b),MUL)
-    @eval $prop(a::Type,b::Type,MUL=:+) = $prop(a,b,MUL,:mvec)
-    @eval @noinline function $prop(a::Type{S},b::Type{<:MultiVector{V,T}},MUL,VEC,swap=false) where S<:TensorGraded{V,G} where {V,G,T}
+    @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
+    @eval @noinline function $prop(a::Type{S},b::Type{<:MultiVector{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
+        MUL,VEC = mulvec(a,b)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:out,:ib,:bs,:bn,:μ),:svec)...)
             for g ∈ 1:N+1
