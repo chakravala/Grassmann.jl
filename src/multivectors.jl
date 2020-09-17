@@ -7,6 +7,16 @@ export TensorTerm, TensorGraded, TensorMixed, SubManifold, Simplex, MultiVector,
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed
 import Leibniz: grade
 
+export TensorNested
+abstract type TensorNested{V} <: Manifold{V} end
+
+for op ∈ (:(Base.:+),:(Base.:-))
+    @eval begin
+        $op(a::A,b::B) where {A<:TensorNested,B<:TensorAlgebra} = $op(DyadicChain(a),b)
+        $op(a::A,b::B) where {A<:TensorAlgebra,B<:TensorNested} = $op(a,DyadicChain(b))
+    end
+end
+
 # symbolic print types
 
 import Leibniz: Fields, parval, mixed
@@ -54,7 +64,10 @@ end
 Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 
-export Chain
+DyadicProduct{V,W,T,N} = Chain{V,1,Chain{W,1,T,N},N}
+DyadicChain{V,T,N} = DyadicProduct{V,V,T,N}
+
+export Chain, DyadicProduct, DyadicChain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
@@ -69,16 +82,18 @@ Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V),G,T)))
 transpose_row(t::Values{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::FixedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
-@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),W)))
-@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(Values{mdims(V)}(1:mdims(V))),W)))
+@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(list(1,mdims(V))),W)))
+@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(list(1,mdims(V))),W)))
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
+
+showparens(tmv) = (!(tmv<:TensorTerm||tmv<:Projector)) && |(broadcast(<:,tmv,parval)...)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib = indexbasis(mdims(V),G)
     @inbounds tmv = typeof(m.v[1])
     if |(broadcast(<:,tmv,parsym)...)
-        par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
+        par = showparens(tmv)
         @inbounds par ? print(io,"(",m.v[1],")") : print(io,m.v[1])
     else
         @inbounds print(io,m.v[1])
@@ -88,7 +103,7 @@ function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
         @inbounds mvs = m.v[k]
         tmv = typeof(mvs)
         if |(broadcast(<:,tmv,parsym)...)
-            par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
+            par = showparens(tmv)
             par ? print(io," + (",mvs,")") : print(io," + ",mvs)
         else
             sbm = signbit(mvs)
@@ -263,7 +278,7 @@ function show(io::IO, m::MultiVector{V,T}) where {V,T}
             @inbounds if mvs ≠ 0
                 tmv = typeof(mvs)
                 if |(broadcast(<:,tmv,parsym)...)
-                    par = (!(tmv<:TensorTerm)) && |(broadcast(<:,tmv,parval)...)
+                    par = showparens(tmv)
                     par ? print(io," + (",mvs,")") : print(io," + ",mvs)
                 else
                     sba = signbit(mvs)
@@ -316,6 +331,55 @@ end
 
 getindex(m::MultiVector,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
 getindex(m::MultiVector{V},i::SubManifold{V}) where V = m[basisindex(mdims(V),UInt(i))]
+
+# Dyadic
+
+export Projector, Dyadic, Proj
+
+struct Projector{V,T} <: TensorNested{V}
+    v::T
+    Projector{V,T}(v::T) where {T<:Manifold{V}} where V = new{V,T}(v)
+    Projector{V}(v::T) where {T<:Manifold{V}} where V = new{V,T}(v)
+end
+
+const Proj = Projector
+
+Proj(v::T) where T<:TensorGraded{V} where V = Proj{V}(v/abs(v))
+Proj(v::Chain{V,1,<:TensorNested}) where V = Proj{V}(v)
+
+(P::Projector)(x) = contraction(P,x)
+
+getindex(P::Proj,i::Int,j::Int) = P.v[i]*P.v[j]
+getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
+
+show(io::IO,P::Projector) = print(io,"Proj(",P.v,")")
+
+DyadicChain{V,T}(P::Proj{V,T}) where {V,T} = outer(P.v,P.v)
+DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(DyadicChain.(value(P.v)))
+DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
+DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
+
+struct Dyadic{V,X,Y} <: TensorNested{V}
+    x::X
+    y::Y
+    Dyadic{V,X,Y}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{V,X,Y}(x,y)
+    Dyadic{V}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{V,X,Y}(x,y)
+end
+
+Dyadic(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = Dyadic{V}(x,y)
+Dyadic(P::Projector) = Dyadic(P.v,P.v)
+Dyadic(D::Dyadic) = D
+
+(P::Dyadic)(x) = contraction(P,x)
+
+getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
+
+show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
+
+DyadicChain(P::Dyadic{V}) where V = DyadicProduct{V}(P)
+DyadicChain{V}(P::Dyadic{V}) where V = DyadicProduct{V}(p)
+DyadicProduct(P::Dyadic{V}) where V = DyadicProduct{V}(P)
+DyadicProduct{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 
 ## Generic
 

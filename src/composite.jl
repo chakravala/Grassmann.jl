@@ -90,7 +90,7 @@ end
 function Base.exp(t::T) where T<:TensorGraded
     S,B = T<:SubManifold,T<:TensorTerm
     if B && isnull(t)
-        return one(V)
+        return one(Manifold(t))
     elseif isR301(Manifold(t)) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
         u = sqrt(abs(abs2(t)[1]))
         u<1e-5 && (return 1+t)
@@ -294,12 +294,12 @@ for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
     @eval function $logfast(t::T) where T<:TensorAlgebra
         V = Manifold(t)
         term = zero(V)
-        norm = FixedVector{2}(0.,0.)
+        nrm = FixedVector{2}(0.,0.)
         while true
             en = $expf(term)
             term -= 2(en-t)/(en+t)
-            @inbounds norm .= (norm[2],norm(term))
-            @inbounds norm[1] ≈ norm[2] && break
+            @inbounds nrm .= (nrm[2],norm(term))
+            @inbounds nrm[1] ≈ nrm[2] && break
         end
         return term
     end
@@ -678,39 +678,32 @@ Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Mani
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(mdims(V),T)))
 
-export Orthotope, Orthogrid
+export Orthogrid
 
-struct Orthotope{V,T}
-    min::Chain{V,1,T}
-    max::Chain{V,1,T}
-end
-
-(::Base.Colon)(min::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthotope{V,T}(min,max)
-
-struct Orthogrid{V,T} # <: TensorGraded{V,1} mess up collect?
-    x::Orthotope{V,T}
+@computed struct Orthogrid{V,T} # <: TensorGraded{V,1} mess up collect?
+    v::Dyadic{V,Chain{V,1,T,mdims(V)},Chain{V,1,T,mdims(V)}}
     n::Chain{V,1,Int}
     s::Chain{V,1,Float64}
 end
 
-Orthogrid{V,T}(x,n) where {V,T} = Orthogrid{V,T}(x,n,Chain{V,1}(value(x.max-x.min)./(value(n)-1)))
+Orthogrid{V,T}(v,n) where {V,T} = Orthogrid{V,T}(v,n,Chain{V,1}(value(v.x-v.y)./(value(n)-1)))
 
-Base.show(io::IO,t::Orthogrid) = println('(',t.x.min,"):(",t.s,"):(",t.x.max,')')
+Base.show(io::IO,t::Orthogrid) = println('(',t.v.x,"):(",t.s,"):(",t.v.y,')')
 
 zeroinf(f) = iszero(f) ? Inf : f
 
-(::Base.Colon)(min::Chain{V,1,T},step::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthogrid{V,T}(min:max,Chain{V,1}(Int.(round.(value(max-min)./zeroinf.(value(step))))+1),step)
+(::Base.Colon)(min::Chain{V,1,T},step::Chain{V,1,T},max::Chain{V,1,T}) where {V,T} = Orthogrid{V,T}(min⊗max,Chain{V,1}(Int.(round.(value(max-min)./zeroinf.(value(step)))).+1),step)
 
 Base.iterate(t::Orthogrid) = (getindex(t,1),1)
 Base.iterate(t::Orthogrid,state) = (s=state+1; s≤length(t) ? (getindex(t,s),s) : nothing)
 @pure Base.eltype(::Type{Orthogrid{V,T}}) where {V,T} = Chain{V,1,T,mdims(V)}
 @pure Base.step(t::Orthogrid) = value(t.s)
-@pure Base.size(t::Orthogrid) = value(t.n).data
+@pure Base.size(t::Orthogrid) = value(t.n).v
 @pure Base.length(t::Orthogrid) = prod(size(t))
 @pure Base.lastindex(t::Orthogrid) = length(t)
 @pure Base.lastindex(t::Orthogrid,i::Int) = size(t)[i]
 @pure Base.getindex(t::Orthogrid,i::CartesianIndex) = getindex(t,i.I...)
-@pure Base.getindex(t::Orthogrid{V},i::Vararg{Int}) where V = Chain{V,1}(value(t.x.min)+(Values(i)-1).*step(t))
+@pure Base.getindex(t::Orthogrid{V},i::Vararg{Int}) where V = Chain{V,1}(value(t.v.x)+(Values(i).-1).*step(t))
 
 Base.IndexStyle(::Orthogrid) = IndexCartesian()
 function Base.getindex(A::Orthogrid, I::Int)
