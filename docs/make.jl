@@ -1,4 +1,4 @@
-#   This file is part of Grassmann.jl. It is licensed under the GPL license
+#   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
 using Documenter, AbstractTensors, DirectSum, Leibniz, Grassmann, StaticArrays

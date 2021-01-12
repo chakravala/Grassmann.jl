@@ -18,7 +18,7 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 @pure *(a::SubManifold{V},b::SubManifold{V}) where V = mul(a,b)
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
-function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b),1,true)) where V
+@pure function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b),1,true)) where V
     ba,bb = bits(a),bits(b)
     (diffcheck(V,ba,bb) || iszero(der)) && (return g_zero(V))
     A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
@@ -30,7 +30,7 @@ function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b
 end
 
 function *(a::Simplex{V},b::SubManifold{V}) where V
-    v = derive_mul(V,bits(basis(a)),bits(b),a.v,true)
+    v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
     bas = mul(basis(a),b,v)
     order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
@@ -180,7 +180,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     ba,bb = bits(basis(a)),bits(basis(b))
     g,C,t,Z = interior(V,ba,bb)
     !t && (return g_zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
+    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
     if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
@@ -205,32 +205,42 @@ outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
 outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
 outer(a::Chain{W},b::Chain{V,1}) where {W,V} = Chain{V,1}(a.*value(b))
 
-contraction(a::Proj,b::TensorGraded) = a.v⊗(a.v⋅b)
+contraction(a::Proj,b::TensorGraded) = a.v⊗(a.λ*(a.v⋅b))
 contraction(a::Dyadic,b::TensorGraded) = a.x⊗(a.y⋅b)
 contraction(a::TensorGraded,b::Dyadic) = (a⋅b.x)⊗b.y
-contraction(a::TensorGraded,b::Proj) = (a⋅b.v)⊗b.v
+contraction(a::TensorGraded,b::Proj) = ((a⋅b.v)*b.λ)⊗b.v
 contraction(a::Dyadic,b::Dyadic) = (a.x*(a.y⋅b.x))⊗b.y
-contraction(a::Dyadic,b::Proj) = (a.x*(a.y⋅b.v))⊗b.v
-contraction(a::Proj,b::Dyadic) = (a.v*(a.v⋅b.x))⊗b.y
-contraction(a::Proj,b::Proj) = (a.v*(a.v⋅b.v))⊗b.v
+contraction(a::Dyadic,b::Proj) = (a.x*((a.y⋅b.v)*b.λ))⊗b.v
+contraction(a::Proj,b::Dyadic) = (a.v*(a.λ*(a.v⋅b.x)))⊗b.y
+contraction(a::Proj,b::Proj) = (a.v*((a.λ*b.λ)*(a.v⋅b.v)))⊗b.v
 contraction(a::Dyadic{V},b::TensorGraded{V,0}) where V = Dyadic{V}(a.x*b,a.y)
-contraction(a::Proj{V},b::TensorGraded{V,0}) where V = valuetype(b)<:Complex ? Proj{V}(a.v*sqrt(b)) : Dyadic{V}(a.v*b,a.v)
+contraction(a::Proj{V},b::TensorTerm{V,0}) where V = Proj{V}(a.v,a.λ*value(b))
+contraction(a::Proj{V},b::Chain{V,0}) where V = Proj{V}(a.v,a.λ*b[1])
 contraction(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj(Chain{V,1}(contraction.(value(a.v),b)))
-contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
+#contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
 contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅Ref(b))
 contraction(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}},b::Chain{V,1}) where {W,V} = a.v:b
 contraction(a::Chain{W,G},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(column(Ref(a).⋅value(b)))
 contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(Ref(a).⋅value(b))
 Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
 Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).⋅Ref(b))
-Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
+#Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
 
-+(a::Proj{V}...) where V = Proj(Chain(a...))
+contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
+contraction(a::Dyadic{V,<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(a.y.⋅b))
+contraction(a::Dyadic{V,T,<:Chain{V,1,<:Chain}} where {V,T},b::TensorGraded) = sum(a.x.⊗(value(a.y).⋅b))
+contraction(a::Proj{V,<:Chain{W,1,<:Chain} where W} where V,b::TensorGraded) = sum(value(a.v).⊗(value(a.λ).*value(a.v).⋅b))
+contraction(a::Proj{V,<:Chain{W,1,<:Chain{V,1}} where W},b::TensorGraded{V,1}) where V = sum(value(a.v).⊗(value(a.λ).*column(value(a.v).⋅b)))
+
++(a::Proj{V}...) where V = Proj{V}(Chain(Values(eigvec.(a)...)),Chain(Values(eigval.(a)...)))
 +(a::Dyadic{V}...) where V = Proj(Chain(a...))
 +(a::TensorNested{V}...) where V = Proj(Chain(Dyadic.(a)...))
 +(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(value(a.v)...,b)
 +(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
 +(a::Proj{M,<:Chain{M,1,<:TensorNested{V}}} where M,b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(value(a.v)...,value(b.v)...)
++(a::Proj{M,<:Chain{M,1,<:Chain{V}}} where M,b::Proj{W,<:Chain{W,1,<:Chain{V}}} where W) where V = Chain(Values(value(a.v)...,value(b.v)...))
+#+(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(b,Proj.(value(a.v),value(a.λ))...)
+#+(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
 
 -(a::TensorNested) where V = -1a
 -(a::TensorNested,b::TensorNested) where V = a+(-b)
@@ -240,7 +250,13 @@ Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅
 @inline *(a::TensorNested{V},b::TensorGraded{V,0}) where V = a⋅b
 @inline *(a::TensorGraded{V,0},b::Proj{V,<:Chain{V,1,<:TensorNested}}) where V = Proj{V}(a*b.v)
 @inline *(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj{V}(a.v*b)
-Base.:∘(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = a⋅b
+
+@inline *(a::DyadicChain,b::DyadicChain) where V = a⋅b
+@inline *(a::DyadicChain,b::Chain) where V = a⋅b
+@inline *(a::DyadicChain,b::TensorTerm) where V = a⋅b
+@inline *(a::TensorGraded,b::DyadicChain) where V = a⋅b
+@inline *(a::DyadicChain,b::TensorNested) where V = a⋅b
+@inline *(a::TensorNested,b::DyadicChain) where V = a⋅b
 
 # dyadic identity element
 
@@ -320,9 +336,9 @@ export ⊘
 for X ∈ TAG, Y ∈ TAG
     @eval ⊘(x::X,y::Y) where {X<:$X{V},Y<:$Y{V}} where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
 end
-for Z ∈ TAG
+#=for Z ∈ TAG
     @eval ⊘(x::Chain{V,G},y::T) where {V,G,T<:$Z} = diffvars(V)≠0 ? conj(y)*x*y : ((~y)*x*involute(y))(Val(G))/abs2(y)
-end
+end=#
 
 
 @doc """
@@ -353,9 +369,16 @@ export ⟂, ∥
 
 function Base.:^(v::T,i::S) where {T<:TensorTerm,S<:Integer}
     i == 0 && (return getbasis(Manifold(v),0))
-    out = basis(v)
-    for k ∈ 1:(i-1)%4
-        out *= basis(v)
+    i == 1 && (return v)
+    j,bas = (i-1)%4,basis(v)
+    out = if j == 0
+        bas
+    elseif j == 1
+        bas*bas
+    elseif j == 2
+        bas*bas*bas
+    elseif j == 3
+        bas*bas*bas*bas
     end
     return typeof(v)<:SubManifold ? out : out*AbstractTensors.:^(value(v),i)
 end
@@ -363,6 +386,11 @@ end
 function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
     V = Manifold(v)
     isone(i) && (return v)
+    if T<:Chain && diffvars(v)==0
+        sq,d = contraction2(~v,v),i÷2
+        val = isone(d) ? sq : sq^d
+        return iszero(i%2) ? val : val*v
+    end
     out = one(V)
     if i < 8 # optimal choice ?
         for k ∈ 1:i
@@ -460,8 +488,9 @@ subvec(a,b,s) = isfixed(a,b) ? (s ? (:($Sym.:-),:($Sym.:∑),:svec) : (:($Sym.:�
 subvec(b) = isfixed(valuetype(b)) ? (:($Sym.:-),:svec,:($Sym.:∏)) : (:-,:mvec,:*)
 conjvec(b) = isfixed(valuetype(b)) ? (:($Sym.conj),:svec) : (:conj,:mvec)
 
+mulvec(a,b,c) = c≠:contraction ? mulvec(a,b) : isfixed(a,b) ? (:($Sym.dot),:svec) : (:dot,:mvec)
 mulvec(a,b) = isfixed(a,b) ? (:($Sym.:∏),:svec) : (:*,:mvec)
-isfixed(a,b) = isfixed(valuetype(a))&&isfixed(valuetype(b))
+isfixed(a,b) = isfixed(valuetype(a))||isfixed(valuetype(b))
 isfixed(::Type{Rational{BigInt}}) = true
 isfixed(::Type{BigFloat}) = true
 isfixed(::Type{BigInt}) = true
@@ -514,7 +543,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
         if binomial(mdims(V),G)<(1<<cache_limit)
-            $(insert_expr((:N,:ib,:t),:svec)...)
+            $(insert_expr((:N,:ib),:svec)...)
+            t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svec(N,G,Any))
             X = UInt(basis(a))
             for k ∈ 1:binomial(N,G)
@@ -523,7 +553,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
                 @inbounds setblade!_pre(out,val,ib[k],Val{N}())
             end
-            return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
+            return :(Chain{V,G}($(Expr(:call,tvec(N,G,t),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VEC(N,G,t),$(bcast(right,:(value(b,$VEC(N,G,t)),))))
@@ -539,7 +569,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T,L}
         left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:ib,:bn,:t),:svec)...)
+            $(insert_expr((:N,:ib,:bn),:svec)...)
+            t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svec(N,Any))
             X = UInt(basis(a))
             for k ∈ 1:binomial(N,G)
@@ -559,7 +590,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     end
                 end
             end
-            return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
+            return :(MultiVector{V}($(Expr(:call,tvec(N,t),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
             @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
@@ -575,7 +606,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:MultiVector{V,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:bs,:bn,:t),:svec)...)
+            $(insert_expr((:N,:bs,:bn),:svec)...)
+            t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svec(N,Any))
             X = UInt(basis(a))
             for g ∈ 1:N+1
@@ -587,7 +619,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     @inbounds setmulti!_pre(out,val,B,Val(N))
                 end
             end
-            return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
+            return :(MultiVector{V}($(Expr(:call,tvec(N,t),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VEC(N,t),$(bcast(right,:(value(b,$VEC(N,t)),))))
@@ -668,8 +700,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return MultiVector{V}(out)
         end end
     end
-    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,T,L}
-        MUL,VEC = mulvec(a,b)
+    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,contr=:contraction) where S<:TensorGraded{V,L} where {V,G,T,L}
+        MUL,VEC = mulvec(a,b,contr)
         (swap ? G<L : L<G) && (!istangent(V)) && (return g_zero(V))
         GL = swap ? G-L : L-G
         if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
@@ -827,12 +859,12 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
             $(insert_expr((:N,:t,:μ),VEC)...)
             ia = indexbasis(mdims(w),G)
             ib = indexbasis(mdims(W),L)
-            out = zeros(μ $VEC(N,t) : $VEC(N,$$GL,t))
-            CA,CB = isdual(L),isdual(R)
-            for i ∈ 1:binomial(mdims(w),L)
+            out = zeros(μ ? $VEC(N,t) : $VEC(N,$$GL,t))
+            CA,CB = isdual(w),isdual(W)
+            for i ∈ 1:binomial(mdims(w),G)
                 @inbounds v,iai = a[i],ia[i]
                 x = CA ? dual(V,iai) : iai
-                v≠0 && for j ∈ 1:binomial(mdims(W),G)
+                v≠0 && for j ∈ 1:binomial(mdims(W),L)
                     X = @inbounds CB ? dual(V,ib[j]) : ib[j]
                     if μ
                         if @inbounds $$grassaddmulti!(V,out,x,X,derive_mul(V,x,X,v,b[j],$MUL))
@@ -885,9 +917,11 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
     prop = op≠:* ? Symbol(:product_,op) : :product
     @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
     @eval @noinline function $prop(a::Type{S},b::Type{<:MultiVector{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
-        MUL,VEC = mulvec(a,b)
+        MUL,VEC = mulvec(a,b,$(QuoteNode(op)))
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:t,:out,:ib,:bs,:bn,:μ),:svec)...)
+            $(insert_expr((:N,:t,:ib,:bs,:bn,:μ),:svec)...)
+            out = zeros(svec(N,Any))
+            t = promote_type(valuetype(a),valuetype(b))
             for g ∈ 1:N+1
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]

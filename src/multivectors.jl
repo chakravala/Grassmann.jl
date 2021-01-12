@@ -117,10 +117,14 @@ for T ∈ Fields
     @eval begin
         ==(a::T,b::Chain{V,G} where V) where {T<:$T,G} = G==0 ? a==value(b)[1] : prod(0==a.==value(b))
         ==(a::Chain{V,G} where V,b::T) where {T<:$T,G} = G==0 ? value(a)[1]==b : prod(0==b.==value(a))
+        isapprox(a::T,b::Chain{V,G} where V) where {T<:$T,G} = G==0 ? a≈value(b)[1] : prod(0≈a.≈value(b))
+        isapprox(a::Chain{V,G} where V,b::T) where {T<:$T,G} = G==0 ? value(a)[1]≈b : prod(0≈b.≈value(a))
     end
 end
 ==(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .== b.v)
 ==(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value(b))
+isapprox(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .≈ b.v)
+isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ value(b))
 
 function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
@@ -150,6 +154,14 @@ function ==(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
 end
 ==(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
 ==(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
+
+function isapprox(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
+    i = bladeindex(mdims(V),bits(basis(b)))
+    @inbounds a[i] ≈ value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
+end
+isapprox(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
+isapprox(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
+
 
 Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T,X} = Chain{V,G,T}(ones(Values{X,T}))
 Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T<:Chain,X} = Chain{V,G,T}(ones.(ntuple(n->T,mdims(V))))
@@ -336,26 +348,32 @@ getindex(m::MultiVector{V},i::SubManifold{V}) where V = m[basisindex(mdims(V),UI
 
 export Projector, Dyadic, Proj
 
-struct Projector{V,T} <: TensorNested{V}
+struct Projector{V,T,Λ} <: TensorNested{V}
     v::T
-    Projector{V,T}(v::T) where {T<:Manifold{V}} where V = new{V,T}(v)
-    Projector{V}(v::T) where {T<:Manifold{V}} where V = new{V,T}(v)
+    λ::Λ
+    Projector{V,T,Λ}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
+    Projector{V,T}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
+    Projector{V}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
 end
 
 const Proj = Projector
 
-Proj(v::T) where T<:TensorGraded{V} where V = Proj{V}(v/abs(v))
-Proj(v::Chain{V,1,<:TensorNested}) where V = Proj{V}(v)
+Proj(v::T,λ=1) where T<:TensorGraded{V} where V = Proj{V}(v/abs(v),λ)
+Proj(v::Chain{W,1,<:Chain{V}},λ=1) where {V,W} = Proj{V}(Chain(value(v)./abs.(value(v))),λ)
+#Proj(v::Chain{V,1,<:TensorNested},λ=1) where V = Proj{V}(v,λ)
 
 (P::Projector)(x) = contraction(P,x)
 
 getindex(P::Proj,i::Int,j::Int) = P.v[i]*P.v[j]
-getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
+getindex(P::Proj{V,<:Chain{W,1,<:Chain}} where {V,W},i::Int,j::Int) = sum(column(P.v,i).*column(P.v,j))
+#getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
 
-show(io::IO,P::Projector) = print(io,"Proj(",P.v,")")
+show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
+show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ} = print(io,"(",P.λ,")Proj(",P.v,")")
 
-DyadicChain{V,T}(P::Proj{V,T}) where {V,T} = outer(P.v,P.v)
-DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(DyadicChain.(value(P.v)))
+DyadicChain{V,T}(P::Proj{V,T}) where {V,T} = outer(P.v*P.λ,P.v)
+DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:Chain}} = sum(outer.(value(P.v).*value(P.λ),P.v))
+#DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(DyadicChain.(value(P.v)))
 DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
 DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
 

@@ -11,7 +11,8 @@ export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, Diago
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent
 
-import Base: @pure, print, show, getindex, setindex!, promote_rule, ==, convert, adjoint
+import Base: @pure, ==, isapprox
+import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
 import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
 import Leibniz: Bits, bit2int, indexbits, indices, diffvars, diffmask
@@ -443,8 +444,11 @@ function __init__()
         Leibniz.extend_field(Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)
         for T ∈ (:RExpr,:Symbol,:Expr)
+            @eval *(a::Reduce.$T,b::Chain{V,G,Any}) where {V,G} = (a*one(V))*b
+            @eval *(a::Chain{V,G,Any},b::Reduce.$T) where {V,G} = a*(b*one(V))
             generate_inverses(:(Reduce.Algebra),T)
             generate_derivation(:(Reduce.Algebra),T,:df,:RExpr)
+            #generate_algebra(:(Reduce.Algebra),T,:df,:RExpr)
         end
     end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
@@ -510,9 +514,19 @@ function __init__()
         end
     end
     @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
-        StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}} where {V,W}) = hcat(value.(value(m))...)
+        StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}}) where {V,W} = StaticArrays.SMatrix{mdims(W),mdims(V)}(vcat(value.(value(m))...))
+        DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{SubManifold(N),1}(m)
         Chain{V,1}(m::StaticArrays.SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Chain{V,1,Chain{W,1}}(m::StaticArrays.SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+        Base.exp(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(exp(StaticArrays.SMatrix(A)))
+        Base.log(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(log(StaticArrays.SMatrix(A)))
+        LinearAlgebra.eigvals(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Values{mdims(V)}(eigvals(StaticArrays.SMatrix(A))))
+        LinearAlgebra.eigvecs(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Chain.(Values{mdims(A)}.(getindex.(Ref(eigvecs(StaticArrays.SMatrix(A))),:,list(1,mdims(A))))))
+        function LinearAlgebra.eigen(A::Chain{V,1,<:Chain{V,1}}) where V
+            E,N = eigen(StaticArrays.SMatrix(A)),mdims(V)
+            e = Chain(Chain.(Values{N}.(getindex.(Ref(E.vectors),:,list(1,N)))))
+            Proj(e,Chain(Values{N}(E.values)))
+        end
     end
     @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
         GeometryBasics.Point(t::Values) = GeometryBasics.Point(Tuple(t.v))

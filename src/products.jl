@@ -2,8 +2,9 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-@pure tvec(N,G,t::Symbol=:Any) = :(Values{$(binomial(N,G)),$t})
-@pure tvec(N,t::Symbol=:Any) = :(Values{$(1<<N),$t})
+@pure tvec(N,G,t=Any) = :(Values{$(binomial(N,G)),$t})
+@pure tvec(N,t::Type=Any) = :(Values{$(1<<N),$t})
+@pure tvec(N,t::Symbol) = :(Values{$(1<<N),$t})
 @pure tvec(N,μ::Bool) = tvec(N,μ ? :Any : :t)
 
 # mutating operations
@@ -12,10 +13,10 @@
 derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
 #derive(n,b,a::T,t) where T<:TensorAlgebra = t ? (a,derive(n,b)) : (derive(n,b),a)
 
-@inline function derive_mul(V,A,B,v,x::Bool)
+@inline @generated function derive_mul(V,A,B,v,x::Bool)
     if !(istangent(V) && isdyadic(V))
-        return v
-    else
+        return :v
+    else quote
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
         ca,cb = count_ones(sa[2]),count_ones(sb[2])
         return if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
@@ -27,13 +28,13 @@ derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
             end
             prev
         end
-    end
+    end end
 end
 
-@inline function derive_mul(V,A,B,a,b,*)
+@inline @generated function derive_mul(V,A,B,a,b,*)
     if !(istangent(V) && isdyadic(V))
-        return a*b
-    else
+        return :(a*b)
+    else quote
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
         ca,cb = count_ones(sa[2]),count_ones(sb[2])
         α,β = if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
@@ -57,7 +58,7 @@ end
             ca == 0 ? prev : (prev[2],prev[1])
         end
         return α*β
-    end
+    end end
 end
 
 function derive_pre(V,A,B,v,x)
@@ -409,7 +410,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     elseif Field ∈ (SymField,:(SymPy.Sym))
         generate_mutators(:(FixedVector{M,T}),Field,set_val,SUB,MUL)
     end
-    PAR && (DirectSum.extend_field(eval(Field)); global parsym = (parsym...,eval(Field)))
+    PAR && (Leibniz.extend_field(eval(Field)); global parsym = (parsym...,eval(Field)))
     TF = Field ∉ FieldsBig ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
     Field ∉ Fields && @eval begin
@@ -472,6 +473,9 @@ end
 
 ### Product Algebra
 
+@generated function contraction2(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
+    product_contraction(a,b,false,:product)
+end
 for (op,prop) ∈ ((:*,:product),(:contraction,:product_contraction))
     @eval begin
         @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,L,T}
