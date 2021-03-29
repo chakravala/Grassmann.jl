@@ -22,7 +22,7 @@
         if Q == V
             if isdyadic(V)
                 if G == M == 1
-                    x = bits(W)
+                    x = UInt(W)
                     X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
                     Y = 0≠X ? X : x
                     out = :(@inbounds b.v[bladeindex($(mdims(V)),Y)])
@@ -43,11 +43,11 @@
         return V===W ? :b : :(Chain{w,G,T}(value(b)))
     elseif W⊆V
         if G == 1
-            ind = Values{mdims(W),Int}(indices(bits(W),mdims(V)))
+            ind = Values{mdims(W),Int}(indices(UInt(W),mdims(V)))
             :(@inbounds Chain{w,1,T}(b.v[$ind]))
         else quote
             out,N = zeros(choicevec(M,G,valuetype(b))),mdims(V)
-            ib,S = indexbasis(N,G),bits(w)
+            ib,S = indexbasis(N,G),UInt(w)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
                     @inbounds if count_ones(ib[k]&S) == G
@@ -66,7 +66,7 @@
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
-                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
+                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
                     if WC && (!VC)
                         @inbounds setblade!(out,b[k],mixed(V,B),Val{M}())
                     elseif (!WC) && (!VC)
@@ -118,7 +118,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
             for k ∈ 1:length(ib)
                 @inbounds s = k+bs[i]
                 @inbounds if m.v[s] ≠ 0
-                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,bits(V),ib[k]) : ib[k]
+                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
                     if WC && (!VC)
                         @inbounds setmulti!(out,m.v[s],mixed(V,B),Val{M}())
                     elseif (!WC) && (!VC)
@@ -222,7 +222,7 @@ end
 
 function (a::Chain{V,1})(b::SubManifold{V,1}) where V
     (!isdyadic(V)) && (return contraction(a,b))
-    x = bits(b)
+    x = UInt(b)
     X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
     Y = X>2^mdims(V) ? x : X
     @inbounds out = a.v[bladeindex(mdims(V),Y)]
@@ -232,7 +232,7 @@ end
     function (a::Chain{V,2,T})(b::SubManifold{V,1}) where {V,T}
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:N,:df,:di))...)
-        Q = bladeindex(N,bits(b))
+        Q = bladeindex(N,UInt(b))
         @inbounds m,val = df[Q][1],df[Q][2]*value(b)
         out = zero(mvec(N,1,T))
         for i ∈ 1:N
@@ -252,7 +252,7 @@ end
     function (a::Simplex{V,1})(b::Chain{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:t,))...)
-        x = bits(a)
+        x = UInt(a)
         X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
         Y = 0≠X ? X : x
         @inbounds out = b.v[bladeindex(mdims(V),Y)]
@@ -267,7 +267,7 @@ end
     function (a::Chain{V,2})(b::Simplex{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:N,:t,:df,:di))...)
-        Q = bladeindex(N,bits(b))
+        Q = bladeindex(N,UInt(b))
         out = zero(mvec(N,1,T))
         @inbounds m,val = df[Q][1],df[Q][2]*b.v
         for i ∈ 1:N

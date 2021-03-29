@@ -128,7 +128,7 @@ isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ 
 
 function Chain(val::𝕂,v::SubManifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
-    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,bits(v),Val(N)))
+    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,UInt(v),Val(N)))
 end
 Chain(v::SubManifold) = Chain(one(Int),v)
 Chain(v::Simplex) = Chain(v.v,basis(v))
@@ -137,7 +137,7 @@ Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
 Chain{V,G,T,X}(x::Simplex{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
 function Chain{V,0,T,X}(x::Simplex{V,0,v}) where {V,T,X,v}
     N = mdims(V)
-    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),bits(v),Val(N)))
+    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),UInt(v),Val(N)))
 end
 
 getindex(m::Chain,i::T) where T<:AbstractVector{<:SubManifold} = getindex.(m,i)
@@ -149,14 +149,14 @@ function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
 end
 
 function ==(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
-    i = bladeindex(mdims(V),bits(basis(b)))
+    i = bladeindex(mdims(V),UInt(basis(b)))
     @inbounds a[i] == value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
 end
 ==(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
 ==(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
 
 function isapprox(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
-    i = bladeindex(mdims(V),bits(basis(b)))
+    i = bladeindex(mdims(V),UInt(basis(b)))
     @inbounds a[i] ≈ value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
 end
 isapprox(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
@@ -201,6 +201,7 @@ end
 @pure iscell(t) = isbundle(t) && islocal(Manifold(t))
 
 @pure Manifold(::ChainBundle{V}) where V = V
+@pure Manifold(::Type{<:ChainBundle{V}}) where V = V
 @pure Manifold(::Vector{<:Chain{V}}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
@@ -312,7 +313,7 @@ function ==(a::MultiVector{V,T},b::Chain{V,G,S}) where {V,T,G,S}
 end
 ==(a::Chain{V,G,T},b::MultiVector{V,S}) where {V,S,G,T} = b == a
 function ==(a::MultiVector{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
-    i = basisindex(mdims(V),bits(basis(b)))
+    i = basisindex(mdims(V),UInt(basis(b)))
     @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
 end
 ==(a::T,b::MultiVector{V,S} where S) where T<:TensorTerm{V} where V = b==a
@@ -325,7 +326,7 @@ end
 
 function MultiVector(val::T,v::SubManifold{V,G}) where {V,T,G}
     N = mdims(V)
-    MultiVector{V}(setmulti!(zeros(mvec(N,T)),val,bits(v),Val{N}()))
+    MultiVector{V}(setmulti!(zeros(mvec(N,T)),val,UInt(v),Val{N}()))
 end
 MultiVector(v::SubManifold{V,G}) where {V,G} = MultiVector(one(Int),v)
 for var ∈ ((:V,:T),(:T,))

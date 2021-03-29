@@ -568,6 +568,14 @@ for op ∈ (:mean,:barycenter,:curl)
     end
 end
 
+function area(m::Vector{<:Chain})
+    S = m[end]∧m[1]
+    for i ∈ 1:length(m)-1
+        S += m[i]∧m[i+1]
+    end
+    return value(abs(⋆(S))/2)
+end
+
 initedges(p::ChainBundle) = Chain{p,1}.(1:length(p)-1,2:length(p))
 initedges(r::R) where R<:AbstractVector = initedges(ChainBundle(initpoints(r)))
 function initmesh(r::R) where R<:AbstractVector
@@ -642,7 +650,7 @@ Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
     (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(x, T, size(adjA, 1)), adjA, x, 2, 0))
 *(transA::LinearAlgebra.Transpose{<:Any,<:SparseMatrixCSC{TA,S}}, x::StridedVector{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =
     (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(x, T, size(transA, 1)), transA, x, 1, 0))
-if VERSION >= v"1.4"
+if VERSION >= v"1.4" && VERSION < v"1.6"
     *(adjA::LinearAlgebra.Adjoint{<:Any,<:SparseMatrixCSC{TA,S}}, B::SparseArrays.AdjOrTransStridedOrTriangularMatrix{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =
         (T = promote_type(TA, Chain{V,G,𝕂,X}); mul!(similar(B, T, (size(adjA, 1), size(B, 2))), adjA, B, 1, 0))
     *(transA::LinearAlgebra.Transpose{<:Any,<:SparseMatrixCSC{TA,S}}, B::SparseArrays.AdjOrTransStridedOrTriangularMatrix{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =

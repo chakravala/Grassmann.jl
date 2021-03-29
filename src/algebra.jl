@@ -18,15 +18,15 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 @pure *(a::SubManifold{V},b::SubManifold{V}) where V = mul(a,b)
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
-@pure function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,bits(a),bits(b),1,true)) where V
-    ba,bb = bits(a),bits(b)
+@pure function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
+    ba,bb = UInt(a),UInt(b)
     (diffcheck(V,ba,bb) || iszero(der)) && (return g_zero(V))
-    A,B,Q,Z = symmetricmask(V,bits(a),bits(b))
+    A,B,Q,Z = symmetricmask(V,UInt(a),UInt(b))
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
     diffvars(V)≠0 && !iszero(Z) && (out = Simplex{V}(getbasis(loworder(V),Z),out))
-    return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻bits(d)))) : out
+    return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻UInt(d)))) : out
 end
 
 function *(a::Simplex{V},b::SubManifold{V}) where V
@@ -35,7 +35,7 @@ function *(a::Simplex{V},b::SubManifold{V}) where V
     order(a.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
 function *(a::SubManifold{V},b::Simplex{V}) where V
-    v = derive_mul(V,bits(a),bits(basis(b)),b.v,false)
+    v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
     order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
@@ -78,7 +78,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 wedges(x,i=length(x)-1) = i ≠ 0 ? Expr(:call,:∧,wedges(x,i-1),x[1+i]) : x[1+i]
 
 @pure function ∧(a::SubManifold{V},b::SubManifold{V}) where V
-    ba,bb = bits(a),bits(b)
+    ba,bb = UInt(a),UInt(b)
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb) || iszero(derive_mul(V,ba,bb,1,true))) && (return g_zero(V))
     d = getbasis(V,(A⊻B)|Q)
@@ -88,7 +88,7 @@ end
 
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     x,y = basis(a), basis(b)
-    ba,bb = bits(x),bits(y)
+    ba,bb = UInt(x),UInt(y)
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
@@ -114,19 +114,19 @@ export ∧, ∨, ⊗
 
 @pure function ∨(a::SubManifold{V},b::SubManifold{V}) where V
     p,C,t,Z = regressive(a,b)
-    (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
+    (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
     istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
     return isone(p) ? d : Simplex{V}(p,d)
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    ba,bb = bits(basis(a)),bits(basis(b))
+    ba,bb = UInt(basis(a)),UInt(basis(b))
     p,C,t,Z = regressive(V,ba,bb)
     !t  && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
+        _,_,Q,_ = symmetricmask(V,UInt(basis(a)),UInt(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
@@ -170,19 +170,19 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 """
 @pure function contraction(a::SubManifold{V},b::SubManifold{V}) where V
     g,C,t,Z = interior(a,b)
-    (!t || iszero(derive_mul(V,bits(a),bits(b),1,true))) && (return g_zero(V))
+    (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return g_zero(V))
     d = getbasis(V,C)
     istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
     return typeof(V) <: Signature ? (g ? Simplex{V}(-1,d) : d) : Simplex{V}(g,d)
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
-    ba,bb = bits(basis(a)),bits(basis(b))
+    ba,bb = UInt(basis(a)),UInt(basis(b))
     g,C,t,Z = interior(V,ba,bb)
     !t && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
     if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,bits(basis(a)),bits(basis(b)))
+        _,_,Q,_ = symmetricmask(V,UInt(basis(a)),UInt(basis(b)))
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
@@ -562,7 +562,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         end; else quote
             $(insert_expr((:N,:t),VEC)...)
             out = value(b,$VEC(N,G,t))
-            addblade!(out,$left(value(a,t)),bits(basis(a)),Val{N}())
+            addblade!(out,$left(value(a,t)),UInt(basis(a)),Val{N}())
             return Chain{V,G}(out)
         end end end
     end
@@ -594,12 +594,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         else return if !swap; quote
             $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
             @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
-            addmulti!(out,value(a,t),bits(basis(a)),Val(N))
+            addmulti!(out,value(a,t),UInt(basis(a)),Val(N))
             return MultiVector{V}(out)
         end; else quote
             $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
             @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-            addmulti!(out,$left(value(b,t)),bits(basis(b)),Val(N))
+            addmulti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
             return MultiVector{V}(out)
         end end end
     end
@@ -623,12 +623,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VEC(N,t),$(bcast(right,:(value(b,$VEC(N,t)),))))
-            addmulti!(out,value(a,t),bits(basis(a)),Val(N))
+            addmulti!(out,value(a,t),UInt(basis(a)),Val(N))
             return MultiVector{V}(out)
         end; else quote
             $(insert_expr((:N,:t),VEC)...)
             out = value(a,$VEC(N,t))
-            addmulti!(out,$left(value(b,t)),bits(basis(b)),Val(N))
+            addmulti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
             return MultiVector{V}(out)
         end end end
     end

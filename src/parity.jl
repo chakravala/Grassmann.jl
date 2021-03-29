@@ -144,7 +144,7 @@ end
 end
 @pure parity(v::Int,a::UInt,b::UInt) = parity(v,metric(v),a,b)
 @pure parity(v::T,a::UInt,b::UInt) where T<:Manifold = parity(Signature(v),a,b)
-@pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(V,bits(a),bits(b))
+@pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(V,UInt(a),UInt(b))
 
 ### parity product caches
 
@@ -171,8 +171,8 @@ for par ∈ (:conformal,:regressive,:interior)
                 for k ∈ length($extra[N][S])+1:m1
                     @inbounds push!($extra[N][S],Dict{UInt,Dict{UInt,Dict{UInt,$T}}}())
                 end
-                @inbounds !haskey($extra[N][S][m1],s) && push!($extra[N][S][m1],s=>Dict{Bits,Dict{Bits,$T}}())
-                @inbounds !haskey($extra[N][S][m1][s],a) && push!($extra[N][S][m1][s],a=>Dict{Bits,$T}())
+                @inbounds !haskey($extra[N][S][m1],s) && push!($extra[N][S][m1],s=>Dict{UInt,Dict{UInt,$T}}())
+                @inbounds !haskey($extra[N][S][m1][s],a) && push!($extra[N][S][m1][s],a=>Dict{UInt,$T}())
                 @inbounds !haskey($extra[N][S][m1][s][a],b) && push!($extra[N][S][m1][s][a],b=>$calc(V,a,b))
                 @inbounds $extra[N][S][m1][s][a][b]
             else
@@ -196,7 +196,7 @@ for par ∈ (:conformal,:regressive,:interior)
                 @inbounds $cache[n][S][m1][s][a1][b+1]
             end
         end
-        @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,bits(a),bits(b))
+        @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,UInt(a),UInt(b))
     end
 end
 
@@ -212,7 +212,7 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval begin
-        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(mdims(V),bits(basis(t))) ∈ $op(V,G) ? t : zero(V)
+        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(mdims(V),UInt(basis(t))) ∈ $op(V,G) ? t : zero(V)
         function $op(t::Chain{V,G,T}) where {V,G,T}
             out = copy(value(t,mvec(mdims(V),G,T)))
             for k ∈ $other(V,G)

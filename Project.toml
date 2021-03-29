@@ -1,7 +1,7 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.7.2"
+version = "0.7.3"
 
 [deps]
 AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
@@ -25,7 +25,6 @@ Requires = "1"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
-GraphPlot = "a2cc645c-3eea-5389-862e-a155d0052231"
 Adapode = "0750cfb5-909a-49d7-927e-29b6595444bf"
 
 [targets]

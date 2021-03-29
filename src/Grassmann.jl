@@ -15,10 +15,10 @@ import Base: @pure, ==, isapprox
 import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
 import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
-import Leibniz: Bits, bit2int, indexbits, indices, diffvars, diffmask
+import Leibniz: bit2int, indexbits, indices, diffvars, diffmask
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
 
-import Leibniz: hasconformal, hasinf2origin, hasorigin2inf, g_zero, g_one, bits
+import Leibniz: hasconformal, hasinf2origin, hasorigin2inf, g_zero, g_one
 import AbstractTensors: valuetype, scalar, isscalar, ⊗
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 
@@ -183,7 +183,7 @@ absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V}(absym.(value(t)))
 collapse(a,b) = a⋅absym(∂(b))
 
 function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
-    N,B,v = mdims(V),bits(basis(t)),value(t)
+    N,B,v = mdims(V),UInt(basis(t)),value(t)
     C = symmetricmask(V,B,B)[1]
     G = count_ones(C)
     G < 2 && (return t)
@@ -202,7 +202,7 @@ path(t) = chain(t,Val{false}())
 𝒫(t::T) where T<:TensorAlgebra = Δ(t,Val{false}())
 subcomplex(x::S,v=Val{true}()) where S<:TensorAlgebra = Δ(absym(∂(x)),v)
 function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
-    B = bits(basis(x))
+    B = UInt(basis(x))
     count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
 end
 function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
@@ -406,7 +406,7 @@ for Big ∈ (BigFloat,BigInt)
 end
 generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
 function generate_derivation(m,t,d,c)
-    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(Manifold(b),bits(b))))
+    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(Manifold(b),UInt(b))))
 end
 function generate_algebra(m,t,d=nothing,c=nothing)
     generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
@@ -498,12 +498,12 @@ function __init__()
             return g
         end
     end
-    #@require GraphPlot="a2cc645c-3eea-5389-862e-a155d0052231"
+    #=@require GraphPlot="a2cc645c-3eea-5389-862e-a155d0052231"
     @require Compose="a81c6b42-2e10-5240-aca2-a61377ecd94b" begin
         import LightGraphs, GraphPlot, Cairo
         viewer = Base.Process(`$(haskey(ENV,"VIEWER") ? ENV["VIEWER"] : "xdg-open") simplex.pdf`,Ptr{Nothing}())
         function Compose.draw(img,x::T,l=layout=GraphPlot.circular_layout) where T<:TensorAlgebra
-            Compose.draw(img,GraphPlot.gplot(LightGraphs.SimpleDiGraph(x),layout=l,nodelabel=collect(1:rank(Manifold(x)))))
+            Compose.draw(img,GraphPlot.gplot(LightGraphs.SimpleDiGraph(x),layout=l,nodelabel=collect(1:mdims(Manifold(x)))))
         end
         function graph(x,n="simplex.pdf",l=GraphPlot.circular_layout)
             cmd = `$(haskey(ENV,"VIEWER") ? ENV["VIEWER"] : "xdg-open") $n`
@@ -512,7 +512,7 @@ function __init__()
             Compose.draw(Compose.PDF(n,16Compose.cm,16Compose.cm),x,l)
             viewer = run(cmd,(devnull,stdout,stderr),wait=false)
         end
-    end
+    end=#
     @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
         StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}}) where {V,W} = StaticArrays.SMatrix{mdims(W),mdims(V)}(vcat(value.(value(m))...))
         DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{SubManifold(N),1}(m)
@@ -520,8 +520,8 @@ function __init__()
         Chain{V,1,Chain{W,1}}(m::StaticArrays.SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Base.exp(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(exp(StaticArrays.SMatrix(A)))
         Base.log(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(log(StaticArrays.SMatrix(A)))
-        LinearAlgebra.eigvals(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Values{mdims(V)}(eigvals(StaticArrays.SMatrix(A))))
-        LinearAlgebra.eigvecs(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Chain.(Values{mdims(A)}.(getindex.(Ref(eigvecs(StaticArrays.SMatrix(A))),:,list(1,mdims(A))))))
+        LinearAlgebra.eigvals(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Values{mdims(V)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
+        LinearAlgebra.eigvecs(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Chain.(Values{mdims(A)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,mdims(A))))))
         function LinearAlgebra.eigen(A::Chain{V,1,<:Chain{V,1}}) where V
             E,N = eigen(StaticArrays.SMatrix(A)),mdims(V)
             e = Chain(Chain.(Values{N}.(getindex.(Ref(E.vectors),:,list(1,N)))))

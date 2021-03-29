@@ -48,7 +48,7 @@ end
             while typeof(prev[1]) <: TensorTerm
                 basi = basis(prev[1])
                 #base *= basi
-                inds = Leibniz.indexsplit(bits(basi),mdims(V))
+                inds = Leibniz.indexsplit(UInt(basi),mdims(V))
                 prev = (value(prev[1]),prev[2])
                 for k ∈ inds
                     prev = derive(prev[2],getbasis(V,k),prev[1],true)
@@ -105,7 +105,7 @@ function derive_post(V,::Val{A},::Val{B},a,b,*) where {A,B}
         while typeof(prev[1]) <: TensorTerm
             basi = basis(prev[1])
             #base *= basi
-            inds = Leibniz.indexsplit(bits(basi),mdims(V))
+            inds = Leibniz.indexsplit(UInt(basi),mdims(V))
             prev = (value(prev[1]),prev[2])
             for k ∈ inds
                 prev = derive(prev[2],getbasis(V,k),prev[1],true)
@@ -173,7 +173,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
             for j ∈ (:join,:geom)
                 for S ∈ (s,spre)
                     @eval @inline function $(Symbol(j,S))(m::$M,v::S,A::SubManifold{V},B::SubManifold{V}) where {V,T<:$F,S<:$F,M}
-                        $(Symbol(j,S))(V,m,bits(A),bits(B),v)
+                        $(Symbol(j,S))(V,m,UInt(A),UInt(B),v)
                     end
                 end
             end
@@ -238,7 +238,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior))
                 for S ∈ (s,spre)
                     @eval @inline function $(Symbol(prod,S))(m::$M,A::SubManifold{V},B::SubManifold{V},v::T) where {V,T,M}
-                        $(Symbol(prod,S))(V,m,bits(A),bits(B),v)
+                        $(Symbol(prod,S))(V,m,UInt(A),UInt(B),v)
                     end
                 end
                 @eval begin
@@ -418,14 +418,16 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         *(a::SubManifold{V},b::F) where {F<:$EF,V} = Simplex{V}(b,a)
         adjoint(b::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{dual(V),G,B',$TF}($CONJ(value(b)))
         Base.promote_rule(::Type{Simplex{V,G,B,T}},::Type{S}) where {V,G,T,B,S<:$Field} = Simplex{V,G,B,promote_type(T,S)}
-        Base.promote_rule(::Type{Chain{V,G,T,B}},::Type{S}) where {V,G,T,B,S<:$Field} = Chain{V,G,promote_type(T,S),B}
         Base.promote_rule(::Type{MultiVector{V,T,B}},::Type{S}) where {V,T,B,S<:$Field} = MultiVector{V,promote_type(T,S),B}
+    end
+    Field ∉ Fields && Field≠Any && @eval begin
+        Base.promote_rule(::Type{Chain{V,G,T,B}},::Type{S}) where {V,G,T,B,S<:$Field} = Chain{V,G,promote_type(T,S),B}
     end
     @eval begin
         Base.:-(a::Simplex{V,G,B,T}) where {V,G,B,T<:$Field} = Simplex{V,G,B,$TF}($SUB(value(a)))
         function *(a::Simplex{V,G,A,T} where {G,A},b::Simplex{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
-            v = derive_mul(V,bits(ba),bits(bb),a.v,b.v,$MUL)
+            v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
             Simplex(v,mul(ba,bb,v))
         end
         ∧(a::$Field,b::$Field) = $MUL(a,b)
