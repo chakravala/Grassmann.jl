@@ -1,5 +1,69 @@
 # Grassmann elements and geometric algebra Λ(V)
 
+**Definition** (Vector space ``\Lambda^1 V = V`` is a field's ``\mathbb K``-module instance).
+	Let ``V`` be a ``\mathbb K``-module (abelian group with respect to ``+``) with an element ``1\in\mathbb K`` such that ``1V = V`` by scalar multiplication ``\mathbb K\times V\rightarrow V`` over field ``\mathbb K`` satisfying
+1. `` a(x+y) = ax+ ay`` distribution of vector addition,
+2. `` (a+b)x = ax + bd`` distribution of field addition,
+3. `` (ab)x = a(bx)`` associative compatibility.
+
+In the software package `Grassmann`, an underlying generating vector space is also synonymous with the term `<:TensorBundle` (an abstract type).
+
+
+**Definition** (Linear dependence).
+	Let ``V`` be a vector space over field $\mathbb K$, then the set ``\{v_i\}_i`` is linearly dependent if and only if ``\sum_{i=1}^n k_iv_i = 0`` for some ``0\ne k\in\mathbb K^n``.
+
+**Definition** (``\wedge``-product annihilation).
+	For a linearly dependent set ``\{v_i\}_1^n\subset V`` 
+```math
+v_1\wedge v_2\wedge\dots\wedge v_n = 0.
+```
+
+Initially, it is enough to understand that ``\wedge:\Lambda^n V\times\Lambda^m V\rightarrow\Lambda^{n+m}V`` is an operation which is zero for linearly dependent arguments. 
+However, this idea comes from extending Grassmann's product ``v_i\wedge v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i`` to yield a tool for characterizing linear dependence.
+
+**Definition** (Dimension ``n``-SubManifold in ``\Lambda^n V``).
+	Hence, writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`SubManifold`.
+
+With the product ``\Lambda^0\Lambda^n V\times(v_1\wedge v_2\wedge\cdots\wedge v_n)\cong \mathbb K`` it is also clear that a 1-dimensional basis subspace is induced by any ``n``-`SubManifold`.
+
+*Example*. Therefore, ``\mathbb K = \Lambda^0\mathbb K \cong \Lambda^1\mathbb K`` is a vector space or a 0-SubManifold.
+
+*Example*. ``\Lambda^n V`` is a vector space with ``\Lambda^1\Lambda^n V = \Lambda^nV`` and ``\Lambda^0\Lambda^nV = \Lambda^0V``.
+
+Denote ``V^* = V\backslash\{0\}`` as the set ``V`` excluding the 0 element in next:
+
+**Definition** (Direct sum ``\oplus``).
+	To consider a set of linearly independent spaces,
+	let ``\pi_i: V\rightarrow V_i`` be projections with vector space ``V_i\subset V``, define
+```math
+V_1\oplus V_2\oplus\cdots\oplus V_n = V \iff
+\bigwedge : V_1^*\times V_2^*\times\cdots\times V_n^* \rightarrow \Lambda^n V^* .
+```
+
+DirectSum of a full  non-zero product implies an ``n``-SubManifold.
+
+**Ddefinition**
+	Grade-``m`` projection is defined as ``\{\Lambda V\,\}_m = \Lambda^m V`` such that
+```math
+\Lambda V = \bigoplus_{m=0}^n \langle\Lambda V\,\rangle_m = \Lambda^0V\oplus\Lambda^1V\oplus\cdots\oplus\Lambda^nV, \qquad \langle\Lambda V\,\rangle_m = \bigoplus_{m=1}^{n\choose m}\mathbb K.
+```
+Note that ``\dim \{\Lambda V\,\}_m = {n\choose m}`` and hence ``\dim\Lambda V = \sum_{m=0}^n {n\choose m} = 2^n``.
+
+*Example* (Combinatorics of ``\mathcal P(V)`` and hypergraphs ``\subseteq P(V)\backslash\{\emptyset\}``).
+Let ``v_1,v_2,v_3 \in\mathbb R^3``, then the power set of elements is:
+```math
+\mathcal P(\mathbb R^3) = \{\emptyset,\{v_1\},\{v_2\},\{v_3\},\{v_1,v_2\},\{v_1,v_3\},\{v_2,v_3\},\{v_1,v_2,v_3\}\}
+```
+Form a direct sum over the elements of ``\mathcal P(V)`` with ``\wedge`` to define ``\Lambda V``, e.g.
+```math
+\Lambda(\mathbb R^3) = \Lambda^0(\mathbb R^3)\oplus\Lambda^1(\mathbb R^3)\oplus\Lambda^2(\mathbb R^3)\oplus\Lambda^3(\mathbb R^3)
+```
+```math
+\overbrace{v_\emptyset}^{\Lambda^0\mathbb R}\oplus \overbrace{v_1\oplus v_2\oplus v_3}^{\Lambda^1(\mathbb R^3)}\oplus\overbrace{(v_1\wedge v_2)\oplus (v_1\wedge v_3) \oplus (v_2\wedge v_3)}^{\Lambda^2(\mathbb R^3)}\oplus\overbrace{(v_1\wedge v_2\wedge v_3)}^{\Lambda^3(\mathbb R^3)}
+```
+
+
+
 The Grassmann `SubManifold` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V'`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V'`` are dependent functions of the `tangent` manifold.
 Let ``V\in\text{Vect}_{\mathbb k}`` be a `TensorBundle` with dual space ``V'`` and the basis elements ``w_k:V\rightarrow\mathbb K``, then for all ``x\in V,c\in\mathbb K`` it holds: ``(w^i+w^j)(x) = w^i(x)+w^j(x)`` and ``(cw^k)(x) = cw^k(x)`` hold.
 An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
@@ -155,11 +219,11 @@ v1^2, v2^2, v12^2, v1*v2*v12
 The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
 All of this is enabled by the psuedoscalar complement duality.
 
-**Definition** (Poincare-Hodge dual complement):
-Let ``\star\langle\omega\rangle_p = \langle\omega\rangle_p\ast I = \langle\tilde\omega\rangle_p\ominus I``,
-then ``\star : \Lambda^pV\rightarrow\Lambda^{n-p}V``.
 
-**Remark**. While ``\star\omega`` is `complementrighthodge` of ``\omega``, the `complementlefthodge` would be ``I\ast'\omega``. The ``\star`` symbol was added to the Julia language as unary operator for ease of use with `Grassmann` on Julia's v1.2 release.
+**Definition** (Poincare-Hodge complement ``\star``):
+Let ``\omega = w_{i_1}\wedge\dots\wedge w_{i_p}`` and ``\star\omega = \widetilde\omega I``, then ``\star : \Lambda^pV\rightarrow\Lambda^{n-p}V``.
+
+**Remark**. While ``\star\omega`` is `complementrighthodge` of ``\omega``, the `complementlefthodge` would be ``I\widetilde\omega``. The ``\star`` symbol was added to the Julia language as unary operator for ease of use with `Grassmann` on Julia's v1.2 release.
 
 With [LightGraphs.jl](https://github.com/JuliaGraphs/LightGraphs.jl), [GraphPlot.jl](https://github.com/JuliaGraphs/GraphPlot.jl), [Cairo.jl](https://github.com/JuliaGraphics/Cairo.jl), [Compose.jl](https://github.com/GiovineItalia/Compose.jl) it is possible to convert `Grassmann` numbers into graphs.
 ```julia
@@ -182,6 +246,63 @@ Together, ``(\wedge,\vee,\star)`` yield an orthocomplementary propositional latt
 (\star\bigvee_k \omega_k)(v_1,\dots,v_P) = (\bigwedge_k\star\omega_k)(v_1,\dots,v_P) \quad DeMorgan's\,Law,
 ```
 where DeMorgan's law is used to derive tensor contractions.
+
+
+However, this is only completely true for Euclidean algebras.
+In general, the original Grassmann (OG) complement must be used in DeMorgan's Law,
+while tensor contractions utilize the Hodge complement's metric.
+
+**Definition** (Original Grassmann complement ``|``).
+	This operation is the same as ``\star`` but is always Euclidean (``g\equiv 1``). In Julia it is also the `!` method.
+
+Interior contractions ``\eta\cdot\omega = \eta\vee\star\omega`` need both ``\star`` and ``|`` complements.
+Of fundamental importance is the complement of a complement axiom:
+
+**Theorem**. Let ``\omega\in\Lambda^m V``, then ``\star\star\omega = (-1)^{m(n-m)}\omega |I|^2``.
+
+Foundationally important formulas include the Grassmann complement axiom with a Euclidean manifold:
+**Corollary** (Euclidean complement of a complement axiom).
+	Let ``\omega\in\Lambda^m(\mathbb R^n)``, then ``\star\star\omega = (-1)^{m(n-m)}\omega`` since ``|I|^2=1``.
+
+The following lemma and corollary are helpful:
+
+*Lemma*. Let ``\omega\in\Lambda^mV``, then ``I\vee\omega = \omega``.
+
+**Corollary**. Obviously, ``\tilde\omega I = I\cdot\omega``
+	since ``I\cdot\omega = I\vee\star\omega = \star\omega = \tilde\omega I``.
+
+Interior and exterior product with Hodge element
+
+**Theorem**.
+	Let ``\omega\in\Lambda^m V``, then ``(\omega\vee\star\omega)I = \omega\wedge\star\omega``.
+
+**Theorem**.
+	``\eta\wedge\star\omega = (\widetilde\omega\vee\star\widetilde\eta)I = (\widetilde\omega\cdot\widetilde\eta)I \iff \eta\cdot\omega = \eta\vee\star\omega = (\widetilde\omega\wedge\star\widetilde\eta)/I``.
+
+**Theorem**.
+	Let ``\eta,\omega\in\Lambda^mV``, then ``\tilde\eta\cdot\tilde\omega = \eta\cdot\omega``.
+
+**Corollary** (Absolute value ``|\omega|^2=\omega\cdot\omega``).
+```math
+(\omega\cdot\omega)I = \tilde\omega\wedge\star\tilde\omega = \tilde\omega\star\tilde\omega = \tilde\omega\omega I = |\omega|^2I \iff \omega\cdot\omega = \tilde\omega\omega
+```
+
+The expressions can also be reversed: ``\omega\wedge\star\omega = \omega\star\omega = \omega\tilde\omega I = |\omega|^2I``.
+However, when ``\eta\in\Lambda^rV`` and ``\omega\in\Lambda^sV`` are of unequal grade, then there exist several possible variations of graded contraction operations.
+Of course, the most natural option for the interior contraction is Grassmann's right contraction also written ``\eta |\omega = \eta\vee\star\omega``.
+However, many authors such as Dorst \cite{dorst-inner} prefer the Conventional contraction, which is one of the other variations.
+
+|Contraction |left(``\eta,\omega``) | right(``\eta,\omega``)|
+--- | --- | ---
+|Grassmann |``\langle\omega\rangle_s\vee\star\langle\eta\rangle_r = \langle\tilde\eta\omega\rangle_{s-r}`` | ``\langle\eta\rangle_r\vee\star\langle\omega\rangle_s = \langle\tilde\eta\omega\rangle_{r-s}``|
+|Reversed |``\langle\tilde\omega\rangle_s\vee\star\langle\tilde\eta\rangle_r = \langle\eta\tilde\omega\rangle_{s-r}`` | ``\langle\tilde\eta\rangle_r\vee\star\langle\tilde\omega\rangle_s = \langle\eta\tilde\omega\rangle_{r-s}``|
+|Conventional |``\langle\omega\rangle_s\vee\star\langle\tilde \eta\rangle_r = \langle\eta\omega\rangle_{s-r}`` | ``\langle\tilde \eta\rangle_r\vee\star\langle\omega\rangle_s = \langle\eta\omega\rangle_{r-s}``|
+|Unconventional |``\langle\tilde \omega\rangle_s\vee\star\langle\eta\rangle_r = \langle\tilde \eta\tilde \omega\rangle_{s-r}`` | ``\langle\eta\rangle_r\vee\star\langle\tilde\omega\rangle_s = \langle\tilde \eta\tilde \omega\rangle_{r-s}``|
+
+```julia
+julia> (v1 + v2) ⋅ (1.5v2 + v3)
+1.5v
+```
 
 **Definition**.
 Symmetrically define skew left $\lrcorner$ and right $\llcorner$ contractions
