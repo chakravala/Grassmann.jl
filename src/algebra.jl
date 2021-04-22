@@ -220,8 +220,8 @@ contraction(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V
 #contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
 contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅Ref(b))
 contraction(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}},b::Chain{V,1}) where {W,V} = a.v:b
-contraction(a::Chain{W,G},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(column(Ref(a).⋅value(b)))
-contraction(a::Chain{W,G,<:Chain},b::Chain{V,1,<:Chain}) where {W,G,V} = Chain{V,1}(Ref(a).⋅value(b))
+contraction(a::Chain{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
+contraction(a::Chain{W,L,<:Chain},b::Chain{V,G,<:Chain{W,L}}) where {W,L,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
 Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
 Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).⋅Ref(b))
 #Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
@@ -386,7 +386,7 @@ end
 function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
     V = Manifold(v)
     isone(i) && (return v)
-    if T<:Chain && diffvars(v)==0
+    if T<:Chain && mdims(V)≤3 && diffvars(v)==0
         sq,d = contraction2(~v,v),i÷2
         val = isone(d) ? sq : sq^d
         return iszero(i%2) ? val : val*v
