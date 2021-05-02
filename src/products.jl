@@ -542,7 +542,7 @@ for side ∈ (:left,:right)
                     out = zeros(svec(N,G,Any))
                     D = diffvars(V)
                     for k ∈ 1:binomial(N,G)
-                        val = :(b.v[$k])
+                        val = :(conj(b.v[$k]))
                         @inbounds p = $p(V,ib[k])
                         v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
                         v = typeof(V)<:Signature ? (p ? :($SUB($v)) : v) : Expr(:call,MUL,p,v)
@@ -559,7 +559,7 @@ for side ∈ (:left,:right)
                         if val≠0
                             @inbounds p = $$p(V,ib[k])
                             v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
-                            v = typeof(V)<:Signature ? (p ? $SUB(v) : v) : $MUL(p,v)
+                            v = conj(typeof(V)<:Signature ? (p ? $SUB(v) : v) : $MUL(p,v))
                             @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
                         end
                     end
@@ -595,7 +595,7 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[bs[g]+i]
                             if val≠0
                                 v = $(c≠h ? :($$pn(V,ib[i],val)) : :val)
-                                v = typeof(V)<:Signature ? ($$p(V,ib[i]) ? $SUB(v) : v) : $$p(V,ib[i])*v
+                                v = conj(typeof(V)<:Signature ? ($$p(V,ib[i]) ? $SUB(v) : v) : $$p(V,ib[i])*v)
                                 @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Val{N}())
                             end
                         end

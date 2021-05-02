@@ -9,6 +9,7 @@ export exph, log_fast, logh_fast
 @inline Base.expm1(t::SubManifold{V,0}) where V = Simplex{V}(ℯ-1)
 @inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
+Base.expm1(t::Chain) = expm1(MultiVector(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     S,term,f = t,(t^2)/2,norm(t)
