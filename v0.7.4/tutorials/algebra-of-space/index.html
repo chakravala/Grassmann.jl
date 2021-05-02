@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>The Algebra of Space (G3) · Grassmann.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Grassmann.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit">Grassmann.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../design/">Design</a></li><li><a class="tocitem" href="../../algebra/">Algebra</a></li><li><a class="tocitem" href="../../library/">Library</a></li><li><a class="tocitem" href="../../agpl/">AGPL-3.0</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../install/">Installation</a></li><li><a class="tocitem" href="../quick-start/">Quick start (G2)</a></li><li class="is-active"><a class="tocitem" href>The Algebra of Space (G3)</a><ul class="internal"><li><a class="tocitem" href="#Basics"><span>Basics</span></a></li><li><a class="tocitem" href="#Reflections"><span>Reflections</span></a></li><li><a class="tocitem" href="#Rotations"><span>Rotations</span></a></li><li><a class="tocitem" href="#Barycentric-Coordinates"><span>Barycentric Coordinates</span></a></li></ul></li><li><a class="tocitem" href="../dyadic-tensors/">Dyadic tensor product ⊗</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>The Algebra of Space (G3)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>The Algebra of Space (G3)</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/chakravala/Grassmann.jl/blob/master/docs/src/tutorials/algebra-of-space.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="The-Algebra-of-Space-(G3)"><a class="docs-heading-anchor" href="#The-Algebra-of-Space-(G3)">The Algebra of Space (G3)</a><a id="The-Algebra-of-Space-(G3)-1"></a><a class="docs-heading-anchor-permalink" href="#The-Algebra-of-Space-(G3)" title="Permalink"></a></h1><p>This notebook is an adaptation from the <a href="https://clifford.readthedocs.io/en/latest/TheAlgebraOfSpaceG3.html">clifford</a> python documentation.</p><p>Import <code>Grassmann</code> and instantiate a three dimensional geometric algebra</p><pre><code class="language-julia-repl">julia&gt; using Grassmann
+
+julia&gt; basis&quot;3&quot;
+(⟨×××⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre><p>Given a three dimensional GA with the orthonormal basis <span>$v_i\cdot v_j = \delta_{ij}$</span>, the basis consists of scalars, three vectors, three bivectors, and a trivector.</p><p class="math-container">\[\{\underbrace{v}_{\text{scalar}},\qquad\underbrace{v_1,v_2,v_3}_{\text{vectors}},\qquad\underbrace{v_{12},v_{23},v_{13}}_{\text{bivectors}},\qquad\underbrace{v_{123}}_{\text{trivector}}\}\]</p><p>The <code>@basis</code> macro declares the algebra and assigns the <code>SubManifold</code> elements to local variables. The <code>Basis</code> can also be assigned to <code>G3</code> as</p><pre><code class="language-julia-repl">julia&gt; G3 = Λ(3)
+DirectSum.Basis{⟨×××⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre><p>You may wish to explicitly assign the blades to variables like so,</p><pre><code class="language-julia">e1 = G3.v1
+e2 = G3.v2
+# etc ...</code></pre><p>Or, if you&#39;re lazy you can use the macro with different local names</p><pre><code class="language-julia-repl">julia&gt; @basis ℝ^3 E e
+(⟨+++⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+
+julia&gt; e3, e123
+(v₃, v₁₂₃)</code></pre><h2 id="Basics"><a class="docs-heading-anchor" href="#Basics">Basics</a><a id="Basics-1"></a><a class="docs-heading-anchor-permalink" href="#Basics" title="Permalink"></a></h2><p>The basic products are available</p><pre><code class="language-julia-repl">julia&gt; v1 * v2 # geometric product
+v₁₂
+
+julia&gt; v1 | v2 # inner product
+0v
+
+julia&gt; v1 ∧ v2 # exterior product
+v₁₂
+
+julia&gt; v1 ∧ v2 ∧ v3 # even more exterior products
+v₁₂₃</code></pre><p>Multivectors can be defined in terms of the basis blades. For example, you can construct a rotor as a sum of a scalar and a bivector, like so</p><pre><code class="language-julia-repl">julia&gt; θ = π/4
+0.7853981633974483
+
+julia&gt; R = cos(θ) + sin(θ)*v23
+0.7071067811865476 + 0.7071067811865475v₂₃
+
+julia&gt; R = exp(θ*v23)
+0.7071067811865476 + 0.7071067811865475v₂₃</code></pre><p>You can also mix grades without any reason</p><pre><code class="language-julia-repl">julia&gt; A = 1 + 2v1 + 3v12 + 4v123
+1 + 2v₁ + 3v₁₂ + 4v₁₂₃</code></pre><p>The reversion operator is accomplished with the tilde <code>~</code> in front of the <code>MultiVector</code> on which it acts</p><pre><code class="language-julia-repl">julia&gt; ~A
+1 + 2v₁ - 3v₁₂ - 4v₁₂₃</code></pre><p>Taking a projection into a specific <code>grade</code> of a <code>MultiVector</code> is usually written <span>$\langle A\rangle_n$</span> and can be done using the soft brackets, like so</p><pre><code class="language-julia-repl">julia&gt; A(0)
+1v
+
+julia&gt; A(1)
+2v₁ + 0v₂ + 0v₃
+
+julia&gt; A(2)
+3v₁₂ + 0v₁₃ + 0v₂₃</code></pre><p>Using the reversion and grade projection operators, we can define the magnitude of <code>A</code> as <span>$|A|^2 = \langle\tilde A A\rangle$</span></p><pre><code class="language-julia-repl">julia&gt; ~A*A
+30 + 4v₁ + 12v₂ + 24v₃
+
+julia&gt; scalar(ans)
+30v</code></pre><p>This is done in the <code>abs</code> and <code>abs2</code> operators</p><pre><code class="language-julia-repl">julia&gt; abs2(A)
+30 + 2v₁ + 6v₂ + 12v₃ + 3v₁₂ + 8v₂₃ + 4v₁₂₃
+
+julia&gt; scalar(ans)
+30v</code></pre><p>The dual of a multivector <code>A</code> can be defined as <span>$\tilde AI$</span>, where <code>I</code> is the pseudoscalar for the geometric algebra. In <code>G3</code>, the dual of a vector is a bivector:</p><pre><code class="language-julia-repl">julia&gt; a = 1v1 + 2v2 + 3v3
+1v₁ + 2v₂ + 3v₃
+
+julia&gt; ⋆a
+3v₁₂ - 2v₁₃ + 1v₂₃</code></pre><h2 id="Reflections"><a class="docs-heading-anchor" href="#Reflections">Reflections</a><a id="Reflections-1"></a><a class="docs-heading-anchor-permalink" href="#Reflections" title="Permalink"></a></h2><p>Reflecting a vector <span>$c$</span> about a normalized vector <span>$n$</span> is pretty simple, <span>$c\mapsto -ncn$</span></p><pre><code class="language-julia-repl">julia&gt; c = v1+v2+v3 # a vector
+1v₁ + 1v₂ + 1v₃
+
+julia&gt; n = v1 # the reflector
+v₁
+
+julia&gt; -n*c*n # reflect a in hyperplane normal to n
+0 - 1v₁ + 1v₂ + 1v₃</code></pre><p>Because we have the <code>inv</code> available, we can equally well reflect in un-normalized vectors using <span>$a\mapsto n^{-1}an$</span></p><pre><code class="language-julia-repl">julia&gt; a = v1+v2+v3 # the vector
+1v₁ + 1v₂ + 1v₃
+
+julia&gt; n = 3v1 # the reflector
+3v₁
+
+julia&gt; inv(n)*a*n
+0.0 + 1.0v₁ - 1.0v₂ - 1.0v₃
+
+julia&gt; n\a*n
+0.0 + 1.0v₁ - 1.0v₂ - 1.0v₃</code></pre><p>Reflections can also be made with respect to the hyperplane normal to the vector, in which case the formula is negated.</p><h2 id="Rotations"><a class="docs-heading-anchor" href="#Rotations">Rotations</a><a id="Rotations-1"></a><a class="docs-heading-anchor-permalink" href="#Rotations" title="Permalink"></a></h2><p>A vector can be rotated using the formula <span>$a\mapsto \tilde R aR$</span>, where <code>R</code> is a rotor. A rotor can be defined by multiple reflections, <span>$R = mn$</span> or by a plane and an angle <span>$R = e^{\theta B/2}$</span>. For example,</p><pre><code class="language-julia-repl">julia&gt; R = exp(π/4*v12)
+0.7071067811865476 + 0.7071067811865475v₁₂
+
+julia&gt; ~R*v1*R
+0.0 + 2.220446049250313e-16v₁ + 1.0v₂</code></pre><p>Maybe we want to define a function which can return rotor of some angle <span>$\theta$</span> in the <span>$v_{12}$</span>-plane, <span>$R_{12} = e^{\theta v_{12}/2}$</span></p><pre><code class="language-julia">R12(θ) = exp(θ/2*v12)</code></pre><p>And use it like this</p><pre><code class="language-julia-repl">julia&gt; R = R12(π/2)
+0.7071067811865476 + 0.7071067811865475v₁₂
+
+julia&gt; a = v1+v2+v3
+1v₁ + 1v₂ + 1v₃
+
+julia&gt; ~R*a*R
+0.0 - 0.9999999999999997v₁ + 1.0v₂ + 1.0v₃</code></pre><p>You might as well make the angle argument a bivector, so that you can control the plane of rotation as well as the angle</p><pre><code class="language-julia">R_B(B) = exp(B/2)</code></pre><p>Then you could do</p><pre><code class="language-julia-repl">julia&gt; Rxy = R_B(π/4*v12)
+0.9238795325112867 + 0.3826834323650898v₁₂
+
+julia&gt; Ryz = R_B(π/5*v23)
+0.9510565162951535 + 0.3090169943749474v₂₃</code></pre><p>or</p><pre><code class="language-julia-repl">julia&gt; R_B(π/6*(v23+v12))
+0.9322404424570728 + 0.25585909935689327v₁₂ + 0.25585909935689327v₂₃</code></pre><p>Maybe you want to define a function which returns a <em>function</em> that enacts a specified rotation, <span>$f(B) = a\mapsto e^{B/2}\\ae^{B/2}$</span>. This just saves you having to write out the sandwich product, which is nice if you are cascading a bunch of rotors, like so</p><pre><code class="language-julia">R_factory(B) = (R = exp(B/2); a -&gt; ~R*a*R)
+Rxy = R_factory(π/3*v12)
+Ryz = R_factory(π/3*v23)
+Rxz = R_factory(π/3*v13)</code></pre><p>Then you can do things like</p><pre><code class="language-julia-repl">julia&gt; R = R_factory(π/6*(v23+v12)) # this returns a function
+#1 (generic function with 1 method)
+
+julia&gt; R(a) # which acts on a vector
+0.0 + 0.5229556000177233v₁ + 0.7381444851051178v₂ + 1.4770443999822769v₃
+
+julia&gt; Rxy(Ryz(Rxz(a)))
+0.0 + 0.40849364905389035v₁ - 0.6584936490538903v₂ + 1.5490381056766584v₃</code></pre><p>To make cascading a sequence of rotations as concise as possible, we could define a function which takes a list of bivectors <span>$A,B,C,...$</span>, and enacts the sequence of rotations which they represent on some vector <span>$x$</span>.</p><pre><code class="language-julia-repl">julia&gt; R_seq(args...) = (R = prod(exp.(args./2)); a -&gt; ~R*a*R)
+R_seq (generic function with 1 method)
+
+julia&gt; R = R_seq(π/2*v23, π/2*v12, v1)
+#3 (generic function with 1 method)
+
+julia&gt; R(v1)
+2.220446049250313e-16 + 3.3306690738754696e-16v₁ + 0.9999999999999998v₂ + 5.551115123125783e-17v₂₃</code></pre><h2 id="Barycentric-Coordinates"><a class="docs-heading-anchor" href="#Barycentric-Coordinates">Barycentric Coordinates</a><a id="Barycentric-Coordinates-1"></a><a class="docs-heading-anchor-permalink" href="#Barycentric-Coordinates" title="Permalink"></a></h2><p>We can find the barycentric coordinates of a point in a triangle using area ratios.</p><pre><code class="language-julia-repl">julia&gt; function barycoords(p, a, b, c)
+         ab = b-a
+         ca = a-c
+         bc = c-b
+         A = -ab∧ca
+         (bc∧(p-b)/A, ca∧(p-c)/A, ab∧(p-a)/A)
+       end
+barycoords (generic function with 1 method)
+
+julia&gt; barycoords(0.25v1+0.25v2, 0v1, 1v1, 1v2)
+(0.5v⃖, 0.25v⃖, 0.25v⃖)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quick-start/">« Quick start (G2)</a><a class="docs-footer-nextpage" href="../dyadic-tensors/">Dyadic tensor product ⊗ »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Sunday 2 May 2021 19:54">Sunday 2 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
