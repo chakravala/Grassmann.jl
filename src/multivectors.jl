@@ -64,8 +64,8 @@ end
 Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 
-DyadicProduct{V,W,T,N} = Chain{V,1,Chain{W,1,T,N},N}
-DyadicChain{V,T,N} = DyadicProduct{V,V,T,N}
+DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
+DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
 
 export Chain, DyadicProduct, DyadicChain
 getindex(m::Chain,i::Int) = m.v[i]
@@ -257,6 +257,22 @@ for var ∈ ((:V,:T),(:T,),())
     end
 end
 
+@generated function MultiVector{V}(args::𝕂...) where {V,𝕂}
+    bg = 1<<mdims(V); ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
+    :(MultiVector{V}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
+end
+
+@generated function MultiVector(args::𝕂...) where 𝕂
+    N = length(args)
+    V = SubManifold(try
+        Int(log2(N))
+    catch
+        throw("Constructor for MultiVector got $N inputs, which is invalid.")
+    end)
+    ref = Values{N}([:(args[$i]) for i ∈ 1:N])
+    :(MultiVector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
+end
+
 function getindex(m::MultiVector{V,T},i::Int) where {V,T}
     N = mdims(V)
     0 <= i <= N || throw(BoundsError(m, i))
@@ -288,7 +304,7 @@ function show(io::IO, m::MultiVector{V,T}) where {V,T}
         for k ∈ 1:length(ib)
             @inbounds s = k+bs[i]
             @inbounds mvs = m.v[s]
-            @inbounds if mvs ≠ 0
+            @inbounds if !isnull(mvs)
                 tmv = typeof(mvs)
                 if |(broadcast(<:,tmv,parsym)...)
                     par = showparens(tmv)
@@ -372,11 +388,11 @@ getindex(P::Proj{V,<:Chain{W,1,<:Chain}} where {V,W},i::Int,j::Int) = sum(column
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ} = print(io,"(",P.λ,")Proj(",P.v,")")
 
-DyadicChain{V,T}(P::Proj{V,T}) where {V,T} = outer(P.v*P.λ,P.v)
-DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:Chain}} = sum(outer.(value(P.v).*value(P.λ),P.v))
+DyadicChain{V,1,T}(P::Proj{V,T}) where {V,T} = outer(P.v*P.λ,P.v)
+DyadicChain{V,1,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:Chain}} = sum(outer.(value(P.v).*value(P.λ),P.v))
 #DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(DyadicChain.(value(P.v)))
-DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
-DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,T}(P)
+DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
+DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
 
 struct Dyadic{V,X,Y} <: TensorNested{V}
     x::X

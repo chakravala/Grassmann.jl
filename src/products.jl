@@ -577,7 +577,7 @@ for side ∈ (:left,:right)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            val = :(m.v[$(bs[g]+i)])
+                            val = :(conj(m.v[$(bs[g]+i)]))
                             v = $(c≠h ? :($pnp(V,ib[i],val)) : :val)
                             v = typeof(V)<:Signature ? ($p(V,ib[i]) ? :($SUB($v)) : v) : Expr(:call,:*,$p(V,ib[i]),v)
                             @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())

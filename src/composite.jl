@@ -343,6 +343,12 @@ function Cramer(N::Int,j=0)
     return x,y,xy
 end
 
+DirectSum.Λ(x::Chain{V,1,<:Chain{V,1}},G) where V = compound(x,G)
+compound(x,G::T) where T<:Integer = compound(x,Val(G))
+@generated function compound(x::Chain{V,1,<:Chain{V,1}},::Val{G}) where {V,G}
+    Expr(:call,:(Chain{V,G}),Expr(:call,:Values,[Expr(:call,:∧,[:(x[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...))
+end
+
 @generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
     W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
     if M == 1 && (V === ℝ1 || V == 1)

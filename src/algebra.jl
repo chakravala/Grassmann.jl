@@ -222,9 +222,29 @@ contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(va
 contraction(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}},b::Chain{V,1}) where {W,V} = a.v:b
 contraction(a::Chain{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
 contraction(a::Chain{W,L,<:Chain},b::Chain{V,G,<:Chain{W,L}}) where {W,L,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
+contraction(a::MultiVector{W,<:MultiVector},b::MultiVector{V,<:MultiVector{W}}) where {W,V} = MultiVector{V}(column(Ref(a).⋅value(b)))
 Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
 Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).⋅Ref(b))
 #Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
+
+contraction(a::SubManifold{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
+contraction(a::Simplex{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
+contraction(x::Chain{V,G,<:Chain},y::Simplex{V,G}) where {V,G} = value(y)*x[bladeindex(mdims(V),UInt(basis(y)))]
+contraction(x::Chain{V,G,<:Chain},y::SubManifold{V,G}) where {V,G} = x[bladeindex(mdims(V),UInt(y))]
+#contraction(a::Chain{V,G,<:Chain{V,G}},b::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(Ref(a).⋅value(b))
+contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
+contraction(x::Chain{W,L,<:MultiVector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = MultiVector{V}(matmul(value(x),value(y)))
+contraction(x::MultiVector{W,<:Chain{V,G},N},y::MultiVector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
+contraction(x::MultiVector{W,<:MultiVector{V},N},y::MultiVector{V,T,N}) where {W,N,V,T} = MultiVector{V}(matmul(value(x),value(y)))
+@inline @generated function matmul(x::Values{N,<:Simplex{V,G}},y::Values{N}) where {N,V,G}
+    Expr(:call,:Values,[Expr(:call,:+,:(y[$i]*value(x[$i]))) for i ∈ 1:N]...)
+end
+@inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
+    Expr(:call,:Values,[Expr(:call,:+,[:(y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
+end
+@inline @generated function matmul(x::Values{N,<:MultiVector{V}},y::Values{N}) where {N,V,G}
+    Expr(:call,:Values,[Expr(:call,:+,[:(y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
+end
 
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(a.y.⋅b))
@@ -531,14 +551,29 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 setblade!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
                 return Chain{V,L}(out)
             end end
-        else quote
-            #@warn("sparse MultiGrade{V} objects not properly handled yet")
-            #return MultiGrade{V}(a,b)
-            $(insert_expr((:N,:t,:out))...)
-            setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
-            setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-            return MultiVector{V}(out)
-        end end
+        else
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:ib),:svec)...)
+                out,ib = zeros(svec(N,Any)),indexbasis(N)
+                X,Y = UInt(basis(a)),UInt(basis(b))
+                for k ∈ 1:1<<N
+                    C = ib[k]
+                    if C ∈ (X,Y)
+                        val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
+                        @inbounds setmulti!_pre(out,val,C,Val{N}())
+                    end
+                end
+                return Expr(:block,insert_expr((:t,),VEC)...,
+                    :(MultiVector{V}($(Expr(:call,tvec(N,:t),out...)))))
+            else quote
+                #@warn("sparse MultiGrade{V} objects not properly handled yet")
+                #return MultiGrade{V}(a,b)
+                $(insert_expr((:N,:t,:out),VEC)...)
+                setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
+                setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+                return MultiVector{V}(out)
+            end end
+        end
     end
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)

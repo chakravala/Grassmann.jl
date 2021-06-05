@@ -293,7 +293,7 @@ function facetsinterior(t::Vector{<:Chain{V}}) where V
     out = Chain{W,1,Int,N}[]
     bnd = Int[]
     for i ∈ t
-        for w ∈ Chain{W,1}.(DirectSum.combinations(sort(value(i)),N))
+        for w ∈ Chain{W,1}.(Leibniz.combinations(sort(value(i)),N))
             j = findfirst(isequal(w),out)
             isnothing(j) ? push!(out,w) : push!(bnd,j)
         end
@@ -451,6 +451,25 @@ function __init__()
             #generate_algebra(:(Reduce.Algebra),T,:df,:RExpr)
         end
     end
+    @require Symbolics="0c5d862f-8b57-4792-8d23-62f2024744c7" begin
+        generate_algebra(:Symbolics,:Num)
+        *(a::Symbolics.Num,b::MultiVector{V}) where V = MultiVector{V}(a*b.v)
+        *(a::MultiVector{V},b::Symbolics.Num) where V = MultiVector{V}(a.v*b)
+        *(a::Symbolics.Num,b::Chain{V,G}) where {V,G} = Chain{V,G}(a*b.v)
+        *(a::Chain{V,G},b::Symbolics.Num) where {V,G} = Chain{V,G}(a.v*b)
+        *(a::Symbolics.Num,b::Simplex{V,G,B,T}) where {V,G,B,T<:Real} = Simplex{V}(a,b)
+        *(a::Simplex{V,G,B,T},b::Symbolics.Num) where {V,G,B,T<:Real} = Simplex{V}(b,a)
+        Base.iszero(a::Simplex{V,G,B,Symbolics.Num}) where {V,G,B} = false
+        isfixed(::Type{Symbolics.Num}) = true
+        for op ∈ (:+,:-)
+            for Term ∈ (:TensorGraded,:TensorMixed)
+                @eval begin
+                    $op(a::T,b::Symbolics.Num) where T<:$Term = $op(a,b*g_one(Manifold(a)))
+                    $op(a::Symbolics.Num,b::T) where T<:$Term = $op(a*g_one(Manifold(b)),b)
+                end
+            end
+        end
+    end
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
         generate_algebra(:SymPy,:Sym,:diff,:symbols)
         generate_symbolic_methods(:SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs))
@@ -514,18 +533,54 @@ function __init__()
         end
     end=#
     @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
-        StaticArrays.SMatrix(m::Chain{V,1,<:Chain{W,1}}) where {V,W} = StaticArrays.SMatrix{mdims(W),mdims(V)}(vcat(value.(value(m))...))
+        StaticArrays.SMatrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = StaticArrays.SMatrix{binomial(mdims(W),G),binomial(mdims(V),G)}(vcat(value.(value(m))...))
         DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{SubManifold(N),1}(m)
-        Chain{V,1}(m::StaticArrays.SMatrix{N,N}) where {V,N} = Chain{V,1}(Chain{V,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        Chain{V,1,Chain{W,1}}(m::StaticArrays.SMatrix{M,N}) where {V,W,M,N} = Chain{V,1}(Chain{W,1}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        Base.exp(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(exp(StaticArrays.SMatrix(A)))
-        Base.log(A::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(log(StaticArrays.SMatrix(A)))
-        LinearAlgebra.eigvals(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Values{mdims(V)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
-        LinearAlgebra.eigvecs(A::Chain{V,1,<:Chain{V,1}}) where V = Chain(Chain.(Values{mdims(A)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,mdims(A))))))
-        function LinearAlgebra.eigen(A::Chain{V,1,<:Chain{V,1}}) where V
-            E,N = eigen(StaticArrays.SMatrix(A)),mdims(V)
+        Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+        Chain{V,G,Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+        Base.exp(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(exp(StaticArrays.SMatrix(A)))
+        Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(log(StaticArrays.SMatrix(A)))
+        LinearAlgebra.eigvals(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Values{binomial(mdims(V),G)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
+        LinearAlgebra.eigvecs(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Chain.(Values{binomial(mdims(A),G)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,binomial(mdims(A),G))))))
+        function LinearAlgebra.eigen(A::Chain{V,G,<:Chain{V,G}}) where {V,G}
+            E,N = eigen(StaticArrays.SMatrix(A)),binomial(mdims(V),G)
             e = Chain(Chain.(Values{N}.(getindex.(Ref(E.vectors),:,list(1,N)))))
             Proj(e,Chain(Values{N}(E.values)))
+        end
+    end
+    @require Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa" begin
+        Meshes.Point(t::Values) = Meshes.Point(Tuple(t.v))
+        Meshes.Point(t::Variables) = Meshes.Point(Tuple(t.v))
+        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorTerm{V} where V = Meshes.Point(value(Chain{V,valuetype(t)}(vector(t))))
+        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorTerm{V,0} where V = Meshes.Point(zeros(valuetype(t),mdims(V))...)
+        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorAlgebra = Meshes.Point(value(vector(t)))
+        Base.convert(::Type{Meshes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? Meshes.Point(value(vector(t))) : Meshes.Point(zeros(T,mdims(V))...)
+        Meshes.Point(t::T) where T<:TensorAlgebra = convert(Meshes.Point,t)
+        pointpair(p,V) = Pair(Meshes.Point.(V.(value(p)))...)
+        function initmesh(m::Meshes.SimpleMesh{N}) where N
+            c,f = Meshes.vertices(m),m.topology.connec
+            s = N+1; V = SubManifold(ℝ^s) # s
+            n = length(f[1].indices)
+            p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k.coords...)) for k ∈ c])
+            M = s ≠ n ? p(list(s-n+1,s)) : p
+            t = ChainBundle([Chain{M,1}(Values{n,Int}(k.indices)) for k ∈ f])
+            return (p,ChainBundle(∂(t)),t)
+        end
+        @pure ptype(::Meshes.Point{N,T} where N) where T = T
+        export pointfield
+        pointfield(t,V=Manifold(t),W=V) = p->Meshes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
+        function pointfield(t,ϕ::T) where T<:AbstractVector
+            M = Manifold(t)
+            V = Manifold(M)
+            z = mdims(V) ≠ 4 ? Meshes(0.0,0.0) : Meshes.Point(0.0,0.0,0.0)
+            p->begin
+                P = Chain{V,1}(one(ptype(p)),p.data...)
+                for i ∈ 1:length(t)
+                    ti = value(t[i])
+                    Pi = Chain{V,1}(M[ti])
+                    P ∈ Pi && (return Meshes.Point((Pi\P)⋅Chain{V,1}(ϕ[ti])))
+                end
+                return z
+            end
         end
     end
     @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
@@ -694,11 +749,11 @@ function __init__()
         #aran(area=0.001,angle=20) = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
     end
     @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
-        function TetGen.TetgenIO(mesh::ChainBundle;
+        function TetGen.JLTetGenIO(mesh::ChainBundle;
                 marker = :markers, holes = TetGen.Point{3,Float64}[])
-            TetGen.TetgenIO(value(mesh); marker=marker, holes=holes)
+            TetGen.JLTetGenIO(value(mesh); marker=marker, holes=holes)
         end
-        function TetGen.TetgenIO(mesh::Vector{<:Chain};
+        function TetGen.JLTetGenIO(mesh::Vector{<:Chain};
                 marker = :markers, holes = TetGen.Point{3, Float64}[])
             f = TetGen.TriangleFace{Cint}.(value.(mesh))
             kw_args = Any[:facets => TetGen.metafree(f),:holes => holes]
@@ -706,9 +761,9 @@ function __init__()
                 push!(kw_args, :facetmarkers => getproperty(f, marker))
             end
             pm = points(mesh); V = Manifold(pm)
-            TetGen.TetgenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
+            TetGen.JLTetGenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
         end
-        function initmesh(tio::TetGen.TetgenIO, command = "Qp")
+        function initmesh(tio::TetGen.JLTetGenIO, command = "Qp")
             r = TetGen.tetrahedralize(tio, command); V = SubManifold(ℝ^4)
             p = ChainBundle([Chain{V,1}(Values{4,Float64}(1.0,k...)) for k ∈ r.points])
             t = Chain{p,1}.(Values{4,Int}.(r.tetrahedra))
@@ -722,7 +777,7 @@ function __init__()
         end
         function TetGen.tetrahedralize(mesh::Vector{<:Chain}, command = "Qp";
                 marker = :markers, holes = TetGen.Point{3, Float64}[])
-            initmesh(TetGen.TetgenIO(mesh;marker=marker,holes=holes),command)
+            initmesh(TetGen.JLTetGenIO(mesh;marker=marker,holes=holes),command)
         end
     end
     @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin

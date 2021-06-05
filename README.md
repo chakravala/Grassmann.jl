@@ -94,6 +94,7 @@ Interoperability of `TensorAlgebra` with other packages is automatically enabled
 
 The package is compatible via [Requires.jl](https://github.com/MikeInnes/Requires.jl) with 
 [Reduce.jl](https://github.com/chakravala/Reduce.jl),
+[Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl),
 [SymPy.jl](https://github.com/JuliaPy/SymPy.jl),
 [SymEngine.jl](https://github.com/symengine/SymEngine.jl),
 [AbstractAlgebra.jl](https://github.com/wbhart/AbstractAlgebra.jl),
@@ -105,6 +106,7 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [Makie.jl](https://github.com/JuliaPlots/Makie.jl),
 [AbstractPlotting.jl](https://github.com/JuliaPlots/AbstractPlotting.jl),
 [GeometryBasics.jl](https://github.com/JuliaGeometry/GeometryBasics.jl),
+[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl),
 [MiniQhull.jl](https://github.com/gridap/MiniQhull.jl),
 [QHull.jl](https://github.com/JuliaPolyhedra/QHull.jl),
 [Delaunay.jl](https://github.com/eschnett/Delaunay.jl),
