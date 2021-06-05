@@ -453,6 +453,7 @@ function __init__()
     end
     @require Symbolics="0c5d862f-8b57-4792-8d23-62f2024744c7" begin
         generate_algebra(:Symbolics,:Num)
+        generate_symbolic_methods(:Symbolics,:Num, (:expand,),(:simplify,:substitute))
         *(a::Symbolics.Num,b::MultiVector{V}) where V = MultiVector{V}(a*b.v)
         *(a::MultiVector{V},b::Symbolics.Num) where V = MultiVector{V}(a.v*b)
         *(a::Symbolics.Num,b::Chain{V,G}) where {V,G} = Chain{V,G}(a*b.v)
