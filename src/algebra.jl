@@ -21,7 +21,7 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 @pure function mul(a::SubManifold{V},b::SubManifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
     ba,bb = UInt(a),UInt(b)
     (diffcheck(V,ba,bb) || iszero(der)) && (return g_zero(V))
-    A,B,Q,Z = symmetricmask(V,UInt(a),UInt(b))
+    A,B,Q,Z = symmetricmask(V,ba,bb)
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
     out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
@@ -126,7 +126,7 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     !t  && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,UInt(basis(a)),UInt(basis(b)))
+        _,_,Q,_ = symmetricmask(V,ba,bb)
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
@@ -182,7 +182,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     !t && (return g_zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
     if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,UInt(basis(a)),UInt(basis(b)))
+        _,_,Q,_ = symmetricmask(V,ba,bb)
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return zero(V))
     end
@@ -451,7 +451,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             d = rm*m
             fd = norm(d)
             sd = scalar(d)
-            value(sd) ≈ fd && (return $d(rm,sd))
+            norm(sd) ≈ fd && (return $d(rm,sd))
             for k ∈ 1:mdims(V)
                 @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end

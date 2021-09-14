@@ -17,8 +17,7 @@ export involute, clifford
 ## product parities
 
 @pure function parityjoin(N,S,a,b)
-    B = digits_fast(b<<1,N)
-    isodd(sum(digits_fast(a,N) .* cumsum(B))+count_ones((a & b) & S))
+    isodd(sum(digits_fast(a,N) .* cumsum(digits_fast(b<<1,N)))+count_ones((a & b) & S))
 end
 
 @pure conformalmask(V) = UInt(2)^(hasinf(V)&&hasorigin(V) ? 2 : 0)-1
@@ -138,9 +137,9 @@ const parity_extra = Dict{UInt,Dict{UInt,Dict{UInt,Bool}}}[]
     end
 end
 @pure function parity(v::Signature,a::UInt,b::UInt)
-    d=diffmask(v)
-    D=isdyadic(v) ? |(d...) : d
-    parity(mdims(v),metric(v),(a&~D),(b&~D))
+    d = diffmask(v)
+    D = ~(isdyadic(v) ? |(d...) : d)
+    parity(mdims(v),metric(v),(a&D),(b&D))
 end
 @pure parity(v::Int,a::UInt,b::UInt) = parity(v,metric(v),a,b)
 @pure parity(v::T,a::UInt,b::UInt) where T<:Manifold = parity(Signature(v),a,b)
@@ -156,8 +155,8 @@ for par ∈ (:conformal,:regressive,:interior)
     @eval begin
         const $cache = Dict{UInt,Vector{Dict{UInt,Vector{Vector{$T}}}}}[]
         const $extra = Dict{UInt,Vector{Dict{UInt,Dict{UInt,Dict{UInt,$T}}}}}[]
-        @pure function ($par(V::TT,a,b)::$T) where TT
-            M,s = TT<:Int ? V : DirectSum.supermanifold(V),metric(V)
+        @pure function $par(V,a,b)::$T
+            M,s = DirectSum.supermanifold(V),metric(V)
             n,m,S = mdims(M),DirectSum.options(M),metric(M)
             m1 = m+1
             if n > sparse_limit
