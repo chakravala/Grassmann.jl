@@ -353,13 +353,15 @@ Anti-symmetrization projection: ⊠(ω...) = ∑(∏(πσ.(ω)...))/factorial(le
 
 export ⊘
 
-for X ∈ TAG, Y ∈ TAG
+#=for X ∈ TAG, Y ∈ TAG
     @eval ⊘(x::X,y::Y) where {X<:$X{V},Y<:$Y{V}} where V = diffvars(V)≠0 ? conj(y)*x*y : y\x*involute(y)
+end=#
+for Y ∈ TAG
+    @eval ⊘(x::TensorGraded{V,1},y::Y) where Y<:$Y{V} where V = diffvars(V)≠0 ? conj(y)*x*involute(y) : y\x*involute(y)
 end
 #=for Z ∈ TAG
     @eval ⊘(x::Chain{V,G},y::T) where {V,G,T<:$Z} = diffvars(V)≠0 ? conj(y)*x*y : ((~y)*x*involute(y))(Val(G))/abs2(y)
 end=#
-
 
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
@@ -745,7 +747,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 μ = istangent(V)|hasconformal(V)
                 ia = indexbasis(N,L)
                 ib = indexbasis(N,G)
-                out = zeros(μ ? svec(N,Any) : svec(N,G-L,Any))
+                out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
                 for i ∈ 1:bnl
                     @inbounds v,iai = :(a[$i]),ia[i]
                     for j ∈ 1:bng

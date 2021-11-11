@@ -161,14 +161,11 @@ function generate_mutators(M,F,set_val,SUB,MUL)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         sm = Symbol(op,:multi!)
         sb = Symbol(op,:blade!)
-        for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
-            spre = Symbol(s,:_pre)
+        for s ∈ (sm,sb)
             @eval @inline function $s(out::$M,val::S,i) where {M,T,S}
                 @inbounds $(set_val(set,:(out[i]),:val))
                 return out
             end
-        end
-        for s ∈ (sm,sb)
             spre = Symbol(s,:_pre)
             for j ∈ (:join,:geom)
                 for S ∈ (s,spre)
@@ -181,7 +178,6 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        #val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B) ? $SUB(v) : v) :
                         val = $MUL(parityinner(V,A,B),v)
                         if diffvars(V)≠0
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
@@ -194,7 +190,6 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        #val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B) ? :($$SUB($v)) : v) :
                         val = :($$MUL($(parityinner(V,A,B)),$v))
                         if diffvars(V)≠0
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
@@ -208,7 +203,6 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                        #val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B)⊻pcc ? $SUB(v) : v) :
                         val = $MUL(parityinner(V,A,B),pcc ? $SUB(v) : v)
                         if istangent(V)
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
@@ -223,7 +217,6 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                        #val = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(V,A,B)⊻pcc ? :($$SUB($v)) : v) :
                         val = :($$MUL($(parityinner(V,A,B)),$(pcc ? :($$SUB($v)) : v)))
                         if istangent(V)
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
@@ -246,15 +239,13 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         if val ≠ 0
                             g,C,t,Z = $uct(V,A,B)
                             v = val
-                            if istangent(V)
-                                if !iszero(Z)
-                                    T≠Any && (return true)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v *= getbasis(loworder(V),Z)
-                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
-                                end
+                            if istangent(V) && !iszero(Z)
+                                T≠Any && (return true)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v *= getbasis(loworder(V),Z)
+                                count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
-                            t && $s(m,typeof(V) <: Signature ? g ? $SUB(v) : v : $MUL(g,v),C,Val(mdims(V)))
+                            t && $s(m,$MUL(g,v),C,Val(mdims(V)))
                         end
                         return false
                     end
@@ -262,14 +253,12 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         if val ≠ 0
                             g,C,t,Z = $uct(V,A,B)
                             v = val
-                            if istangent(V)
-                                if !iszero(Z)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
-                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
-                                end
+                            if istangent(V) && !iszero(Z)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                             end
-                            t && $spre(m,typeof(V) <: Signature ? g ? :($$SUB($v)) : v : Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                            t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
                         end
                         return false
                     end
@@ -535,6 +524,7 @@ for side ∈ (:left,:right)
         @eval begin
             @generated function $c(b::Chain{V,G,T}) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                istangent(V) && (return :($$c(MultiVector(b))))
                 SUB,VEC,MUL = subvec(b)
                 if binomial(mdims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:ib,:D),:svec)...)
@@ -543,9 +533,7 @@ for side ∈ (:left,:right)
                     D = diffvars(V)
                     for k ∈ 1:binomial(N,G)
                         val = :(conj(b.v[$k]))
-                        @inbounds p = $p(V,ib[k])
-                        v = $(c≠h ? :($pnp(V,ib[k],val)) : :val)
-                        v = typeof(V)<:Signature ? (p ? :($SUB($v)) : v) : Expr(:call,MUL,p,v)
+                        v = Expr(:call,MUL,$p(V,ib[k]),$(c≠h ? :($pnp(V,ib[k],val)) : :val))
                         @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
                     end
                     return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
@@ -557,10 +545,9 @@ for side ∈ (:left,:right)
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
-                            @inbounds p = $$p(V,ib[k])
-                            v = $(c≠h ? :($$pn(V,ib[k],val)) : :val)
-                            v = conj(typeof(V)<:Signature ? (p ? $SUB(v) : v) : $MUL(p,v))
-                            @inbounds setblade!(out,v,complement(N,ib[k],D,P),Val{N}())
+                            @inbounds ibk = ib[k]
+                            v = conj($MUL($$p(V,ibk),$(c≠h ? :($$pn(V,ibk,val)) : :val)))
+                            setblade!(out,v,complement(N,ibk,D,P),Val{N}())
                         end
                     end
                     return Chain{V,N-G}(out)
@@ -578,8 +565,7 @@ for side ∈ (:left,:right)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             val = :(conj(m.v[$(bs[g]+i)]))
-                            v = $(c≠h ? :($pnp(V,ib[i],val)) : :val)
-                            v = typeof(V)<:Signature ? ($p(V,ib[i]) ? :($SUB($v)) : v) : Expr(:call,:*,$p(V,ib[i]),v)
+                            v = Expr(:call,:*,$p(V,ib[i]),$(c≠h ? :($pnp(V,ib[i],val)) : :val))
                             @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())
                         end
                     end
@@ -594,9 +580,9 @@ for side ∈ (:left,:right)
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds val = m.v[bs[g]+i]
                             if val≠0
-                                v = $(c≠h ? :($$pn(V,ib[i],val)) : :val)
-                                v = conj(typeof(V)<:Signature ? ($$p(V,ib[i]) ? $SUB(v) : v) : $$p(V,ib[i])*v)
-                                @inbounds setmulti!(out,v,complement(N,ib[i],D,P),Val{N}())
+                                ibi = @inbounds ib[i]
+                                v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                setmulti!(out,v,complement(N,ibi,D,P),Val{N}())
                             end
                         end
                     end

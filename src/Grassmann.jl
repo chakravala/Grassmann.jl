@@ -130,25 +130,26 @@ end
     !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
-        :((($G.v∞*(one(valuetype(ω))/2))*ω^2+$G.v∅)+ω)
+        :((($G.v∞*(one(valuetype(ω))/2))*((~ω)⋅ω)+$G.v∅)+ω)
+        #:((($G.v∞*(one(valuetype(ω))/2))*ω^2+$G.v∅)+ω)
     else
         quote
-            ω2 = ω^2
+            ω2 = (~ω)⋅ω # ω^2
             iω2 = inv(ω2+1)
-            (hasinf($V) ? $G.v∞ : $G.v∅)*(ω2-1)*iω2 + 2*iω2*ω
+            (hasinf($V) ? $G.v∞ : $G.v∅)*((ω2-1)*iω2) + (2iω2)*ω
         end
     end
 end
 ↑(ω::ChainBundle) = ω
 function ↑(ω,b)
-    ω2 = ω^2
+    ω2 = (~ω)⋅ω # ω^2
     iω2 = inv(ω2+1)
-    2*iω2*ω + (ω2-1)*iω2*b
+    (2iω2)*ω + ((ω2-1)*iω2)*b
 end
 function ↑(ω,p,m)
-    ω2 = ω^2
+    ω2 = scalar((~ω)⋅ω) # ω^2
     iω2 = inv(ω2+1)
-    2*iω2*ω + (ω2-1)*iω2*p + (ω2+1)*iω2*m
+    (2iω2)*ω + ((ω2-1)*iω2)*p + ((ω2+1)*iω2)*m
 end
 
 @generated function ↓(ω::T) where T<:TensorAlgebra
@@ -157,18 +158,19 @@ end
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
         M && (return ω(3:mdims(V)))
-        :(inv(one(valuetype(ω))*$G.v∞∅)*($G.v∞∅∧ω)/(-ω⋅$G.v∞))
+        #:(inv(one(valuetype(ω))*$G.v∞∅)*($G.v∞∅∧ω)/(-ω⋅$G.v∞))
+        :((($G.v∞∅∧ω)⋅inv(one(valuetype(ω))*~$G.v∞∅))/(-ω⋅$G.v∞))
     else
         M && (return V(2:mdims(V)))
         quote
             b = hasinf($V) ? $G.v∞ : $G.v∅
-            ((ω∧b)*b)/(1-b⋅ω)
+            (~(ω∧b)⋅b)/(1-b⋅ω) # ((ω∧b)*b)/(1-b⋅ω)
         end
     end
 end
 ↓(ω::ChainBundle) = ω(list(2,mdims(ω)))
-↓(ω,b) = ((b∧ω)*b)/(1-ω⋅b)
-↓(ω,∞,∅) = (m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
+↓(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
+↓(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
 ## skeleton / subcomplex
 
@@ -620,51 +622,54 @@ function __init__()
             end
         end
     end
-    @require AbstractPlotting="537997a7-5e4e-5d89-9595-2241ea00577e" begin
-        AbstractPlotting.arrows(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows(value(p),v;args...)
-        AbstractPlotting.arrows!(p::ChainBundle{V},v;args...) where V = AbstractPlotting.arrows!(value(p),v;args...)
-        AbstractPlotting.arrows(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        AbstractPlotting.arrows!(p::Vector{<:Chain{V}},v;args...) where V = AbstractPlotting.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        AbstractPlotting.scatter(p::ChainBundle,x;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter!(p::ChainBundle,x;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter(p::Vector{<:Chain},x;args...) = AbstractPlotting.scatter(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter!(p::Vector{<:Chain},x;args...) = AbstractPlotting.scatter!(submesh(p)[:,1],x;args...)
-        AbstractPlotting.scatter(p::ChainBundle;args...) = AbstractPlotting.scatter(submesh(p);args...)
-        AbstractPlotting.scatter!(p::ChainBundle;args...) = AbstractPlotting.scatter!(submesh(p);args...)
-        AbstractPlotting.scatter(p::Vector{<:Chain};args...) = AbstractPlotting.scatter(submesh(p);args...)
-        AbstractPlotting.scatter!(p::Vector{<:Chain};args...) = AbstractPlotting.scatter!(submesh(p);args...)
-        AbstractPlotting.lines(p::ChainBundle;args...) = AbstractPlotting.lines(value(p);args...)
-        AbstractPlotting.lines!(p::ChainBundle;args...) = AbstractPlotting.lines!(value(p);args...)
-        AbstractPlotting.lines(p::Vector{<:TensorAlgebra};args...) = AbstractPlotting.lines(GeometryBasics.Point.(p);args...)
-        AbstractPlotting.lines!(p::Vector{<:TensorAlgebra};args...) = AbstractPlotting.lines!(GeometryBasics.Point.(p);args...)
-        AbstractPlotting.linesegments(e::ChainBundle;args...) = AbstractPlotting.linesegments(value(e);args...)
-        AbstractPlotting.linesegments!(e::ChainBundle;args...) = AbstractPlotting.linesegments!(value(e);args...)
-        AbstractPlotting.linesegments(e::Vector{<:Chain};args...) = (p=points(e); AbstractPlotting.linesegments(pointpair.(p[e],↓(Manifold(p)));args...))
-        AbstractPlotting.linesegments!(e::Vector{<:Chain};args...) = (p=points(e); AbstractPlotting.linesegments!(pointpair.(p[e],↓(Manifold(p)));args...))
-        AbstractPlotting.wireframe(t::ChainBundle;args...) = AbstractPlotting.linesegments(edges(t);args...)
-        AbstractPlotting.wireframe!(t::ChainBundle;args...) = AbstractPlotting.linesegments!(edges(t);args...)
-        AbstractPlotting.wireframe(t::Vector{<:Chain};args...) = AbstractPlotting.linesegments(edges(t);args...)
-        AbstractPlotting.wireframe!(t::Vector{<:Chain};args...) = AbstractPlotting.linesegments!(edges(t);args...)
-        AbstractPlotting.mesh(t::ChainBundle;args...) = AbstractPlotting.mesh(points(t),t;args...)
-        AbstractPlotting.mesh!(t::ChainBundle;args...) = AbstractPlotting.mesh!(points(t),t;args...)
-        AbstractPlotting.mesh(t::Vector{<:Chain};args...) = AbstractPlotting.mesh(points(t),t;args...)
-        AbstractPlotting.mesh!(t::Vector{<:Chain};args...) = AbstractPlotting.mesh!(points(t),t;args...)
-        function AbstractPlotting.mesh(p::ChainBundle,t;args...)
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
+        Makie.convert_arguments(P::Makie.PointBased, a::Vector{<:Chain}) = Makie.convert_arguments(P, Makie.Point.(a))
+        Makie.convert_arguments(P::Makie.PointBased, a::ChainBundle) = Makie.convert_arguments(P, value(a))
+        Makie.convert_single_argument(a::Chain) = convert_arguments(P,Point(a))
+        Makie.arrows(p::ChainBundle{V},v;args...) where V = Makie.arrows(value(p),v;args...)
+        Makie.arrows!(p::ChainBundle{V},v;args...) where V = Makie.arrows!(value(p),v;args...)
+        Makie.arrows(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
+        Makie.arrows!(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
+        Makie.scatter(p::ChainBundle,x;args...) = Makie.scatter(submesh(p)[:,1],x;args...)
+        Makie.scatter!(p::ChainBundle,x;args...) = Makie.scatter!(submesh(p)[:,1],x;args...)
+        Makie.scatter(p::Vector{<:Chain},x;args...) = Makie.scatter(submesh(p)[:,1],x;args...)
+        Makie.scatter!(p::Vector{<:Chain},x;args...) = Makie.scatter!(submesh(p)[:,1],x;args...)
+        Makie.scatter(p::ChainBundle;args...) = Makie.scatter(submesh(p);args...)
+        Makie.scatter!(p::ChainBundle;args...) = Makie.scatter!(submesh(p);args...)
+        Makie.scatter(p::Vector{<:Chain};args...) = Makie.scatter(submesh(p);args...)
+        Makie.scatter!(p::Vector{<:Chain};args...) = Makie.scatter!(submesh(p);args...)
+        Makie.lines(p::ChainBundle;args...) = Makie.lines(value(p);args...)
+        Makie.lines!(p::ChainBundle;args...) = Makie.lines!(value(p);args...)
+        Makie.lines(p::Vector{<:TensorAlgebra};args...) = Makie.lines(GeometryBasics.Point.(p);args...)
+        Makie.lines!(p::Vector{<:TensorAlgebra};args...) = Makie.lines!(GeometryBasics.Point.(p);args...)
+        Makie.linesegments(e::ChainBundle;args...) = Makie.linesegments(value(e);args...)
+        Makie.linesegments!(e::ChainBundle;args...) = Makie.linesegments!(value(e);args...)
+        Makie.linesegments(e::Vector{<:Chain};args...) = (p=points(e); Makie.linesegments(pointpair.(p[e],↓(Manifold(p)));args...))
+        Makie.linesegments!(e::Vector{<:Chain};args...) = (p=points(e); Makie.linesegments!(pointpair.(p[e],↓(Manifold(p)));args...))
+        Makie.wireframe(t::ChainBundle;args...) = Makie.linesegments(edges(t);args...)
+        Makie.wireframe!(t::ChainBundle;args...) = Makie.linesegments!(edges(t);args...)
+        Makie.wireframe(t::Vector{<:Chain};args...) = Makie.linesegments(edges(t);args...)
+        Makie.wireframe!(t::Vector{<:Chain};args...) = Makie.linesegments!(edges(t);args...)
+        Makie.mesh(t::ChainBundle;args...) = Makie.mesh(points(t),t;args...)
+        Makie.mesh!(t::ChainBundle;args...) = Makie.mesh!(points(t),t;args...)
+        Makie.mesh(t::Vector{<:Chain};args...) = Makie.mesh(points(t),t;args...)
+        Makie.mesh!(t::Vector{<:Chain};args...) = Makie.mesh!(points(t),t;args...)
+        function Makie.mesh(p::ChainBundle,t;args...)
             if mdims(p) == 2
                 sm = submesh(p)[:,1]
-                AbstractPlotting.lines(sm,args[:color])
-                AbstractPlotting.plot!(sm,args[:color])
+                Makie.lines(sm,args[:color])
+                Makie.plot!(sm,args[:color])
             else
-                AbstractPlotting.mesh(submesh(p),array(t);args...)
+                Makie.mesh(submesh(p),array(t);args...)
             end
         end
-        function AbstractPlotting.mesh!(p::ChainBundle,t;args...)
+        function Makie.mesh!(p::ChainBundle,t;args...)
             if mdims(p) == 2
                 sm = submesh(p)[:,1]
-                AbstractPlotting.lines!(sm,args[:color])
-                AbstractPlotting.plot!(sm,args[:color])
+                Makie.lines!(sm,args[:color])
+                Makie.plot!(sm,args[:color])
             else
-                AbstractPlotting.mesh!(submesh(p),array(t);args...)
+                Makie.mesh!(submesh(p),array(t);args...)
             end
         end
     end
