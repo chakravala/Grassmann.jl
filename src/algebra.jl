@@ -674,9 +674,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif S<:Chain && L == 0
             return :(Chain{V,G}(broadcast($MUL,Ref(a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : S<:Chain ? :(a[1]*complementlefthodge(~b)) : :(⋆(~a)*b[1])
+            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
-            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(⋆(~a)*b[1]) : :(complementlefthodge(~b))
+            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
@@ -990,18 +990,20 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                         val≠0 && for j ∈ 1:bn[G+1]
                             A,B = $(swap ? :((ia[i],ib[j])) : :((ib[j],ia[i])))
                             X,Y = $(swap ? :((val,a[j])) : :((a[j],val)))
-                            if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))&μ
+                            dm = derive_mul(V,A,B,X,Y,$MUL)
+                            if @inbounds $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))
+                                @inbounds $$product!(V,out,A,B,dm)
                             end
                         end end
                     else quote
                         A,B = $(swap ? :((ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),ia[i])))
                         $(if S<:Simplex; quote
                             X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,b.v[bs[g]+1])))
-                            if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))&μ
+                            dm = derive_mul(V,A,B,X,Y,$MUL)
+                            if @inbounds $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,X,Y,$MUL))
+                                @inbounds $$product!(V,out,A,B,dm)
                             end end
                         else
                             :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],false))&μ
@@ -1044,9 +1046,10 @@ end
                         @inbounds R = bs[G]
                         Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]
-                            if @inbounds $product!(V,out,X[i],Y[j],derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL))&μ
+                            dm = derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL)
+                            if @inbounds $product!(V,out,X[i],Y[j],dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $product!(V,out,X[i],Y[j],derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL))
+                                @inbounds $product!(V,out,X[i],Y[j],dm)
                             end
                         end
                     end
