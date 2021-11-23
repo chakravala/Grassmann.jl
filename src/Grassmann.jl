@@ -38,7 +38,9 @@ include("forms.jl")
 
 ## fundamentals
 
-export hyperplanes, points, TensorAlgebra
+export cayley, hyperplanes, points, TensorAlgebra
+
+cayley(x) = (y=Vector(Λ(x).b); y*transpose(y))
 
 @pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 
