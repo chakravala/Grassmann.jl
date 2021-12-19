@@ -5,7 +5,7 @@
 export TensorTerm, TensorGraded, TensorMixed, SubManifold, Simplex, MultiVector, SparseChain, MultiGrade, ChainBundle
 
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed
-import Leibniz: grade
+import Leibniz: grade, showvalue
 
 export TensorNested
 abstract type TensorNested{V} <: Manifold{V} end
@@ -21,6 +21,20 @@ end
 
 import Leibniz: Fields, parval, mixed
 parsym = (Symbol,parval...)
+
+function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
+    if !(|(broadcast(<:,T,parsym)...)) && signbit(i) && !isnan(i)
+        print(io, compact ? "-" : " - ")
+        if isa(i,Signed) && !isa(i,BigInt) && i == typemin(typeof(i))
+            showvalue(io, V, B, -widen(i))
+        else
+            showvalue(io, V, B, -i)
+        end
+    else
+        print(io, compact ? "+" : " + ")
+        showvalue(io, V, B, i)
+    end
+end
 
 ## pseudoscalar
 
@@ -88,29 +102,11 @@ transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 
-showparens(tmv) = (!(tmv<:TensorTerm||tmv<:Projector)) && |(broadcast(<:,tmv,parval)...)
-
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
-    ib = indexbasis(mdims(V),G)
-    @inbounds tmv = typeof(m.v[1])
-    if |(broadcast(<:,tmv,parsym)...)
-        par = showparens(tmv)
-        @inbounds par ? print(io,"(",m.v[1],")") : print(io,m.v[1])
-    else
-        @inbounds print(io,m.v[1])
-    end
-    @inbounds Leibniz.printindices(io,V,ib[1])
+    ib,compact = indexbasis(mdims(V),G),get(io,:compact,false)
+    @inbounds Leibniz.showvalue(io,V,ib[1],m.v[1])
     for k ∈ 2:length(ib)
-        @inbounds mvs = m.v[k]
-        tmv = typeof(mvs)
-        if |(broadcast(<:,tmv,parsym)...)
-            par = showparens(tmv)
-            par ? print(io," + (",mvs,")") : print(io," + ",mvs)
-        else
-            sbm = signbit(mvs)
-            print(io,sbm ? " - " : " + ",sbm ? abs(mvs) : mvs)
-        end
-        @inbounds Leibniz.printindices(io,V,ib[k])
+        @inbounds showterm(io,V,ib[k],m.v[k],compact)
     end
 end
 
@@ -298,30 +294,17 @@ function (m::MultiVector{V,T})(g::Int,i::Int) where {V,T,B}
 end
 
 function show(io::IO, m::MultiVector{V,T}) where {V,T}
-    N = mdims(V)
-    basis_count = true
-    print(io,m[0][1])
+    N,compact = mdims(V),get(io,:compact,false)
     bs = binomsum_set(N)
-    for i ∈ 2:N+1
+    print(io,m[0][1])
+    for i ∈ list(2,N+1)
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
             @inbounds s = k+bs[i]
-            @inbounds mvs = m.v[s]
-            @inbounds if !isnull(mvs)
-                tmv = typeof(mvs)
-                if |(broadcast(<:,tmv,parsym)...)
-                    par = showparens(tmv)
-                    par ? print(io," + (",mvs,")") : print(io," + ",mvs)
-                else
-                    sba = signbit(mvs)
-                    print(io,sba ? " - " : " + ",sba ? abs(mvs) : mvs)
-                end
-                @inbounds Leibniz.printindices(io,V,ib[k])
-                basis_count = false
-            end
+            @inbounds !isnull(m.v[s]) && showterm(io,V,ib[k],m.v[s],compact)
         end
     end
-    basis_count && print(io,pre[1]*'⃖')
+    isscalar(m) && (Leibniz.showstar(io,m.v[1]); print(io,pre[1]*'⃖'))
 end
 
 ==(a::MultiVector{V,T},b::MultiVector{V,S}) where {V,T,S} = prod(a.v .== b.v)
@@ -387,6 +370,8 @@ Proj(v::Chain{W,1,<:Chain{V}},λ=1) where {V,W} = Proj{V}(Chain(value(v)./abs.(v
 getindex(P::Proj,i::Int,j::Int) = P.v[i]*P.v[j]
 getindex(P::Proj{V,<:Chain{W,1,<:Chain}} where {V,W},i::Int,j::Int) = sum(column(P.v,i).*column(P.v,j))
 #getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
+
+Leibniz.extend_parnot(Projector)
 
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ} = print(io,"(",P.λ,")Proj(",P.v,")")
