@@ -277,7 +277,7 @@ function SparseArrays.sparse(t,cols=columns(t))
     np,N = length(points(t)),mdims(Manifold(t))
     A = spzeros(Int,np,np)
     for c ∈ combo(N,2)
-        A += sparse(cols[c[1]],cols[c[2]],1,np,np)
+        A += @inbounds sparse(cols[c[1]],cols[c[2]],1,np,np)
     end
     return A
 end
@@ -287,7 +287,7 @@ function edges(t,adj=adjacency(t))
     mdims(t) == 2 && (return t)
     N = mdims(Manifold(t)); M = points(t)(list(N-1,N)...)
     f = findall(x->!iszero(x),LinearAlgebra.triu(adj))
-    [Chain{M,1}(Values{2,Int}(f[n].I)) for n ∈ 1:length(f)]
+    [Chain{M,1}(Values{2,Int}(@inbounds f[n].I)) for n ∈ 1:length(f)]
 end
 
 function facetsinterior(t::Vector{<:Chain{V}}) where V
@@ -331,7 +331,7 @@ function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
     vec = zeros(Variables{mdims(V),Int})
     val = N+1==mdims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(Values{binomial(mdims(V),N)})
     for i ∈ 1:length(t)
-        vec[:] = value(t[i])
+        vec[:] = @inbounds value(t[i])
         par = DirectSum.indexparity!(vec)
         w = Chain{W,1}.(DirectSum.combinations(par[2],N))
         for k ∈ 1:binomial(mdims(V),N)

@@ -16,6 +16,7 @@ export involute, clifford
 
 ## product parities
 
+@pure parityjoin(N,a,b) = isodd(sum(digits_fast(a,N) .* cumsum(digits_fast(b<<1,N))))
 @pure function parityjoin(N,S,a,b)
     isodd(sum(digits_fast(a,N) .* cumsum(digits_fast(b<<1,N)))+count_ones((a & b) & S))
 end
@@ -29,8 +30,7 @@ end
 end
 
 @pure function parityconformal(V,A,B)
-    C,hio = A ⊻ B, hasinforigin(V,A,B)
-    cc = hio || hasorigininf(V,A,B)
+    C,cc = A ⊻ B, hasinforigin(V,A,B) || hasorigininf(V,A,B)
     A3,B3,i2o,o2i,xor = conformalcheck(V,A,B)
     pcc,bas = xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
     return pcc, bas, cc, zero(UInt)
@@ -121,6 +121,8 @@ const parity_extra = Dict{UInt,Dict{UInt,Dict{UInt,Bool}}}[]
         @inbounds !haskey(parity_extra[N][s],a) && push!(parity_extra[N][s],a=>Dict{UInt,Bool}())
         @inbounds !haskey(parity_extra[N][s][a],b) && push!(parity_extra[N][s][a],b=>parityjoin(n,s,a,b))
         @inbounds parity_extra[N][s][a][b]
+    elseif n==0
+        parityjoin(n,s,a,b)
     else
         a1 = a+1
         for k ∈ length(parity_cache)+1:n
@@ -174,6 +176,8 @@ for par ∈ (:conformal,:regressive,:interior)
                 @inbounds !haskey($extra[N][S][m1][s],a) && push!($extra[N][S][m1][s],a=>Dict{UInt,$T}())
                 @inbounds !haskey($extra[N][S][m1][s][a],b) && push!($extra[N][S][m1][s][a],b=>$calc(V,a,b))
                 @inbounds $extra[N][S][m1][s][a][b]
+            elseif n==0
+                $calc(V,a,b)
             else
                 a1 = a+1
                 for k ∈ length($cache)+1:n

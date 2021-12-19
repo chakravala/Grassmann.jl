@@ -32,6 +32,7 @@ export UniformScaling, I, points
 
 @computed struct Chain{V,G,𝕂} <: TensorGraded{V,G}
     v::Values{binomial(mdims(V),G),𝕂}
+    Chain{V,G,𝕂}(v) where {V,G,𝕂} = new{DirectSum.submanifold(V),G,𝕂}(v)
 end
 
 """
@@ -175,7 +176,7 @@ Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T<:Chain,X} = Chain{V,G,T}(ones.(nt
 Subsets of a bundle cross-section over a `Manifold` topology.
 """
 struct ChainBundle{V,G,𝕂,Points} <: Manifold{V}
-    @pure ChainBundle{V,G,𝕂,P}() where {V,G,𝕂,P} = new{V,G,𝕂,P}()
+    @pure ChainBundle{V,G,𝕂,P}() where {V,G,𝕂,P} = new{DirectSum.submanifold(V),G,𝕂,P}()
 end
 
 const bundle_cache = (Vector{Chain{V,G,T,X}} where {V,G,T,X})[]
@@ -212,6 +213,7 @@ end
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
 @pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
+@pure DirectSum.submanifold(m::ChainBundle) = m
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
@@ -239,6 +241,7 @@ Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
 
 @computed struct MultiVector{V,𝕂} <: TensorMixed{V}
     v::Values{1<<mdims(V),𝕂}
+    MultiVector{V,𝕂}(v) where {V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
 end
 
 """
@@ -368,9 +371,9 @@ export Projector, Dyadic, Proj
 struct Projector{V,T,Λ} <: TensorNested{V}
     v::T
     λ::Λ
-    Projector{V,T,Λ}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
-    Projector{V,T}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
-    Projector{V}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{V,T,Λ}(v,λ)
+    Projector{V,T,Λ}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
+    Projector{V,T}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
+    Projector{V}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
 end
 
 const Proj = Projector
@@ -397,8 +400,8 @@ DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
 struct Dyadic{V,X,Y} <: TensorNested{V}
     x::X
     y::Y
-    Dyadic{V,X,Y}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{V,X,Y}(x,y)
-    Dyadic{V}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{V,X,Y}(x,y)
+    Dyadic{V,X,Y}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{DirectSum.submanifold(V),X,Y}(x,y)
+    Dyadic{V}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{DirectSum.submanifold(V),X,Y}(x,y)
 end
 
 Dyadic(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = Dyadic{V}(x,y)
@@ -450,20 +453,20 @@ Base.isapprox(a::S,b::T) where {S<:MultiVector,T<:MultiVector} = Manifold(a)==Ma
 Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
 function Leibniz.gdims(t::Vector{<:Chain})
     out = zeros(Variables{mdims(Manifold(points(t)))+1,Int})
-    out[mdims(Manifold(t))+1] = length(t)
+    @inbounds out[mdims(Manifold(t))+1] = length(t)
     return out
 end
 function Leibniz.gdims(t::Values{N,<:Vector}) where N
     out = zeros(Variables{mdims(points(t[1]))+1,Int})
-    for i ∈ 1:N
-        out[mdims(Manifold(t[i]))+1] = length(t[i])
+    for i ∈ list(1,N)
+        @inbounds out[mdims(Manifold(t[i]))+1] = length(t[i])
     end
     return out
 end
 function Leibniz.gdims(t::Values{N,<:Tuple}) where N
     out = zeros(Variables{mdims(points(t[1][1]))+1,Int})
-    for i ∈ 1:N
-        out[mdims(Manifold(t[i][1]))+1] = length(t[i][1])
+    for i ∈ list(1,N)
+        @inbounds out[mdims(Manifold(t[i][1]))+1] = length(t[i][1])
     end
     return out
 end
@@ -471,7 +474,7 @@ function Leibniz.gdims(t::MultiVector{V}) where V
     N = mdims(V)
     out = zeros(Variables{N+1,Int})
     bs = binomsum_set(N)
-    for G ∈ 0:N
+    for G ∈ list(0,N)
         ib = indexbasis(N,G)
         for k ∈ 1:length(ib)
             @inbounds t.v[k+bs[G+1]] ≠ 0 && (out[count_ones(symmetricmask(V,ib[k],ib[k])[1])+1] += 1)
@@ -523,7 +526,7 @@ end
         $(insert_expr((:N,:t,:out),:mvec,:T,:(typeof((one(T)/(2one(T))))))...)
         out = copy(value(a,mvec(N,G,t)))
         bi = bladeindex(N,unsplitstart(G)):bladeindex(N,unsplitend(G))-1
-        out[bi] = unsplitter(N,G)*out[bi]
+        @inbounds out[bi] = unsplitter(N,G)*out[bi]
         return out
     end
     #norm(t::MultiVector) = norm(unsplitval(t))
@@ -533,7 +536,7 @@ end
         out = copy(value(a,mvec(N,t)))
         for G ∈ 1:N-1
             bi = basisindex(N,unsplitstart(G)):basisindex(N,unsplitend(G))-1
-            out[bi] = unsplitter(N,G)*out[bi]
+            @inbounds out[bi] = unsplitter(N,G)*out[bi]
         end
         return out
     end

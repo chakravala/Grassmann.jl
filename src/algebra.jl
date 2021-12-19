@@ -69,7 +69,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
 @generated ∧(t::T) where T<:Values{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
-@generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
+@generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(@inbounds t[$i]) for i ∈ 1:N])
 ∧(::Values{0,<:Chain{V}}) where V = one(V) # ∧() = 1
 ∧(::FixedVector{0,<:Chain{V}}) where V = one(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
@@ -215,7 +215,7 @@ contraction(a::Proj,b::Dyadic) = (a.v*(a.λ*(a.v⋅b.x)))⊗b.y
 contraction(a::Proj,b::Proj) = (a.v*((a.λ*b.λ)*(a.v⋅b.v)))⊗b.v
 contraction(a::Dyadic{V},b::TensorGraded{V,0}) where V = Dyadic{V}(a.x*b,a.y)
 contraction(a::Proj{V},b::TensorTerm{V,0}) where V = Proj{V}(a.v,a.λ*value(b))
-contraction(a::Proj{V},b::Chain{V,0}) where V = Proj{V}(a.v,a.λ*b[1])
+contraction(a::Proj{V},b::Chain{V,0}) where V = Proj{V}(a.v,a.λ*(@inbounds b[1]))
 contraction(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj(Chain{V,1}(contraction.(value(a.v),b)))
 #contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
 contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅Ref(b))
@@ -231,19 +231,19 @@ contraction(a::SubManifold{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(
 contraction(a::Simplex{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
 contraction(x::Chain{V,G,<:Chain},y::Simplex{V,G}) where {V,G} = value(y)*x[bladeindex(mdims(V),UInt(basis(y)))]
 contraction(x::Chain{V,G,<:Chain},y::SubManifold{V,G}) where {V,G} = x[bladeindex(mdims(V),UInt(y))]
-#contraction(a::Chain{V,G,<:Chain{V,G}},b::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(Ref(a).⋅value(b))
+contraction(a::Chain{V,L,<:Chain{V,G}},b::Chain{V,G,<:Chain{V}}) where {V,G,L} = Chain{V,G}(matmul(value(a),value(b)))
 contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
 contraction(x::Chain{W,L,<:MultiVector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = MultiVector{V}(matmul(value(x),value(y)))
 contraction(x::MultiVector{W,<:Chain{V,G},N},y::MultiVector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
 contraction(x::MultiVector{W,<:MultiVector{V},N},y::MultiVector{V,T,N}) where {W,N,V,T} = MultiVector{V}(matmul(value(x),value(y)))
 @inline @generated function matmul(x::Values{N,<:Simplex{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,:(y[$i]*value(x[$i]))) for i ∈ 1:N]...)
+    Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ 1:N]...)
 end
 @inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
 end
 @inline @generated function matmul(x::Values{N,<:MultiVector{V}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
 end
 
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
@@ -585,10 +585,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             out = zeros(svec(N,G,Any))
             X = UInt(basis(a))
             for k ∈ 1:binomial(N,G)
-                B = ib[k]
-                val = :($right(b.v[$k]))
+                B = @inbounds ib[k]
+                val = :(@inbounds $right(b.v[$k]))
                 val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
-                @inbounds setblade!_pre(out,val,ib[k],Val{N}())
+                setblade!_pre(out,val,B,Val{N}())
             end
             return :(Chain{V,G}($(Expr(:call,tvec(N,G,t),out...))))
         else return if !swap; quote
@@ -611,8 +611,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             out = zeros(svec(N,Any))
             X = UInt(basis(a))
             for k ∈ 1:binomial(N,G)
-                B = ib[k]
-                val = :($right(b.v[$k]))
+                B = @inbounds ib[k]
+                val = :(@inbounds $right(b.v[$k]))
                 val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
                 @inbounds setmulti!_pre(out,val,B,Val(N))
             end
@@ -620,10 +620,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 g-1 == G && continue
                 ib = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    B = ib[i]
+                    B = @inbounds ib[i]
                     if B == X
-                        val = :($left(value(a,$t)))
-                        @inbounds setmulti!_pre(out,val,B,Val(N))
+                        val = :(@inbounds $left(value(a,$t)))
+                        setmulti!_pre(out,val,B,Val(N))
                     end
                 end
             end
@@ -650,10 +650,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             for g ∈ 1:N+1
                 ib = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    B = ib[i]
-                    val = :($right(b.v[$(bs[g]+i)]))
+                    B = @inbounds ib[i]
+                    val = :(@inbounds $right(b.v[$(bs[g]+i)]))
                     val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
-                    @inbounds setmulti!_pre(out,val,B,Val(N))
+                    setmulti!_pre(out,val,B,Val(N))
                 end
             end
             return :(MultiVector{V}($(Expr(:call,tvec(N,t),out...))))
@@ -672,33 +672,33 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
         MUL,VEC = mulvec(a,b)
         if G == 0
-            return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(b[1])))) : swap ? :(b[1]*a) : :(a*b[1])
+            return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(@inbounds b[1])))) : swap ? :(@inbounds b[1]*a) : :(@inbounds a*b[1])
         elseif S<:Chain && L == 0
-            return :(Chain{V,G}(broadcast($MUL,Ref(a[1]),b.v)))
+            return :(Chain{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(⋆(~a)*b[1])
+            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
-            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
+            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
                 out = zeros(svec(N,t))
                 B = indexbasis(N,L)
                 for i ∈ 1:binomial(N,L)
-                    @inbounds v,ibi = :(a[$i]),B[i]
+                    @inbounds v,ibi = :(@inbounds a[$i]),B[i]
                     for j ∈ 1:bng
-                        @inbounds geomaddmulti!_pre(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(b[$j]),MUL))
+                        @inbounds geomaddmulti!_pre(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(@inbounds b[$j]),MUL))
                     end
                 end
             else
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 U = UInt(basis(a))
                 for i ∈ 1:binomial(N,G)
-                    A,B = swap ? (ib[i],U) : (U,ib[i])
+                    A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Simplex
-                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                     else
-                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                        @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
                     end
                 end
             end
@@ -721,7 +721,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             $(insert_expr((:N,:t,:out,:ib,:μ),VEC)...)
             U = UInt(basis(a))
             for i ∈ 1:binomial(N,G)
-                A,B = swap ? (ib[i],U) : (U,ib[i])
+                A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                 $(if S<:Simplex
                     :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$MUL))&μ
                         $(insert_expr((:out,);mv=:out)...)
@@ -749,12 +749,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 ib = indexbasis(N,G)
                 out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
                 for i ∈ 1:bnl
-                    @inbounds v,iai = :(a[$i]),ia[i]
+                    @inbounds v,iai = :(@inbounds a[$i]),ia[i]
                     for j ∈ 1:bng
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),MUL))
+                            @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL))
                         else
-                            @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(b[$j]),MUL))
+                            @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL))
                         end
                     end
                 end
@@ -763,18 +763,18 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
                 U = UInt(basis(a))
                 for i ∈ 1:bng
-                    A,B = swap ? (ib[i],U) : (U,ib[i])
+                    A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Simplex
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         else
-                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         end
                     else
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
                         else
-                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
                         end
                     end
                 end
@@ -810,7 +810,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             U = UInt(basis(a))
             for i ∈ 1:bng
                 if μ
-                    A,B = swap ? (ib[i],U) : (U,ib[i])
+                    A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     $(if S<:Simplex
                         :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$MUL))
                             #$(insert_expr((:out,);mv=:(value(mv)))...)
@@ -852,14 +852,14 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                 out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
                 CA,CB = isdual(w),isdual(W)
                 for i ∈ 1:binomial(mdims(w),G)
-                    @inbounds v,iai = :(a[$i]),ia[i]
+                    @inbounds v,iai = :(@inbounds a[$i]),ia[i]
                     x = CA ? dual(V,iai) : iai
                     for j ∈ 1:binomial(mdims(W),L)
                         X = @inbounds CB ? dual(V,ib[j]) : ib[j]
                         if μ
-                            $grassaddmulti!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),MUL))
+                            $grassaddmulti!_pre(V,out,x,X,derive_pre(V,x,X,v,:(@inbounds b[$j]),MUL))
                         else
-                            $grassaddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(b[$j]),MUL))
+                            $grassaddblade!_pre(V,out,x,X,derive_pre(V,x,X,v,:(@inbounds b[$j]),MUL))
                         end
                     end
                 end
@@ -873,15 +873,15 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                     A,B = swap ? (X,x) : (x,X)
                     if S<:Simplex
                         if μ
-                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         else
-                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(b[$i]),MUL))
+                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         end
                     else
                         if μ
-                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                            $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
                         else
-                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(b[$i]),false))
+                            $grassaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
                         end
                     end
                 end
@@ -963,20 +963,20 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     if S<:Chain
-                        @inbounds val = :(b.v[$(bs[g]+i)])
+                        @inbounds val = :(@inbounds b.v[$(bs[g]+i)])
                         for j ∈ 1:bn[G+1]
                             A,B = swapper(ib[j],ia[i],swap)
-                            X,Y = swapper(:(a[$j]),val,swap)
+                            X,Y = swapper(:(@inbounds a[$j]),val,swap)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     else
                         U = UInt(basis(a))
                         A,B = swapper(U,ia[i],swap)
                         if S<:Simplex
-                            X,Y = swapper(:(a.v),:(b.v[$(bs[g]+i)]),swap)
+                            X,Y = swapper(:(a.v),:(@inbounds b.v[$(bs[g]+i)]),swap)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(b.v[$(bs[g]+i)]),false))
+                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(@inbounds b.v[$(bs[g]+i)]),false))
                         end
                     end
                 end
@@ -990,8 +990,8 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                     $(if S<:Chain; quote
                         @inbounds val = b.v[bs[g]+i]
                         val≠0 && for j ∈ 1:bn[G+1]
-                            A,B = $(swap ? :((ia[i],ib[j])) : :((ib[j],ia[i])))
-                            X,Y = $(swap ? :((val,a[j])) : :((a[j],val)))
+                            A,B = $(swap ? :(@inbounds (ia[i],ib[j])) : :(@inbounds (ib[j],ia[i])))
+                            X,Y = $(swap ? :((val,@inbounds a[j])) : :((@inbounds a[j],val)))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
                             if @inbounds $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
@@ -999,9 +999,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                             end
                         end end
                     else quote
-                        A,B = $(swap ? :((ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),ia[i])))
+                        A,B = $(swap ? :((@inbounds ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),@inbounds ia[i])))
                         $(if S<:Simplex; quote
-                            X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,b.v[bs[g]+1])))
+                            X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,@inbounds b.v[bs[g]+1])))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
                             if @inbounds $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
@@ -1027,12 +1027,12 @@ end
         for g ∈ 1:N+1
             X = indexbasis(N,g-1)
             @inbounds for i ∈ 1:bn[g]
-                @inbounds val = nothing≠d ? :($a[$(bs[g]+i)]/$d) : :($a[$(bs[g]+i)])
+                @inbounds val = nothing≠d ? :(@inbounds $a[$(bs[g]+i)]/$d) : :(@inbounds $a[$(bs[g]+i)])
                 for G ∈ 1:N+1
                     @inbounds R = bs[G]
                     Y = indexbasis(N,G-1)
                     @inbounds for j ∈ 1:bn[G]
-                        @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:($b[$(R+j)]),MUL))
+                        @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL))
                     end
                 end
             end
@@ -1043,7 +1043,7 @@ end
             for g ∈ 1:N+1
                 X = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
-                    @inbounds val = $(nothing≠d ? :($a[bs[g]+i]/$d) : :($a[bs[g]+i]))
+                    @inbounds val = $(nothing≠d ? :(@inbounds $a[bs[g]+i]/$d) : :(@inbounds $a[bs[g]+i]))
                     val≠0 && for G ∈ 1:N+1
                         @inbounds R = bs[G]
                         Y = indexbasis(N,G-1)

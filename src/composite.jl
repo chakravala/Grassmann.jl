@@ -56,7 +56,7 @@ end
 
 function Base.exp(t::MultiVector)
     st = scalar(t)
-    mt = t-scalar(t)
+    mt = t-st
     sq = mt*mt
     if isscalar(sq)
         hint = value(scalar(sq))
@@ -70,7 +70,7 @@ end
 
 function Base.exp(t::MultiVector,::Val{hint}) where hint
     st = scalar(t)
-    mt = t-scalar(t)
+    mt = t-st
     sq = mt*mt
     if isscalar(sq)
         isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
@@ -352,7 +352,7 @@ end
 @generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
     W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
     if M == 1 && (V === ℝ1 || V == 1)
-        return :(Chain{V,1}(Values(v[1]/t[1][1])))
+        return :(@inbounds Chain{V,1}(Values(v[1]/t[1][1])))
     elseif M == 2 && (V === ℝ2 || V == 2)
         return quote
             (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
@@ -361,8 +361,8 @@ end
         end
     elseif M == 3 && (V === ℝ3 || V == 3)
         return quote
-            dv = v/∧(t)[1]; c1,c2,c3 = value(t)
-            return Chain{V,1}(
+            dv = @inbounds v/∧(t)[1]; c1,c2,c3 = value(t)
+            return @inbounds Chain{V,1}(
                 (c2[2]*c3[3] - c3[2]*c2[3])*dv[1] +
                     (c3[1]*c2[3] - c2[1]*c3[3])*dv[2] +
                     (c2[1]*c3[2] - c3[1]*c2[2])*dv[3],
@@ -379,29 +379,29 @@ end
     x,y,xy = Grassmann.Cramer(N) # paste this into the REPL for faster eval
     mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
     out = Expr(:call,:Values,:(v∧$(y[end])),mid...,:($(x[end])∧v))
-    detx = :(detx = (t[1]∧$(y[end])))
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,detx,
+    detx = :(detx = @inbounds (t[1]∧$(y[end])))
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,detx,
         :(Chain{$W,1}(column($(Expr(:call,:.⋅,out,:(Ref(detx))))./abs2(detx)))))
 end
 
 @generated function Base.in(v::Chain{V,1},t::Values{N,<:Chain{V,1}}) where {V,N}
     if N == mdims(V)
         x,y,xy = Grassmann.Cramer(N-1)
-        mid = [:(s==signbit(($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-2]
-        out = Values(:(s==signbit((v∧$(y[end]))[1])),mid...,:(s==signbit(($(x[end])∧v)[1])))
-        return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(s=signbit((t[1]∧$(y[end]))[1])),ands(out))
+        mid = [:(s==signbit(@inbounds ($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-2]
+        out = Values(:(s==signbit(@inbounds (v∧$(y[end]))[1])),mid...,:(s==signbit(@inbounds ($(x[end])∧v)[1])))
+        return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(s=signbit(@inbounds (t[1]∧$(y[end]))[1])),ands(out))
     else
         x,y,xy = Grassmann.Cramer(N-1,1)
         mid = [:(signscalar(($(x[i])∧(v-x1)∧$(y[end-i]))/d)) for i ∈ 1:N-2]
         out = Values(:(signscalar((v∧∧(vectors(t,v)))/d)),mid...,:(signscalar(($(x[end])∧(v-x1))/d)))
-        return Expr(:block,:(T=vectors(t)),:((x1,y1)=(t[1],T[end])),xy...,
+        return Expr(:block,:(T=vectors(t)),:((x1,y1)=@inbounds (t[1],T[end])),xy...,
             :($(x[end])=$(x[end-1])∧T[end-1];d=$(x[end])∧T[end]),ands(out))
     end
 end
 
 @generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
     W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
-    N<1 && (return :(_transpose(Values(inv(t[1])),$W)))
+    N<1 && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
@@ -412,11 +412,11 @@ end
         Expr(:call,:Values,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
     out = if M≠mdims(V)
-        :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
+        :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
     else
-        :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
+        :(.⋆($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end]))[1])))))
     end
-    return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,:(_transpose($out,$W)))
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
 
 @generated function grad(T::Values{M,<:Chain{V,1}}) where {M,V}
@@ -431,11 +431,11 @@ end
         Expr(:call,:Values,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
     end
     out = if M≠mdims(V)
-        :(vector.($(Expr(:call,:./,val,:((t[1]∧$(y[end])))))))
+        :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
     else
-        :(.⋆($(Expr(:call,:./,val,:((t[1]∧$(y[end]))[1])))))
+        :(.⋆($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end]))[1])))))
     end
-    return Expr(:block,:(t=_transpose(T,$W)),:((x1,y1)=(t[1],t[end])),xy...,:(_transpose($out,↓(V))))
+    return Expr(:block,:(t=_transpose(T,$W)),:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,↓(V))))
 end
 
 @generated function Base.:\(t::Values{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
@@ -504,13 +504,13 @@ signscalar(x::SubManifold{V,0} where V) = true
 signscalar(x::Simplex{V,0} where V) = !signbit(value(x))
 signscalar(x::Simplex) = false
 signscalar(x::Chain) = false
-signscalar(x::Chain{V,0} where V) = !signbit(x[1])
+signscalar(x::Chain{V,0} where V) = !signbit(@inbounds x[1])
 signscalar(x::MultiVector) = isscalar(x) && !signbit(value(scalar(x)))
 ands(x,i=length(x)-1) = i ≠ 0 ? Expr(:&&,x[end-i],ands(x,i-1)) : x[end-i]
 
 function Base.findfirst(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
     for i ∈ 1:length(t)
-        P ∈ t[i] && (return i)
+        @inbounds P ∈ t[i] && (return i)
     end
     return 0
 end
@@ -523,7 +523,7 @@ function Base.findfirst(P,t::ChainBundle)
 end
 function Base.findlast(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
     for i ∈ length(t):-1:1
-        P ∈ t[i] && (return i)
+        @inbounds P ∈ t[i] && (return i)
     end
     return 0
 end
@@ -546,8 +546,8 @@ detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::T) where T<:AbstractVector{<:Chain} = sum(m)/length(m)
 mean(m::T) where T<:Values = sum(m)/length(m)
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
-barycenter(m::Values{N,<:Chain}) where N = (s=sum(m);s/s[1])
-barycenter(m::Vector{<:Chain}) = (s=sum(m);s/s[1])
+barycenter(m::Values{N,<:Chain}) where N = (s=sum(m);@inbounds s/s[1])
+barycenter(m::Vector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
@@ -699,6 +699,7 @@ export Orthogrid
     v::Dyadic{V,Chain{V,1,T,mdims(V)},Chain{V,1,T,mdims(V)}}
     n::Chain{V,1,Int}
     s::Chain{V,1,Float64}
+    Orthogrid{V,T}(v,n,s) where {V,T} = new{DirectSum.submanifold(V),T}(v,n,s)
 end
 
 Orthogrid{V,T}(v,n) where {V,T} = Orthogrid{V,T}(v,n,Chain{V,1}(value(v.x-v.y)./(value(n)-1)))

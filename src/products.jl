@@ -18,12 +18,12 @@ derive(n,b,a,t) = t ? (a,derive(n,b)) : (derive(n,b),a)
         return :v
     else quote
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
-        ca,cb = count_ones(sa[2]),count_ones(sb[2])
+        ca,cb = count_ones(@inbounds sa[2]),count_ones(@inbounds sb[2])
         return if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
             v
         else
             prev = ca == 0 ? (x ? one(typeof(v)) : v) : (x ? v : one(typeof(v)))
-            for k ∈ Leibniz.indexsplit((ca==0 ? sa : sb)[1],mdims(V))
+            for k ∈ Leibniz.indexsplit(@inbounds (ca==0 ? sa : sb)[1],mdims(V))
                 prev = derive(prev,getbasis(V,k))
             end
             prev
@@ -36,26 +36,26 @@ end
         return :(a*b)
     else quote
         sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
-        ca,cb = count_ones(sa[2]),count_ones(sb[2])
+        ca,cb = count_ones(@inbounds sa[2]),count_ones(@inbounds sb[2])
         α,β = if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
             a,b
         else
             prev = ca == 0 ? (a,b) : (b,a)
-            for k ∈ Leibniz.indexsplit((ca==0 ? sa : sb)[1],mdims(V))
-                prev = derive(prev[2],getbasis(V,k),prev[1],true)
+            for k ∈ Leibniz.indexsplit(@inbounds (ca==0 ? sa : sb)[1],mdims(V))
+                prev = @inbounds derive(prev[2],getbasis(V,k),prev[1],true)
             end
             #base = getbasis(V,0)
-            while typeof(prev[1]) <: TensorTerm
-                basi = basis(prev[1])
+            while typeof(@inbounds prev[1]) <: TensorTerm
+                basi = @inbounds basis(prev[1])
                 #base *= basi
                 inds = Leibniz.indexsplit(UInt(basi),mdims(V))
-                prev = (value(prev[1]),prev[2])
+                prev = @inbounds (value(prev[1]),prev[2])
                 for k ∈ inds
-                    prev = derive(prev[2],getbasis(V,k),prev[1],true)
+                    prev = @inbounds derive(prev[2],getbasis(V,k),prev[1],true)
                 end
             end
             #base ≠ getbasis(V,0) && (prev = (base*prev[1],prev[2]))
-            ca == 0 ? prev : (prev[2],prev[1])
+            ca == 0 ? prev : (@inbounds prev[2],@inbounds prev[1])
         end
         return α*β
     end end
@@ -79,12 +79,12 @@ end
 
 function derive_post(V,::Val{A},::Val{B},v,x::Bool) where {A,B}
     sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
-    ca,cb = count_ones(sa[2]),count_ones(sb[2])
+    ca,cb = count_ones(@inbounds sa[2]),count_ones(@inbounds sb[2])
     return if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
         v
     else
         prev = ca == 0 ? (x ? one(typeof(v)) : v) : (x ? v : one(typeof(v)))
-        for k ∈ Leibniz.indexsplit((ca==0 ? sa : sb)[1],mdims(V))
+        for k ∈ Leibniz.indexsplit(@inbounds (ca==0 ? sa : sb)[1],mdims(V))
             prev = derive(prev,getbasis(V,k))
         end
         prev
@@ -93,26 +93,26 @@ end
 
 function derive_post(V,::Val{A},::Val{B},a,b,*) where {A,B}
     sa,sb = symmetricsplit(V,A),symmetricsplit(V,B)
-    ca,cb = count_ones(sa[2]),count_ones(sb[2])
+    ca,cb = count_ones(@inbounds sa[2]),count_ones(@inbounds sb[2])
     α,β = if (ca == cb == 0) || ((ca ≠ 0) && (cb ≠ 0))
         a,b
     else
         prev = ca == 0 ? (a,b) : (b,a)
-        for k ∈ Leibniz.indexsplit((ca==0 ? sa : sb)[1],mdims(V))
-            prev = derive(prev[2],getbasis(V,k),prev[1],true)
+        for k ∈ Leibniz.indexsplit(@inbounds (ca==0 ? sa : sb)[1],mdims(V))
+            prev = @inbounds derive(prev[2],getbasis(V,k),prev[1],true)
         end
         #base = getbasis(V,0)
-        while typeof(prev[1]) <: TensorTerm
-            basi = basis(prev[1])
+        while typeof(@inbounds prev[1]) <: TensorTerm
+            basi = @inbounds basis(prev[1])
             #base *= basi
             inds = Leibniz.indexsplit(UInt(basi),mdims(V))
-            prev = (value(prev[1]),prev[2])
+            prev = @inbounds (value(prev[1]),prev[2])
             for k ∈ inds
-                prev = derive(prev[2],getbasis(V,k),prev[1],true)
+                prev = @inbounds derive(prev[2],getbasis(V,k),prev[1],true)
             end
         end
         #base ≠ getbasis(V,0) && (prev = (base*prev[1],prev[2]))
-        ca == 0 ? prev : (prev[2],prev[1])
+        ca == 0 ? prev : (@inbounds prev[2],@inbounds prev[1])
     end
     return α*β
 end
@@ -339,7 +339,7 @@ end
                 $(insert_expr((:N,:M,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
                 for i ∈ 1:binomial(N,G)
-                    @inbounds setblade!_pre(out,:($CONJ(m.v[$i])),dual(V,ib[i],M),Val{N}())
+                    @inbounds setblade!_pre(out,:($CONJ(@inbounds m.v[$i])),dual(V,ib[i],M),Val{N}())
                 end
                 return :(Chain{$(dual(V)),G}($(Expr(:call,tvec(N,TF),out...))))
             else
@@ -368,7 +368,7 @@ end
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds setmulti!_pre(out,:($CONJ(m.v[$(bs[g]+i)])),dual(V,ib[i],M))
+                        @inbounds setmulti!_pre(out,:($CONJ(@inbounds m.v[$(bs[g]+i)])),dual(V,ib[i],M))
                     end
                 end
                 return :(MultiVector{$(dual(V))}($(Expr(:call,tvec(N,TF),out...))))
@@ -532,9 +532,10 @@ for side ∈ (:left,:right)
                     out = zeros(svec(N,G,Any))
                     D = diffvars(V)
                     for k ∈ 1:binomial(N,G)
-                        val = :(conj(b.v[$k]))
-                        v = Expr(:call,MUL,$p(V,ib[k]),$(c≠h ? :($pnp(V,ib[k],val)) : :val))
-                        @inbounds setblade!_pre(out,v,complement(N,ib[k],D,P),Val{N}())
+                        B = @inbounds ib[k]
+                        val = :(conj(@inbounds b.v[$k]))
+                        v = Expr(:call,MUL,$p(V,B),$(c≠h ? :($pnp(V,B,val)) : :val))
+                        setblade!_pre(out,v,complement(N,B,D,P),Val{N}())
                     end
                     return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,:T),out...))))
                 else return quote
@@ -564,9 +565,10 @@ for side ∈ (:left,:right)
                     for g ∈ 1:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
-                            val = :(conj(m.v[$(bs[g]+i)]))
-                            v = Expr(:call,:*,$p(V,ib[i]),$(c≠h ? :($pnp(V,ib[i],val)) : :val))
-                            @inbounds setmulti!_pre(out,v,complement(N,ib[i],D,P),Val{N}())
+                            ibi = @inbounds ib[i]
+                            val = :(conj(@inbounds m.v[$(bs[g]+i)]))
+                            v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
+                            @inbounds setmulti!_pre(out,v,complement(N,ibi,D,P),Val{N}())
                         end
                     end
                     return :(MultiVector{V}($(Expr(:call,tvec(N,:T),out...))))
@@ -603,7 +605,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
                 for k ∈ 1:binomial(N,G)
-                    @inbounds v = :(b.v[$k])
+                    v = :(@inbounds b.v[$k])
                     if D==0
                         @inbounds setblade!_pre(out,:($SUB($v)),ib[k],Val{N}())
                     else
@@ -637,7 +639,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                     pg = $p(g-1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds v = :(m.v[$(bs[g]+i)])
+                        v = :(@inbounds m.v[$(@inbounds bs[g]+i)])
                         if D==0
                             @inbounds setmulti!(out,pg ? :($SUB($v)) : v,ib[i],Val{N}())
                         else
