@@ -12,6 +12,12 @@ export exph, log_fast, logh_fast
 Base.expm1(t::Chain) = expm1(MultiVector(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
+    if T<:SimplexComplex
+        B = basis(t); BB = value(B*B)
+        if BB == -1
+            return SimplexComplex{V,B}(expm1(t.v))
+        end
+    end
     S,term,f = t,(t^2)/2,norm(t)
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 3
@@ -73,6 +79,18 @@ function Base.exp(t::MultiVector,::Val{hint}) where hint
     mt = t-st
     sq = mt*mt
     if isscalar(sq)
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::SimplexComplex{V,B}) where {V,B}
+    st,mt = scalar(t),imaginary(t)
+    if isscalar(B*B)
+        hint = value(scalar(B*B))
         isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
         return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
@@ -176,6 +194,8 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
     end
 end
 
+Base.log(t::SimplexComplex{V,B}) where {V,B} = value(B*B)==-1 ? SimplexComplex{V,B}(log(t.v)) : qlog((t-1)/(t+1))
+Base.log1p(t::SimplexComplex{V,B}) where {V,B} = value(B*B)==-1 ? SimplexComplex{V,B}(log1p(t.v)) : qlog(t/(t+2))
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
@@ -183,6 +203,10 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
+        end
+        @inline function Base.$qrt(t::SimplexComplex{V,B}) where {V,B}
+            value(B*B)==-1 ? SimplexComplex{V,B}($qrt(t.v)) :
+                isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
         @inline Base.$qrt(t::SubManifold{V,0} where V) = t
         @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
@@ -195,6 +219,12 @@ end
 
 function Base.cosh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
+    if T<:SimplexComplex
+        B = basis(t); BB = value(B*B)
+        if BB == -1
+            return SimplexComplex{V,B}(cosh(t.v))
+        end
+    end
     τ = t^2
     S,term = τ/2,(τ^2)/24
     f = norm(S)
@@ -245,6 +275,12 @@ end
 
 function Base.sinh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
+    if T<:SimplexComplex
+        B = basis(t); BB = value(B*B)
+        if BB == -1
+            return SimplexComplex{V,B}(sinh(t.v))
+        end
+    end
     τ,f = t^2,norm(t)
     S,term = t,(t*τ)/6
     norms = FixedVector{3}(f,norm(term),f)
@@ -682,6 +718,7 @@ end
 Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
+Base.map(fn, x::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
 
 import Random: SamplerType, AbstractRNG
 Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
@@ -692,6 +729,11 @@ Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(
 Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(mdims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{SimplexComplex}) = rand(SimplexComplex{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V}}) where V = rand(SimplexComplex{V,rand(Simplex{V})})
+Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B}}) where {V,B} = SimplexComplex{V,G}(rand(Complex{Float64}))
+Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B,T}}) where {V,B,T} = SimplexComplex{V,G}(rand(Complex{T}))
+Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B,T} where B}) where {V,T} = rand(SimplexComplex{V,rand(Simplex{V}),T})
 
 export Orthogrid
 

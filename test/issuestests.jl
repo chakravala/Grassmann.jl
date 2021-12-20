@@ -20,7 +20,7 @@ end
     
     a = v + v1 - v1
     @test a == v
-    @test typeof(a) <: MultiVector
+    @test typeof(a) <: SimplexComplex
     @test a == 1
     
     b = a - 1

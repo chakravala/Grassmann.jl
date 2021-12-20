@@ -40,15 +40,6 @@ function *(a::SubManifold{V},b::Simplex{V}) where V
     order(b.v)+order(bas)>diffmode(V) ? zero(V) : Simplex{V}(v,bas)
 end
 
-#*(a::MultiGrade{V},b::SubManifold{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
-#*(a::SubManifold{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
-#*(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
-
-*(a::UniformScaling,b::Simplex{V}) where V = V(a)*b
-*(a::Simplex{V},b::UniformScaling) where V = a*V(b)
-*(a::UniformScaling,b::Chain{V}) where V = V(a)*b
-*(a::Chain{V},b::UniformScaling) where V = a*V(b)
-
 export ∗, ⊛, ⊖
 import AbstractTensors: ⊖, ⊘, ∗
 
@@ -98,10 +89,6 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     end
     return Simplex{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
-
-#∧(a::MultiGrade{V},b::SubManifold{V}) where V = MultiGrade{V}(a.v,basis(a)*b)
-#∧(a::SubManifold{V},b::MultiGrade{V}) where V = MultiGrade{V}(b.v,a*basis(b))
-#∧(a::MultiGrade{V},b::MultiGrade{V}) where V = MultiGrade{V}(a.v*b.v,basis(a)*basis(b))
 
 export ∧, ∨, ⊗
 
@@ -196,101 +183,6 @@ export ⨼, ⨽
 
 Interior (right) contraction product: ω⋅η = ω∨⋆η
 """ dot
-
-# dyadic products
-
-export outer
-
-outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
-outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
-outer(a::Chain{W},b::Chain{V,1}) where {W,V} = Chain{V,1}(a.*value(b))
-
-contraction(a::Proj,b::TensorGraded) = a.v⊗(a.λ*(a.v⋅b))
-contraction(a::Dyadic,b::TensorGraded) = a.x⊗(a.y⋅b)
-contraction(a::TensorGraded,b::Dyadic) = (a⋅b.x)⊗b.y
-contraction(a::TensorGraded,b::Proj) = ((a⋅b.v)*b.λ)⊗b.v
-contraction(a::Dyadic,b::Dyadic) = (a.x*(a.y⋅b.x))⊗b.y
-contraction(a::Dyadic,b::Proj) = (a.x*((a.y⋅b.v)*b.λ))⊗b.v
-contraction(a::Proj,b::Dyadic) = (a.v*(a.λ*(a.v⋅b.x)))⊗b.y
-contraction(a::Proj,b::Proj) = (a.v*((a.λ*b.λ)*(a.v⋅b.v)))⊗b.v
-contraction(a::Dyadic{V},b::TensorGraded{V,0}) where V = Dyadic{V}(a.x*b,a.y)
-contraction(a::Proj{V},b::TensorTerm{V,0}) where V = Proj{V}(a.v,a.λ*value(b))
-contraction(a::Proj{V},b::Chain{V,0}) where V = Proj{V}(a.v,a.λ*(@inbounds b[1]))
-contraction(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj(Chain{V,1}(contraction.(value(a.v),b)))
-#contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
-contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅Ref(b))
-contraction(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}},b::Chain{V,1}) where {W,V} = a.v:b
-contraction(a::Chain{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(a::Chain{W,L,<:Chain},b::Chain{V,G,<:Chain{W,L}}) where {W,L,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(a::MultiVector{W,<:MultiVector},b::MultiVector{V,<:MultiVector{W}}) where {W,V} = MultiVector{V}(column(Ref(a).⋅value(b)))
-Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
-Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).⋅Ref(b))
-#Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
-
-contraction(a::SubManifold{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(a::Simplex{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(x::Chain{V,G,<:Chain},y::Simplex{V,G}) where {V,G} = value(y)*x[bladeindex(mdims(V),UInt(basis(y)))]
-contraction(x::Chain{V,G,<:Chain},y::SubManifold{V,G}) where {V,G} = x[bladeindex(mdims(V),UInt(y))]
-contraction(a::Chain{V,L,<:Chain{V,G}},b::Chain{V,G,<:Chain{V}}) where {V,G,L} = Chain{V,G}(matmul(value(a),value(b)))
-contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
-contraction(x::Chain{W,L,<:MultiVector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = MultiVector{V}(matmul(value(x),value(y)))
-contraction(x::MultiVector{W,<:Chain{V,G},N},y::MultiVector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
-contraction(x::MultiVector{W,<:MultiVector{V},N},y::MultiVector{V,T,N}) where {W,N,V,T} = MultiVector{V}(matmul(value(x),value(y)))
-@inline @generated function matmul(x::Values{N,<:Simplex{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ 1:N]...)
-end
-@inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
-end
-@inline @generated function matmul(x::Values{N,<:MultiVector{V}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
-end
-
-contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
-contraction(a::Dyadic{V,<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(a.y.⋅b))
-contraction(a::Dyadic{V,T,<:Chain{V,1,<:Chain}} where {V,T},b::TensorGraded) = sum(a.x.⊗(value(a.y).⋅b))
-contraction(a::Proj{V,<:Chain{W,1,<:Chain} where W} where V,b::TensorGraded) = sum(value(a.v).⊗(value(a.λ).*value(a.v).⋅b))
-contraction(a::Proj{V,<:Chain{W,1,<:Chain{V,1}} where W},b::TensorGraded{V,1}) where V = sum(value(a.v).⊗(value(a.λ).*column(value(a.v).⋅b)))
-
-+(a::Proj{V}...) where V = Proj{V}(Chain(Values(eigvec.(a)...)),Chain(Values(eigval.(a)...)))
-+(a::Dyadic{V}...) where V = Proj(Chain(a...))
-+(a::TensorNested{V}...) where V = Proj(Chain(Dyadic.(a)...))
-+(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(value(a.v)...,b)
-+(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
-+(a::Proj{M,<:Chain{M,1,<:TensorNested{V}}} where M,b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(value(a.v)...,value(b.v)...)
-+(a::Proj{M,<:Chain{M,1,<:Chain{V}}} where M,b::Proj{W,<:Chain{W,1,<:Chain{V}}} where W) where V = Chain(Values(value(a.v)...,value(b.v)...))
-#+(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(b,Proj.(value(a.v),value(a.λ))...)
-#+(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
-
--(a::TensorNested) where V = -1a
--(a::TensorNested,b::TensorNested) where V = a+(-b)
-*(a::Number,b::TensorNested{V}) where V = (a*one(V))*b
-*(a::TensorNested{V},b::Number) where V = a*(b*one(V))
-@inline *(a::TensorGraded{V,0},b::TensorNested{V}) where V = b⋅a
-@inline *(a::TensorNested{V},b::TensorGraded{V,0}) where V = a⋅b
-@inline *(a::TensorGraded{V,0},b::Proj{V,<:Chain{V,1,<:TensorNested}}) where V = Proj{V}(a*b.v)
-@inline *(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj{V}(a.v*b)
-
-@inline *(a::DyadicChain,b::DyadicChain) where V = a⋅b
-@inline *(a::DyadicChain,b::Chain) where V = a⋅b
-@inline *(a::DyadicChain,b::TensorTerm) where V = a⋅b
-@inline *(a::TensorGraded,b::DyadicChain) where V = a⋅b
-@inline *(a::DyadicChain,b::TensorNested) where V = a⋅b
-@inline *(a::TensorNested,b::DyadicChain) where V = a⋅b
-
-# dyadic identity element
-
-Base.:+(t::LinearAlgebra.UniformScaling,g::TensorNested) = t+DyadicChain(g)
-Base.:+(g::TensorNested,t::LinearAlgebra.UniformScaling) = DyadicChain(g)+t
-Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
-Base.:-(t::LinearAlgebra.UniformScaling,g::TensorNested) = t-DyadicChain(g)
-Base.:-(g::TensorNested,t::LinearAlgebra.UniformScaling) = DyadicChain(g)-t
-@generated Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
-@generated Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
-@generated Base.:-(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
-@generated Base.:-(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).-$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).-t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
 
 ## cross product
 
@@ -412,6 +304,8 @@ function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
         sq,d = contraction2(~v,v),i÷2
         val = isone(d) ? sq : sq^d
         return iszero(i%2) ? val : val*v
+    elseif T<:SimplexComplex && value(basis(v)*basis(v))==-1
+        return SimplexComplex{V,basis(v)}(v.v^i)
     end
     out = one(V)
     if i < 8 # optimal choice ?
@@ -484,6 +378,150 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     end
 end
 
+/(a::TensorTerm{V,0},b::SimplexComplex{V,B,S}) where {V,B,S} = (T = promote_type(valuetype(a),S); SimplexComplex{V,B}(value(a)*inv(T(b.v))))
+/(a::SimplexComplex{V,B},b::TensorTerm{V,0}) where {V,B} = SimplexComplex{V,B}(Complex(a.v.re/value(b),a.v.im/value(b)))
+
+function /(a::SimplexComplex{V,B,T}, b::SimplexComplex{V,B,T}) where {V,B,T<:Real}
+    are,aim = reim(a); bre,bim = reim(b)
+    B2 = value(abs2_inv(B))
+    SimplexComplex{V,B}(if abs(bre) <= abs(bim)
+        if isinf(bre) && isinf(bim)
+            r = sign(bre)/sign(bim)
+        else
+            r = bre / bim
+        end
+        den = bim*B2 + r*bre
+        Complex((are*r + aim*B2)/den, (aim*r - are)/den)
+    else
+        if isinf(bre) && isinf(bim)
+            r = sign(bim)/sign(bre)
+        else
+            r = bim / bre
+        end
+        den = bre + (r*bim)*B2
+        Complex((are + (aim*r)*B2)/den, (aim - are*r)/den)
+    end)
+end
+
+inv(z::SimplexComplex{V,B,<:Union{Float16,Float32}}) where {V,B} =
+    (w = inv(widen(z)); SimplexComplex{V,B}(oftype(z.v,w.v)))
+
+/(z::SimplexComplex{V,B,T}, w::SimplexComplex{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
+    (w = widen(z)*inv(widen(w)); SimplexComplex{V,B}(oftype(z.v, w.v)))
+
+# robust complex division for double precision
+# variables are scaled & unscaled to avoid over/underflow, if necessary
+# based on arxiv.1210.4539
+#             a + i*b
+#  p + i*q = ---------
+#             c + i*d
+function /(z::SimplexComplex{V,B,Float64}, w::SimplexComplex{V,B,Float64}) where {V,B}
+    a, b = reim(z); c, d = reim(w)
+    absa = abs(a); absb = abs(b);  ab = absa >= absb ? absa : absb # equiv. to max(abs(a),abs(b)) but without NaN-handling (faster)
+    absc = abs(c); absd = abs(d);  cd = absc >= absd ? absc : absd
+    halfov = 0.5*floatmax(Float64)              # overflow threshold
+    twounϵ = floatmin(Float64)*2.0/eps(Float64) # underflow threshold
+    # actual division operations
+    e = Val(float(value(abs2_inv(B))))
+    if  ab>=halfov || ab<=twounϵ || cd>=halfov || cd<=twounϵ # over/underflow case
+        p,q = scaling_cdiv(a,b,c,d,ab,cd,e) # scales a,b,c,d before division (unscales after)
+    else
+        p,q = cdiv(a,b,c,d,e)
+    end
+    return SimplexComplex{V,B}(ComplexF64(p,q))
+end
+
+# sub-functionality for /(z::ComplexF64, w::ComplexF64)
+@inline function cdiv(a::Float64, b::Float64, c::Float64, d::Float64, e::Val)
+    if abs(d)<=abs(c)
+        p,q = Base.robust_cdiv1(a,b,c,d,e)
+    else
+        p,q = robust_cdiv1_rev(b,a,d,c,e)
+        q = -q
+    end
+    return p,q
+end
+@noinline function scaling_cdiv(a::Float64, b::Float64, c::Float64, d::Float64, ab::Float64, cd::Float64, e::Val)
+    # this over/underflow functionality is outlined for performance, cf. #29688
+    a,b,c,d,s = Base.scaleargs_cdiv(a,b,c,d,ab,cd)
+    p,q = cdiv(a,b,c,d,e)
+    return p*s,q*s
+end
+@inline function Base.robust_cdiv1(a::Float64, b::Float64, c::Float64, d::Float64, e::Val{f}) where f
+    r = d/c
+    t = 1.0/(c+(d*r)*f)
+    p = Base.robust_cdiv2(a,b,c,d,r,t,e)
+    q = Base.robust_cdiv2(b,-a,c,d,r,t)
+    return p,q
+end
+@inline function robust_cdiv1_rev(a::Float64, b::Float64, c::Float64, d::Float64, e::Val{f}) where f
+    r = d/c
+    t = 1.0/(c*f+d*r)
+    p = robust_cdiv2_rev(a,b,c,d,r,t,e)
+    q = Base.robust_cdiv2(b,-a,c,d,r,t)
+    return p,q
+end
+function Base.robust_cdiv2(a::Float64, b::Float64, c::Float64, d::Float64, r::Float64, t::Float64, ::Val{e}) where e
+    if r != 0
+        br = b*r
+        return (br != 0 ? (a+br*e)*t : a*t + ((b*t)*r)*e)
+    else
+        return (a + (d*(b/c))*e) * t
+    end
+end
+function robust_cdiv2_rev(a::Float64, b::Float64, c::Float64, d::Float64, r::Float64, t::Float64, ::Val{e}) where e
+    if r != 0
+        br = b*r
+        return (br != 0 ? (a*e+br)*t : (a*t)*e + (b*t)*r)
+    else
+        return (a*e + d*(b/c)) * t
+    end
+end
+
+function inv(z::SimplexComplex{V,B}) where {V,B}
+    c, d = reim(z)
+    (isinf(c) | isinf(d)) && (return SimplexComplex{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
+    e = c*c + d*d*value(abs2_inv(B))
+    SimplexComplex{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
+end
+inv(z::SimplexComplex{V,B,<:Integer}) where {V,B} = inv(SimplexComplex{V,B}(float(z.v)))
+
+function inv(w::SimplexComplex{V,B,Float64}) where {V,B}
+    c, d = reim(w)
+    (isinf(c) | isinf(d)) && return complex(copysign(0.0, c), flipsign(-0.0, d))
+    absc, absd = abs(c), abs(d)
+    cd = ifelse(absc>absd, absc, absd) # cheap `max`: don't need sign- and nan-checks here
+    ϵ  = eps(Float64)
+    bs = 2/(ϵ*ϵ)
+    # scaling
+    s = 1.0
+    if cd >= floatmax(Float64)/2
+        c *= 0.5; d *= 0.5; s = 0.5 # scale down c, d
+    elseif cd <= 2floatmin(Float64)/ϵ
+        c *= bs;  d *= bs;  s = bs  # scale up c, d
+    end
+    # inversion operations
+    a = Val(float(value(abs2_inv(B))))
+    if absd <= absc
+        p, q = robust_cinv(c, d, a)
+    else
+        q, p = robust_cinv_rev(-d, -c, a)
+    end
+    return SimplexComplex{V,B}(ComplexF64(p*s, q*s)) # undo scaling
+end
+function robust_cinv(c::Float64, d::Float64, ::Val{a}) where a
+    r = d/c
+    p = inv(muladd(d, r*a, c))
+    q = -r*p
+    return p, q
+end
+function robust_cinv_rev(c::Float64, d::Float64, ::Val{a}) where a
+    r = d/c
+    p = inv(muladd(d, r, c*a))
+    q = -r*p
+    return p, q
+end
+
 function generate_inverses(Mod,T)
     for (nv,d,ds) ∈ ((:inv,:/,:($Sym.:/)),(:inv_rat,://,:($Sym.://)))
         for Term ∈ (:TensorGraded,:TensorMixed)
@@ -532,6 +570,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,bop,VEC = addvec(a,b,false,op)
         if basis(a) == basis(b)
             :(Simplex{V,L}($bop(value(a),value(b)),basis(a)))
+        elseif !istangent(V) && !hasconformal(V) && L == 0 &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            :(SimplexComplex{V,basis(b)}(Complex(value(a),$bop(value(b)))))
+        elseif !istangent(V) && !hasconformal(V) && G == 0 &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            :(SimplexComplex{V,basis(a)}(Complex($bop(value(b)),value(a))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
@@ -554,28 +598,32 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 return Chain{V,L}(out)
             end end
         else
-            if mdims(V)<cache_limit
-                $(insert_expr((:N,:ib),:svec)...)
-                out,ib = zeros(svec(N,Any)),indexbasis(N)
-                X,Y = UInt(basis(a)),UInt(basis(b))
-                for k ∈ 1:1<<N
-                    C = ib[k]
-                    if C ∈ (X,Y)
-                        val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
-                        @inbounds setmulti!_pre(out,val,C,Val{N}())
-                    end
-                end
-                return Expr(:block,insert_expr((:t,),VEC)...,
-                    :(MultiVector{V}($(Expr(:call,tvec(N,:t),out...)))))
-            else quote
-                #@warn("sparse MultiGrade{V} objects not properly handled yet")
-                #return MultiGrade{V}(a,b)
-                $(insert_expr((:N,:t,:out),VEC)...)
-                setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
-                setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-                return MultiVector{V}(out)
-            end end
+            adder2(a,b,op)
         end
+    end
+    @noinline function adder2(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
+        left,bop,VEC = addvec(a,b,false,op)
+        if mdims(V)<cache_limit
+            $(insert_expr((:N,:ib),:svec)...)
+            out,ib = zeros(svec(N,Any)),indexbasis(N)
+            X,Y = UInt(basis(a)),UInt(basis(b))
+            for k ∈ 1:1<<N
+                C = ib[k]
+                if C ∈ (X,Y)
+                    val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
+                    @inbounds setmulti!_pre(out,val,C,Val{N}())
+                end
+            end
+            return Expr(:block,insert_expr((:t,),VEC)...,
+                :(MultiVector{V}($(Expr(:call,tvec(N,:t),out...)))))
+        else quote
+            #@warn("sparse MultiGrade{V} objects not properly handled yet")
+            #return MultiGrade{V}(a,b)
+            $(insert_expr((:N,:t,:out),VEC)...)
+            setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
+            setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+            return MultiVector{V}(out)
+        end end
     end
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
