@@ -33,7 +33,7 @@ end
     C,cc = A ⊻ B, hasinforigin(V,A,B) || hasorigininf(V,A,B)
     A3,B3,i2o,o2i,xor = conformalcheck(V,A,B)
     pcc,bas = xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
-    return pcc, bas, cc, zero(UInt)
+    return pcc, bas, cc, Zero(UInt)
 end
 
 function paritycomplementinverse(N,G)#,S)
@@ -59,12 +59,12 @@ end
             cx = cc || xor
             cx && parity(V,A3,β3)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
         else
-            false, A+B≠0 ? bas : g_zero(UInt)
+            false, A+B≠0 ? bas : Zero(UInt)
         end
         par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
         return (isodd(L*(L-G))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
     else
-        return false, g_zero(UInt), false, Z
+        return false, Zero(UInt), false, Z
     end
 end
 
@@ -76,21 +76,21 @@ end
 
 @pure function parityinterior(V::Int,a,b)
     A,B,Q,Z = symmetricmask(V,a,b)
-    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,g_zero(UInt),false,Z)
+    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,Zero(UInt),false,Z)
     p,C,t = parityregressive(V,A,complement(V,B,diffvars(V)),Val(true))
     t ? (p⊻parityright(0,sum(indices(B,V)),count_ones(B)) ? -1 : 1) : 1, C|Q, t, Z
 end
 
 #=@pure function parityinterior(V::Signature{N,M,S},a,b) where {N,M,S}
     A,B,Q,Z = symmetricmask(V,a,b)
-    diffcheck(V,A,B) && (return false,g_zero(UInt),false,Z)
+    diffcheck(V,A,B) && (return false,Zero(UInt),false,Z)
     p,C,t = parityregressive(V,A,complement(N,B,diffvars(V)),Val{true}())
     return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
 end=#
 
 @pure function parityinterior(V::M,a,b) where M<:Manifold
     A,B,Q,Z = symmetricmask(V,a,b); N = rank(V)
-    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,g_zero(UInt),false,Z)
+    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,Zero(UInt),false,Z)
     p,C,t = parityregressive(Signature(V),A,complement(N,B,diffvars(V)),Val{true}())
     ind = indices(B,N); g = prod(V[ind])
     return t ? (p⊻parityright(0,sum(ind),count_ones(B)) ? -(g) : g) : g, C|Q, t, Z
@@ -145,7 +145,7 @@ end
 end
 @pure parity(v::Int,a::UInt,b::UInt) = parity(v,metric(v),a,b)
 @pure parity(v::T,a::UInt,b::UInt) where T<:Manifold = parity(Signature(v),a,b)
-@pure parity(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = parity(V,UInt(a),UInt(b))
+@pure parity(a::Submanifold{V,G,B},b::Submanifold{V,L,C}) where {V,G,B,L,C} = parity(V,UInt(a),UInt(b))
 
 ### parity product caches
 
@@ -199,7 +199,7 @@ for par ∈ (:conformal,:regressive,:interior)
                 @inbounds $cache[n][S][m1][s][a1][b+1]
             end
         end
-        @pure $par(a::SubManifold{V,G,B},b::SubManifold{V,L,C}) where {V,G,B,L,C} = $par(V,UInt(a),UInt(b))
+        @pure $par(a::Submanifold{V,G,B},b::Submanifold{V,L,C}) where {V,G,B,L,C} = $par(V,UInt(a),UInt(b))
     end
 end
 
@@ -215,7 +215,7 @@ export odd, even, angular, radial, ₊, ₋, ǂ
 
 for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     @eval begin
-        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(mdims(V),UInt(basis(t))) ∈ $op(V,G) ? t : zero(V)
+        $op(t::T) where T<:TensorTerm{V,G} where {V,G} = basisindex(mdims(V),UInt(basis(t))) ∈ $op(V,G) ? t : Zero(V)
         function $op(t::Chain{V,G,T}) where {V,G,T}
             out = copy(value(t,mvec(mdims(V),G,T)))
             for k ∈ $other(V,G)
@@ -226,7 +226,7 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     end
 end
 
-function odd(t::MultiVector{V,T}) where {V,T}
+function odd(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -236,9 +236,9 @@ function odd(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V}(out)
+    Multivector{V}(out)
 end
-function even(t::MultiVector{V,T}) where {V,T}
+function even(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -247,10 +247,10 @@ function even(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V}(out)
+    Multivector{V}(out)
 end
 
-function imag(t::MultiVector{V,T}) where {V,T}
+function imag(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -260,9 +260,9 @@ function imag(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V}(out)
+    Multivector{V}(out)
 end
-function real(t::MultiVector{V,T}) where {V,T}
+function real(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -271,5 +271,5 @@ function real(t::MultiVector{V,T}) where {V,T}
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
-    MultiVector{V}(out)
+    Multivector{V}(out)
 end

@@ -21,12 +21,12 @@ v_1\wedge v_2\wedge\dots\wedge v_n = 0.
 Initially, it is enough to understand that ``\wedge:\Lambda^n V\times\Lambda^m V\rightarrow\Lambda^{n+m}V`` is an operation which is zero for linearly dependent arguments. 
 However, this idea comes from extending Grassmann's product ``v_i\wedge v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i`` to yield a tool for characterizing linear dependence.
 
-**Definition** (Dimension ``n``-SubManifold in ``\Lambda^n V``).
-	Hence, writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`SubManifold`.
+**Definition** (Dimension ``n``-Submanifold in ``\Lambda^n V``).
+	Hence, writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`Submanifold`.
 
-With the product ``\Lambda^0\Lambda^n V\times(v_1\wedge v_2\wedge\cdots\wedge v_n)\cong \mathbb K`` it is also clear that a 1-dimensional basis subspace is induced by any ``n``-`SubManifold`.
+With the product ``\Lambda^0\Lambda^n V\times(v_1\wedge v_2\wedge\cdots\wedge v_n)\cong \mathbb K`` it is also clear that a 1-dimensional basis subspace is induced by any ``n``-`Submanifold`.
 
-*Example*. Therefore, ``\mathbb K = \Lambda^0\mathbb K \cong \Lambda^1\mathbb K`` is a vector space or a 0-SubManifold.
+*Example*. Therefore, ``\mathbb K = \Lambda^0\mathbb K \cong \Lambda^1\mathbb K`` is a vector space or a 0-Submanifold.
 
 *Example*. ``\Lambda^n V`` is a vector space with ``\Lambda^1\Lambda^n V = \Lambda^nV`` and ``\Lambda^0\Lambda^nV = \Lambda^0V``.
 
@@ -40,7 +40,7 @@ V_1\oplus V_2\oplus\cdots\oplus V_n = V \iff
 \bigwedge : V_1^*\times V_2^*\times\cdots\times V_n^* \rightarrow \Lambda^n V^* .
 ```
 
-DirectSum of a full  non-zero product implies an ``n``-SubManifold.
+DirectSum of a full  non-zero product implies an ``n``-Submanifold.
 
 **Ddefinition**
 	Grade-``m`` projection is defined as ``\{\Lambda V\,\}_m = \Lambda^m V`` such that
@@ -64,11 +64,11 @@ Form a direct sum over the elements of ``\mathcal P(V)`` with ``\wedge`` to defi
 
 
 
-The Grassmann `SubManifold` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V'`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V'`` are dependent functions of the `tangent` manifold.
+The Grassmann `Submanifold` elements ``v_k\in\Lambda^1V`` and ``w^k\in\Lambda^1V'`` are linearly independent vector and covector elements of ``V``, while the Leibniz `Operator` elements ``\partial_k\in L^1V`` are partial tangent derivations and ``\epsilon_k\in L^1V'`` are dependent functions of the `tangent` manifold.
 Let ``V\in\text{Vect}_{\mathbb k}`` be a `TensorBundle` with dual space ``V'`` and the basis elements ``w_k:V\rightarrow\mathbb K``, then for all ``x\in V,c\in\mathbb K`` it holds: ``(w^i+w^j)(x) = w^i(x)+w^j(x)`` and ``(cw^k)(x) = cw^k(x)`` hold.
 An element of a mixed-symmetry `TensorAlgebra{V}` is a multilinear mapping that is formally constructed by taking the tensor products of linear and multilinear maps,
 ``(\bigotimes_k \omega_k)(v_1,\dots,v_{\sum_k p_k}) = \prod_k \omega_k(v_1,\dots,v_{p_k})``.
-Higher `grade` elements correspond to `SubManifold` subspaces, while higher `order` function elements become homogenous polynomials and Taylor series.
+Higher `grade` elements correspond to `Submanifold` subspaces, while higher `order` function elements become homogenous polynomials and Taylor series.
 ```@setup ga
 using Grassmann
 ```
@@ -79,10 +79,10 @@ using Grassmann
 
 Λ(tangent((ℝ^0)',3,3))
 ```
-Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `SubManifold` ``\langle v_{i_1}\otimes\cdots\otimes v_{i_k}\rangle_k : V'^k\rightarrow\mathbb K``, where `rank` is determined by the sum of basis index multiplicities in the tensor product decomposition.
+Combining the linear basis generating elements with each other using the multilinear tensor product yields a graded (decomposable) tensor `Submanifold` ``\langle v_{i_1}\otimes\cdots\otimes v_{i_k}\rangle_k : V'^k\rightarrow\mathbb K``, where `rank` is determined by the sum of basis index multiplicities in the tensor product decomposition.
 The Grassmann anti-symmetric exterior basis is denoted by ``v_{i_1\dots i_g}\in\Lambda^gV`` having the dual elements ``w^{i_1\cdots i_g}\in\Lambda^gV'``, while the Leibniz symmetric basis will be denoted by ``\partial_{i_1}^{\mu_1}\dots\partial_{i_g}^{\mu_g}\in L^gV`` with corresponding ``\epsilon_{i_1}^{\mu_1}\dots\epsilon_{i_g}^{\mu_g}\in L^gV'`` adjoint elements.
 Combined, this space produces the full Leibniz tangent algebra ``T^\mu V=V\oplus (\bigoplus_{g=1}^\mu L^g V)`` and the Grassmann exterior algebra ``\Lambda V = \bigoplus_{g=1}^n\Lambda^g V`` with ``2^n`` elements.
-The mixed index algebra ``\Lambda(T^\mu V) = (\bigoplus_{g=1}^n\Lambda^g V)\oplus(\bigoplus_{g=1}^\mu L^g V)`` is partitioned into both symmetric and anti-symmetric tensor equivalence classes. Any mixed tensor `SubManifold` pair ``\omega,\eta`` satisfies either
+The mixed index algebra ``\Lambda(T^\mu V) = (\bigoplus_{g=1}^n\Lambda^g V)\oplus(\bigoplus_{g=1}^\mu L^g V)`` is partitioned into both symmetric and anti-symmetric tensor equivalence classes. Any mixed tensor `Submanifold` pair ``\omega,\eta`` satisfies either
 ```math
 \underbrace{\omega\otimes\eta = -\eta\otimes\omega}_{\text{anti-symmetric}} \qquad \text{or} \qquad  \underbrace{\omega\otimes\eta = \eta\otimes\omega}_{\text{symmetric}}.
 ```
@@ -103,23 +103,23 @@ There is a partitioning into `even` grade components ``\omega_+`` and `odd` grad
 
 Grassmann's exterior algebra doesn't invoke the properties of multi-sets, as it is related to the algebra of oriented sets; while the Leibniz symmetric algebra is that of unoriented multi-sets.
 Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
-The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `MultiVector` simplicial complex.
+The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `Multivector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including ``\cup,\cap,\oplus`` and the index operation ``\ominus``, which is symmetric difference operation.
 
-By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `SubManifold{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `MultiVector{V,𝕂}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `Multivector{V,𝕂}`, and `MultiGrade{V,G}` types.
 
-The elements of the `Basis` can be generated in many ways using the `SubManifold` elements created by the `@basis` macro,
+The elements of the `Basis` can be generated in many ways using the `Submanifold` elements created by the `@basis` macro,
 ```@repl ga
 using Grassmann; @basis ℝ'⊕ℝ^3 # equivalent to basis"-+++"
 ```
-As a result of this macro, all of the `SubManifold{V,G}` elements generated by that `TensorBundle` become available in the local workspace with the specified naming.
-The first argument provides signature specifications, the second argument is the variable name for the `TensorBundle`, and the third and fourth argument are prefixes of the `SubManifold` vector names (and covector basis names). By default, ``V`` is assigned the `TensorBundle` and ``v`` is the prefix for the `SubManifold` elements.
+As a result of this macro, all of the `Submanifold{V,G}` elements generated by that `TensorBundle` become available in the local workspace with the specified naming.
+The first argument provides signature specifications, the second argument is the variable name for the `TensorBundle`, and the third and fourth argument are prefixes of the `Submanifold` vector names (and covector basis names). By default, ``V`` is assigned the `TensorBundle` and ``v`` is the prefix for the `Submanifold` elements.
 ```@repl ga
 V # Minkowski spacetime
 typeof(V) # dispatch by vector space
 typeof(v13) # extensive type info
 2v1 + v3 # vector Chain{V,1} element
-5 + v2 + v234 # MultiVector{V} element
+5 + v2 + v234 # Multivector{V} element
 ```
 It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to ``S`` instead of ``V`` and basis elements to ``b`` instead of ``v``, so that their local names do not interfere:
 ```@repl ga
@@ -148,7 +148,7 @@ The ``\ominus`` choice helps emphasize that the geometric algebraic product is c
 (1 + 2v34) ⊖ (3 + 4v34), (1 + 2v34) * (3 + 4v34), (1 + 2im) * (3 + 4im)
 ```
 Symmetry properties of the tensor algebra can be characterized in terms of the geometric product by two averaging operations, which are the symmetrization ``\odot`` and anti-symmetrization ``\boxtimes`` operators.
-These products satisfy various `MultiVector` properties, including the associative and distributive laws.
+These products satisfy various `Multivector` properties, including the associative and distributive laws.
 
 **Definition** (Exterior product):
 Let ``w_k\in\Lambda^{p_k}V``, then for all ``\sigma\in S_{\sum p_k}`` define an equivalence relation ``\sim`` such that
@@ -456,7 +456,7 @@ Compute the value ``\chi(\Delta(\omega))=1`` and ``\chi(\Delta(\partial(\omega))
 ```@repl ga
 [(χ(Δ(ω)),χ(Δ(∂(ω)))) for ω ∈ (Λ(ℝ5).v12,Λ(ℝ5).v123,Λ(ℝ5).v1234,Λ(ℝ5).v12345)]
 ```
-These methods can be applied to any `MultiVector` simplicial complex.
+These methods can be applied to any `Multivector` simplicial complex.
 
 ## Null-basis of the projective split
 
@@ -534,7 +534,7 @@ V(∇) # vector field
 V(∇) ⋅ V(∇) # Laplacian
 ans*∂1 # 3rd order is zero
 ```
-Multiplication with an ``\epsilon_i`` element is used help signify tensor fields so that differential operators are automatically applied in the `SubManifold` algebra as ∂ⱼ⊖(ω⊗ϵᵢ) = ∂ⱼ(ωϵᵢ) ≠ (∂ⱼ⊗ω)⊖ϵᵢ.
+Multiplication with an ``\epsilon_i`` element is used help signify tensor fields so that differential operators are automatically applied in the `Submanifold` algebra as ∂ⱼ⊖(ω⊗ϵᵢ) = ∂ⱼ(ωϵᵢ) ≠ (∂ⱼ⊗ω)⊖ϵᵢ.
 ```julia
 julia> using Reduce, Grassmann; @mixedbasis tangent(ℝ^2,3,2);
 

@@ -15,7 +15,7 @@ module SymEngineTests
         simp = (x+1)^2*v1
         @show expand(simp)
 
-        # expansion/substitution on each symbolic coefficient of a `MultiVector`
+        # expansion/substitution on each symbolic coefficient of a `Multivector`
         mv = (x+y)^3 * v12 + (y+z) * v123
         @show expand(mv)
         @show numeric_mv = N(subs(mv, Dict(x=>2, y=>2, z=>2)))

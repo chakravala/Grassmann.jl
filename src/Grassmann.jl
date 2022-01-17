@@ -5,21 +5,22 @@ module Grassmann
 
 using SparseArrays, ComputedFieldTypes
 using AbstractTensors, Leibniz, DirectSum, Requires
-import AbstractTensors: Values, Variables, FixedVector, clifford
+import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, vee
 
-export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, SubManifold, Signature, DiagonalForm, value
+export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, Submanifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent
+export hodge, wedge, vee, complement, dot
 
 import Base: @pure, ==, isapprox
 import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
-import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual
+import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual, Zero, One, Zero, One
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
 import Leibniz: bit2int, indexbits, indices, diffvars, diffmask
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
 
-import Leibniz: hasconformal, hasinf2origin, hasorigin2inf, g_zero, g_one
-import AbstractTensors: valuetype, scalar, isscalar, ⊗
+import Leibniz: hasconformal, hasinf2origin, hasorigin2inf
+import AbstractTensors: valuetype, scalar, isscalar, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 
 ## cache
@@ -45,7 +46,7 @@ cayley(x) = (y=Vector(Λ(x).b); y*transpose(y))
 @pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 
 for M ∈ (:Signature,:DiagonalForm)
-    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = MultiVector{V,Int}(ones(Int,1<<mdims(V)))
+    @eval (::$M)(::S) where S<:SubAlgebra{V} where V = Multivector{V,Int}(ones(Int,1<<mdims(V)))
 end
 
 points(f::F,r=-2π:0.0001:2π) where F<:Function = vector.(f.(r))
@@ -55,7 +56,7 @@ import Leibniz: ∇, Δ, d, ∂
 export ∇, Δ, ∂, d, δ, ↑, ↓
 
 #generate_products(:(Leibniz.Operator),:svec)
-for T ∈ (:(Chain{V}),:(MultiVector{V}))
+for T ∈ (:(Chain{V}),:(Multivector{V}))
     @eval begin
         *(a::Derivation,b::$T) where V = V(a)*b
         *(a::$T,b::Derivation) where V = a*V(b)
@@ -74,7 +75,7 @@ end
     isodd(O) ? sum([(x*getbasis(V,1<<(k+G)))*getbasis(V,1<<k) for k ∈ 0:G2]) : x
 end
 
-@pure function (M::SubManifold{W,N})(d::Leibniz.Derivation{T,O}) where {W,N,T,O}
+@pure function (M::Submanifold{W,N})(d::Leibniz.Derivation{T,O}) where {W,N,T,O}
     V = isbasis(M) ? W : M
     (O<1||diffvars(V)==0) && (return Chain{V,1,Int}(d.v.λ*ones(Values{N,Int})))
     G,D,C = grade(V),diffvars(V)==1,isdyadic(V)
@@ -128,7 +129,7 @@ end
 
 @generated function ↑(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
-    T<:SubManifold && !isbasis(ω) && (return Leibniz.supermanifold(V))
+    T<:Submanifold && !isbasis(ω) && (return Leibniz.supermanifold(V))
     !(hasinf(V)||hasorigin(V)) && (return :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
@@ -155,7 +156,7 @@ function ↑(ω,p,m)
 end
 
 @generated function ↓(ω::T) where T<:TensorAlgebra
-    V,M = Manifold(ω),T<:SubManifold && !isbasis(ω)
+    V,M = Manifold(ω),T<:Submanifold && !isbasis(ω)
     !(hasinf(V)||hasorigin(V)) && (return M ? V(2:mdims(V)) : :ω)
     G = Λ(V)
     return if hasinf(V) && hasorigin(V)
@@ -179,10 +180,10 @@ end
 export skeleton, 𝒫, collapse, subcomplex, chain, path
 
 absym(t) = abs(t)
-absym(t::SubManifold) = t
+absym(t::Submanifold) = t
 absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
 absym(t::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(absym.(value(t)))
-absym(t::MultiVector{V,T}) where {V,T} = MultiVector{V}(absym.(value(t)))
+absym(t::Multivector{V,T}) where {V,T} = Multivector{V}(absym.(value(t)))
 
 collapse(a,b) = a⋅absym(∂(b))
 
@@ -207,7 +208,7 @@ path(t) = chain(t,Val{false}())
 subcomplex(x::S,v=Val{true}()) where S<:TensorAlgebra = Δ(absym(∂(x)),v)
 function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
     B = UInt(basis(x))
-    count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? g_zero(V) : absym(x))
+    count_ones(symmetricmask(V,B,B)[1])>0 ? absym(x)+skeleton(absym(∂(x)),v) : (T ? Zero(V) : absym(x))
 end
 function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
     N,G,g = mdims(V),rank(x),0
@@ -219,7 +220,7 @@ function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
     end
     return g
 end
-function skeleton(x::MultiVector{V},v::Val{T}=Val{true}()) where {V,T}
+function skeleton(x::Multivector{V},v::Val{T}=Val{true}()) where {V,T}
     N,g = mdims(V),0
     for i ∈ 0:N
         R = binomsum(N,i)
@@ -238,7 +239,7 @@ end
 initpoints(P::T) where T<:AbstractVector = Chain{ℝ2,1}.(1.0,P)
 initpoints(P::T) where T<:AbstractRange = Chain{ℝ2,1}.(1.0,P)
 @generated function initpoints(P,::Val{n}=Val(size(P,1))) where n
-    Expr(:.,:(Chain{$(SubManifold(n+1)),1}),
+    Expr(:.,:(Chain{$(Submanifold(n+1)),1}),
          Expr(:tuple,1.0,[:(P[$k,:]) for k ∈ 1:n]...))
 end
 
@@ -436,10 +437,10 @@ end
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
-        *(a::Reduce.RExpr,b::SubManifold{V}) where V = Simplex{V}(a,b)
-        *(a::SubManifold{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
-        *(a::Reduce.RExpr,b::MultiVector{V,T}) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        *(a::MultiVector{V,T},b::Reduce.RExpr) where {V,T} = MultiVector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
+        *(a::Reduce.RExpr,b::Submanifold{V}) where V = Simplex{V}(a,b)
+        *(a::Submanifold{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
+        *(a::Reduce.RExpr,b::Multivector{V,T}) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
+        *(a::Multivector{V,T},b::Reduce.RExpr) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         #*(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         #*(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
@@ -448,8 +449,8 @@ function __init__()
         Leibniz.extend_field(Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)
         for T ∈ (:RExpr,:Symbol,:Expr)
-            @eval *(a::Reduce.$T,b::Chain{V,G,Any}) where {V,G} = (a*one(V))*b
-            @eval *(a::Chain{V,G,Any},b::Reduce.$T) where {V,G} = a*(b*one(V))
+            @eval *(a::Reduce.$T,b::Chain{V,G,Any}) where {V,G} = (a*One(V))*b
+            @eval *(a::Chain{V,G,Any},b::Reduce.$T) where {V,G} = a*(b*One(V))
             generate_inverses(:(Reduce.Algebra),T)
             generate_derivation(:(Reduce.Algebra),T,:df,:RExpr)
             #generate_algebra(:(Reduce.Algebra),T,:df,:RExpr)
@@ -458,8 +459,8 @@ function __init__()
     @require Symbolics="0c5d862f-8b57-4792-8d23-62f2024744c7" begin
         generate_algebra(:Symbolics,:Num)
         generate_symbolic_methods(:Symbolics,:Num, (:expand,),(:simplify,:substitute))
-        *(a::Symbolics.Num,b::MultiVector{V}) where V = MultiVector{V}(a*b.v)
-        *(a::MultiVector{V},b::Symbolics.Num) where V = MultiVector{V}(a.v*b)
+        *(a::Symbolics.Num,b::Multivector{V}) where V = Multivector{V}(a*b.v)
+        *(a::Multivector{V},b::Symbolics.Num) where V = Multivector{V}(a.v*b)
         *(a::Symbolics.Num,b::Chain{V,G}) where {V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::Symbolics.Num) where {V,G} = Chain{V,G}(a.v*b)
         *(a::Symbolics.Num,b::Simplex{V,G,B,T}) where {V,G,B,T<:Real} = Simplex{V}(a,b)
@@ -469,8 +470,8 @@ function __init__()
         for op ∈ (:+,:-)
             for Term ∈ (:TensorGraded,:TensorMixed)
                 @eval begin
-                    $op(a::T,b::Symbolics.Num) where T<:$Term = $op(a,b*g_one(Manifold(a)))
-                    $op(a::Symbolics.Num,b::T) where T<:$Term = $op(a*g_one(Manifold(b)),b)
+                    $op(a::T,b::Symbolics.Num) where T<:$Term = $op(a,b*One(Manifold(a)))
+                    $op(a::Symbolics.Num,b::T) where T<:$Term = $op(a*One(Manifold(b)),b)
                 end
             end
         end
@@ -479,7 +480,7 @@ function __init__()
         generate_algebra(:SymPy,:Sym,:diff,:symbols)
         generate_symbolic_methods(:SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs))
         for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
-                    MultiVector{V,SymPy.Sym} where V,
+                    Multivector{V,SymPy.Sym} where V,
                     Simplex{V,G,SymPy.Sym} where {V,G} )
             SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
         end
@@ -507,7 +508,7 @@ function __init__()
             end
             return g
         end
-        function LightGraphs.SimpleDiGraph(x::MultiVector{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
+        function LightGraphs.SimpleDiGraph(x::Multivector{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
            N = mdims(V)
            for i ∈ 2:N
                 R = binomsum(N,i)
@@ -539,7 +540,7 @@ function __init__()
     end=#
     @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
         StaticArrays.SMatrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = StaticArrays.SMatrix{binomial(mdims(W),G),binomial(mdims(V),G)}(vcat(value.(value(m))...))
-        DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{SubManifold(N),1}(m)
+        DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
         Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Chain{V,G,Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Base.exp(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(exp(StaticArrays.SMatrix(A)))
@@ -563,7 +564,7 @@ function __init__()
         pointpair(p,V) = Pair(Meshes.Point.(V.(value(p)))...)
         function initmesh(m::Meshes.SimpleMesh{N}) where N
             c,f = Meshes.vertices(m),m.topology.connec
-            s = N+1; V = SubManifold(ℝ^s) # s
+            s = N+1; V = Submanifold(ℝ^s) # s
             n = length(f[1].indices)
             p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k.coords...)) for k ∈ c])
             M = s ≠ n ? p(list(s-n+1,s)) : p
@@ -599,7 +600,7 @@ function __init__()
         pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
         function initmesh(m::GeometryBasics.Mesh)
             c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
-            s = size(eltype(c))[1]+1; V = SubManifold(ℝ^s) # s
+            s = size(eltype(c))[1]+1; V = Submanifold(ℝ^s) # s
             n = size(eltype(f))[1]
             p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k...)) for k ∈ c])
             M = s ≠ n ? p(list(s-n+1,s)) : p
@@ -772,7 +773,7 @@ function __init__()
             TetGen.JLTetGenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
         end
         function initmesh(tio::TetGen.JLTetGenIO, command = "Qp")
-            r = TetGen.tetrahedralize(tio, command); V = SubManifold(ℝ^4)
+            r = TetGen.tetrahedralize(tio, command); V = Submanifold(ℝ^4)
             p = ChainBundle([Chain{V,1}(Values{4,Float64}(1.0,k...)) for k ∈ r.points])
             t = Chain{p,1}.(Values{4,Int}.(r.tetrahedra))
             e = Chain{p(2,3,4),1}.(Values{3,Int}.(r.trifaces))

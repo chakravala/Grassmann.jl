@@ -1,7 +1,7 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.7.8"
+version = "0.8"
 
 [deps]
 AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
@@ -15,10 +15,10 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 julia = "1"
-Leibniz = "0.1.6"
-DirectSum = "0.7.7"
-AbstractTensors = "0.6.3"
-ComputedFieldTypes = "0.1"
+Leibniz = "0.2"
+DirectSum = "0.8"
+AbstractTensors = "0.7"
+ComputedFieldTypes = "1"
 Requires = "1"
 
 [extras]

@@ -9,14 +9,14 @@
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
-(W::SubManifold)(V::ChainBundle) = W.(value(V))
-(M::ChainBundle)(b::Int...) = SubManifold{M}(b)
-(M::ChainBundle)(b::Tuple) = SubManifold{M}(b)
-(M::ChainBundle)(b::UnitRange) = SubManifold{M}(b)
-(M::ChainBundle)(b::T) where T<:AbstractVector = SubManifold{M}(b)
+(W::Submanifold)(V::ChainBundle) = W.(value(V))
+(M::ChainBundle)(b::Int...) = Submanifold{M}(b)
+(M::ChainBundle)(b::Tuple) = Submanifold{M}(b)
+(M::ChainBundle)(b::UnitRange) = Submanifold{M}(b)
+(M::ChainBundle)(b::T) where T<:AbstractVector = Submanifold{M}(b)
 
-(W::Signature)(b::Chain{V,G,T}) where {V,G,T} = SubManifold(W)(b)
-@generated function (w::SubManifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
+(W::Signature)(b::Chain{V,G,T}) where {V,G,T} = Submanifold(W)(b)
+@generated function (w::Submanifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
     W = Manifold(w)
     if isbasis(W)
         if Q == V
@@ -26,7 +26,7 @@
                     X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
                     Y = 0≠X ? X : x
                     out = :(@inbounds b.v[bladeindex($(mdims(V)),Y)])
-                    return :(Simplex{V}(V[intlog(Y)+1] ? -($out) : $out,SubManifold{V}()))
+                    return :(Simplex{V}(V[intlog(Y)+1] ? -($out) : $out,Submanifold{V}()))
                 elseif G == 1 && M == 2
                     ib,(m1,m2) = indexbasis(N,1),DirectSum.eval_shift(W)
                     :(@inbounds $(V[m2] ? :(-(b.v[m2])) : :(b.v[m2]))*getbasis(V,ib[m1]))
@@ -66,7 +66,7 @@
             ib = indexbasis(N,G)
             for k ∈ 1:length(ib)
                 @inbounds if b[k] ≠ 0
-                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
+                    @inbounds B = typeof(V)<:Submanifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
                     if WC && (!VC)
                         @inbounds setblade!(out,b[k],mixed(V,B),Val{M}())
                     elseif (!WC) && (!VC)
@@ -85,13 +85,13 @@
     end
 end
 
-(W::Signature)(b::MultiVector{V,T}) where {V,T} = SubManifold(W)(b)
-function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
+(W::Signature)(b::Multivector{V,T}) where {V,T} = Submanifold(W)(b)
+function (W::Submanifold{Q,M,S})(m::Multivector{V,T}) where {Q,M,V,S,T}
     if isbasis(W)
-        isdyadic(V) && throw(error("MultiVector forms not yet supported"))
+        isdyadic(V) && throw(error("Multivector forms not yet supported"))
         return V==W ? contraction(W,m) : interform(W,m)
     elseif V==W
-        return V===W ? m : MultiVector{W,T}(value(m))
+        return V===W ? m : Multivector{W,T}(value(m))
     elseif W⊆V
         out,N = zeros(choicevec(M,valuetype(m))),mdims(V)
         bs = binomsum_set(N)
@@ -106,7 +106,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
                 end
             end
         end
-        return MultiVector{W}(out)
+        return Multivector{W}(out)
     elseif V⊆W
         WC,VC,N = isdyadic(W),isdyadic(V),mdims(V)
         #if ((C1≠C2)&&(C1≥0)&&(C2≥0))
@@ -118,7 +118,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
             for k ∈ 1:length(ib)
                 @inbounds s = k+bs[i]
                 @inbounds if m.v[s] ≠ 0
-                    @inbounds B = typeof(V)<:SubManifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
+                    @inbounds B = typeof(V)<:Submanifold ? expandbits(M,UInt(V),ib[k]) : ib[k]
                     if WC && (!VC)
                         @inbounds setmulti!(out,m.v[s],mixed(V,B),Val{M}())
                     elseif (!WC) && (!VC)
@@ -129,7 +129,7 @@ function (W::SubManifold{Q,M,S})(m::MultiVector{V,T}) where {Q,M,V,S,T}
                 end
             end
         end
-        return MultiVector{W}(out)
+        return Multivector{W}(out)
     elseif V == V''
         return W((V'')(m))
     else
@@ -220,16 +220,16 @@ end
 
 # more forms
 
-function (a::Chain{V,1})(b::SubManifold{V,1}) where V
+function (a::Chain{V,1})(b::Submanifold{V,1}) where V
     (!isdyadic(V)) && (return contraction(a,b))
     x = UInt(b)
     X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
     Y = X>2^mdims(V) ? x : X
     @inbounds out = a.v[bladeindex(mdims(V),Y)]
-    Simplex{V}((V[intlog(x)+1]*out),SubManifold{V}())
+    Simplex{V}((V[intlog(x)+1]*out),Submanifold{V}())
 end
 @eval begin
-    function (a::Chain{V,2,T})(b::SubManifold{V,1}) where {V,T}
+    function (a::Chain{V,2,T})(b::Submanifold{V,1}) where {V,T}
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:N,:df,:di))...)
         Q = bladeindex(N,UInt(b))
@@ -247,7 +247,7 @@ end
         X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
         Y = X>2^mdims(V) ? x : X
         @inbounds out = a.v[bladeindex(mdims(V),Y)]
-        Simplex{V}((V[intlog(x)+1]*out*b.v)::t,SubManifold{V}())
+        Simplex{V}((V[intlog(x)+1]*out*b.v)::t,Submanifold{V}())
     end
     function (a::Simplex{V,1})(b::Chain{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
@@ -256,7 +256,7 @@ end
         X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
         Y = 0≠X ? X : x
         @inbounds out = b.v[bladeindex(mdims(V),Y)]
-        Simplex{V}((a.v*V[intlog(Y)+1]*out)::t,SubManifold{V}())
+        Simplex{V}((a.v*V[intlog(Y)+1]*out)::t,Submanifold{V}())
     end
     function (a::Simplex{V,2})(b::Chain{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
@@ -282,6 +282,6 @@ end
         for Q ∈ 1:M
             @inbounds out += a.v[df[Q][1]]*(df[Q][2]*b.v[Q])
         end
-        return Simplex{V}(out::t,SubManifold{V}())
+        return Simplex{V}(out::t,Submanifold{V}())
     end
 end

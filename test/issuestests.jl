@@ -15,7 +15,7 @@ using Test
     @test (v∞ * v∅, v∅ * v∞) == (-1 + 1v∞∅, -1 - 1v∞∅)
 end
 
-@testset "Issue #17: Equality between Number and MultiVector" begin
+@testset "Issue #17: Equality between Number and Multivector" begin
     basis"2"
     
     a = v + v1 - v1
@@ -44,7 +44,7 @@ end
     @test A == 2v1 + v2
 end
 
-@testset "Issue #14: Error when adding MultiVectors" begin
+@testset "Issue #14: Error when adding Multivectors" begin
     basis"+++"
     @test (v1+v2) + (v1+v2)*(v1+v2) == 2 + 1v1 + 1v2
 end
@@ -71,13 +71,13 @@ end
     @test Simplex{V}(-1, a) == -a
 end
 
-@testset "Issue #22: Error in MultiVector constructor for Chains" begin
+@testset "Issue #22: Error in Multivector constructor for Chains" begin
     basis"++"
 
     a = v1 + v2
     @test typeof(a) <: Chain
 
-    @test MultiVector(a) == v1 + v2
+    @test Multivector(a) == v1 + v2
     @test Chain(v) == v
 end
 end

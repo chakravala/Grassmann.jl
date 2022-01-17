@@ -13,7 +13,7 @@ Given a three dimensional GA with the orthonormal basis ``v_i\cdot v_j = \delta_
 ```math
 \{\underbrace{v}_{\text{scalar}},\qquad\underbrace{v_1,v_2,v_3}_{\text{vectors}},\qquad\underbrace{v_{12},v_{23},v_{13}}_{\text{bivectors}},\qquad\underbrace{v_{123}}_{\text{trivector}}\}
 ```
-The `@basis` macro declares the algebra and assigns the `SubManifold` elements to local variables. The `Basis` can also be assigned to `G3` as
+The `@basis` macro declares the algebra and assigns the `Submanifold` elements to local variables. The `Basis` can also be assigned to `G3` as
 ```@repl ga
 G3 = Λ(3)
 ```
@@ -50,11 +50,11 @@ You can also mix grades without any reason
 ```@repl ga
 A = 1 + 2v1 + 3v12 + 4v123
 ```
-The reversion operator is accomplished with the tilde `~` in front of the `MultiVector` on which it acts
+The reversion operator is accomplished with the tilde `~` in front of the `Multivector` on which it acts
 ```@repl ga
 ~A
 ```
-Taking a projection into a specific `grade` of a `MultiVector` is usually written ``\langle A\rangle_n`` and can be done using the soft brackets, like so
+Taking a projection into a specific `grade` of a `Multivector` is usually written ``\langle A\rangle_n`` and can be done using the soft brackets, like so
 ```@repl ga
 A(0)
 A(1)

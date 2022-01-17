@@ -6,10 +6,10 @@ export exph, log_fast, logh_fast
 
 ## exponential & logarithm function
 
-@inline Base.expm1(t::SubManifold{V,0}) where V = Simplex{V}(ℯ-1)
+@inline Base.expm1(t::Submanifold{V,0}) where V = Simplex{V}(ℯ-1)
 @inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
-Base.expm1(t::Chain) = expm1(MultiVector(t))
+Base.expm1(t::Chain) = expm1(Multivector(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     if T<:SimplexComplex
@@ -32,7 +32,7 @@ function Base.expm1(t::T) where T<:TensorAlgebra
     return S
 end
 
-@eval @generated function Base.expm1(b::MultiVector{V,T}) where {V,T}
+@eval @generated function Base.expm1(b::Multivector{V,T}) where {V,T}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
     return quote
         B = value(b)
@@ -56,11 +56,11 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 1
         end
-        return MultiVector{V}(S)
+        return Multivector{V}(S)
     end
 end
 
-function Base.exp(t::MultiVector)
+function Base.exp(t::Multivector)
     st = scalar(t)
     mt = t-st
     sq = mt*mt
@@ -74,7 +74,7 @@ function Base.exp(t::MultiVector)
     end
 end
 
-function Base.exp(t::MultiVector,::Val{hint}) where hint
+function Base.exp(t::Multivector,::Val{hint}) where hint
     st = scalar(t)
     mt = t-st
     sq = mt*mt
@@ -100,16 +100,16 @@ function Base.exp(t::SimplexComplex{V,B}) where {V,B}
 end
 
 @pure isR301(V::DiagonalForm) = DirectSum.diagonalform(V) == Values(1,1,1,0)
-@pure isR301(::SubManifold{V}) where V = isR301(V)
+@pure isR301(::Submanifold{V}) where V = isR301(V)
 @pure isR301(V) = false
 
 @inline unabs!(t) = t
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
 function Base.exp(t::T) where T<:TensorGraded
-    S,B = T<:SubManifold,T<:TensorTerm
+    S,B = T<:Submanifold,T<:TensorTerm
     if B && isnull(t)
-        return one(Manifold(t))
+        return One(Manifold(t))
     elseif isR301(Manifold(t)) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
         u = sqrt(abs(abs2(t)[1]))
         u<1e-5 && (return 1+t)
@@ -130,7 +130,7 @@ function Base.exp(t::T) where T<:TensorGraded
 end
 
 function Base.exp(t::T,::Val{hint}) where T<:TensorGraded where hint
-    S = T<:SubManifold
+    S = T<:Submanifold
     i = T<:TensorTerm ? basis(t) : t
     sq = i*i
     if isscalar(sq)
@@ -162,12 +162,12 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-@eval @generated function qlog_fast(b::MultiVector{V,T,E},x::Int=10000) where {V,T,E}
+@eval @generated function qlog_fast(b::Multivector{V,T,E},x::Int=10000) where {V,T,E}
     loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
-        w2::MultiVector{V,T,E} = b^2
+        w2::Multivector{V,T,E} = b^2
         B = value(w2)
         S = zeros(mvec(N,t))
         prod = zeros(mvec(N,t))
@@ -190,7 +190,7 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
             k += 2
         end
         S *= 2
-        return MultiVector{V}(S)
+        return Multivector{V}(S)
     end
 end
 
@@ -208,7 +208,7 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
             value(B*B)==-1 ? SimplexComplex{V,B}($qrt(t.v)) :
                 isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
-        @inline Base.$qrt(t::SubManifold{V,0} where V) = t
+        @inline Base.$qrt(t::Submanifold{V,0} where V) = t
         @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end
 end
@@ -241,13 +241,13 @@ function Base.cosh(t::T) where T<:TensorAlgebra
     return 1+S
 end
 
-@eval @generated function Base.cosh(b::MultiVector{V,T,E}) where {V,T,E}
+@eval @generated function Base.cosh(b::Multivector{V,T,E}) where {V,T,E}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Simplex{V}(AbstractTensors.cosh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::MultiVector{V,T,E} = b^2
+        τ::Multivector{V,T,E} = b^2
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -267,7 +267,7 @@ end
             k += 2
         end
         @inbounds S[1] += 1
-        return MultiVector{V}(S)
+        return Multivector{V}(S)
     end
 end
 
@@ -296,13 +296,13 @@ function Base.sinh(t::T) where T<:TensorAlgebra
     return S
 end
 
-@eval @generated function Base.sinh(b::MultiVector{V,T,E}) where {V,T,E}
+@eval @generated function Base.sinh(b::Multivector{V,T,E}) where {V,T,E}
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Simplex{V}(AbstractTensors.sinh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::MultiVector{V,T,E} = b^2
+        τ::Multivector{V,T,E} = b^2
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -321,7 +321,7 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 2
         end
-        return MultiVector{V}(S)
+        return Multivector{V}(S)
     end
 end
 
@@ -330,7 +330,7 @@ exph(t) = Base.cosh(t)+Base.sinh(t)
 for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
     @eval function $logfast(t::T) where T<:TensorAlgebra
         V = Manifold(t)
-        term = zero(V)
+        term = Zero(V)
         nrm = FixedVector{2}(0.,0.)
         while true
             en = $expf(term)
@@ -386,7 +386,7 @@ compound(x,G::T) where T<:Integer = compound(x,Val(G))
 end
 
 @generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
-    W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
+    W = M≠mdims(V) ? Submanifold(M) : V; N = M-1
     if M == 1 && (V === ℝ1 || V == 1)
         return :(@inbounds Chain{V,1}(Values(v[1]/t[1][1])))
     elseif M == 2 && (V === ℝ2 || V == 2)
@@ -436,7 +436,7 @@ end
 end
 
 @generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
-    W = M≠mdims(V) ? SubManifold(M) : V; N = M-1
+    W = M≠mdims(V) ? Submanifold(M) : V; N = M-1
     N<1 && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
@@ -456,7 +456,7 @@ end
 end
 
 @generated function grad(T::Values{M,<:Chain{V,1}}) where {M,V}
-    W = M≠mdims(V) ? SubManifold(M) : V; N = mdims(V)-1
+    W = M≠mdims(V) ? Submanifold(M) : V; N = mdims(V)-1
     M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
@@ -475,7 +475,7 @@ end
 end
 
 @generated function Base.:\(t::Values{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
-    W = M≠mdims(V) ? SubManifold(N) : V
+    W = M≠mdims(V) ? Submanifold(N) : V
     if mdims(M) > mdims(V)
         :(ct=Chain{$W,1}(t); ct⋅(inv(_transpose(t,$W)⋅ct)⋅v))
     else # mdims(M) < mdims(V) ? inv(tt⋅t)⋅(tt⋅v) : tt⋅(inv(t⋅tt)⋅v)
@@ -510,8 +510,8 @@ end
 vandermonde(x,y,V) = (length(x)≠mdims(V) ? _vandermonde(x,V) : vandermonde(x,V))\y
 vandermonde(x,V) = transpose(_vandermonde(x,V))
 _vandermonde(x::Chain,V) = _vandermonde(value(x),V)
-@generated _vandermonde(x::Values{N},V) where N = :(Chain{$(SubManifold(N)),1}(polynom.(x,$(Val(mdims(V))))))
-@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(SubManifold(N)),1}),Expr(:call,:Values,[:(x^$i) for i ∈ 0:N-1]...))
+@generated _vandermonde(x::Values{N},V) where N = :(Chain{$(Submanifold(N)),1}(polynom.(x,$(Val(mdims(V))))))
+@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(Submanifold(N)),1}),Expr(:call,:Values,[:(x^$i) for i ∈ 0:N-1]...))
 
 function vandermondeinterp(x,y,V,grid) # grid=384
     coef = vandermonde(x,y,V) # Vandermonde ((inv(X'*X))*X')*y
@@ -536,12 +536,12 @@ vectors(x::Values{N,<:Chain{V}},y=x[1]) where {N,V} = ↓(V).(x[list(2,N)].-y)
 vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
 #point(x,y=x[1]) = y∧∧(vectors(x))
 
-signscalar(x::SubManifold{V,0} where V) = true
+signscalar(x::Submanifold{V,0} where V) = true
 signscalar(x::Simplex{V,0} where V) = !signbit(value(x))
 signscalar(x::Simplex) = false
 signscalar(x::Chain) = false
 signscalar(x::Chain{V,0} where V) = !signbit(@inbounds x[1])
-signscalar(x::MultiVector) = isscalar(x) && !signbit(value(scalar(x)))
+signscalar(x::Multivector) = isscalar(x) && !signbit(value(scalar(x)))
 ands(x,i=length(x)-1) = i ≠ 0 ? Expr(:&&,x[end-i],ands(x,i-1)) : x[end-i]
 
 function Base.findfirst(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
@@ -606,7 +606,7 @@ for op ∈ (:mean,:barycenter,:curl)
         export $op, $ops
         $ops(m::Vector{<:Chain{p}}) where p = $ops(m,p)
         @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
-        @pure $ops(m,::SubManifold{p}) where p = $ops(m,p)
+        @pure $ops(m,::Submanifold{p}) where p = $ops(m,p)
         @pure $ops(m,p) = $op.(getindex.(Ref(p),value.(value(m))))
     end
 end
@@ -670,19 +670,19 @@ end
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin
         Base.$op(a::Chain{V,G,T},m) where {V,G,T} = Chain{V,G}($op.(value(a),m))
-        Base.$op(a::MultiVector{V,T},m) where {T,V} = MultiVector{V}($op.(value(a),m))
+        Base.$op(a::Multivector{V,T},m) where {T,V} = Multivector{V}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
     @eval begin
         Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G}($op.(value(a)))
-        Base.$op(a::MultiVector{V,T}) where {V,T} = MultiVector{V}($op.(value(a)))
+        Base.$op(a::Multivector{V,T}) where {V,T} = Multivector{V}($op.(value(a)))
     end
 end
 Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
-Base.isfinite(a::MultiVector) = prod(isfinite.(value(a)))
+Base.isfinite(a::Multivector) = prod(isfinite.(value(a)))
 Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G}(rationalize.(t,value(a),tol))
-Base.rationalize(t::Type,a::MultiVector{V,T};tol::Real=eps(T)) where {V,T} = MultiVector{V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::Multivector{V,T};tol::Real=eps(T)) where {V,T} = Multivector{V}(rationalize.(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
 
 *(A::SparseMatrixCSC{TA,S}, x::StridedVector{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =
@@ -715,7 +715,7 @@ end
     end
 end
 
-Base.map(fn, x::MultiVector{V}) where V = MultiVector{V}(map(fn, value(x)))
+Base.map(fn, x::Multivector{V}) where V = Multivector{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
 Base.map(fn, x::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
@@ -726,9 +726,9 @@ Base.rand(::AbstractRNG,::SamplerType{Chain{V}}) where V = rand(Chain{V,rand(0:m
 Base.rand(::AbstractRNG,::SamplerType{Chain{V,G}}) where {V,G} = Chain{V,G}(DirectSum.orand(svec(mdims(V),G,Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(rand(svec(mdims(V),G,T)))
 Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(Chain{V,rand(0:mdims(V)),T})
-Base.rand(::AbstractRNG,::SamplerType{MultiVector}) = rand(MultiVector{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{MultiVector{V}}) where V = MultiVector{V}(DirectSum.orand(svec(mdims(V),Float64)))
-Base.rand(::AbstractRNG,::SamplerType{MultiVector{V,T}}) where {V,T} = MultiVector{V}(rand(svec(mdims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{Multivector}) = rand(Multivector{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{Multivector{V}}) where V = Multivector{V}(DirectSum.orand(svec(mdims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{Multivector{V,T}}) where {V,T} = Multivector{V}(rand(svec(mdims(V),T)))
 Base.rand(::AbstractRNG,::SamplerType{SimplexComplex}) = rand(SimplexComplex{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V}}) where V = rand(SimplexComplex{V,rand(Simplex{V})})
 Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B}}) where {V,B} = SimplexComplex{V,G}(rand(Complex{Float64}))

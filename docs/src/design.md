@@ -51,13 +51,13 @@ The type `TensorBundle{n,ℙ,g,ν,μ}` uses *byte-encoded* data available at pre
 ``g`` is a bilinear form that specifies the metric of the space,
 and ``\mu`` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, ``\nu`` is the number of tangent variables.
 The dual space functor ``'``
-is an involution which toggles a dual vector space with inverted signature with property ``V' = \text{Hom}(V,\mathbb K)`` and having `SubManifold` generators
+is an involution which toggles a dual vector space with inverted signature with property ``V' = \text{Hom}(V,\mathbb K)`` and having `Submanifold` generators
 ```math
 \langle v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu\rangle=M\leftrightarrow M' = \langle w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu\rangle
 ```
 where ``v_i,w_i`` are a basis for the vectors and covectors, while ``\partial_j,\epsilon_j`` are a basis for differential operators and tensor fields.
 
-The metric signature of the `SubManifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` constructor by using ``+`` and ``-`` to specify whether the `SubManifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
+The metric signature of the `Submanifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` constructor by using ``+`` and ``-`` to specify whether the `Submanifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
 For example, `S"+++"` constructs a positive definite 3-dimensional `TensorBundle`.
 ```@setup ds
 using DirectSum
@@ -87,9 +87,9 @@ W = V⊕V'
 ```
 The direct sum of a `TensorBundle` and its dual ``V\oplus V'`` represents the full mother space ``V*``.
 ```@repl ds
-collect(V) # all SubManifold vector basis elements
-collect(SubManifold(V')) # all covector basis elements
-collect(SubManifold(W)) # all mixed basis elements
+collect(V) # all Submanifold vector basis elements
+collect(Submanifold(V')) # all covector basis elements
+collect(Submanifold(W)) # all mixed basis elements
 ```
 In addition to the direct-sum operation, several other operations are supported, such as ``\cup,\cap,\subseteq,\supseteq`` for set operations.
 Due to the design of the `TensorBundle` dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.
@@ -106,12 +106,12 @@ Due to the design of the `TensorBundle` dispatch, these operations enable code o
 \bigoplus T^{\mu_i}V_i = \left(|\mathbb P|+\sum (n_i-|\mathbb P_i|),\, \bigcup \mathbb P_i,\, \oplus_i g_i,\,\max\{\mu_i\}_i\right)
 ```
 Calling manifolds with sets of indices constructs the subspace representations.
-Given `M(s::Int...)` one can encode `SubManifold{length(s),M,s}` with induced orthogonal space ``Z``, such that computing unions of submanifolds is done by inspecting the parameter ``s\in V\subseteq W`` and ``s\notin Z``.
+Given `M(s::Int...)` one can encode `Submanifold{length(s),M,s}` with induced orthogonal space ``Z``, such that computing unions of submanifolds is done by inspecting the parameter ``s\in V\subseteq W`` and ``s\notin Z``.
 ```@repl ds
 (ℝ^5)(3,5)
 dump(ans)
 ```
-Here, calling a `Manifold` with a set of indices produces a `SubManifold` representation.
+Here, calling a `Manifold` with a set of indices produces a `Submanifold` representation.
 ```math
 T^eV \subset T^\mu W \iff \exists Z\in\text{Vect}_{\mathbb K}(T^e(V\oplus Z) = T^{e\leq \mu}W,\,V\perp Z).
 ```
@@ -148,7 +148,7 @@ The 62 indices require full alpha-numeric labeling with lower-case and capital l
 using DirectSum # hide
 DirectSum.printindices(stdout,DirectSum.indices(UInt(2^62-1))) # hide
 ```
-Full `MultiVector` allocations are only possible for ``N\leq22``, but sparse operations are also available at higher dimensions.
+Full `Multivector` allocations are only possible for ``N\leq22``, but sparse operations are also available at higher dimensions.
 While `DirectSum.Basis{V}` is a container for the `TensorAlgebra` generators of ``V``, the `Basis` is only cached for ``N\leq8``.
 For the range of dimensions ``8<N\leq22``, the `SparseBasis` type is used.
 ```julia
@@ -167,7 +167,7 @@ At 22 dimensions and lower there is better caching, with further extra caching f
 Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the `ExtendedBasis` built in.
 It is still feasible to extend to a further super-extended 128-bit representation using the `UInt128` type (but this will require further modifications of internals and helper functions.
 To reach into infinity even further, it is theoretically possible to construct ultra-extensions also using dictionaries.
-Full `MultiVector` elements are not representable when `ExtendedBasis` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
+Full `Multivector` elements are not representable when `ExtendedBasis` is used, but the performance of the `Basis` and sparse elements should be just as fast as for lower dimensions for the current `SubAlgebra` and `TensorAlgebra` types.
 The sparse representations are a work in progress to be improved with time.
 
 ## Interoperability for `TensorAlgebra{V}`
