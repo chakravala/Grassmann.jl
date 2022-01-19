@@ -161,7 +161,7 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return Zero(V))
     d = getbasis(V,C)
     istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return typeof(V) <: Signature ? (g ? Simplex{V}(-1,d) : d) : Simplex{V}(g,d)
+    return isone(g) ? d : Simplex{V}(g,d)
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -174,7 +174,7 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
         v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
     end
-    return Simplex{V}(typeof(V) <: Signature ? (g ? -v : v) : g*v,getbasis(V,C))
+    return Simplex{V}(g*v,getbasis(V,C))
 end
 
 export ⨼, ⨽

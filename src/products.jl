@@ -296,7 +296,10 @@ contraction(a::Zero{V},::Zero{V}) where V = a
 -(a::Zero,b::T) where T<:TensorAlgebra{V} where V = -b
 *(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
 *(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
-/(a::Zero,b::T) where T<:Number = a
+/(a::Zero,b::T) where T<:Number = iszero(b) ? Simplex{V}(0/0) : a
+/(a::Zero,b::T) where T<:TensorAlgebra{V} where V = iszero(b) ? Simplex{V}(0/0) : Zero(V)
+/(a::Zero,b::T) where T<:SimplexComplex{V} where V = iszero(b) ? Simplex{V}(0/0) : Zero(V)
+/(a::Zero{V},b::Zero) where V = Simplex{V}(0/0)
 inv(a::Zero{V}) where V = Simplex{V}(inv(value(a)))
 ∧(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
 ∧(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
@@ -311,6 +314,13 @@ contraction(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
 -(a::Zero{V},b::T) where {T<:Number,V} = Simplex{V}(-b)
 *(a::T,b::Zero) where T<:Number = b
 *(a::Zero,b::T) where T<:Number = a
+
+@inline Base.:^(a::T,b::Zero) where T<:TensorAlgebra{V} where V = One(V)
+@inline Base.:^(a::Zero,b::T) where T<:TensorAlgebra{V} where V = Zero(V)
+@inline Base.:^(a::T,b::Zero{V}) where {T<:Number,V} = One(V)
+@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = Zero(V)
+@inline Base.:^(a::Zero{V},::Zero) where V = One(V)
+@inline Base.:^(a::Zero,::T) where T<:Integer = a
 
 plus(b::Chain{V,G},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Chain{V,G},a::Submanifold{V,L}) where {V,G,L} = plus(a,b)
@@ -340,8 +350,8 @@ plus(a::SimplexComplex{V},b::Chain{V}) where V = (b+imaginary(a))+scalar(a)
 minus(a::Chain{V},b::SimplexComplex{V}) where V = (a-imaginary(b))-scalar(b)
 minus(a::SimplexComplex{V},b::Chain{V}) where V = (imaginary(a)-b)+scalar(a)
 
-for op ∈ (:plus,:minus)
-    @eval $op(a::SimplexComplex{V,B},b::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}($op(a.v,b.v))
+for (op,po) ∈ ((:plus,:+),(:minus,:-))
+    @eval $op(a::SimplexComplex{V,B},b::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}($po(a.v,b.v))
 end
 
 function times(a::SimplexComplex{V,B},b::SimplexComplex{V,B}) where {V,B}
@@ -626,7 +636,7 @@ for F ∈ Fields
     end
 end
 for op ∈ (:+,:-)
-    for Term ∈ (:TensorGraded,:TensorMixed)
+    for Term ∈ (:TensorGraded,:TensorMixed,:Zero)
         @eval begin
             $op(a::T,b::NSE) where T<:$Term = iszero(b) ? a : $op(a,b*One(Manifold(a)))
             $op(a::NSE,b::T) where T<:$Term = iszero(a) ? $op(b) : $op(a*One(Manifold(b)),b)
