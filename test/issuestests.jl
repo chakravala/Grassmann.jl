@@ -20,7 +20,7 @@ end
     
     a = v + v1 - v1
     @test a == v
-    @test typeof(a) <: SimplexComplex
+    @test typeof(a) <: Couple
     @test a == 1
     
     b = a - 1
@@ -68,7 +68,7 @@ end
     
     a = v∅*basis(-v∞)
     @test a == -1 - v∞∅
-    @test Simplex{V}(-1, a) == -a
+    @test Single{V}(-1, a) == -a
 end
 
 @testset "Issue #22: Error in Multivector constructor for Chains" begin

@@ -2,7 +2,7 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorTerm, TensorGraded, TensorMixed, Submanifold, Simplex, Multivector, SparseChain, MultiGrade, ChainBundle
+export TensorTerm, TensorGraded, TensorMixed, Submanifold, Single, Multivector, SparseChain, MultiGrade, ChainBundle
 export Zero, One
 
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
@@ -60,6 +60,12 @@ Chain{V}(val::S) where {V,S<:TupleVector{N,𝕂}} where {N,𝕂} = Chain{V,1,�
 Chain(val::S) where S<:TupleVector{N,𝕂} where {N,𝕂} = Chain{Submanifold(N),1,𝕂}(val)
 #Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G)}(args...))
 @generated function Chain{V,G}(args::𝕂...) where {V,G,𝕂}
+    bg = binomial(mdims(V),G)
+    ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
+    :(Chain{V,G}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
+end
+
+@generated function Chain{V,G,𝕂}(args...) where {V,G,𝕂}
     bg = binomial(mdims(V),G)
     ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
     :(Chain{V,G}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
@@ -126,16 +132,17 @@ equal(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value
 isapprox(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .≈ b.v)
 isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ value(b))
 
-function Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂}
+function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
     Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,UInt(v),Val(N)))
 end
+Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(val,v)
 Chain(v::Submanifold) = Chain(one(Int),v)
-Chain(v::Simplex) = Chain(v.v,basis(v))
-Chain{𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
-Chain{𝕂}(v::Simplex{V,G,B}) where {V,G,B,𝕂} = Chain{𝕂}(v.v,basis(v))
-Chain{V,G,T,X}(x::Simplex{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
-function Chain{V,0,T,X}(x::Simplex{V,0,v}) where {V,T,X,v}
+Chain(v::Single) = Chain(v.v,basis(v))
+Chain{V,G,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
+Chain{V,G,𝕂}(v::Single{V}) where {V,G,𝕂} = Chain{V,G,𝕂}(v.v,basis(v))
+Chain{V,G,T,X}(x::Single{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
+function Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v}
     N = mdims(V)
     Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),UInt(v),Val(N)))
 end
@@ -145,7 +152,7 @@ getindex(m::Chain{V,G},i::Submanifold{V,G}) where {V,G} = m[bladeindex(mdims(V),
 getindex(m::Chain{V,G,T},i::Submanifold{V}) where {V,G,T} = zero(T)
 
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
-    Simplex{V,G,Submanifold{V}(indexbasis(mdims(V),G)[i]),T}(m[i])
+    Single{V,G,Submanifold{V}(indexbasis(mdims(V),G)[i]),T}(m[i])
 end
 
 function equal(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
@@ -275,6 +282,11 @@ end
     :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
 end
 
+@generated function Multivector{V,𝕂}(args...) where {V,𝕂}
+    N = 1<<mdims(V); ref = Values{N}([:(args[$i]) for i ∈ 1:N])
+    :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
+end
+
 function getindex(m::Multivector{V,T},i::Int) where {V,T}
     N = mdims(V)
     0 <= i <= N || throw(BoundsError(m, i))
@@ -295,7 +307,7 @@ function (m::Multivector{V,T})(::Val{g}) where {V,T,g,B}
     Chain{V,g,T}(m[g])
 end
 function (m::Multivector{V,T})(g::Int,i::Int) where {V,T,B}
-    Simplex{V,g,Basis{V}(indexbasis(mdims(V),g)[i]),T}(m[g][i])
+    Single{V,g,Basis{V}(indexbasis(mdims(V),g)[i]),T}(m[g][i])
 end
 
 function show(io::IO, m::Multivector{V,T}) where {V,T}
@@ -305,8 +317,7 @@ function show(io::IO, m::Multivector{V,T}) where {V,T}
     for i ∈ list(2,N+1)
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
-            @inbounds s = k+bs[i]
-            @inbounds mvs = m.v[s]
+            @inbounds mvs = m.v[k+bs[i]]
             if !isnull(mvs)
                 @inbounds showterm(io,V,ib[k],mvs,compact)
                 bases = false
@@ -352,7 +363,7 @@ for var ∈ ((:V,:T),(:T,))
 end
 for var ∈ ((:V,:T),(:T,),())
     @eval begin
-        function Multivector{$(var...)}(v::Simplex{V,G,B,T}) where {V,G,B,T}
+        function Multivector{$(var...)}(v::Single{V,G,B,T}) where {V,G,B,T}
             return Multivector(v.v,basis(v))
         end
     end
@@ -361,64 +372,64 @@ end
 getindex(m::Multivector,i::T) where T<:AbstractVector{<:Submanifold} = getindex.(m,i)
 getindex(m::Multivector{V},i::Submanifold{V}) where V = m[basisindex(mdims(V),UInt(i))]
 
-## SimplexComplex{V,B}
+## Couple{V,B}
 
-export SimplexComplex
+export Couple
 
 """
-    SimplexComplex{V,B,𝕂} <: TensorMixed{V}
+    Couple{V,B,𝕂} <: TensorMixed{V}
 
 `Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field `𝕂::Type`.
 """
-struct SimplexComplex{V,B,T} <: TensorMixed{V}
+struct Couple{V,B,T} <: TensorMixed{V}
     v::Complex{T}
-    SimplexComplex{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
+    Couple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
-DirectSum.basis(::SimplexComplex{V,B}) where {V,B} = B
-Base.reim(z::SimplexComplex) = reim(z.v)
-Base.widen(z::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}(widen(z.v))
-Base.abs2(z::SimplexComplex{V,B}) where {V,B} = Simplex{V}(z.v.re*z.v.re + (z.v.im*z.v.im)*abs2_inv(B))
+DirectSum.basis(::Couple{V,B}) where {V,B} = B
+Base.reim(z::Couple) = reim(z.v)
+Base.widen(z::Couple{V,B}) where {V,B} = Couple{V,B}(widen(z.v))
+Base.abs2(z::Couple{V,B}) where {V,B} = Single{V}(z.v.re*z.v.re + (z.v.im*z.v.im)*abs2_inv(B))
 
-grade(z::SimplexComplex{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v.re : Zero(V)
+grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v.re : Zero(V)
 
-@generated Multivector{V}(a::Simplex{V,L},b::Simplex{V,G}) where {V,L,G} = adder2(a,b,:+)
-Multivector{V,T}(z::SimplexComplex{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))
-Multivector{V}(z::SimplexComplex{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
-Multivector(z::SimplexComplex{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
+@generated Multivector{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adder2(a,b,:+)
+Multivector{V,T}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))
+Multivector{V}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
+Multivector(z::Couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
 
-function Base.show(io::IO,z::SimplexComplex{V,B}) where {V,B}
+function Base.show(io::IO,z::Couple{V,B}) where {V,B}
     r, i = reim(z)
     show(io, r)
     showterm(io, V, UInt(B), i)
 end
 
-Base.zero(::SimplexComplex{V,B,T}) where {V,B,T} = SimplexComplex{V,B}(zero(Complex{T}))
-Base.one(t::SimplexComplex{V,B,T}) where {V,B,T} = SimplexComplex{V,B}(one(Complex{T}))
-Base.zero(::Type{SimplexComplex{V,B,T}}) where {V,B,T} = SimplexComplex{V,B}(zero(Complex{T}))
-Base.one(t::Type{SimplexComplex{V,B,T}}) where {V,B,T} = SimplexComplex{V,B}(one(Complex{T}))
+Base.zero(::Couple{V,B,T}) where {V,B,T} = Couple{V,B}(zero(Complex{T}))
+Base.one(t::Couple{V,B,T}) where {V,B,T} = Couple{V,B}(one(Complex{T}))
+Base.zero(::Type{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(zero(Complex{T}))
+Base.one(t::Type{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(one(Complex{T}))
 
-equal(a::SimplexComplex{V},b::SimplexComplex{V}) where V = a.v.re==b.v.re && a.v.im==b.v.im==0
-isapprox(a::SimplexComplex{V},b::SimplexComplex{V}) where V = a.v.re≈b.v.re && a.v.im≈b.v.im≈0
+equal(a::Couple{V},b::Couple{V}) where V = a.v.re==b.v.re && a.v.im==b.v.im==0
+isapprox(a::Couple{V},b::Couple{V}) where V = a.v.re≈b.v.re && a.v.im≈b.v.im≈0
 
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::SimplexComplex) where T<:$T = isscalar(b) && a == b.v.re
-        ==(a::SimplexComplex,b::T) where T<:$T = b == a
+        ==(a::T,b::Couple) where T<:$T = isscalar(b) && a == b.v.re
+        ==(a::Couple,b::T) where T<:$T = b == a
     end
 end
 
 for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     @eval begin
-        $qe(a::SimplexComplex{V,B},b::SimplexComplex{V,B}) where {V,B} = $eq(a.v,b.v)
-        $qe(a::SimplexComplex{V},b::TensorTerm{V,0}) where V = isscalar(a) && $eq(a.v.re, value(b))
-        $qe(a::TensorTerm{V,0},b::SimplexComplex{V}) where V = isscalar(b) && $eq(b.v.re,value(a))
-        $qe(a::SimplexComplex{V,B},b::TensorTerm{V}) where {V,B} = B == basis(b) && iszero(a.v.re) && $eq(a.v.im,value(b))
-        $qe(a::TensorTerm{V},b::SimplexComplex{V,B}) where {V,B} = B == basis(a) && iszero(b.v.re) && $eq(b.v.im,value(a))
-        $qe(a::SimplexComplex{V},b::Chain{V}) where V = $eq(Multivector(a),b)
-        $qe(a::Chain{V},b::SimplexComplex{V}) where V = $eq(a,Multivector(b))
-        $qe(a::SimplexComplex{V},b::Multivector{V}) where V = $eq(Multivector(a),b)
-        $qe(a::Multivector{V},b::SimplexComplex{V}) where V = $eq(a,Multivector(b))
+        $qe(a::Couple{V,B},b::Couple{V,B}) where {V,B} = $eq(a.v,b.v)
+        $qe(a::Couple{V},b::TensorTerm{V,0}) where V = isscalar(a) && $eq(a.v.re, value(b))
+        $qe(a::TensorTerm{V,0},b::Couple{V}) where V = isscalar(b) && $eq(b.v.re,value(a))
+        $qe(a::Couple{V,B},b::TensorTerm{V}) where {V,B} = B == basis(b) && iszero(a.v.re) && $eq(a.v.im,value(b))
+        $qe(a::TensorTerm{V},b::Couple{V,B}) where {V,B} = B == basis(a) && iszero(b.v.re) && $eq(b.v.im,value(a))
+        $qe(a::Couple{V},b::Chain{V}) where V = $eq(Multivector(a),b)
+        $qe(a::Chain{V},b::Couple{V}) where V = $eq(a,Multivector(b))
+        $qe(a::Couple{V},b::Multivector{V}) where V = $eq(Multivector(a),b)
+        $qe(a::Multivector{V},b::Couple{V}) where V = $eq(a,Multivector(b))
     end
 end
 
@@ -489,32 +500,32 @@ import LinearAlgebra: rank, norm
 export basis, grade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
 
-#const VBV = Union{Simplex,Chain,Multivector}
+#const VBV = Union{Single,Chain,Multivector}
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::Multivector{V,T} where V) where T = T
-@pure valuetype(::SimplexComplex{V,B,T} where {V,B}) where T = T
+@pure valuetype(::Couple{V,B,T} where {V,B}) where T = T
 @pure valuetype(::Type{<:Chain{V,G,T} where {V,G}}) where T = T
 @pure valuetype(::Type{<:Multivector{V,T} where V}) where T = T
-@pure valuetype(::Type{SimplexComplex{V,B,T} where {V,B}}) where T = T
+@pure valuetype(::Type{Couple{V,B,T} where {V,B}}) where T = T
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
-@inline value(m::SimplexComplex,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
+@inline value(m::Couple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
 
 Base.isapprox(a::S,b::T) where {S<:Multivector,T<:Multivector} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
 
-@inline scalar(z::SimplexComplex{V}) where V = Simplex{V}(z.v.re)
-@inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Simplex{V}(t.v[1])
-@inline scalar(t::Multivector{V}) where V = @inbounds Simplex{V}(t.v[1])
+@inline scalar(z::Couple{V}) where V = Single{V}(z.v.re)
+@inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
+@inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
 @inline vector(t::Multivector{V,T}) where {V,T} = @inbounds Chain{V,1,T}(t[1])
-@inline volume(t::Multivector{V}) where V = @inbounds Simplex{V}(t.v[end])
-@inline isscalar(z::SimplexComplex) = iszero(z.v.im)
+@inline volume(t::Multivector{V}) where V = @inbounds Single{V}(t.v[end])
+@inline isscalar(z::Couple) = iszero(z.v.im)
 @inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
-@inline imaginary(z::SimplexComplex{V,B}) where {V,B} = Simplex{V,grade(B),B}(z.v.im)
+@inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
 
 Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
 function Leibniz.gdims(t::Vector{<:Chain})
@@ -572,7 +583,7 @@ const unsplitter_cache = SparseMatrixCSC{Float64,Int64}[]
 end
 @pure unsplitter(n,g) = unsplitter(bladeindex(n,unsplitend(g))-bladeindex(n,unsplitstart(g)))
 
-for implex ∈ (Simplex,Submanifold)
+for implex ∈ (Single,Submanifold)
     @eval begin
         #norm(t::$implex) = norm(unsplitval(t))
         function unsplitvalue(a::$implex{V,G}) where {V,G}

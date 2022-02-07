@@ -25,20 +25,20 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
     A,B,Q,Z = symmetricmask(V,ba,bb)
     pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
     d = getbasis(V,bas|Q)
-    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Simplex{V}(-1,d) : d) : Simplex{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
-    diffvars(V)≠0 && !iszero(Z) && (out = Simplex{V}(getbasis(loworder(V),Z),out))
-    return cc ? (v=value(out);out+Simplex{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻UInt(d)))) : out
+    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Single{V}(-1,d) : d) : Single{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
+    diffvars(V)≠0 && !iszero(Z) && (out = Single{V}(getbasis(loworder(V),Z),out))
+    return cc ? (v=value(out);out+Single{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻UInt(d)))) : out
 end
 
-function times(a::Simplex{V},b::Submanifold{V}) where V
+function times(a::Single{V},b::Submanifold{V}) where V
     v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
     bas = mul(basis(a),b,v)
-    order(a.v)+order(bas)>diffmode(V) ? Zero(V) : Simplex{V}(v,bas)
+    order(a.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
 end
-function times(a::Submanifold{V},b::Simplex{V}) where V
+function times(a::Submanifold{V},b::Single{V}) where V
     v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
-    order(b.v)+order(bas)>diffmode(V) ? Zero(V) : Simplex{V}(v,bas)
+    order(b.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
 end
 
 export ∗, ⊛, ⊖
@@ -74,8 +74,8 @@ wedges(x,i=length(x)-1) = i ≠ 0 ? Expr(:call,:∧,wedges(x,i-1),x[1+i]) : x[1+
     A,B,Q,Z = symmetricmask(V,ba,bb)
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb) || iszero(derive_mul(V,ba,bb,1,true))) && (return Zero(V))
     d = getbasis(V,(A⊻B)|Q)
-    diffvars(V)≠0 && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return parity(a,b) ? Simplex{V}(-1,d) : d
+    diffvars(V)≠0 && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+    return parity(a,b) ? Single{V}(-1,d) : d
 end
 
 function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -85,10 +85,10 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ((count_ones(A&B)>0) || diffcheck(V,ba,bb)) && (return Zero(V))
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
     end
-    return Simplex{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
+    return Single{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
 export ∧, ∨, ⊗
@@ -104,8 +104,8 @@ export ∧, ∨, ⊗
     p,C,t,Z = regressive(a,b)
     (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return Zero(V))
     d = getbasis(V,C)
-    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return isone(p) ? d : Simplex{V}(p,d)
+    istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+    return isone(p) ? d : Single{V}(p,d)
 end
 
 function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -115,10 +115,10 @@ function ∨(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.∏)
     if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,ba,bb)
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
     end
-    return Simplex{V}(isone(p) ? v : p*v,getbasis(V,C))
+    return Single{V}(isone(p) ? v : p*v,getbasis(V,C))
 end
 
 """
@@ -160,8 +160,8 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     g,C,t,Z = interior(a,b)
     (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return Zero(V))
     d = getbasis(V,C)
-    istangent(V) && !iszero(Z) && (d = Simplex{V}(getbasis(loworder(V),Z),d))
-    return isone(g) ? d : Simplex{V}(g,d)
+    istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+    return isone(g) ? d : Single{V}(g,d)
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
@@ -171,10 +171,10 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
     v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
     if istangent(V) && !iszero(Z)
         _,_,Q,_ = symmetricmask(V,ba,bb)
-        v = !(typeof(v)<:TensorTerm) ? Simplex{V}(v,getbasis(V,Z)) : Simplex{V}(v,getbasis(loworder(V),Z))
+        v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
         count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
     end
-    return Simplex{V}(g*v,getbasis(V,C))
+    return Single{V}(g*v,getbasis(V,C))
 end
 
 export ⨼, ⨽
@@ -285,8 +285,8 @@ function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
         sq,d = contraction2(~v,v),i÷2
         val = isone(d) ? sq : sq^d
         return iszero(i%2) ? val : val*v
-    elseif T<:SimplexComplex && value(basis(v)*basis(v))==-1
-        return SimplexComplex{V,basis(v)}(v.v^i)
+    elseif T<:Couple && value(basis(v)*basis(v))==-1
+        return Couple{V,basis(v)}(v.v^i)
     end
     out = One(V)
     if i < 8 # optimal choice ?
@@ -349,23 +349,23 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         @pure function $nv(b::Submanifold{V,G,B}) where {V,G,B}
             $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
         end
-        $nv(b::Simplex{V,0,B}) where {V,B} = Simplex{V,0,B}(AbstractTensors.inv(value(b)))
-        function $nv(b::Simplex{V,G,B,T}) where {V,G,B,T}
-            Simplex{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
+        $nv(b::Single{V,0,B}) where {V,B} = Single{V,0,B}(AbstractTensors.inv(value(b)))
+        function $nv(b::Single{V,G,B,T}) where {V,G,B,T}
+            Single{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
         end
-        function $nv(b::Simplex{V,G,B,Any}) where {V,G,B}
-            Simplex{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+        function $nv(b::Single{V,G,B,Any}) where {V,G,B}
+            Single{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
         end
     end
 end
 
-/(a::TensorTerm{V,0},b::SimplexComplex{V,B,S}) where {V,B,S} = (T = promote_type(valuetype(a),S); SimplexComplex{V,B}(value(a)*inv(T(b.v))))
-/(a::SimplexComplex{V,B},b::TensorTerm{V,0}) where {V,B} = SimplexComplex{V,B}(Complex(a.v.re/value(b),a.v.im/value(b)))
+/(a::TensorTerm{V,0},b::Couple{V,B,S}) where {V,B,S} = (T = promote_type(valuetype(a),S); Couple{V,B}(value(a)*inv(T(b.v))))
+/(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re/value(b),a.v.im/value(b)))
 
-function /(a::SimplexComplex{V,B,T}, b::SimplexComplex{V,B,T}) where {V,B,T<:Real}
+function /(a::Couple{V,B,T}, b::Couple{V,B,T}) where {V,B,T<:Real}
     are,aim = reim(a); bre,bim = reim(b)
     B2 = value(abs2_inv(B))
-    SimplexComplex{V,B}(if abs(bre) <= abs(bim)
+    Couple{V,B}(if abs(bre) <= abs(bim)
         if isinf(bre) && isinf(bim)
             r = sign(bre)/sign(bim)
         else
@@ -384,11 +384,11 @@ function /(a::SimplexComplex{V,B,T}, b::SimplexComplex{V,B,T}) where {V,B,T<:Rea
     end)
 end
 
-inv(z::SimplexComplex{V,B,<:Union{Float16,Float32}}) where {V,B} =
-    (w = inv(widen(z)); SimplexComplex{V,B}(oftype(z.v,w.v)))
+inv(z::Couple{V,B,<:Union{Float16,Float32}}) where {V,B} =
+    (w = inv(widen(z)); Couple{V,B}(oftype(z.v,w.v)))
 
-/(z::SimplexComplex{V,B,T}, w::SimplexComplex{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
-    (w = widen(z)*inv(widen(w)); SimplexComplex{V,B}(oftype(z.v, w.v)))
+/(z::Couple{V,B,T}, w::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
+    (w = widen(z)*inv(widen(w)); Couple{V,B}(oftype(z.v, w.v)))
 
 # robust complex division for double precision
 # variables are scaled & unscaled to avoid over/underflow, if necessary
@@ -396,7 +396,7 @@ inv(z::SimplexComplex{V,B,<:Union{Float16,Float32}}) where {V,B} =
 #             a + i*b
 #  p + i*q = ---------
 #             c + i*d
-function /(z::SimplexComplex{V,B,Float64}, w::SimplexComplex{V,B,Float64}) where {V,B}
+function /(z::Couple{V,B,Float64}, w::Couple{V,B,Float64}) where {V,B}
     a, b = reim(z); c, d = reim(w)
     absa = abs(a); absb = abs(b);  ab = absa >= absb ? absa : absb # equiv. to max(abs(a),abs(b)) but without NaN-handling (faster)
     absc = abs(c); absd = abs(d);  cd = absc >= absd ? absc : absd
@@ -409,7 +409,7 @@ function /(z::SimplexComplex{V,B,Float64}, w::SimplexComplex{V,B,Float64}) where
     else
         p,q = cdiv(a,b,c,d,e)
     end
-    return SimplexComplex{V,B}(ComplexF64(p,q))
+    return Couple{V,B}(ComplexF64(p,q))
 end
 
 # sub-functionality for /(z::ComplexF64, w::ComplexF64)
@@ -459,15 +459,15 @@ function robust_cdiv2_rev(a::Float64, b::Float64, c::Float64, d::Float64, r::Flo
     end
 end
 
-function inv(z::SimplexComplex{V,B}) where {V,B}
+function inv(z::Couple{V,B}) where {V,B}
     c, d = reim(z)
-    (isinf(c) | isinf(d)) && (return SimplexComplex{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
+    (isinf(c) | isinf(d)) && (return Couple{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
     e = c*c + d*d*value(abs2_inv(B))
-    SimplexComplex{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
+    Couple{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
 end
-inv(z::SimplexComplex{V,B,<:Integer}) where {V,B} = inv(SimplexComplex{V,B}(float(z.v)))
+inv(z::Couple{V,B,<:Integer}) where {V,B} = inv(Couple{V,B}(float(z.v)))
 
-function inv(w::SimplexComplex{V,B,Float64}) where {V,B}
+function inv(w::Couple{V,B,Float64}) where {V,B}
     c, d = reim(w)
     (isinf(c) | isinf(d)) && return complex(copysign(0.0, c), flipsign(-0.0, d))
     absc, absd = abs(c), abs(d)
@@ -488,7 +488,7 @@ function inv(w::SimplexComplex{V,B,Float64}) where {V,B}
     else
         q, p = robust_cinv_rev(-d, -c, a)
     end
-    return SimplexComplex{V,B}(ComplexF64(p*s, q*s)) # undo scaling
+    return Couple{V,B}(ComplexF64(p*s, q*s)) # undo scaling
 end
 function robust_cinv(c::Float64, d::Float64, ::Val{a}) where a
     r = d/c
@@ -508,8 +508,8 @@ function generate_inverses(Mod,T)
         for Term ∈ (:TensorGraded,:TensorMixed)
             @eval $d(a::S,b::T) where {S<:$Term,T<:$Mod.$T} = a*$ds(1,b)
         end
-        @eval function $nv(b::Simplex{V,G,B,$Mod.$T}) where {V,G,B}
-            Simplex{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+        @eval function $nv(b::Single{V,G,B,$Mod.$T}) where {V,G,B}
+            Single{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
         end
     end
 end
@@ -550,13 +550,13 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
         left,bop,VEC = addvec(a,b,false,op)
         if basis(a) == basis(b)
-            :(Simplex{V,L}($bop(value(a),value(b)),basis(a)))
+            :(Single{V,L}($bop(value(a),value(b)),basis(a)))
         elseif !istangent(V) && !hasconformal(V) && L == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(SimplexComplex{V,basis(b)}(Complex(value(a),$bop(value(b)))))
+            :(Couple{V,basis(b)}(Complex(value(a),$bop(value(b)))))
         elseif !istangent(V) && !hasconformal(V) && G == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(SimplexComplex{V,basis(a)}(Complex($bop(value(b)),value(a))))
+            :(Couple{V,basis(a)}(Complex($bop(value(b)),value(a))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
@@ -705,9 +705,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif S<:Chain && L == 0
             return :(Chain{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Simplex ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
+            return swap ? (S<:Single ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
-            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Simplex ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
+            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
@@ -724,7 +724,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 U = UInt(basis(a))
                 for i ∈ 1:binomial(N,G)
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
-                    if S<:Simplex
+                    if S<:Single
                         @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                     else
                         @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
@@ -751,7 +751,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             U = UInt(basis(a))
             for i ∈ 1:binomial(N,G)
                 A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
-                $(if S<:Simplex
+                $(if S<:Single
                     :(if @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$MUL))&μ
                         $(insert_expr((:out,);mv=:out)...)
                         @inbounds geomaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],$MUL))
@@ -793,7 +793,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 U = UInt(basis(a))
                 for i ∈ 1:bng
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
-                    if S<:Simplex
+                    if S<:Single
                         if μ
                             @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         else
@@ -808,7 +808,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     end
                 end
             end
-            #return :(value_diff(Simplex{V,0,$(getbasis(V,0))}($(value(mv)))))
+            #return :(value_diff(Single{V,0,$(getbasis(V,0))}($(value(mv)))))
             return if μ
                 insert_t(:(Multivector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
             else
@@ -840,7 +840,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             for i ∈ 1:bng
                 if μ
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
-                    $(if S<:Simplex
+                    $(if S<:Single
                         :(if @inbounds skewaddmulti!(V,out,A,B,derive_mul(V,A,B,b[i],$MUL))
                             #$(insert_expr((:out,);mv=:(value(mv)))...)
                             out,t = zeros(svec(N,Any)) .+ out,Any
@@ -900,7 +900,7 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                 for i ∈ 1:binomial(mdims(W),L)
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     A,B = swap ? (X,x) : (x,X)
-                    if S<:Simplex
+                    if S<:Single
                         if μ
                             $grassaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
                         else
@@ -952,7 +952,7 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
             for i ∈ 1:binomial(mdims(W),L)
                 X = @inbounds C ? dual(V,ib[i]) : ib[i]
                 A,B = (X,x) : (x,X)
-                $(if S<:Simplex
+                $(if S<:Single
                     :(if μ
                         if @inbounds $$grassaddmulti!(V,out,A,B,derive_mul(V,A,B,a.v,b[i],false))
                             out,t = zeros(svec(N,Any)) .+ out,Any
@@ -1001,7 +1001,7 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                     else
                         U = UInt(basis(a))
                         A,B = swapper(U,ia[i],swap)
-                        if S<:Simplex
+                        if S<:Single
                             X,Y = swapper(:(a.v),:(@inbounds b.v[$(bs[g]+i)]),swap)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
@@ -1029,7 +1029,7 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                         end end
                     else quote
                         A,B = $(swap ? :((@inbounds ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),@inbounds ia[i])))
-                        $(if S<:Simplex; quote
+                        $(if S<:Single; quote
                             X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,@inbounds b.v[bs[g]+1])))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
                             if @inbounds $$product!(V,out,A,B,dm)&μ

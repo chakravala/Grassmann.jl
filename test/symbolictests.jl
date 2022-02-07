@@ -11,7 +11,7 @@ module SymEngineTests
         @basis S"+++"
         x,y,z = symbols("x y z")
 
-        # expanding the symbolic coefficient of a `Simplex`
+        # expanding the symbolic coefficient of a `Single`
         simp = (x+1)^2*v1
         @show expand(simp)
 

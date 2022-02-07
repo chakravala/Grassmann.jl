@@ -106,7 +106,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `Multivector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including ``\cup,\cap,\oplus`` and the index operation ``\ominus``, which is symmetric difference operation.
 
-By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `Multivector{V,𝕂}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Single{V,G,B,𝕂}`, `Couple{V,B,𝕂}`, `Chain{V,G,𝕂}`, `Spinor{V,𝕂}`, and `Multivector{V,𝕂}` types.
 
 The elements of the `Basis` can be generated in many ways using the `Submanifold` elements created by the `@basis` macro,
 ```@repl ga
@@ -452,7 +452,7 @@ Let's obtain the full `skeleton` of a simplical complex ``\Delta(\omega)=\mathca
 ```math
 \Delta(\omega) =  \sum_{g=1}^n\sum_{k=1}^{n\choose g}\left(\text{abs}\langle\omega\rangle_{g,k} + \Delta\left(\text{abs}\,\partial\langle\omega\rangle_{g,k}\right)\right).
 ```
-Compute the value ``\chi(\Delta(\omega))=1`` and ``\chi(\Delta(\partial(\omega))) = \, ?`` for any `Simplex` ``\omega``. As an exercise, also compute the corresponding `betti` numbers..
+Compute the value ``\chi(\Delta(\omega))=1`` and ``\chi(\Delta(\partial(\omega))) = \, ?`` for any simplex ``\omega``. As an exercise, also compute the corresponding `betti` numbers..
 ```@repl ga
 [(χ(Δ(ω)),χ(Δ(∂(ω)))) for ω ∈ (Λ(ℝ5).v12,Λ(ℝ5).v123,Λ(ℝ5).v1234,Λ(ℝ5).v12345)]
 ```

@@ -26,7 +26,7 @@
                     X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
                     Y = 0≠X ? X : x
                     out = :(@inbounds b.v[bladeindex($(mdims(V)),Y)])
-                    return :(Simplex{V}(V[intlog(Y)+1] ? -($out) : $out,Submanifold{V}()))
+                    return :(Single{V}(V[intlog(Y)+1] ? -($out) : $out,Submanifold{V}()))
                 elseif G == 1 && M == 2
                     ib,(m1,m2) = indexbasis(N,1),DirectSum.eval_shift(W)
                     :(@inbounds $(V[m2] ? :(-(b.v[m2])) : :(b.v[m2]))*getbasis(V,ib[m1]))
@@ -226,7 +226,7 @@ function (a::Chain{V,1})(b::Submanifold{V,1}) where V
     X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
     Y = X>2^mdims(V) ? x : X
     @inbounds out = a.v[bladeindex(mdims(V),Y)]
-    Simplex{V}((V[intlog(x)+1]*out),Submanifold{V}())
+    Single{V}((V[intlog(x)+1]*out),Submanifold{V}())
 end
 @eval begin
     function (a::Chain{V,2,T})(b::Submanifold{V,1}) where {V,T}
@@ -240,31 +240,31 @@ end
         end
         return Chain{V,1}(out)
     end
-    function (a::Chain{V,1})(b::Simplex{V,1}) where V
+    function (a::Chain{V,1})(b::Single{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:t,))...)
         x = bits(b)
         X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
         Y = X>2^mdims(V) ? x : X
         @inbounds out = a.v[bladeindex(mdims(V),Y)]
-        Simplex{V}((V[intlog(x)+1]*out*b.v)::t,Submanifold{V}())
+        Single{V}((V[intlog(x)+1]*out*b.v)::t,Submanifold{V}())
     end
-    function (a::Simplex{V,1})(b::Chain{V,1}) where V
+    function (a::Single{V,1})(b::Chain{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:t,))...)
         x = UInt(a)
         X = isdyadic(V) ? x>>Int(mdims(V)/2) : x
         Y = 0≠X ? X : x
         @inbounds out = b.v[bladeindex(mdims(V),Y)]
-        Simplex{V}((a.v*V[intlog(Y)+1]*out)::t,Submanifold{V}())
+        Single{V}((a.v*V[intlog(Y)+1]*out)::t,Submanifold{V}())
     end
-    function (a::Simplex{V,2})(b::Chain{V,1}) where V
+    function (a::Single{V,2})(b::Chain{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:N,:t))...)
         ib,(m1,m2) = indexbasis(N,1),DirectSum.eval_shift(a)
         @inbounds ((V[m2]*a.v*b.v[m2])::t)*getbasis(V,ib[m1])
     end
-    function (a::Chain{V,2})(b::Simplex{V,1}) where V
+    function (a::Chain{V,2})(b::Single{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:N,:t,:df,:di))...)
         Q = bladeindex(N,UInt(b))
@@ -282,6 +282,6 @@ end
         for Q ∈ 1:M
             @inbounds out += a.v[df[Q][1]]*(df[Q][2]*b.v[Q])
         end
-        return Simplex{V}(out::t,Submanifold{V}())
+        return Single{V}(out::t,Submanifold{V}())
     end
 end

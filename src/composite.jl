@@ -6,16 +6,16 @@ export exph, log_fast, logh_fast
 
 ## exponential & logarithm function
 
-@inline Base.expm1(t::Submanifold{V,0}) where V = Simplex{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.expm1(t::Submanifold{V,0}) where V = Single{V}(ℯ-1)
+@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
 Base.expm1(t::Chain) = expm1(Multivector(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
-    if T<:SimplexComplex
+    if T<:Couple
         B = basis(t); BB = value(B*B)
         if BB == -1
-            return SimplexComplex{V,B}(expm1(t.v))
+            return Couple{V,B}(expm1(t.v))
         end
     end
     S,term,f = t,(t^2)/2,norm(t)
@@ -37,7 +37,7 @@ end
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
-        sb ≈ nb && (return Simplex{V}(AbstractTensors.expm1(value(sb))))
+        sb ≈ nb && (return Single{V}(AbstractTensors.expm1(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
@@ -87,7 +87,7 @@ function Base.exp(t::Multivector,::Val{hint}) where hint
     end
 end
 
-function Base.exp(t::SimplexComplex{V,B}) where {V,B}
+function Base.exp(t::Couple{V,B}) where {V,B}
     st,mt = scalar(t),imaginary(t)
     if isscalar(B*B)
         hint = value(scalar(B*B))
@@ -121,7 +121,7 @@ function Base.exp(t::T) where T<:TensorGraded
     if isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return 1+t)
-        grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
@@ -135,7 +135,7 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded where hint
     sq = i*i
     if isscalar(sq)
         isnull(hint) && (return 1+t)
-        grade(t)==0 && (return Simplex{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
@@ -194,18 +194,18 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
     end
 end
 
-Base.log(t::SimplexComplex{V,B}) where {V,B} = value(B*B)==-1 ? SimplexComplex{V,B}(log(t.v)) : qlog((t-1)/(t+1))
-Base.log1p(t::SimplexComplex{V,B}) where {V,B} = value(B*B)==-1 ? SimplexComplex{V,B}(log1p(t.v)) : qlog(t/(t+2))
+Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : qlog((t-1)/(t+1))
+Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : qlog(t/(t+2))
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
 @inline Base.sinh(::Zero{V}) where V = Zero(V)
 
 for op ∈ (:log,:exp,:asin,:acos,:atan,:acot,:sinc,:cosc)
-    @eval @inline Base.$op(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($op(value(t)))
+    @eval @inline Base.$op(t::T) where T<:TensorGraded{V,0} where V = Single{V}($op(value(t)))
 end
 
-for op ∈ (:exp2,:exp10,:cosh,:sinc) # exp
+for op ∈ (:exp,:exp2,:exp10,:cosh,:sinc) # exp
     @eval @inline Base.$op(::Zero{V}) where V = One(V)
 end
 for op ∈ (:log,:log2,:log10,:asech,:acosh,:sinc)
@@ -220,25 +220,25 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
-        @inline function Base.$qrt(t::SimplexComplex{V,B}) where {V,B}
-            value(B*B)==-1 ? SimplexComplex{V,B}($qrt(t.v)) :
+        @inline function Base.$qrt(t::Couple{V,B}) where {V,B}
+            value(B*B)==-1 ? Couple{V,B}($qrt(t.v)) :
                 isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
         end
         @inline Base.$qrt(t::Submanifold{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Simplex{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
+        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Single{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end
 end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.cosh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
-    if T<:SimplexComplex
+    if T<:Couple
         B = basis(t); BB = value(B*B)
         if BB == -1
-            return SimplexComplex{V,B}(cosh(t.v))
+            return Couple{V,B}(cosh(t.v))
         end
     end
     τ = t^2
@@ -261,7 +261,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(AbstractTensors.cosh(value(sb))))
+        sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::Multivector{V,T,E} = b^2
         B = value(τ)
@@ -287,14 +287,14 @@ end
     end
 end
 
-@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Simplex{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
+@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.sinh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
-    if T<:SimplexComplex
+    if T<:Couple
         B = basis(t); BB = value(B*B)
         if BB == -1
-            return SimplexComplex{V,B}(sinh(t.v))
+            return Couple{V,B}(sinh(t.v))
         end
     end
     τ,f = t^2,norm(t)
@@ -316,7 +316,7 @@ end
     loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Simplex{V}(AbstractTensors.sinh(value(sb))))
+        sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         τ::Multivector{V,T,E} = b^2
         B = value(τ)
@@ -548,13 +548,14 @@ end
     end
 end
 @pure list(a::Int,b::Int) = Values{max(0,b-a+1),Int}(a:b...)
+@pure evens(a::Int,b::Int) = Values{((b-a)÷2)+1,Int}(a:2:b...)
 vectors(x::Values{N,<:Chain{V}},y=x[1]) where {N,V} = ↓(V).(x[list(2,N)].-y)
 vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
 #point(x,y=x[1]) = y∧∧(vectors(x))
 
 signscalar(x::Submanifold{V,0} where V) = true
-signscalar(x::Simplex{V,0} where V) = !signbit(value(x))
-signscalar(x::Simplex) = false
+signscalar(x::Single{V,0} where V) = !signbit(value(x))
+signscalar(x::Single) = false
 signscalar(x::Chain) = false
 signscalar(x::Chain{V,0} where V) = !signbit(@inbounds x[1])
 signscalar(x::Multivector) = isscalar(x) && !signbit(value(scalar(x)))
@@ -733,8 +734,8 @@ end
 
 Base.map(fn, x::Multivector{V}) where V = Multivector{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
-Base.map(fn, x::Simplex{V,G,B}) where {V,G,B} = fn(value(x))*B
-Base.map(fn, x::SimplexComplex{V,B}) where {V,B} = SimplexComplex{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
+Base.map(fn, x::Single{V,G,B}) where {V,G,B} = fn(value(x))*B
+Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
 
 import Random: SamplerType, AbstractRNG
 Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
@@ -745,11 +746,11 @@ Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(
 Base.rand(::AbstractRNG,::SamplerType{Multivector}) = rand(Multivector{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Multivector{V}}) where V = Multivector{V}(DirectSum.orand(svec(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Multivector{V,T}}) where {V,T} = Multivector{V}(rand(svec(mdims(V),T)))
-Base.rand(::AbstractRNG,::SamplerType{SimplexComplex}) = rand(SimplexComplex{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V}}) where V = rand(SimplexComplex{V,rand(Simplex{V})})
-Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B}}) where {V,B} = SimplexComplex{V,G}(rand(Complex{Float64}))
-Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B,T}}) where {V,B,T} = SimplexComplex{V,G}(rand(Complex{T}))
-Base.rand(::AbstractRNG,::SamplerType{SimplexComplex{V,B,T} where B}) where {V,T} = rand(SimplexComplex{V,rand(Simplex{V}),T})
+Base.rand(::AbstractRNG,::SamplerType{Couple}) = rand(Couple{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,rand(Single{V})})
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,G}(rand(Complex{Float64}))
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T}}) where {V,B,T} = Couple{V,G}(rand(Complex{T}))
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T} where B}) where {V,T} = rand(Couple{V,rand(Single{V}),T})
 
 export Orthogrid
 

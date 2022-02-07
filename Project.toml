@@ -16,7 +16,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 [compat]
 julia = "1"
 Leibniz = "0.2"
-DirectSum = "0.8"
+DirectSum = "0.8.1"
 AbstractTensors = "0.7"
 ComputedFieldTypes = "1"
 Requires = "1"

@@ -196,7 +196,7 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `Multivector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including `∪,∩,⊕` and the index operation `⊖`, which is symmetric difference operation `⊻`.
 
-By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Simplex{V,G,B,𝕂}`, `Chain{V,G,𝕂}`, `SparseChain{V,G,𝕂}`, `Multivector{V,𝕂}`, and `MultiGrade{V,G}` types.
+By virtue of Julia's multiple dispatch on the field type `𝕂`, methods can specialize on the dimension `n` and grade `G` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Single{V,G,B,𝕂}`, `Couple{V,B,𝕂}`, `Chain{V,G,𝕂}`, `Spinor{V,𝕂}`, and `Multivector{V,𝕂}` types.
 
 The elements of the `Basis` can be generated in many ways using the `Submanifold` elements created by the `@basis` macro,
 ```Julia
@@ -273,7 +273,7 @@ In order to work with a `TensorAlgebra{V}`, it is necessary for some computation
 Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
 The parametric type formalism in `Grassmann` is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.
 
-It is possible to reach `Simplex` elements with up to `N=62` vertices from a `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+It is possible to reach elements with up to `N=62` vertices from a `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 The 62 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to `4,611,686,018,427,387,904` dimensions with Julia `using Grassmann`. Then the volume element is
 ```Julia
 v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ

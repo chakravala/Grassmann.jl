@@ -181,7 +181,7 @@ export skeleton, 𝒫, collapse, subcomplex, chain, path
 
 absym(t) = abs(t)
 absym(t::Submanifold) = t
-absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(absym(value(t)),basis(t))
+absym(t::T) where T<:TensorTerm{V,G} where {V,G} = Single{V,G}(absym(value(t)),basis(t))
 absym(t::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(absym.(value(t)))
 absym(t::Multivector{V,T}) where {V,T} = Multivector{V}(absym.(value(t)))
 
@@ -215,7 +215,7 @@ function skeleton(x::Chain{V},v::Val{T}=Val{true}()) where {V,T}
     ib = indexbasis(N,G)
     for k ∈ 1:binomial(N,G)
         if !iszero(x.v[k]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
-            g += skeleton(Simplex{V,G}(x.v[k],getbasis(V,ib[k])),v)
+            g += skeleton(Single{V,G}(x.v[k],getbasis(V,ib[k])),v)
         end
     end
     return g
@@ -227,7 +227,7 @@ function skeleton(x::Multivector{V},v::Val{T}=Val{true}()) where {V,T}
         ib = indexbasis(N,i)
         for k ∈ 1:binomial(N,i)
             if !iszero(x.v[k+R]) && (!T || count_ones(symmetricmask(V,ib[k],ib[k])[1])>0)
-                g += skeleton(Simplex{V,i}(x.v[k+R],getbasis(V,ib[k])),v)
+                g += skeleton(Single{V,i}(x.v[k+R],getbasis(V,ib[k])),v)
             end
         end
     end
@@ -437,15 +437,15 @@ end
 
 function __init__()
     @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
-        *(a::Reduce.RExpr,b::Submanifold{V}) where V = Simplex{V}(a,b)
-        *(a::Submanifold{V},b::Reduce.RExpr) where V = Simplex{V}(b,a)
+        *(a::Reduce.RExpr,b::Submanifold{V}) where V = Single{V}(a,b)
+        *(a::Submanifold{V},b::Reduce.RExpr) where V = Single{V}(b,a)
         *(a::Reduce.RExpr,b::Multivector{V,T}) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         *(a::Multivector{V,T},b::Reduce.RExpr) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         #*(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
         #*(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
         ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
-        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(a,b)
-        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Simplex{V,G}(b,a)
+        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Single{V,G}(a,b)
+        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Single{V,G}(b,a)
         Leibniz.extend_field(Reduce.RExpr)
         parsym = (parsym...,Reduce.RExpr)
         for T ∈ (:RExpr,:Symbol,:Expr)
@@ -463,9 +463,9 @@ function __init__()
         *(a::Multivector{V},b::Symbolics.Num) where V = Multivector{V}(a.v*b)
         *(a::Symbolics.Num,b::Chain{V,G}) where {V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::Symbolics.Num) where {V,G} = Chain{V,G}(a.v*b)
-        *(a::Symbolics.Num,b::Simplex{V,G,B,T}) where {V,G,B,T<:Real} = Simplex{V}(a,b)
-        *(a::Simplex{V,G,B,T},b::Symbolics.Num) where {V,G,B,T<:Real} = Simplex{V}(b,a)
-        Base.iszero(a::Simplex{V,G,B,Symbolics.Num}) where {V,G,B} = false
+        *(a::Symbolics.Num,b::Single{V,G,B,T}) where {V,G,B,T<:Real} = Single{V}(a,b)
+        *(a::Single{V,G,B,T},b::Symbolics.Num) where {V,G,B,T<:Real} = Single{V}(b,a)
+        Base.iszero(a::Single{V,G,B,Symbolics.Num}) where {V,G,B} = false
         isfixed(::Type{Symbolics.Num}) = true
         for op ∈ (:+,:-)
             for Term ∈ (:TensorGraded,:TensorMixed)
@@ -481,7 +481,7 @@ function __init__()
         generate_symbolic_methods(:SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs))
         for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
                     Multivector{V,SymPy.Sym} where V,
-                    Simplex{V,G,SymPy.Sym} where {V,G} )
+                    Single{V,G,SymPy.Sym} where {V,G} )
             SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
         end
     end

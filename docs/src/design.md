@@ -138,7 +138,7 @@ One way of declaring the cache for all 3 combinations of a `TensorBundle{N}` and
 Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations.
 The parametric type formalism in `Grassmann` is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.
 
-It is possible to reach `Simplex` elements with up to ``N=62`` vertices from a `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
+It is possible to reach elements with up to ``N=62`` vertices from a `TensorAlgebra` having higher maximum dimensions than supported by Julia natively.
 ```@repl ds
 Λ(62)
 Λ(62).v32a87Ng
