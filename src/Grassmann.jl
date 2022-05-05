@@ -1,7 +1,23 @@
 module Grassmann
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
+#                                              ___
+#                 /\                  _____   / _ \
+#   __   __      /  \      __   __   (_____) | | | |
+#  / / _ \ \    / /\ \    / / _ \ \   _____  | | | |
+# | |_/ \_| |  / /  \ \  | |_/ \_| | (_____) | |_| |
+#  \___^___/  /_/    \_\  \___^___/           \___/
 
 using SparseArrays, ComputedFieldTypes
 using AbstractTensors, Leibniz, DirectSum, Requires
@@ -844,5 +860,13 @@ function __init__()
         end
     end
 end
+
+#   ____  ____    ____   _____  _____ ___ ___   ____  ____   ____
+#  /    T|    \  /    T / ___/ / ___/|   T   T /    T|    \ |    \
+# Y   __j|  D  )Y  o  |(   \_ (   \_ | _   _ |Y  o  ||  _  Y|  _  Y
+# |  T  ||    / |     | \__  T \__  T|  \_/  ||     ||  |  ||  |  |
+# |  l_ ||    \ |  _  | /  \ | /  \ ||   |   ||  _  ||  |  ||  |  |
+# |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
+# l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
 
 end # module

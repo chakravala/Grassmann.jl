@@ -1,6 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
 
 export TensorTerm, TensorGraded, TensorMixed, Submanifold, Single, Multivector, SparseChain, MultiGrade, ChainBundle
 export Zero, One
@@ -350,6 +360,8 @@ Base.zero(::Multivector{V,T,X}) where {V,T,X} = Multivector{V,T}(zeros(Values{X,
 Base.one(t::Multivector{V}) where V = zero(t)+one(V)
 Base.zero(::Type{Multivector{V,T,X}}) where {V,T,X} = Multivector{V,T}(zeros(Values{X,T}))
 Base.one(t::Type{Multivector{V,T,X}}) where {V,T,X} = zero(t)+one(V)
+
+Single(v,b::Multivector) = v*b
 
 function Multivector(val::T,v::Submanifold{V,G}) where {V,T,G}
     N = mdims(V)
