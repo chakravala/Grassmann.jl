@@ -12,7 +12,6 @@
 [![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://grassmann.crucialflow.com/stable)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://grassmann.crucialflow.com/dev)
 [![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![BiVector](https://img.shields.io/badge/bivector.net-Discourse-blueviolet)](https://bivector.net)
 
 The [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) package provides tools for doing computations based on multi-linear algebra, differential geometry, and spin groups using the extended tensor algebra known as Leibniz-Grassmann-Clifford-Hestenes geometric algebra.
 Combinatorial products include `∧, ∨, ⋅, *, ⋆, ', ~, d, ∂` (which are the exterior, regressive, inner, and geometric products; along with the Hodge star, adjoint, reversal, differential and boundary operators).
@@ -25,9 +24,15 @@ Additionally, the universal interoperability between different sub-algebras is e
 [![Liberapay patrons](https://img.shields.io/liberapay/patrons/chakravala.svg)](https://liberapay.com/chakravala)
 [![Build Status](https://travis-ci.org/chakravala/Grassmann.jl.svg?branch=master)](https://travis-ci.org/chakravala/Grassmann.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/c36u0rgtm2rjcquk?svg=true)](https://ci.appveyor.com/project/chakravala/grassmann-jl)
-[![Coverage Status](https://coveralls.io/repos/chakravala/Grassmann.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/chakravala/Grassmann.jl?branch=master)
-[![codecov.io](https://codecov.io/github/chakravala/Grassmann.jl/coverage.svg?branch=master)](https://codecov.io/github/chakravala/Grassmann.jl?branch=master)
-
+```
+   ____  ____    ____   _____  _____ ___ ___   ____  ____   ____
+  /    T|    \  /    T / ___/ / ___/|   T   T /    T|    \ |    \
+ Y   __j|  D  )Y  o  |(   \_ (   \_ | _   _ |Y  o  ||  _  Y|  _  Y
+ |  T  ||    / |     | \__  T \__  T|  \_/  ||     ||  |  ||  |  |
+ |  l_ ||    \ |  _  | /  \ | /  \ ||   |   ||  _  ||  |  ||  |  |
+ |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
+ l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
+```
 This `Grassmann` package for the Julia language was created by [github.com/chakravala](https://github.com/chakravala) for mathematics and computer algebra research with differential geometric algebras.
 These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
 Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Bandcamp](https://music.crucialflow.com) or contribute (documentation, tests, examples) in the repositories.
@@ -336,3 +341,29 @@ Support this project with your organization. Your logo will show up here with a 
 <a href="https://opencollective.com/grassmannjl/organization/7/website"><img src="https://opencollective.com/grassmannjl/organization/7/avatar.svg"></a>
 <a href="https://opencollective.com/grassmannjl/organization/8/website"><img src="https://opencollective.com/grassmannjl/organization/8/avatar.svg"></a>
 <a href="https://opencollective.com/grassmannjl/organization/9/website"><img src="https://opencollective.com/grassmannjl/organization/9/avatar.svg"></a>
+
+```
+developed by
+        /\
+       /  \     ___   ___   __  __ _   _
+      / /\ \   / _ \ / __) /  \/ /| | | |
+     / /__\ \ | |_) )> _) ( ()  < | |_| |
+    /________\|  __/ \___) \__/\_\| ._,_|
+  ______      | |                 | |
+  \  ___)     |_|                 |_|
+   \ \   __   __  __  __ ___  ___  ___   ___
+    > >  \ \ / / /  \/ /(   )(   )/ __) / _ \
+   / /__  \ v / ( ()  <  | |  | | > _) | |_) )
+  /_____)  > <   \__/\_\  \_)  \_)\___)|  __/
+          / ^ \                        | |
+         /_/ \_\                       |_|
+
+   https://crucialflow.com
+   https://github.com/chakravala
+       _           _                         _
+      | |         | |                       | |
+   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+ | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+```

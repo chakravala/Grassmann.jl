@@ -1,6 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
 
 @pure tvec(N,G,t=Any) = :(Values{$(binomial(N,G)),$t})
 @pure tvec(N,t::Type=Any) = :(Values{$(1<<N),$t})
@@ -127,9 +137,7 @@ add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Exp
 
 function generate_mutators(M,F,set_val,SUB,MUL,i,B)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-        sm = Symbol(op,:multi!)
-        sb = Symbol(op,:blade!)
-        for (s,index) ∈ ((sm,:basisindex),(sb,:bladeindex))
+        for (s,index) ∈ ((Symbol(op,:multi!),:basisindex),(Symbol(op,:blade!),:bladeindex),(Symbol(op,:spin!),:spinindex))
             spre = Symbol(s,:_pre)
             @eval begin
                 @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
@@ -159,9 +167,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
     generate_mutators(M,F,set_val,SUB,MUL,:i,UInt)
     generate_mutators(M,F,set_val,SUB,MUL,:(UInt(i)),Submanifold)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-        sm = Symbol(op,:multi!)
-        sb = Symbol(op,:blade!)
-        for s ∈ (sm,sb)
+        for s ∈ (Symbol(op,:multi!),Symbol(op,:blade!),Symbol(op,:spin!))
             @eval @inline function $s(out::$M,val::S,i) where {M,T,S}
                 @inbounds $(set_val(set,:(out[i]),:val))
                 return out
@@ -271,8 +277,10 @@ end
 @inline exterbits(V,α,β) = diffvars(V)≠0 ? ((a,b)=symmetricmask(V,α,β);count_ones(a&b)==0) : count_ones(α&β)==0
 @inline exteraddmulti!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!(V,out,α,β,γ)
 @inline exteraddblade!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
+@inline exteraddspin!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!(V,out,α,β,γ)
 @inline exteraddmulti!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!_pre(V,out,α,β,γ)
 @inline exteraddblade!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
+@inline exteraddspin!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!_pre(V,out,α,β,γ)
 
 # algebra
 
@@ -397,7 +405,7 @@ end
 
 minus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = (re = value(a)-b.v.re; Couple{V,B}(Complex(re,-oftype(re,b.v.im))))
 minus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re-value(b),a.v.im))
-function minus(a::TensorTerm{V},b::Couple{V,B}) where {V,G,B}
+function minus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
         re = value(a)-b.v.im
         Couple{V,B}(Complex(-oftype(re,b.v.re),re))
@@ -569,7 +577,7 @@ end
 @inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
     Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
 end
-@inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V,G}
+@inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
     Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
 end
 
@@ -589,8 +597,8 @@ plus(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where
 #+(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(b,Proj.(value(a.v),value(a.λ))...)
 #+(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
 
--(a::TensorNested) where V = -1a
-minus(a::TensorNested,b::TensorNested) where V = a+(-b)
+-(a::TensorNested) = -1a
+minus(a::TensorNested,b::TensorNested) = a+(-b)
 *(a::Number,b::TensorNested{V}) where V = (a*One(V))*b
 *(a::TensorNested{V},b::Number) where V = a*(b*One(V))
 @inline times(a::TensorGraded{V,0},b::TensorNested{V}) where V = b⋅a
@@ -598,12 +606,12 @@ minus(a::TensorNested,b::TensorNested) where V = a+(-b)
 @inline times(a::TensorGraded{V,0},b::Proj{V,<:Chain{V,1,<:TensorNested}}) where V = Proj{V}(a*b.v)
 @inline times(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj{V}(a.v*b)
 
-@inline times(a::DyadicChain,b::DyadicChain) where V = a⋅b
-@inline times(a::DyadicChain,b::Chain) where V = a⋅b
-@inline times(a::DyadicChain,b::TensorTerm) where V = a⋅b
-@inline times(a::TensorGraded,b::DyadicChain) where V = a⋅b
-@inline times(a::DyadicChain,b::TensorNested) where V = a⋅b
-@inline times(a::TensorNested,b::DyadicChain) where V = a⋅b
+@inline times(a::DyadicChain,b::DyadicChain) = a⋅b
+@inline times(a::DyadicChain,b::Chain) = a⋅b
+@inline times(a::DyadicChain,b::TensorTerm) = a⋅b
+@inline times(a::TensorGraded,b::DyadicChain) = a⋅b
+@inline times(a::DyadicChain,b::TensorNested) = a⋅b
+@inline times(a::TensorNested,b::DyadicChain) = a⋅b
 
 # dyadic identity element
 

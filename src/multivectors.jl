@@ -312,11 +312,11 @@ Base.lastindex(m::Multivector{V,T} where T) where V = mdims(V)
 
 grade(m::Multivector,g::Val) = m(g)
 
-(m::Multivector{V,T})(g::Int) where {T,V,B} = m(Val(g))
-function (m::Multivector{V,T})(::Val{g}) where {V,T,g,B}
+(m::Multivector{V,T})(g::Int) where {T,V} = m(Val(g))
+function (m::Multivector{V,T})(::Val{g}) where {V,T,g}
     Chain{V,g,T}(m[g])
 end
-function (m::Multivector{V,T})(g::Int,i::Int) where {V,T,B}
+function (m::Multivector{V,T})(g::Int,i::Int) where {V,T}
     Single{V,g,Basis{V}(indexbasis(mdims(V),g)[i]),T}(m[g][i])
 end
 
