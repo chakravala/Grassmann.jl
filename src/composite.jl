@@ -1,6 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
 
 export exph, log_fast, logh_fast
 
@@ -60,7 +70,49 @@ end
     end
 end
 
+@eval @generated function Base.expm1(b::Spinor{V,T}) where {V,T}
+    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:k)
+    return quote
+        B = value(b)
+        sb,nb = scalar(b),AbstractTensors.norm(B)
+        sb ≈ nb && (return Single{V}(AbstractTensors.expm1(value(sb))))
+        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
+        S = zeros(mvecs(N,t))
+        term = zeros(mvecs(N,t))
+        S .= B
+        out .= value(b^2)/2
+        norms = FixedVector{3}(nb,norm(out),norm(term))
+        k::Int = 3
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= b/k
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 1
+        end
+        return Spinor{V}(S)
+    end
+end
+
 function Base.exp(t::Multivector)
+    st = scalar(t)
+    mt = t-st
+    sq = mt*mt
+    if isscalar(sq)
+        hint = value(scalar(sq))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+    else
+        return 1+expm1(t)
+    end
+end
+
+function Base.exp(t::Spinor)
     st = scalar(t)
     mt = t-st
     sq = mt*mt
@@ -194,6 +246,38 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
     end
 end
 
+@eval @generated function qlog_fast(b::Spinor{V,T,E},x::Int=10000) where {V,T,E}
+    loop = generate_loop_spinor(V,:prod,:B,:*,:geomaddspin!,geomaddspin!_pre)
+    return quote
+        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        f = norm(b)
+        w2::Spinor{V,T,E} = b^2
+        B = value(w2)
+        S = zeros(mvecs(N,t))
+        prod = zeros(mvecs(N,t))
+        term = zeros(mvecs(N,t))
+        S .= value(b)
+        out .= value(b*w2)
+        term .= out/3
+        norms = FixedVector{3}(f,norm(term),f)
+        k::Int = 5
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
+            S += term
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            prod .= out
+            out .= 0
+            # prod *= w2
+            $(loop[2])
+            term .= out/k
+            @inbounds norms .= (norms[2],norm(term),ns)
+            k += 2
+        end
+        S *= 2
+        return Spinor{V}(S)
+    end
+end
+
 Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : qlog((t-1)/(t+1))
 Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : qlog(t/(t+2))
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
@@ -287,6 +371,37 @@ end
     end
 end
 
+@eval @generated function Base.cosh(b::Spinor{V,T,E}) where {V,T,E}
+    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    return quote
+        sb,nb = scalar(b),norm(b)
+        sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
+        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
+        τ::Spinor{V,T,E} = b^2
+        B = value(τ)
+        S = zeros(mvecs(N,t))
+        term = zeros(mvecs(N,t))
+        S .= value(τ)/2
+        out .= value((τ^2))/24
+        norms = FixedVector{3}(norm(S),norm(out),norm(term))
+        k::Int = 6
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= τ/(k*(k-1))
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 2
+        end
+        @inbounds S[1] += 1
+        return Spinor{V}(S)
+    end
+end
+
+
 @inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
 function Base.sinh(t::T) where T<:TensorAlgebra
@@ -338,6 +453,35 @@ end
             k += 2
         end
         return Multivector{V}(S)
+    end
+end
+
+@eval @generated function Base.sinh(b::Spinor{V,T,E}) where {V,T,E}
+    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    return quote
+        sb,nb = scalar(b),norm(b)
+        sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
+        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
+        τ::Spinor{V,T,E} = b^2
+        B = value(τ)
+        S = zeros(mvecs(N,t))
+        term = zeros(mvecs(N,t))
+        S .= value(b)
+        out .= value(b*τ)/6
+        norms = FixedVector{3}(norm(S),norm(out),norm(term))
+        k::Int = 5
+        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
+            S += out
+            ns = norm(S)
+            @inbounds ns ≈ norms[3] && break
+            term .= out
+            out .= 0
+            # term *= τ/(k*(k-1))
+            $(loop[2])
+            @inbounds norms .= (norms[2],norm(out),ns)
+            k += 2
+        end
+        return Spinor{V}(S)
     end
 end
 
@@ -733,6 +877,7 @@ end
 end
 
 Base.map(fn, x::Multivector{V}) where V = Multivector{V}(map(fn, value(x)))
+Base.map(fn, x::Spinor{V}) where V = Spinor{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::Single{V,G,B}) where {V,G,B} = fn(value(x))*B
 Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
@@ -746,6 +891,9 @@ Base.rand(::AbstractRNG,::SamplerType{Chain{V,G,T} where G}) where {V,T} = rand(
 Base.rand(::AbstractRNG,::SamplerType{Multivector}) = rand(Multivector{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Multivector{V}}) where V = Multivector{V}(DirectSum.orand(svec(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Multivector{V,T}}) where {V,T} = Multivector{V}(rand(svec(mdims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{Spinor}) = rand(Spinor{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{Spinor{V}}) where V = Spinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{Spinor{V,T}}) where {V,T} = Spinor{V}(rand(svecs(mdims(V),T)))
 Base.rand(::AbstractRNG,::SamplerType{Couple}) = rand(Couple{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,rand(Single{V})})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,G}(rand(Complex{Float64}))

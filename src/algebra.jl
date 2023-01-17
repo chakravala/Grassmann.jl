@@ -1,6 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractTensors: ∧, ∨, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction, TAG, SUB
@@ -345,6 +355,28 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             end
             throw(error("inv($m) is undefined"))
         end
+        function $nv(m::Spinor{V,T}) where {V,T}
+            rm = ~m
+            d = rm*m
+            fd = norm(d)
+            sd = scalar(d)
+            norm(sd) ≈ fd && (return $d(rm,sd))
+            for k ∈ 1:2:mdims(V)
+                @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+            end
+            throw(error("inv($m) is undefined"))
+        end
+        function $nv(m::Spinor{V,Any}) where V
+            rm = ~m
+            d = rm*m
+            fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
+            sd = scalar(d)
+            $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
+            for k ∈ 1:2:mdims(V)
+                @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
+            end
+            throw(error("inv($m) is undefined"))
+        end
         @pure $nv(b::Submanifold{V,0} where V) = b
         @pure function $nv(b::Submanifold{V,G,B}) where {V,G,B}
             $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
@@ -634,40 +666,77 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     end
     @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T,L}
         left,right,VEC = addvec(a,b,swap,op)
-        if mdims(V)<cache_limit
-            $(insert_expr((:N,:ib,:bn),:svec)...)
-            t = promote_type(valuetype(a),valuetype(b))
-            out = zeros(svec(N,Any))
-            X = UInt(basis(a))
-            for k ∈ 1:binomial(N,G)
-                B = @inbounds ib[k]
-                val = :(@inbounds $right(b.v[$k]))
-                val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
-                @inbounds setmulti!_pre(out,val,B,Val(N))
-            end
-            for g ∈ 1:N+1
-                g-1 == G && continue
-                ib = indexbasis(N,g-1)
-                @inbounds for i ∈ 1:bn[g]
-                    B = @inbounds ib[i]
-                    if B == X
-                        val = :(@inbounds $left(value(a,$t)))
-                        setmulti!_pre(out,val,B,Val(N))
+        if iseven(L) && iseven(G)
+            if mdims(V)-1<cache_limit
+                $(insert_expr((:N,:ib,:bn),:svecs)...)
+                t = promote_type(valuetype(a),valuetype(b))
+                out = zeros(svecs(N,Any))
+                X = UInt(basis(a))
+                for k ∈ 1:binomial(N,G)
+                    B = @inbounds ib[k]
+                    val = :(@inbounds $right(b.v[$k]))
+                    val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                    @inbounds setspin!_pre(out,val,B,Val(N))
+                end
+                for g ∈ 1:2:N+1
+                    g-1 == G && continue
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        B = @inbounds ib[i]
+                        if B == X
+                            val = :(@inbounds $left(value(a,$t)))
+                            setspin!_pre(out,val,B,Val(N))
+                        end
                     end
                 end
-            end
-            return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
-        else return if !swap; quote
-            $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-            @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
-            addmulti!(out,value(a,t),UInt(basis(a)),Val(N))
-            return Multivector{V}(out)
-        end; else quote
-            $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-            @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
-            addmulti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
-            return Multivector{V}(out)
-        end end end
+                return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+            else return if !swap; quote
+                $(insert_expr((:N,:t,:out,:rr,:bng),VECS)...)
+                @inbounds out[rr+1:rr+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
+                addspin!(out,value(a,t),UInt(basis(a)),Val(N))
+                return Spinor{V}(out)
+            end; else quote
+                $(insert_expr((:N,:t,:out,:rr,:bng),VECS)...)
+                @inbounds out[rr+1:rr+bng] = value(a,$VEC(N,G,t))
+                addspin!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
+                return Spinor{V}(out)
+            end end end
+        else
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:ib,:bn),:svec)...)
+                t = promote_type(valuetype(a),valuetype(b))
+                out = zeros(svec(N,Any))
+                X = UInt(basis(a))
+                for k ∈ 1:binomial(N,G)
+                    B = @inbounds ib[k]
+                    val = :(@inbounds $right(b.v[$k]))
+                    val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                    @inbounds setmulti!_pre(out,val,B,Val(N))
+                end
+                for g ∈ 1:N+1
+                    g-1 == G && continue
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        B = @inbounds ib[i]
+                        if B == X
+                            val = :(@inbounds $left(value(a,$t)))
+                            setmulti!_pre(out,val,B,Val(N))
+                        end
+                    end
+                end
+                return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
+            else return if !swap; quote
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
+                addmulti!(out,value(a,t),UInt(basis(a)),Val(N))
+                return Multivector{V}(out)
+            end; else quote
+                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
+                addmulti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
+                return Multivector{V}(out)
+            end end end
+        end
     end
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Multivector{V,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
@@ -696,6 +765,37 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             out = value(a,$VEC(N,t))
             addmulti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
             return Multivector{V}(out)
+        end end end
+    end
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Spinor{V,T}},op,swap=false) where {V,G,T}
+        left,right,VEC = addvec(a,b,swap,op)
+        VECS = Symbol(string(VEC)*"s")
+        !iseven(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
+        if mdims(V)<cache_limit
+            $(insert_expr((:N,:rs,:bn),:svec)...)
+            t = promote_type(valuetype(a),valuetype(b))
+            out = zeros(svecs(N,Any))
+            X = UInt(basis(a))
+            for g ∈ 1:2:N+1
+                ib = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    B = @inbounds ib[i]
+                    val = :(@inbounds $right(b.v[$(rs[g]+i)]))
+                    val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
+                    setspin!_pre(out,val,B,Val(N))
+                end
+            end
+            return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+        else return if !swap; quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
+            addspin!(out,value(a,t),UInt(basis(a)),Val(N))
+            return Spinor{V}(out)
+        end; else quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = value(a,$VECS(N,t))
+            addspin!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
+            return Spinor{V}(out)
         end end end
     end
     @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
@@ -977,18 +1077,22 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
     end
 end
 
-for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
-                     (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
-    preproduct! = Symbol(product!,:_pre)
+for inspin ∈ (true,false)
+for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
+                     (:∨,:meetadd),(:contraction,:skewadd))
+    outspin = inspin && product ∈ (:exteradd,:geomadd)
+    product! = outspin ? :(isodd(G) ? $(Symbol(product,:multi!)) : $(Symbol(product,:spin!))) : Symbol(product,:multi!)
+    preproduct! = outspin ? :(isodd(G) ? $(Symbol(product,:multi!_pre)) : $(Symbol(product,:spin!_pre))) : Symbol(product,:multi!_pre)
     prop = op≠:* ? Symbol(:product_,op) : :product
-    @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
-    @eval @noinline function $prop(a::Type{S},b::Type{<:Multivector{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
+    inspin && @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
+    @eval @noinline function $prop(a::Type{S},b::Type{<:$(inspin ? :Spinor : :Multivector){V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
         MUL,VEC = mulvec(a,b,$(QuoteNode(op)))
+        VECS = isodd(G) ? VEC : string(VEC)*"s"
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:t,:ib,:bs,:bn,:μ),:svec)...)
-            out = zeros(svec(N,Any))
-            t = promote_type(valuetype(a),valuetype(b))
-            for g ∈ 1:N+1
+            $(insert_expr((:N,:t,:ib,:bn,:μ))...)
+            bs = $(inspin ? :spinsum_set : :binomsum_set)(N)
+            out = zeros($(outspin ? :(isodd(G) ? svec : svecs) : :svec)(N,Any))
+            for g ∈ $(inspin ? :(1:2:N+1) : :(1:N+1))
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     if S<:Chain
@@ -1010,10 +1114,11 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                     end
                 end
             end
-            return insert_t(:(Multivector{V}($(Expr(:call,tvec(N,μ),out...)))))
+            return insert_t(:($($(outspin ? :(isodd(G) ? Multivector : Spinor) : Multivector)){V}($(Expr(:call,$(outspin ? :(isodd(G) ? tvec : tvecs) : :tvec)(N,μ),out...)))))
         else return quote
-            $(insert_expr((:N,:t,:out,:ib,:bs,:bn,:μ),VEC)...)
-            for g ∈ 1:N+1
+            $(insert_expr((:N,:t,:out,:ib,:bn,:μ),VECS)...)
+            bs = $(inspin ? :spinsum_set : :binomsum_set)(N)
+            for g ∈ $(inspin ? :(1:2:N+1) : :(1:N+1))
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     $(if S<:Chain; quote
@@ -1030,57 +1135,65 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:*,:geomaddmulti!),
                     else quote
                         A,B = $(swap ? :((@inbounds ia[i],$(UInt(basis(a))))) : :(($(UInt(basis(a))),@inbounds ia[i])))
                         $(if S<:Single; quote
-                            X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,@inbounds b.v[bs[g]+1])))
+                            X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,@inbounds b.v[rs[g]+1])))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
                             if @inbounds $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
                                 @inbounds $$product!(V,out,A,B,dm)
                             end end
                         else
-                            :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],false))&μ
+                            :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[rs[g]+i],false))&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[bs[g]+i],false))
+                                @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[rs[g]+i],false))
                             end)
                         end) end
                     end)
                 end
             end
-            return Multivector{V}(out)
+            return $($(outspin ? :(isodd(G) ? Multivector : Spinor) : :Multivector)){V}(out)
         end end
     end
 end
+end
 
-@eval @noinline function generate_loop_multivector(V,a,b,MUL,product!,preproduct!,d=nothing)
-    if mdims(V)<cache_limit/2
-        $(insert_expr((:N,:t,:out,:bs,:bn),:svec)...)
-        for g ∈ 1:N+1
-            X = indexbasis(N,g-1)
-            @inbounds for i ∈ 1:bn[g]
-                @inbounds val = nothing≠d ? :(@inbounds $a[$(bs[g]+i)]/$d) : :(@inbounds $a[$(bs[g]+i)])
-                for G ∈ 1:N+1
-                    @inbounds R = bs[G]
-                    Y = indexbasis(N,G-1)
-                    @inbounds for j ∈ 1:bn[G]
-                        @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL))
+for com ∈ (:spinor,:spin_multi,:s_m,:m_s,:multivector)
+    outspin = com == :spinor
+    leftspin = com ∈ (:spinor,:spin_multi,:s_m)
+    rightspin = com ∈ (:spinor,:spin_multi,:m_s)
+    br = (leftspin&&rightspin) ? (:rs,) : (leftspin||rightspin) ? (:bs,:rs) : (:bs,)
+    genloop = Symbol(:generate_loop_,com)
+    @eval @noinline function $genloop(V,a,b,MUL,product!,preproduct!,d=nothing)
+        if mdims(V)<cache_limit/2
+            $(insert_expr((:N,:t,:out,br...,:bn),outspin ? :svecs : :svec)...)
+            for g ∈ $(leftspin ? :(1:2:N+1) : :(1:N+1))
+                X = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    @inbounds val = nothing≠d ? :(@inbounds $a[$($(leftspin ? :rs : :bs)[g]+i)]/$d) : :(@inbounds $a[$($(leftspin ? :rs : :bs)[g]+i)])
+                    for G ∈ $(rightspin ? :(1:2:N+1) : :(1:N+1))
+                        @inbounds R = $(rightspin ? :rs : :bs)[G]
+                        Y = indexbasis(N,G-1)
+                        @inbounds for j ∈ 1:bn[G]
+                            @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL))
+                        end
                     end
                 end
             end
-        end
-        (:N,:t,:out), :(out .= $(Expr(:call,tvec(N,:t),out...)))
-    else
-        (:N,:t,:out,:bs,:bn,:μ), quote
-            for g ∈ 1:N+1
-                X = indexbasis(N,g-1)
-                @inbounds for i ∈ 1:bn[g]
-                    @inbounds val = $(nothing≠d ? :(@inbounds $a[bs[g]+i]/$d) : :(@inbounds $a[bs[g]+i]))
-                    val≠0 && for G ∈ 1:N+1
-                        @inbounds R = bs[G]
-                        Y = indexbasis(N,G-1)
-                        @inbounds for j ∈ 1:bn[G]
-                            dm = derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL)
-                            if @inbounds $product!(V,out,X[i],Y[j],dm)&μ
-                                $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $product!(V,out,X[i],Y[j],dm)
+            (:N,:t,:out), :(out .= $(Expr(:call,$(outspin ? :tvecs : :tvec)(N,:t),out...)))
+        else
+            (:N,:t,:out,br...,:bn,:μ), quote
+                for g ∈ $(leftspin ? :(1:2:N+1) : :(1:N+1))
+                    X = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds val = $(nothing≠d ? :(@inbounds $a[$(leftspin ? :rs : :bs)[g]+i]/$d) : :(@inbounds $a[$(leftspin ? :rs : :bs)[g]+i]))
+                        val≠0 && for G ∈ $(rightspin ? :(1:2:N+1) : :(1:N+1))
+                            @inbounds R = $(rightspin ? :rs : :bs)[G]
+                            Y = indexbasis(N,G-1)
+                            @inbounds for j ∈ 1:bn[G]
+                                dm = derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL)
+                                if @inbounds $product!(V,out,X[i],Y[j],dm)&μ
+                                    $(insert_expr((:out,);mv=:out)...)
+                                    @inbounds $product!(V,out,X[i],Y[j],dm)
+                                end
                             end
                         end
                     end

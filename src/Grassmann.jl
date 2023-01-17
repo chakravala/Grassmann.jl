@@ -67,6 +67,9 @@ end
 
 points(f::F,r=-2π:0.0001:2π) where F<:Function = vector.(f.(r))
 
+export 𝕚,𝕛,𝕜
+const 𝕚,𝕛,𝕜 = hyperplanes(ℝ3)
+
 using Leibniz
 import Leibniz: ∇, Δ, d, ∂
 export ∇, Δ, ∂, d, δ, ↑, ↓

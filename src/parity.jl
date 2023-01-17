@@ -1,6 +1,16 @@
 
-#   This file is part of Grassmann.jl. It is licensed under the AGPL license
+#   This file is part of Grassmann.jl
+#   It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
+#       _           _                         _
+#      | |         | |                       | |
+#   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+#  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+# | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+#  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+#
+#   https://github.com/chakravala
+#   https://crucialflow.com
 
 import Leibniz: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute
 import Leibniz: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
@@ -238,6 +248,8 @@ function odd(t::Multivector{V,T}) where {V,T}
     end
     Multivector{V}(out)
 end
+odd(t::Spinor{V}) where V = Zero{V}()
+even(t::Spinor) = t
 function even(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
@@ -272,4 +284,27 @@ function real(t::Multivector{V,T}) where {V,T}
         end
     end
     Multivector{V}(out)
+end
+function imag(t::Spinor{V,T}) where {V,T}
+    N = mdims(V)
+    out = copy(value(t,mvecs(N,T)))
+    bs = spinsum_set(N)
+    @inbounds out[1]≠0 && (out[1] = zero(T))
+    for g ∈ 2:N+1
+        @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    Spinor{V}(out)
+end
+function real(t::Spinor{V,T}) where {V,T}
+    N = mdims(V)
+    out = copy(value(t,mvecs(N,T)))
+    bs = spinsum_set(N)
+    for g ∈ 3:N+1
+        @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    Spinor{V}(out)
 end

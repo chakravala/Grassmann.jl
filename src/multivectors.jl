@@ -12,7 +12,7 @@
 #   https://github.com/chakravala
 #   https://crucialflow.com
 
-export TensorTerm, TensorGraded, TensorMixed, Submanifold, Single, Multivector, SparseChain, MultiGrade, ChainBundle
+export TensorTerm, TensorGraded, TensorMixed, Submanifold, Single, Multivector, Spinor, SparseChain, MultiGrade, ChainBundle
 export Zero, One
 
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
@@ -30,7 +30,7 @@ end
 
 # symbolic print types
 
-import Leibniz: Fields, parval, mixed
+import Leibniz: Fields, parval, mixed, mvecs, svecs, spinsum, spinsum_set
 parsym = (Symbol,parval...)
 
 function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
@@ -384,6 +384,79 @@ end
 getindex(m::Multivector,i::T) where T<:AbstractVector{<:Submanifold} = getindex.(m,i)
 getindex(m::Multivector{V},i::Submanifold{V}) where V = m[basisindex(mdims(V),UInt(i))]
 
+## Spinor{V}
+
+@computed struct Spinor{V,𝕂} <: TensorMixed{V}
+    v::Values{1<<(mdims(V)-1),𝕂}
+    Spinor{V,𝕂}(v::Values{N,𝕂}) where {N,V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
+    Spinor{V,T}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
+    Spinor{V}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(v)
+end
+
+Spinor{V}(val::Submanifold{V}) where V = Spinor{V,Int}(1,val)
+Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
+function Spinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
+    isodd(G) && error("$(typeof(v)) is not expressible as a Spinor")
+    N = mdims(V)
+    Spinor{V,𝕂}(setspin!(zeros(mvecs(N,𝕂)),val,UInt(v),Val(N)))
+end
+Spinor{V,𝕂}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = Spinor{V,𝕂}(val.v,B)
+Spinor{V}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = Spinor{V,𝕂}(val)
+Spinor(val::TensorAlgebra{V}) where V = Spinor{V}(val)
+
+Spinor(t::Chain{V}) where V = Spinor{V}(t)
+@generated function Spinor{V}(t::Chain{V,G,T}) where {V,G,T}
+    isodd(G) && error("$t is not expressible as a Spinor")
+    N = mdims(V)
+    :(Spinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(t.v[$i]) for i ∈ 1:binomial(N,g)] : zeros(T,binomial(N,g)) for g ∈ 0:2:N]...)...))))
+end
+
+Multivector(t::Spinor{V}) where V = Multivector{V}(t)
+@generated function Multivector{V}(t::Spinor{V,T}) where {V,T}
+    N = mdims(V)
+    bs = spinsum_set(N)
+    :(Multivector{V,T}($(Expr(:call,:Values,vcat([iseven(G) ? [:(t.v[$(i+bs[G+1])]) for i ∈ 1:binomial(N,G)] : zeros(T,binomial(N,G)) for G ∈ 0:N]...)...))))
+end
+
+function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
+    N,compact = mdims(V),get(io,:compact,false)
+    bs = spinsum_set(N)
+    print(io,m.v[1])
+    for i ∈ evens(2,N)
+        ib = indexbasis(N,i)
+        for k ∈ 1:length(ib)
+            @inbounds showterm(io,V,ib[k],m.v[k+bs[i+1]],compact)
+        end
+    end
+end
+
+Base.zero(::Spinor{V,T}) where {V,T} = Spinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
+Base.one(::Spinor{V,T}) where {V,T} = Spinor{V,T}(one(T),Submanifold{V}())
+Base.zero(::Type{Spinor{V,T}}) where {V,T} = Spinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
+Base.one(::Type{Spinor{V,T}}) where {V,T} = Spinor{V,T}(one(T),Submanifold{V}())
+
+equal(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S} = prod(a.v .== b.v)
+equal(a::Spinor{V,T},b::Multivector{V,S}) where {V,T,S} = equal(Multivector(a),b)
+equal(a::Multivector{V,T},b::Spinor{V,S}) where {V,T,S} = equal(a,Multivector(b))
+function equal(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
+    isodd(G) && (return iszero(b) && iszero(a))
+    N = mdims(V)
+    r,R = spinsum(N,G), N≠G ? spinsum(N,G+1) : 2^N+1
+    @inbounds prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
+end
+equal(a::Chain{V,G,T},b::Spinor{V,S}) where {V,S,G,T} = b == a
+function equal(a::Spinor{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
+    i = spinindex(mdims(V),UInt(basis(b)))
+    @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
+end
+equal(a::T,b::Spinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
+for T ∈ Fields
+    @eval begin
+        ==(a::T,b::Spinor{V,S,G} where {V,S}) where {T<:$T,G} = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
+        ==(a::Spinor{V,S,G} where {V,S},b::T) where {T<:$T,G} = b == a
+    end
+end
+
 ## Couple{V,B}
 
 export Couple
@@ -409,6 +482,16 @@ grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v
 Multivector{V,T}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))
 Multivector{V}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
 Multivector(z::Couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
+
+Spinor{V}(val::Couple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V,𝕂}(val)
+function Spinor{V,𝕂}(val::Couple{V,B,𝕂}) where {V,B,𝕂}
+    isodd(grade(B)) && error("$(typeof(B)) is not expressible as a Spinor")
+    N = mdims(V)
+    out = zeros(mvecs(N,𝕂))
+    setspin!(out,val.v.re,UInt(0),Val(N))
+    setspin!(out,val.v.im,UInt(B),Val(N))
+    Spinor{V,𝕂}(out)
+end
 
 function Base.show(io::IO,z::Couple{V,B}) where {V,B}
     r, i = reim(z)
@@ -442,6 +525,8 @@ for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
         $qe(a::Chain{V},b::Couple{V}) where V = $eq(a,Multivector(b))
         $qe(a::Couple{V},b::Multivector{V}) where V = $eq(Multivector(a),b)
         $qe(a::Multivector{V},b::Couple{V}) where V = $eq(a,Multivector(b))
+        $qe(a::Couple{V,B},b::Spinor{V}) where {V,B} = $eq(iseven(grade(B)) ? Spinor(a) : Multivector(a),b)
+        $qe(a::Spinor{V},b::Couple{V,B}) where {V,B} = $eq(a,iseven(grade(B)) ? Spinor(b) : Multivector(b))
     end
 end
 
@@ -516,26 +601,32 @@ export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::Multivector{V,T} where V) where T = T
+@pure valuetype(::Spinor{V,T} where V) where T = T
 @pure valuetype(::Couple{V,B,T} where {V,B}) where T = T
 @pure valuetype(::Type{<:Chain{V,G,T} where {V,G}}) where T = T
 @pure valuetype(::Type{<:Multivector{V,T} where V}) where T = T
+@pure valuetype(::Type{<:Spinor{V,T} where V}) where T = T
 @pure valuetype(::Type{Couple{V,B,T} where {V,B}}) where T = T
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
+@inline value(m::Spinor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Couple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
 
 Base.isapprox(a::S,b::T) where {S<:Multivector,T<:Multivector} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
+Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
 
 @inline scalar(z::Couple{V}) where V = Single{V}(z.v.re)
 @inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
+@inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
 @inline vector(t::Multivector{V,T}) where {V,T} = @inbounds Chain{V,1,T}(t[1])
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V}(t.v[end])
 @inline isscalar(z::Couple) = iszero(z.v.im)
 @inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0
+@inline isscalar(t::Spinor) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
 @inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
 
