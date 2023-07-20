@@ -12,9 +12,11 @@
 #   https://github.com/chakravala
 #   https://crucialflow.com
 
-export TensorTerm, TensorGraded, TensorMixed, Submanifold, Single, Multivector, Spinor, SparseChain, MultiGrade, ChainBundle
-export Zero, One
+export TensorTerm, TensorGraded, TensorMixed, Scalar, GradedVector, Bivector, Trivector
+export Submanifold, Single, Multivector, Spinor, SparseChain, MultiGrade, ChainBundle
+export Zero, One, Quaternion, GaussianInteger, PointCloud, ElementMesh # Imaginary
 
+import AbstractTensors: Scalar, GradedVector, Bivector, Trivector
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
 import Leibniz: grade, showvalue
 
@@ -596,6 +598,13 @@ import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 import LinearAlgebra: rank, norm
 export basis, grade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
+
+#const Imaginary{V,T} = Spinor{V,T,2}
+const Quaternion{V,T} = Spinor{V,T,4}
+const LipschitzInteger{V,T<:Integer} = Quaternion{V,T}
+const GaussianInteger{V,B,T<:Integer} = Couple{V,B,T}
+const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
+const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
 
 #const VBV = Union{Single,Chain,Multivector}
 
