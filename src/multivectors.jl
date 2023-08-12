@@ -641,7 +641,7 @@ const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
 const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
 
 const AbstractReal = Union{Real,Single{V,G,B,<:Real} where {V,G,B},Chain{V,G,<:Real,1} where {V,G}}
-const AbstractComplex{T<:Real} = Union{Complex{T},Couple{V,B,Complex{T}} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
+const AbstractComplex{T<:Real} = Union{Complex{T},Couple{V,B,T} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
 const AbstractBool = Union{Bool,Single{V,G,B,Bool} where {V,G,B},Chain{V,G,Bool,1} where {V,G}}
 const AbstractInteger = Union{Integer,Single{V,G,B,<:Integer} where {V,G,B},Chain{V,G,<:Integer,1} where {V,G}}
 const AbstractSigned = Union{Signed,Single{V,G,B,<:Signed} where {V,G,B},Chain{V,G,<:Signed,1} where {V,G}}
