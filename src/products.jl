@@ -312,12 +312,17 @@ contraction(a::Zero{V},::Zero{V}) where V = a
 /(a::Zero,b::T) where T<:Couple{V} where V = iszero(b) ? Single{V}(0/0) : Zero(V)
 /(a::Zero{V},b::Zero) where V = Single{V}(0/0)
 inv(a::Zero{V}) where V = Single{V}(inv(value(a)))
-∧(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
-∧(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
-∨(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
-∨(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
-contraction(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
-contraction(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
+
+for T ∈ (:TensorTerm,:Couple,:Chain,:Spinor,:Multivector)
+    @eval begin
+        ∧(a::T,b::Zero) where T<:$T = b
+        ∧(a::Zero,b::T) where T<:$T = a
+        ∨(a::T,b::Zero) where T<:$T = b
+        ∨(a::Zero,b::T) where T<:$T = a
+        contraction(a::T,b::Zero) where T<:$T = b
+        contraction(a::Zero,b::T) where T<:$T = a
+    end
+end
 
 +(a::T,b::Zero{V}) where {T<:Number,V} = Single{V}(a)
 +(a::Zero{V},b::T) where {T<:Number,V} = Single{V}(b)

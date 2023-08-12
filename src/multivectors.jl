@@ -14,7 +14,9 @@
 
 export TensorTerm, TensorGraded, TensorMixed, Scalar, GradedVector, Bivector, Trivector
 export Submanifold, Single, Multivector, Spinor, SparseChain, MultiGrade, ChainBundle
-export Zero, One, Quaternion, GaussianInteger, PointCloud, ElementMesh # Imaginary
+export Zero, One, Quaternion, GaussianInteger, PointCloud, ElementMesh, AbstractSpinor
+export AbstractReal, AbstractComplex, AbstractRational, ScalarFloat, ScalarIrrational
+export AbstractInteger, AbstractBool, AbstractSigned, AbstractUnsigned # Imaginary
 
 import AbstractTensors: Scalar, GradedVector, Bivector, Trivector
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
@@ -63,7 +65,7 @@ export UniformScaling, I, points
 end
 
 """
-    Chain{V,G,𝕂} <: TensorGraded{V,G}
+    Chain{V,G,𝕂} <: TensorGraded{V,G} <: TensorAlgebra{V}
 
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
 """
@@ -159,6 +161,18 @@ function Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v}
     Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),UInt(v),Val(N)))
 end
 
+Single(m::Chain{V,0} where V) = scalar(m)
+Single(m::Chain{V,G,T,1} where {V,G,T}) = volume(m)
+Single{V}(m::Chain{V,0}) where V = scalar(m)
+Single{V}(m::Chain{V,G,T,1} where {G,T}) where V = volume(m)
+(::Type{T})(m::Chain{V,G,<:Real,1} where {V,G}) where T<:Real = T(value(m)[1])
+(::Type{Complex})(m::Chain{V,0,T,1} where V) where T<:Real = Complex(value(m)[1],zero(T))
+(::Type{Complex{T}})(m::Chain{V,0,<:Real,1} where V) where T<:Real = Complex{T}(value(m)[1],zero(T))
+(::Type{Complex})(m::Chain{V,G,T,1} where {V,G}) where T<:Real = Complex(zero(T),value(m)[1])
+(::Type{Complex{T}})(m::Chain{V,G,<:Real,1} where {V,G}) where T<:Real = Complex{T}(zero(T),value(m)[1])
+(::Type{Complex})(m::Chain{V,G,<:Complex,1} where {V,G}) = value(m)[1]
+(::Type{Complex{T}})(m::Chain{V,G,<:Complex,1} where {V,G}) where T<:Real = Complex{T}(value(m)[1])
+
 getindex(m::Chain,i::T) where T<:AbstractVector{<:Submanifold} = getindex.(m,i)
 getindex(m::Chain{V,G},i::Submanifold{V,G}) where {V,G} = m[bladeindex(mdims(V),UInt(i))]
 getindex(m::Chain{V,G,T},i::Submanifold{V}) where {V,G,T} = zero(T)
@@ -243,6 +257,7 @@ AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
 getindex(m::ChainBundle,i) = getindex(value(m),i)
 getindex(m::ChainBundle,i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
+getindex(m::AbstractVector,i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
 getindex(m::ChainBundle{V},i::ChainBundle) where V = m[value(i)]
 getindex(m::ChainBundle{V},i::T) where {V,T<:AbstractVector{<:Chain}} = getindex.(Ref(m),i)
 setindex!(m::ChainBundle,k,i) = setindex!(value(m),k,i)
@@ -386,15 +401,29 @@ end
 getindex(m::Multivector,i::T) where T<:AbstractVector{<:Submanifold} = getindex.(m,i)
 getindex(m::Multivector{V},i::Submanifold{V}) where V = m[basisindex(mdims(V),UInt(i))]
 
+## AbstractSpinor{V}
+
+"""
+    AbstractSpinor{V} <: TensorMixed{V} <: TensorAlgebra{V}
+
+Elements of `TensorAlgebra` having non-homogenous grade being a spinor in the abstract.
+"""
+abstract type AbstractSpinor{V} <: TensorMixed{V} end
+
 ## Spinor{V}
 
-@computed struct Spinor{V,𝕂} <: TensorMixed{V}
+@computed struct Spinor{V,𝕂} <: AbstractSpinor{V}
     v::Values{1<<(mdims(V)-1),𝕂}
     Spinor{V,𝕂}(v::Values{N,𝕂}) where {N,V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
     Spinor{V,T}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
     Spinor{V}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(v)
 end
 
+"""
+    Spinor{V,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+
+Spinor (`even` grade) type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
+"""
 Spinor{V}(val::Submanifold{V}) where V = Spinor{V,Int}(1,val)
 Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
 function Spinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
@@ -464,11 +493,11 @@ end
 export Couple
 
 """
-    Couple{V,B,𝕂} <: TensorMixed{V}
+    Couple{V,B,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
 
 `Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field `𝕂::Type`.
 """
-struct Couple{V,B,T} <: TensorMixed{V}
+struct Couple{V,B,T} <: AbstractSpinor{V}
     v::Complex{T}
     Couple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
@@ -479,6 +508,11 @@ Base.widen(z::Couple{V,B}) where {V,B} = Couple{V,B}(widen(z.v))
 Base.abs2(z::Couple{V,B}) where {V,B} = Single{V}(z.v.re*z.v.re + (z.v.im*z.v.im)*abs2_inv(B))
 
 grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v.re : Zero(V)
+
+(::Type{Complex})(m::Couple) = value(m)
+(::Type{Complex{T}})(m::Couple) where T<:Real = Complex{T}(value(m))
+Couple(m::TensorTerm{V}) where V = Couple{V,basis(m)}(Complex(m))
+Couple(m::TensorTerm{V,0}) where V = Couple{V,Submanifold(V)}(Complex(m))
 
 @generated Multivector{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adder2(a,b,:+)
 Multivector{V,T}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))
@@ -599,14 +633,28 @@ import LinearAlgebra: rank, norm
 export basis, grade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
 
-#const Imaginary{V,T} = Spinor{V,T,2}
+const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
 const LipschitzInteger{V,T<:Integer} = Quaternion{V,T}
 const GaussianInteger{V,B,T<:Integer} = Couple{V,B,T}
 const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
 const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
 
+const AbstractReal = Union{Real,Single{V,G,B,<:Real} where {V,G,B},Chain{V,G,<:Real,1} where {V,G}}
+const AbstractComplex{T<:Real} = Union{Complex{T},Couple{V,B,Complex{T}} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
+const AbstractBool = Union{Bool,Single{V,G,B,Bool} where {V,G,B},Chain{V,G,Bool,1} where {V,G}}
+const AbstractInteger = Union{Integer,Single{V,G,B,<:Integer} where {V,G,B},Chain{V,G,<:Integer,1} where {V,G}}
+const AbstractSigned = Union{Signed,Single{V,G,B,<:Signed} where {V,G,B},Chain{V,G,<:Signed,1} where {V,G}}
+const AbstractUnsigned = Union{Unsigned,Single{V,G,B,<:Unsigned} where {V,G,B},Chain{V,G,<:Unsigned,1} where {V,G}}
+const AbstractRational{T<:Integer} = Union{Rational{T},Single{V,G,B,Rational{T}} where {V,G,B},Chain{V,G,Rational{T},1} where {V,G}}
+const ScalarFloat = Union{AbstractFloat,Single{V,G,B,<:AbstractFloat} where {V,G,B},Chain{V,G,<:AbstractFloat,1} where {V,G}}
+const ScalarIrrational = Union{AbstractIrrational,Single{V,G,B,<:AbstractIrrational} where {V,G,B},Chain{V,G,<:AbstractIrrational,1} where {V,G}}
+
 #const VBV = Union{Single,Chain,Multivector}
+
+(::Type{Complex})(m::Imaginary) = Complex(value(m)...)
+(::Type{Complex{T}})(m::Imaginary) where T<:Real = Complex{T}(value(m)...)
+Couple(m::Imaginary{V}) where V = Couple{V,Submanifold(V)}(Complex(m))
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::Multivector{V,T} where V) where T = T
