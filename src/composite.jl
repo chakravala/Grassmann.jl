@@ -532,6 +532,88 @@ end
     return sum(terms[1:end-1])
 end=#
 
+function Base.angle(z::Couple{V,B}) where {V,B}
+    c = value(z)
+    if value(B^2) == -1
+        atan(imag(c),real(c))
+    elseif value(B^2) == 1
+        atanh(imag(c),real(c))
+    else
+        error("Unsupported trigonometric angle")
+    end
+end
+
+Base.atanh(y::Real, x::Real) = atanh(promote(float(y),float(x))...)
+Base.atanh(y::T, x::T) where {T<:AbstractFloat} = Base.no_op_err("atanh", T)
+
+function Base.atanh(y::T, x::T) where T<:Union{Float32, Float64}
+    # Method :
+    #    M1) Reduce y to positive by atanh2(y,x)=-atanh2(-y,x).
+    #    M2) Reduce x to positive by (if x and y are unexceptional):
+    #        ARGH (x+iy) = arctanh(y/x)     ... if x > 0,
+    #        ARGH (x+iy) = arctanh[y/(-x)]  ... if x < 0,
+    #
+    # Special cases:
+    #
+    #    S1) ATANH2((anything), NaN ) is NaN;
+    #    S2) ATANH2(NAN , (anything) ) is NaN;
+    #    S3) ATANH2(+-0, +-(anything but NaN)) is +-0;
+    #    S4) ATANH2(+-(anything but 0 and NaN), 0) is ERROR;
+    #    S5) ATANH2(+-(anything but INF and NaN), +-INF) is +-0;
+    #    S6) ATANH2(+-INF,+-INF ) is +-Inf;
+    #    S7) ATANH2(+-INF, (anything but,0,NaN, and INF)) is ERROR;
+    if isnan(x) || isnan(y) # S1 or S2
+        return T(NaN)
+    end
+
+    if x == T(1.0) # then y/x = y and x > 0, see M2
+        return atanh(y)
+    end
+    # generate an m ∈ {0, 1, 2, 3} to branch off of
+    m = 2*signbit(x) + 1*signbit(y)
+
+    if iszero(y)
+        return y # atanh(+-0, +-anything) = +-0
+    elseif iszero(x)
+        return atanh(copysign(T(Inf), y))
+    end
+
+    if isinf(x)
+        if isinf(y)
+            return y # atanh(+-Inf, +-Inf)
+        else
+            if m == 0 || m == 2
+                return zero(T)  # atanh(+...,+-Inf) */
+            elseif m == 1 || m == 3
+                return -zero(T) # atanh(-...,+-Inf) */
+            end
+        end
+    end
+
+    # x wasn't Inf, but y is
+    isinf(y) && return atanh(y)
+
+    ypw = Base.Math.poshighword(y)
+    xpw = Base.Math.poshighword(x)
+    # compute y/x for Float32
+    k = reinterpret(Int32, ypw-xpw)>>Base.Math.ATAN2_RATIO_BIT_SHIFT(T)
+
+    if k > Base.Math.ATAN2_RATIO_THRESHOLD(T) # |y/x| >  threshold
+        z=T(pi)/2+T(0.5)*Base.Math.ATAN2_PI_LO(T)
+        m&=1;
+    elseif x<0 && k < -Base.Math.ATAN2_RATIO_THRESHOLD(T) # 0 > |y|/x > threshold
+        z = zero(T)
+    else #safe to do y/x
+        z = atanh(abs(y/x))
+    end
+
+    if m == 0 || m == 2
+        return z # atanh(+,+-)
+    else # default case m == 1 || m == 3
+        return -z # atanh(-,+-)
+    end
+end
+
 function Cramer(N::Int,j=0)
     t = j ≠ 0 ? :T : :t
     x,y = Values{N}([Symbol(:x,i) for i ∈ 1:N]),Values{N}([Symbol(:y,i) for i ∈ 1:N])

@@ -161,9 +161,9 @@ function Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v}
     Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),UInt(v),Val(N)))
 end
 
-Single(m::Chain{V,0} where V) = scalar(m)
+Single(m::Chain{V,0,T,1} where {V,T}) = scalar(m)
 Single(m::Chain{V,G,T,1} where {V,G,T}) = volume(m)
-Single{V}(m::Chain{V,0}) where V = scalar(m)
+Single{V}(m::Chain{V,0,T,1} where T) where V = scalar(m)
 Single{V}(m::Chain{V,G,T,1} where {G,T}) where V = volume(m)
 (::Type{T})(m::Chain{V,G,<:Real,1} where {V,G}) where T<:Real = T(value(m)[1])
 (::Type{Complex})(m::Chain{V,0,T,1} where V) where T<:Real = Complex(value(m)[1],zero(T))
