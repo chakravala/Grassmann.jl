@@ -370,27 +370,39 @@ minus(a::Chain{V},b::Couple{V}) where V = (a-imaginary(b))-scalar(b)
 minus(a::Couple{V},b::Chain{V}) where V = (imaginary(a)-b)+scalar(a)
 
 for (op,po) ∈ ((:plus,:+),(:minus,:-))
-    @eval $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(a.v,b.v))
+    @eval begin
+        $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(a.v,b.v))
+        $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($po(Couple(a),Couple(b)))
+        $op(a::Couple{V},b::Phasor{V}) where V = $po(a,Couple(b))
+        $op(a::Phasor{V},b::Couple{V}) where V = $po(Couple(a),b)
+    end
 end
 
 function times(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(B*B),a.v.re*b.v.im+a.v.im*b.v.re))
 end
+function times(a::Phasor{V,B},b::Phasor{V,B}) where {V,B}
+    Phasor{V,B}(a.v.re*b.v.re,a.v.im+b.v.im)
+end
 
 function ∧(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re))
 end
+∧(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∧Couple(b))
 
 function ∨(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     grade(B)==grade(V) ? Couple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im)) : Zero(V)
 end
+∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
 
 function contraction(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(abs2_inv(B)),a.v.im*b.v.re))
 end
+contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Couple(a),Couple(b)))
 
 for op ∈ (:plus,:minus)
     @eval $op(a::Couple{V},b::Couple{V}) where V = $op(Multivector(a),b)
+    @eval $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
 end
 times(a::Couple{V},b::Couple{V}) where V = Multivector(a)*Multivector(b)
 ∧(a::Couple{V},b::Couple{V}) where V = Multivector(a)∧b
@@ -652,6 +664,8 @@ for F ∈ Fields
     @eval begin
         *(a::F,b::Couple{V,B}) where {F<:$F,V,B} = Couple{V,B}(a*b.v)
         *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(a.v*b)
+        *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*b.v.re,b.v.im)
+        *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(a.v.re*b,a.v.im)
         *(a::F,b::Multivector{V}) where {F<:$F,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$F,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$F,V} = Spinor{V}(a*b.v)
@@ -1039,6 +1053,7 @@ for side ∈ (:left,:right)
     pnp = :(Leibniz.$(Symbol(pn,:pre)))
     for (c,p) ∈ ((c,p),(h,pg))
         @eval begin
+            $c(z::Phasor) = $c(Couple(z))
             function $c(z::Couple{V}) where V
                 G = grade(V)
                 Single{V,G,getbasis(V,UInt(1)<<G-1)}(z.v.re) + $c(imaginary(z))
@@ -1157,6 +1172,9 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
     @eval begin
         function $reverse(z::Couple{V,B}) where {V,B}
             Couple{V,B}(Complex(z.v.re,$p(grade(B)) ? -z.v.im : z.v.im))
+        end
+        function $reverse(z::Phasor{V,B}) where {V,B}
+            Phasor{V,B}(Complex(z.v.re,$p(grade(B)) ? -z.v.im : z.v.im))
         end
         @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
             SUB,VEC = subvec(b)

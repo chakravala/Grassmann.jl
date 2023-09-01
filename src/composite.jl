@@ -139,6 +139,12 @@ function Base.exp(t::Multivector,::Val{hint}) where hint
     end
 end
 
+Base.expm1(t::Phasor) = exp(t)-1
+function Base.exp(t::Phasor{V,B}) where {V,B}
+    z = exp(angle(t))
+    Phasor{V,B}(exp(radius(t)+z.v.re),z.v.im)
+end
+
 function Base.exp(t::Couple{V,B}) where {V,B}
     st,mt = scalar(t),imaginary(t)
     if isscalar(B*B)
@@ -278,8 +284,10 @@ end
     end
 end
 
-Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : qlog((t-1)/(t+1))
-Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : qlog(t/(t+2))
+Base.log(t::Phasor) = log(radius(t))+angle(t)
+Base.log1p(t::Phasor) = log(1+t)
+Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : log(radius(z))+angle(z)
+Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(1+t)
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
@@ -306,8 +314,9 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
         end
         @inline function Base.$qrt(t::Couple{V,B}) where {V,B}
             value(B*B)==-1 ? Couple{V,B}($qrt(t.v)) :
-                isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
+                $qrt(radius(t))*exp(angle(t)/$n)
         end
+        @inline Base.$qrt(t::Phasor) = Phasor($qrt(radius(t)),angle(t)/$n)
         @inline Base.$qrt(t::Submanifold{V,0} where V) = t
         @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Single{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end
@@ -535,9 +544,9 @@ end=#
 function Base.angle(z::Couple{V,B}) where {V,B}
     c = value(z)
     if value(B^2) == -1
-        atan(imag(c),real(c))
+        atan(imag(c),real(c))*B
     elseif value(B^2) == 1
-        atanh(imag(c),real(c))
+        atanh(imag(c),real(c))*B
     else
         error("Unsupported trigonometric angle")
     end
@@ -566,7 +575,7 @@ function Base.atanh(y::T, x::T) where T<:Union{Float32, Float64}
         return T(NaN)
     end
 
-    if x == T(1.0) # then y/x = y and x > 0, see M2
+    if x == T(1.0) || x == T(-1.0) # then y/x = y, see M2
         return atanh(y)
     end
     # generate an m ∈ {0, 1, 2, 3} to branch off of

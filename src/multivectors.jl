@@ -566,6 +566,88 @@ for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     end
 end
 
+## Phasor{V,B}
+
+export Phasor, ∠, radius
+
+"""
+    Phasor{V,B,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+
+`Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field `𝕂::Type`.
+"""
+struct Phasor{V,B,T} <: AbstractSpinor{V}
+    v::Complex{T}
+    Phasor{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
+    Phasor{V,B}(r::Real,iθ::Real) where {V,B} = Phasor{V,B}(Complex(r,iθ))
+end
+
+const ∠ = Phasor
+@pure DirectSum.basis(::Phasor{V,B}) where {V,B} = B
+Base.reim(z::Phasor) = reim(z.v)
+Base.widen(z::Phasor{V,B}) where {V,B} = Phasor{V,B}(widen(z.v))
+function Base.abs2(z::Phasor{V,B}) where {V,B}
+    if B*B == -1
+        Single{V}(radius(z)*radius(z))
+    else
+        abs2(Couple(z))
+    end
+end
+
+Base.angle(z::Phasor) = z.v.im*basis(z)
+radius(z::Phasor) = z.v.re
+radius(z::Couple{V,B}) where {V,B} = sqrt(z.v.re^2 - z.v.im^2*value(B*B))
+
+Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = a
+
+grade(z::Phasor{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? angle(z) : G==0 ? radius(z) : Zero(V)
+
+(::Type{Complex})(m::Phasor) = Complex(Couple(m))
+(::Type{Complex{T}})(m::Phasor) where T<:Real = Complex{T}(Couple(m))
+Phasor(m::TensorTerm{V}) where V = Phasor{V,basis(m)}(Complex(1,value(m)))
+Phasor(m::TensorTerm{V,0}) where V = Phasor{V,Submanifold(V)}(Complex(m))
+Phasor(m::Couple) = Phasor(radius(m),angle(m))
+Phasor(r::Real,iθ::Single{V,G,B}) where {V,G,B} = Phasor{V,B}(Complex(r,value(iθ)))
+Phasor(r::Real,iθ::Submanifold{V}) where V = Phasor{V,iθ}(Complex(r,value(iθ)))
+Phasor(r::TensorTerm{V,0} where V,iθ) = Phasor(value(r),iθ)
+Couple(z::Phasor{V,B}) where {V,B} = radius(z)*exp(angle(z))
+Couple{V,B,T}(z::Phasor{V,B}) where {V,B,T} = Couple(z)
+
+(z::Phasor{V,B})(ωt) where {V,B} = Phasor{V,B}(radius(z),ωt+z.v.im)
+
+Multivector{V,T}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V,T}(Couple(z))
+Multivector{V}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V}(Couple(z))
+Multivector(z::Phasor) = Multivector(Couple(z))
+
+Spinor{V}(val::Phasor{V}) where V = Couple(val)
+
+function Base.show(io::IO,z::Phasor)
+    show(io, radius(z))
+    print(io, " ∠ ", angle(z))
+end
+
+Base.zero(::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(zero(Complex{T}))
+Base.one(t::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(one(Complex{T}))
+Base.zero(::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(zero(Complex{T}))
+Base.one(t::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(one(Complex{T}))
+
+equal(a::Phasor{V},b::Phasor{V}) where V = a.v.re==b.v.re && a.v.im==b.v.im==0
+isapprox(a::Phasor{V},b::Phasor{V}) where V = a.v.re≈b.v.re && a.v.im≈b.v.im≈0
+
+for T ∈ Fields
+    @eval begin
+        ==(a::T,b::Phasor) where T<:$T = isscalar(b) && a == b.v.re
+        ==(a::Phasor,b::T) where T<:$T = b == a
+    end
+end
+
+for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
+    @eval begin
+        $qe(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = $eq(a.v,b.v)
+        $qe(a::Phasor{V,B},b::Couple{V,B}) where {V,B} = $eq(Couple(a),b)
+        $qe(a::Couple{V,B},b::Phasor{V,B}) where {V,B} = $eq(a,Couple(b))
+    end
+end
+
 # Dyadic
 
 export Projector, Dyadic, Proj
@@ -660,15 +742,18 @@ Couple(m::Imaginary{V}) where V = Couple{V,Submanifold(V)}(Complex(m))
 @pure valuetype(::Multivector{V,T} where V) where T = T
 @pure valuetype(::Spinor{V,T} where V) where T = T
 @pure valuetype(::Couple{V,B,T} where {V,B}) where T = T
+@pure valuetype(::Phasor{V,B,T} where {V,B}) where T = T
 @pure valuetype(::Type{<:Chain{V,G,T} where {V,G}}) where T = T
 @pure valuetype(::Type{<:Multivector{V,T} where V}) where T = T
 @pure valuetype(::Type{<:Spinor{V,T} where V}) where T = T
 @pure valuetype(::Type{Couple{V,B,T} where {V,B}}) where T = T
+@pure valuetype(::Type{Phasor{V,B,T} where {V,B}}) where T = T
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Spinor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Couple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
+#@inline value(m::Phasor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
 
@@ -676,6 +761,7 @@ Base.isapprox(a::S,b::T) where {S<:Multivector,T<:Multivector} = Manifold(a)==Ma
 Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
 
 @inline scalar(z::Couple{V}) where V = Single{V}(z.v.re)
+@inline scalar(z::Phasor) = scalar(Couple(z))
 @inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
@@ -686,6 +772,14 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline isscalar(t::Spinor) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
 @inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
+
+function isscalar(z::Phasor)
+    if basis(z)*basis(z) == -1
+        (z.v.im%π) ≈ 0
+    else
+        isscalar(Couple(z))
+    end
+end
 
 Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
 function Leibniz.gdims(t::Vector{<:Chain})
