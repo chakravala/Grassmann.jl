@@ -766,6 +766,7 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
 @inline vector(t::Multivector{V,T}) where {V,T} = @inbounds Chain{V,1,T}(t[1])
+@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V}(t.v[end])
 @inline isscalar(z::Couple) = iszero(z.v.im)
 @inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0

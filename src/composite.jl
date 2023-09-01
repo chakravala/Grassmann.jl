@@ -288,6 +288,8 @@ Base.log(t::Phasor) = log(radius(t))+angle(t)
 Base.log1p(t::Phasor) = log(1+t)
 Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : log(radius(z))+angle(z)
 Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(1+t)
+Base.log(t::Quaternion{V}) where V = iszero(metric(V)) ? log(radius(t))+angle(t) : qlog((t-1)/(t+1))
+Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(1+t) : qlog(t/(t+2))
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
@@ -311,6 +313,9 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
         @inline function Base.$qrt(t::T) where T<:TensorAlgebra
             isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
+        end
+        @inline function Base.$qrt(t::Quaternion{V}) where V
+            iszero(metric(V)) ? $qrt(radius(t))*exp(angle(t)/$n) : exp(log(t)/$n)
         end
         @inline function Base.$qrt(t::Couple{V,B}) where {V,B}
             value(B*B)==-1 ? Couple{V,B}($qrt(t.v)) :
@@ -550,6 +555,12 @@ function Base.angle(z::Couple{V,B}) where {V,B}
     else
         error("Unsupported trigonometric angle")
     end
+end
+
+radius(z::Quaternion) = value(scalar(abs(z)))
+function Base.angle(z::Quaternion)
+    b = bivector(z)
+    (acos(value(scalar(z))/radius(z))/value(abs(b)))*b
 end
 
 Base.atanh(y::Real, x::Real) = atanh(promote(float(y),float(x))...)
