@@ -284,7 +284,7 @@ end
     end
 end
 
-Base.log(t::Phasor) = log(radius(t))+angle(t)
+Base.log(t::Phasor) = (r=radius(t); log(r)+angle(t,r))
 Base.log1p(t::Phasor) = log(1+t)
 Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : log(radius(z))+angle(z)
 Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(1+t)
@@ -558,9 +558,9 @@ function Base.angle(z::Couple{V,B}) where {V,B}
 end
 
 radius(z::Quaternion) = value(scalar(abs(z)))
-function Base.angle(z::Quaternion)
+function Base.angle(z::Quaternion,r=radius(z))
     b = bivector(z)
-    (acos(value(scalar(z))/radius(z))/value(abs(b)))*b
+    (acos(value(scalar(z))/r)/value(abs(b)))*b
 end
 
 Base.atanh(y::Real, x::Real) = atanh(promote(float(y),float(x))...)
