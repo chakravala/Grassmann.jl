@@ -70,8 +70,14 @@ end
 Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
 """
 Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,𝕂}(val)
+Chain{V,G}(val::NTuple{N,T}) where {V,G,N,T} = Chain{V,G}(Values{N,T}(val))
+Chain{V,G}(val::NTuple{N,Any}) where {V,G,N} = Chain{V,G}(Values{N}(val))
 Chain{V}(val::S) where {V,S<:TupleVector{N,𝕂}} where {N,𝕂} = Chain{V,1,𝕂}(val)
+Chain{V}(val::NTuple{N,T}) where {V,N,T} = Chain{V}(Values{N,T}(val))
+Chain{V}(val::NTuple{N,Any}) where {V,N} = Chain{V}(Values{N}(val))
 Chain(val::S) where S<:TupleVector{N,𝕂} where {N,𝕂} = Chain{Submanifold(N),1,𝕂}(val)
+Chain(val::NTuple{N,T}) where {N,T} = Chain(Values{N,T}(val))
+Chain(val::NTuple{N,Any}) where N = Chain(Values{N}(val))
 #Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G)}(args...))
 @generated function Chain{V,G}(args::𝕂...) where {V,G,𝕂}
     bg = binomial(mdims(V),G)
@@ -85,6 +91,7 @@ end
     :(Chain{V,G}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
 end
 
+
 @generated function Chain{V}(args::𝕂...) where {V,𝕂}
     bg = mdims(V); ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
     :(Chain{V,1}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
@@ -97,6 +104,7 @@ end
     :(Chain{$V,1}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
 end
 
+@inline (::Type{T})(x...) where {T<:Chain} = T(x)
 Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 
@@ -298,13 +306,17 @@ end
     :(Multivector{V}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
 end
 
-@generated function Multivector(args::𝕂...) where 𝕂
-    N = length(args)
-    V = Submanifold(try
+@pure function log2sub(N)
+    Submanifold(try
         Int(log2(N))
     catch
         throw("Constructor for Multivector got $N inputs, which is invalid.")
     end)
+end
+
+@generated function Multivector(args::𝕂...) where 𝕂
+    N = length(args)
+    V = log2sub(N)
     ref = Values{N}([:(args[$i]) for i ∈ 1:N])
     :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
 end
@@ -313,6 +325,12 @@ end
     N = 1<<mdims(V); ref = Values{N}([:(args[$i]) for i ∈ 1:N])
     :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
 end
+
+Multivector{V}(val::NTuple{N,T}) where {V,N,T} = Multivector{V}(Values{N,T}(val))
+Multivector{V}(val::NTuple{N,Any}) where {V,N} = Multivector{V}(Values{N}(val))
+Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(val))
+Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
+@inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
 function getindex(m::Multivector{V,T},i::Int) where {V,T}
     N = mdims(V)
@@ -415,9 +433,10 @@ abstract type AbstractSpinor{V} <: TensorMixed{V} end
 @computed struct Spinor{V,𝕂} <: AbstractSpinor{V}
     v::Values{1<<(mdims(V)-1),𝕂}
     Spinor{V,𝕂}(v::Values{N,𝕂}) where {N,V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
-    Spinor{V,T}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
-    Spinor{V}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(v)
 end
+
+Spinor{V,T}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
+Spinor{V}(v::AbstractVector{T}) where {V,T} = Spinor{V,T}(v)
 
 """
     Spinor{V,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
@@ -441,6 +460,14 @@ Spinor(t::Chain{V}) where V = Spinor{V}(t)
     N = mdims(V)
     :(Spinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(t.v[$i]) for i ∈ 1:binomial(N,g)] : zeros(T,binomial(N,g)) for g ∈ 0:2:N]...)...))))
 end
+
+@pure log2sub2(N) = log2sub(2N)
+
+Spinor{V}(val::NTuple{N,T}) where {V,N,T} = Spinor{V}(Values{N,T}(val))
+Spinor{V}(val::NTuple{N,Any}) where {V,N} = Spinor{V}(Values{N}(val))
+Spinor(val::NTuple{N,T}) where {N,T} = Spinor{log2sub2(N)}(Values{N,T}(val))
+Spinor(val::NTuple{N,Any}) where N = Spinor{log2sub2(N)}(Values{N}(val))
+@inline (::Type{T})(x...) where {T<:Spinor} = T(x)
 
 Multivector(t::Spinor{V}) where V = Multivector{V}(t)
 @generated function Multivector{V}(t::Spinor{V,T}) where {V,T}
@@ -499,8 +526,12 @@ export Couple
 """
 struct Couple{V,B,T} <: AbstractSpinor{V}
     v::Complex{T}
+    Couple{V,B}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     Couple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
+
+Couple{V,B}(a,b) where {V,B} = Couple{V,B}(Complex(a,b))
+Couple(a,b) = (V=Submanifold(2); Couple{V,Submanifold(V)}(a,b))
 
 DirectSum.basis(::Couple{V,B}) where {V,B} = B
 Base.reim(z::Couple) = reim(z.v)
@@ -577,9 +608,12 @@ export Phasor, ∠, radius
 """
 struct Phasor{V,B,T} <: AbstractSpinor{V}
     v::Complex{T}
+    Phasor{V,B}(r::T,iθ::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(r,iθ))
     Phasor{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
-    Phasor{V,B}(r::Real,iθ::Real) where {V,B} = Phasor{V,B}(Complex(r,iθ))
 end
+
+Phasor{V,B}(a,b) where {V,B} = Couple{V,B}(Complex(a,b))
+Phasor(a,b) = (V=Submanifold(2); Couple{V,Submanifold(V)}(a,b))
 
 const ∠ = Phasor
 @pure DirectSum.basis(::Phasor{V,B}) where {V,B} = B
