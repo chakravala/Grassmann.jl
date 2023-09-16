@@ -78,35 +78,9 @@ Chain{V}(val::NTuple{N,Any}) where {V,N} = Chain{V}(Values{N}(val))
 Chain(val::S) where S<:TupleVector{N,𝕂} where {N,𝕂} = Chain{Submanifold(N),1,𝕂}(val)
 Chain(val::NTuple{N,T}) where {N,T} = Chain(Values{N,T}(val))
 Chain(val::NTuple{N,Any}) where N = Chain(Values{N}(val))
-#Chain{V,G}(args::𝕂...) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G)}(args...))
-@generated function Chain{V,G}(args::𝕂...) where {V,G,𝕂}
-    bg = binomial(mdims(V),G)
-    ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
-    :(Chain{V,G}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
-end
-
-@generated function Chain{V,G,𝕂}(args...) where {V,G,𝕂}
-    bg = binomial(mdims(V),G)
-    ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
-    :(Chain{V,G}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
-end
-
-
-@generated function Chain{V}(args::𝕂...) where {V,𝕂}
-    bg = mdims(V); ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
-    :(Chain{V,1}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
-end
-
-@generated function Chain(args::𝕂...) where 𝕂
-    N = length(args)
-    V = Submanifold(N)
-    ref = Values{N}([:(args[$i]) for i ∈ 1:N])
-    :(Chain{$V,1}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
-end
-
+Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
+#Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 @inline (::Type{T})(x...) where {T<:Chain} = T(x)
-Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
-Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 
 DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
 DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
@@ -301,29 +275,12 @@ for var ∈ ((:V,:T),(:T,),())
     end
 end
 
-@generated function Multivector{V}(args::𝕂...) where {V,𝕂}
-    bg = 1<<mdims(V); ref = Values{bg}([:(args[$i]) for i ∈ 1:bg])
-    :(Multivector{V}($(Expr(:call,:(Values{$bg,𝕂}),ref...))))
-end
-
 @pure function log2sub(N)
     Submanifold(try
         Int(log2(N))
     catch
         throw("Constructor for Multivector got $N inputs, which is invalid.")
     end)
-end
-
-@generated function Multivector(args::𝕂...) where 𝕂
-    N = length(args)
-    V = log2sub(N)
-    ref = Values{N}([:(args[$i]) for i ∈ 1:N])
-    :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
-end
-
-@generated function Multivector{V,𝕂}(args...) where {V,𝕂}
-    N = 1<<mdims(V); ref = Values{N}([:(args[$i]) for i ∈ 1:N])
-    :(Multivector{$V}($(Expr(:call,:(Values{$N,𝕂}),ref...))))
 end
 
 Multivector{V}(val::NTuple{N,T}) where {V,N,T} = Multivector{V}(Values{N,T}(val))

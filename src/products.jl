@@ -332,11 +332,26 @@ end
 *(a::Zero,b::T) where T<:Number = a
 
 @inline Base.:^(a::T,b::Zero) where T<:TensorAlgebra{V} where V = One(V)
-@inline Base.:^(a::Zero,b::T) where T<:TensorAlgebra{V} where V = Zero(V)
+@inline Base.:^(a::Zero,b::T) where T<:TensorAlgebra{V} where V = iszero(b) ? One(V) : Zero(V)
 @inline Base.:^(a::T,b::Zero{V}) where {T<:Number,V} = One(V)
-@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = Zero(V)
+@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : Zero(V)
 @inline Base.:^(a::Zero{V},::Zero) where V = One(V)
-@inline Base.:^(a::Zero,::T) where T<:Integer = a
+@inline Base.:^(a::Zero{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : a
+
++(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+Couple(b)
++(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)+b
+-(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a-Couple(b)
+-(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)-b
+*(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a*Couple(b)
+*(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)*b
+/(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a/Couple(b)
+/(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)/b
+∧(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∧Couple(b)
+∧(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)∧b
+∨(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∨Couple(b)
+∨(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)∨b
+contraction(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = contraction(a,Couple(b))
+contraction(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = contraction(Couple(a),b)
 
 plus(b::Chain{V,G},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Chain{V,G},a::Submanifold{V,L}) where {V,G,L} = plus(a,b)
