@@ -301,26 +301,49 @@ const FieldsBig = (Fields...,BigFloat,BigInt,Complex{BigFloat},Complex{BigInt},R
 ∨(a::Zero{V},::Zero{V}) where V = a
 contraction(a::Zero{V},::Zero{V}) where V = a
 
+*(a::Infinity{V},::Infinity{V}) where V = a
+∧(a::Infinity{V},::Infinity{V}) where V = a
+∨(a::Infinity{V},::Infinity{V}) where V = a
+contraction(a::Infinity{V},::Infinity{V}) where V = a
+
 +(a::T,b::Zero) where T<:TensorAlgebra{V} where V = a
 +(a::Zero,b::T) where T<:TensorAlgebra{V} where V = b
 -(a::T,b::Zero) where T<:TensorAlgebra{V} where V = a
 -(a::Zero,b::T) where T<:TensorAlgebra{V} where V = -b
 *(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
 *(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
+#/(a::T,b::Zero) where T<:TensorAlgebra = inv(b)
 /(a::Zero,b::T) where T<:Number = iszero(b) ? Single{V}(0/0) : a
 /(a::Zero,b::T) where T<:TensorAlgebra{V} where V = iszero(b) ? Single{V}(0/0) : Zero(V)
 /(a::Zero,b::T) where T<:Couple{V} where V = iszero(b) ? Single{V}(0/0) : Zero(V)
-/(a::Zero{V},b::Zero) where V = Single{V}(0/0)
-inv(a::Zero{V}) where V = Single{V}(inv(value(a)))
+#/(a::Zero{V},b::Zero) where V = Single{V}(0/0)
+/(a::One,b::Zero) = inv(b)
+inv(a::Zero{V}) where V = Infinity(V)
+
++(a::T,b::Infinity) where T<:TensorAlgebra = b
++(a::Infinity,b::T) where T<:TensorAlgebra = a
+-(a::T,b::Infinity) where T<:TensorAlgebra = b
+-(a::Infinity,b::T) where T<:TensorAlgebra = a
+*(a::T,b::Infinity) where T<:TensorAlgebra = b
+*(a::Infinity,b::T) where T<:TensorAlgebra = a
+#/(a::T,b::Infinity) where T<:TensorAlgebra = inv(b)
+/(a::Infinity,b::T) where T<:Number = isinf(b) ? Single{V}(Inf/Inf) : a
+/(a::Infinity,b::T) where T<:TensorAlgebra{V} where V = isinf(norm(b)) ? Single{V}(Inf/Inf) : Infinity(V)
+/(a::Infinity,b::T) where T<:Couple{V} where V = isinf(value(b)) ? Single{V}(Inf/Inf) : Infinity(V)
+#/(a::Infinity{V},b::Infinity) where V = Single{V}(Inf/Inf)
+/(a::One,b::Infinity) = inv(b)
+inv(a::Infinity{V}) where V = Zero(V)
 
 for T ∈ (:TensorTerm,:Couple,:Chain,:Spinor,:Multivector)
-    @eval begin
-        ∧(a::T,b::Zero) where T<:$T = b
-        ∧(a::Zero,b::T) where T<:$T = a
-        ∨(a::T,b::Zero) where T<:$T = b
-        ∨(a::Zero,b::T) where T<:$T = a
-        contraction(a::T,b::Zero) where T<:$T = b
-        contraction(a::Zero,b::T) where T<:$T = a
+    for type ∈ (:Zero,:Infinity)
+        @eval begin
+            ∧(a::T,b::$type) where T<:$T = b
+            ∧(a::$type,b::T) where T<:$T = a
+            ∨(a::T,b::$type) where T<:$T = b
+            ∨(a::$type,b::T) where T<:$T = a
+            contraction(a::T,b::$type) where T<:$T = b
+            contraction(a::$type,b::T) where T<:$T = a
+        end
     end
 end
 
@@ -331,12 +354,28 @@ end
 *(a::T,b::Zero) where T<:Number = b
 *(a::Zero,b::T) where T<:Number = a
 
++(a::T,b::Infinity) where T<:Number = b
++(a::Infinity,b::T) where T<:Number = a
+-(a::T,b::Infinity) where T<:Number = b
+-(a::Infinity,b::T) where T<:Number = a
+*(a::T,b::Infinity) where T<:Number = b
+*(a::Infinity,b::T) where T<:Number = a
+
 @inline Base.:^(a::T,b::Zero) where T<:TensorAlgebra{V} where V = One(V)
-@inline Base.:^(a::Zero,b::T) where T<:TensorAlgebra{V} where V = iszero(b) ? One(V) : Zero(V)
+@inline Base.:^(a::Zero,b::Single{V,0}) where V = iszero(b) ? One(V) : isless(b,0) ? Infinity(V) : Zero(V)
 @inline Base.:^(a::T,b::Zero{V}) where {T<:Number,V} = One(V)
-@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : Zero(V)
+@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
 @inline Base.:^(a::Zero{V},::Zero) where V = One(V)
-@inline Base.:^(a::Zero{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : a
+@inline Base.:^(a::Zero,::Infinity) = a
+@inline Base.:^(a::Zero{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
+
+@inline Base.:^(a::Single{V,0},b::Infinity) where V = (c=abs(value(a)); isone(c) ? One(V) : isless(c,1) ? Zero(V) : b)
+@inline Base.:^(a::Infinity,b::T) where T<:TensorTerm{V,0} where V = iszero(b) ? One(V) : isless(b,0) ? Zero(V) : Infinity(V)
+@inline Base.:^(a::T,b::Infinity{V}) where {T<:Number,V} = (c=abs(a); isone(c) ? One(V) : isless(c,1) : Zero(V) : b)
+@inline Base.:^(a::Infinity{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
+@inline Base.:^(a::Infinity{V},::Zero) where V = One(V)
+@inline Base.:^(a::Infinity,::Infinity) = a
+@inline Base.:^(a::Infinity{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
 
 +(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+Couple(b)
 +(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)+b

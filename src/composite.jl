@@ -293,20 +293,33 @@ Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(1+t) : qlog(t/(t+
 @inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
-@inline Base.sinh(::Zero{V}) where V = Zero(V)
-
 for op ∈ (:log,:exp,:asin,:acos,:atan,:acot,:sinc,:cosc)
     @eval @inline Base.$op(t::T) where T<:TensorGraded{V,0} where V = Single{V}($op(value(t)))
 end
 
+for op ∈ (:log,:log2,:log10,:asech,:acosh,:acos,:sinc)
+    @eval @inline Base.$op(::One{V}) where V = Zero(V)
+end
+for op ∈ (:atanh,:acoth)
+    @eval @inline Base.$op(::One{V}) where V = Infinity(V)
+end
+
+@inline Base.sinh(::Zero{V}) where V = Zero(V)
 for op ∈ (:exp,:exp2,:exp10,:cosh,:sinc) # exp
     @eval @inline Base.$op(::Zero{V}) where V = One(V)
 end
-for op ∈ (:log,:log2,:log10,:asech,:acosh,:sinc)
-    @eval @inline Base.$op(::One{V}) where V = Zero(V)
-end
-for op ∈ (:acos,:asin,:atan,:asinh,:atanh,:cosc,:sqrt,:cbrt)
+for op ∈ (:asin,:atan,:asinh,:atanh,:cosc,:sqrt,:cbrt)
     @eval @inline Base.$op(t::Zero) = t
+end
+
+for op ∈ (:tanh,:coth)
+    @eval @inline Base.$op(::Infinity{V}) where V = One(V)
+end
+for op ∈ (:acoth,:acot,:sinc,:cosc)
+    @eval @inline Base.$op(::Infinity{V}) where V = Zero(V)
+end
+for op ∈ (:exp,:exp2,:exp10,:log,:log2,:log10,:cosh,:sinh,:acosh,:asinh,:sqrt,:cbrt)
+    @eval @inline Base.$op(t::Infinity) = t
 end
 
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
