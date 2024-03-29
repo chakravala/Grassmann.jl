@@ -252,6 +252,19 @@ odd(t::Spinor{V}) where V = Zero{V}()
 even(t::Spinor) = t
 function even(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
+    out = zeros(mvec(N-1,T))
+    bs = binomsum_set(N)
+    i = 1
+    for g ∈ 1:2:N+1
+        @inbounds for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[i] = t.v[k]
+            i += 1
+        end
+    end
+    Spinor{V}(out)
+end
+#=function even(t::Multivector{V,T}) where {V,T}
+    N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     for g ∈ 2:2:N+1
@@ -260,7 +273,7 @@ function even(t::Multivector{V,T}) where {V,T}
         end
     end
     Multivector{V}(out)
-end
+end=#
 
 function imag(t::Multivector{V,T}) where {V,T}
     N = mdims(V)

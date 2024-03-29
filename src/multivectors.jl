@@ -177,7 +177,6 @@ end
 isapprox(a::T,b::Chain{V}) where T<:TensorTerm{V} where V = b==a
 isapprox(a::Chain{V},b::T) where T<:TensorTerm{V} where V = prod(0==value(b).==value(a))
 
-
 Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T,X} = Chain{V,G,T}(ones(Values{X,T}))
 Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T<:Chain,X} = Chain{V,G,T}(ones.(ntuple(n->T,mdims(V))))
 ⊗(a::Type{<:Chain{V}},b::Type{<:Chain{W}}) where {V,W} = Chain{V,1,Chain{W,1,Float64,mdims(W)},mdims(V)}
@@ -309,7 +308,7 @@ function (m::Multivector{V,T})(::Val{g}) where {V,T,g}
     Chain{V,g,T}(m[g])
 end
 function (m::Multivector{V,T})(g::Int,i::Int) where {V,T}
-    Single{V,g,Basis{V}(indexbasis(mdims(V),g)[i]),T}(m[g][i])
+    Single{V,g,DirectSum.getbasis(V,indexbasis(mdims(V),g)[i]),T}(m[g][i])
 end
 
 function show(io::IO, m::Multivector{V,T}) where {V,T}
@@ -425,6 +424,30 @@ Spinor{V}(val::NTuple{N,Any}) where {V,N} = Spinor{V}(Values{N}(val))
 Spinor(val::NTuple{N,T}) where {N,T} = Spinor{log2sub2(N)}(Values{N,T}(val))
 Spinor(val::NTuple{N,Any}) where N = Spinor{log2sub2(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Spinor} = T(x)
+
+function getindex(m::Spinor{V,T},i::Int) where {V,T}
+    N = mdims(V)
+    0 <= i <= N || throw(BoundsError(m, i))
+    isodd(i) && return zeros(svec(N,i,Int))
+    r = spinsum(N,i)
+    return @view m.v[r+1:r+binomial(N,i)]
+end
+getindex(m::Spinor,i::Int,j::Int) = m[i][j]
+#getindex(m::Spinor,i::UnitRange{Int}) = m.v[i]
+#getindex(m::Spinor,i::T) where T<:AbstractVector = m.v[i]
+#setindex!(m::Spinor{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
+Base.firstindex(m::Spinor) = 0
+Base.lastindex(m::Spinor{V,T} where T) where V = mdims(V)
+
+grade(m::Spinor,g::Val) = m(g)
+
+(m::Spinor{V,T})(g::Int) where {T,V} = m(Val(g))
+function (m::Spinor{V,T})(::Val{g}) where {V,T,g}
+    Chain{V,g,T}(m[g])
+end
+function (m::Spinor{V,T})(g::Int,i::Int) where {V,T}
+    Single{V,g,DirectSum.getbasis(V,indexbasis(mdims(V),g)[i]),T}(m[g][i])
+end
 
 Multivector(t::Spinor{V}) where V = Multivector{V}(t)
 @generated function Multivector{V}(t::Spinor{V,T}) where {V,T}
