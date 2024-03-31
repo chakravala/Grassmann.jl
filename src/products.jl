@@ -1221,17 +1221,19 @@ for side ∈ (:left,:right)
         end
     end
 end
-for reverse ∈ (:reverse,:involute,:conj,:clifford)
-    p = Symbol(:parity,reverse)
+for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
+    p = Symbol(:parity,reverse≠:antireverse ? reverse : :reverse)
+    g = reverse≠:antireverse ? :grade : :antigrade
     @eval begin
         function $reverse(z::Couple{V,B}) where {V,B}
-            Couple{V,B}(Complex(z.v.re,$p(grade(B)) ? -z.v.im : z.v.im))
+            Couple{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
         end
         function $reverse(z::Phasor{V,B}) where {V,B}
-            Phasor{V,B}(Complex(z.v.re,$p(grade(B)) ? -z.v.im : z.v.im))
+            Phasor{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
         end
-        @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
+        @generated function $reverse(b::Chain{V,g,T}) where {V,g,T}
             SUB,VEC = subvec(b)
+            G = $g(b)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 D = diffvars(V)
                 D==0 && !$p(G) && (return :b)
@@ -1243,7 +1245,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                         @inbounds setblade!_pre(out,:($SUB($v)),ib[k],Val{N}())
                     else
                         @inbounds B = ib[k]
-                        setblade!_pre(out,$p(grade(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                        setblade!_pre(out,$p($g(V,B)) ? :($SUB($v)) : v,B,Val{N}())
                     end
                 end
                 return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
@@ -1258,7 +1260,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                         @inbounds setblade!(out,$SUB(v),ib[k],Val{N}())
                     else
                         @inbounds B = ib[k]
-                        setblade!(out,$$p(grade(V,B)) ? $SUB(v) : v,B,Val{N}())
+                        setblade!(out,$$p($$g(V,B)) ? $SUB(v) : v,B,Val{N}())
                     end
                 end
                 return Chain{V,G}(out)
@@ -1277,7 +1279,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                             @inbounds setmulti!(out,pg ? :($SUB($v)) : v,ib[i],Val{N}())
                         else
                             @inbounds B = ib[i]
-                            setmulti!(out,$p(grade(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                            setmulti!(out,$p($g(V,B)) ? :($SUB($v)) : v,B,Val{N}())
                         end
                     end
                 end
@@ -1294,7 +1296,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                             @inbounds setmulti!(out,pg ? $SUB(v) : v,ib[i],Val{N}())
                         else
                             @inbounds B = ib[i]
-                            setmulti!(out,$$p(grade(V,B)) ? $SUB(v) : v,B,Val{N}())
+                            setmulti!(out,$$p($$g(V,B)) ? $SUB(v) : v,B,Val{N}())
                         end
                     end
                 end
@@ -1314,7 +1316,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                             @inbounds setspin!(out,pg ? :($SUB($v)) : v,ib[i],Val{N}())
                         else
                             @inbounds B = ib[i]
-                            setspin!(out,$p(grade(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                            setspin!(out,$p($g(V,B)) ? :($SUB($v)) : v,B,Val{N}())
                         end
                     end
                 end
@@ -1331,7 +1333,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford)
                             @inbounds setspin!(out,pg ? $SUB(v) : v,ib[i],Val{N}())
                         else
                             @inbounds B = ib[i]
-                            setspin!(out,$$p(grade(V,B)) ? $SUB(v) : v,B,Val{N}())
+                            setspin!(out,$$p($$g(V,B)) ? $SUB(v) : v,B,Val{N}())
                         end
                     end
                 end

@@ -14,7 +14,7 @@
 
 import Leibniz: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute
 import Leibniz: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
-
+import DirectSum: antireverse, antiinvolute, anticlifford
 ## complement
 
 export complementleft, complementright, ⋆, complementlefthodge, complementrighthodge
@@ -22,7 +22,7 @@ export complementleft, complementright, ⋆, complementlefthodge, complementrigh
 ## reverse
 
 import Base: reverse, conj, ~
-export involute, clifford
+export involute, clifford, antireverse, antiinvolute, anticlifford
 
 ## product parities
 

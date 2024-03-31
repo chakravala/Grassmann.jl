@@ -20,7 +20,7 @@ export AbstractInteger, AbstractBool, AbstractSigned, AbstractUnsigned # Imagina
 
 import AbstractTensors: Scalar, GradedVector, Bivector, Trivector
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
-import Leibniz: grade, showvalue
+import Leibniz: grade, antigrade, showvalue, basis, order
 
 export TensorNested
 abstract type TensorNested{V} <: Manifold{V} end
@@ -219,6 +219,7 @@ end
 @pure Manifold(::Vector{<:Chain{V}}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
+@pure antigrade(::ChainBundle{V}) where V = antigrade(V)
 @pure AbstractTensors.mdims(::ChainBundle{V}) where V = mdims(V)
 @pure AbstractTensors.mdims(::Type{T}) where T<:ChainBundle{V} where V = mdims(V)
 @pure AbstractTensors.mdims(::Vector{<:Chain{V}}) where V = mdims(V)
@@ -722,11 +723,10 @@ DyadicProduct{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 ## Generic
 
 import Base: isinf, isapprox
-import Leibniz: basis, grade, order
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, unit, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
-export basis, grade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
+export basis, grade, antigrade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
 
 const Imaginary{V,T} = Spinor{V,T,2}
