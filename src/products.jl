@@ -1231,12 +1231,11 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
         function $reverse(z::Phasor{V,B}) where {V,B}
             Phasor{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
         end
-        @generated function $reverse(b::Chain{V,g,T}) where {V,g,T}
+        @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
             SUB,VEC = subvec(b)
-            G = $g(b)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 D = diffvars(V)
-                D==0 && !$p(G) && (return :b)
+                D==0 && !$p($g(b)) && (return :b)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
                 for k ∈ 1:binomial(N,G)
@@ -1251,7 +1250,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
             else return quote
                 D = diffvars(V)
-                D==0 && !$$p(G) && (return b)
+                D==0 && !$$p($g(b)) && (return b)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros($VEC(N,G,T))
                 for k ∈ 1:binomial(N,G)
@@ -1271,7 +1270,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 $(insert_expr((:N,:bs,:bn,:D),:svec)...)
                 out = zeros(svec(N,Any))
                 for g ∈ 1:N+1
-                    pg = $p(g-1)
+                    pg = $p($(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         v = :(@inbounds m.v[$(@inbounds bs[g]+i)])
@@ -1288,7 +1287,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 $(insert_expr((:N,:bs,:bn,:D),:svec)...)
                 out = zeros($VEC(N,T))
                 for g ∈ 1:N+1
-                    pg = $$p(g-1)
+                    pg = $$p($$(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds v = m.v[bs[g]+i]
@@ -1308,7 +1307,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 $(insert_expr((:N,:rs,:bn,:D),:svec)...)
                 out = zeros(svecs(N,Any))
                 for g ∈ 1:2:N+1
-                    pg = $p(g-1)
+                    pg = $p($(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         v = :(@inbounds m.v[$(@inbounds rs[g]+i)])
@@ -1325,7 +1324,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 $(insert_expr((:N,:rs,:bn,:D),:svec)...)
                 out = zeros($VECS(N,T))
                 for g ∈ 1:2:N+1
-                    pg = $$p(g-1)
+                    pg = $$p($$(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds v = m.v[rs[g]+i]
