@@ -1083,7 +1083,7 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!))
         end
     end
 end
-for (op,product!) ∈ ((:∨,:meetaddspin!),(:contraction,:skewaddspin!))
+for (op,product!) ∈ ((:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
     preproduct! = Symbol(product!,:_pre)
     prop = op≠:times ? Symbol(:product_,op) : :product
     @eval begin
