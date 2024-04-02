@@ -1028,19 +1028,6 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:times,:geomaddmulti!),
                 return Multivector{V,t}(out)
             end end
         end
-    end
-end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
-                     (:∨,:meetaddspin!),(:contraction,:skewaddspin!))
-    preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
-    @eval begin
-        @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
-            Grassmann.$prop(a,b,true)
-        end
-        @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S}) where {V,G,S}
-            Grassmann.$prop(a,b)
-        end
         @generated function $op(a::Spinor{V,T},b::Multivector{V,S}) where {V,T,S}
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_m(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
@@ -1063,6 +1050,19 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
                 return Multivector{V,t}(out)
             end end
 
+        end
+    end
+end
+for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
+                     (:∨,:meetaddspin!),(:contraction,:skewaddspin!))
+    preproduct! = Symbol(product!,:_pre)
+    prop = op≠:times ? Symbol(:product_,op) : :product
+    @eval begin
+        @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
+            Grassmann.$prop(a,b,true)
+        end
+        @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S}) where {V,G,S}
+            Grassmann.$prop(a,b)
         end
     end
 end
