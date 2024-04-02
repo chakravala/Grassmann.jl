@@ -946,13 +946,17 @@ end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin
+        Base.$op(a::Couple{V,B},m) where {V,B} = Couple{V,B}($op.(value(a),m))
         Base.$op(a::Chain{V,G,T},m) where {V,G,T} = Chain{V,G}($op.(value(a),m))
+        Base.$op(a::Spinor{V,T},m) where {T,V} = Spinor{V}($op.(value(a),m))
         Base.$op(a::Multivector{V,T},m) where {T,V} = Multivector{V}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
     @eval begin
+        Base.$op(a::Couple{V,B}) where {V,B} = Couple{V,B}($op(value(a)))
         Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G}($op.(value(a)))
+        Base.$op(a::Spinor{V,T}) where {V,T} = Spinor{V}($op.(value(a)))
         Base.$op(a::Multivector{V,T}) where {V,T} = Multivector{V}($op.(value(a)))
     end
 end
