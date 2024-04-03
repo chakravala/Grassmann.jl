@@ -723,11 +723,13 @@ DyadicProduct{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 ## Generic
 
 import Base: isinf, isapprox
-import AbstractTensors: value, valuetype, scalar, isscalar, involute, unit, even, odd
+import AbstractTensors: antiabs, antiabs2, geomabs, unit, unitize
+import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
 export basis, grade, antigrade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
+export antiabs, antiabs2, unitize, geomabs
 
 const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
@@ -779,13 +781,21 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
-@inline vector(t::Multivector{V,T}) where {V,T} = @inbounds Chain{V,1,T}(t[1])
-@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
-@inline volume(t::Multivector{V}) where V = @inbounds Single{V}(t.v[end])
+@inline vector(z::Couple{V,B}) where {V,B} = grade(B)==1 ? Single{V}(z.v.im) : Zero(V)
+@inline vector(t::Multivector) = t(Val(1))
+@inline vector(t::Spinor) = t(Val(1))
+@inline bivector(z::Couple{V,B}) where {V,B} = grade(B)==2 ? Single{V,2,B}(z.v.im) : Zero(V)
+@inline bivector(t::Multivector) = t(Val(2))
+@inline bivector(t::Spinor) = t(Val(2))
+#@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
+@inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(z.v.im) : Zero(V)
+@inline volume(t::Multivector{V}) where V = @inbounds Single{V,grade(V)}(t.v[end])
+@inline volume(t::Spinor{V}) where V = iseven(grade(V)) ? (@inbounds Single{V,grade(V),Submanifold(V)}(t.v[end])) : Zero(V)
 @inline isscalar(z::Couple) = iszero(z.v.im)
 @inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isscalar(t::Spinor) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
+@inline isvector(t::Spinor) = iszero(t)
 @inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
 
 function isscalar(z::Phasor)

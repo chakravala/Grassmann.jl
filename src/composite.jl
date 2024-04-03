@@ -954,10 +954,10 @@ for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
     @eval begin
-        Base.$op(a::Couple{V,B}) where {V,B} = Couple{V,B}($op(value(a)))
-        Base.$op(a::Chain{V,G,T}) where {V,G,T} = Chain{V,G}($op.(value(a)))
-        Base.$op(a::Spinor{V,T}) where {V,T} = Spinor{V}($op.(value(a)))
-        Base.$op(a::Multivector{V,T}) where {V,T} = Multivector{V}($op.(value(a)))
+        Base.$op(a::Couple{V,B};args...) where {V,B} = Couple{V,B}($op(value(a);args...))
+        Base.$op(a::Chain{V,G,T};args...) where {V,G,T} = Chain{V,G}($op.(value(a);args...))
+        Base.$op(a::Spinor{V,T};args...) where {V,T} = Spinor{V}($op.(value(a);args...))
+        Base.$op(a::Multivector{V,T};args...) where {V,T} = Multivector{V}($op.(alue(a);args...))
     end
 end
 Base.isfinite(a::Chain) = prod(isfinite.(value(a)))

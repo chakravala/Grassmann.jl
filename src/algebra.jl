@@ -13,11 +13,15 @@
 #   https://crucialflow.com
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
-import AbstractTensors: ∧, ∨, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, contraction, TAG, SUB
-import AbstractTensors: plus, minus, times, contraction, equal
+import AbstractTensors: ∧, ∨, ⟑, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
+import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
 import Leibniz: diffcheck, diffmode, hasinforigin, hasorigininf, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
+
+if VERSION >= v"1.10.0"
+    include(joinpath(dirname(Base.find_package("AbstractTensors")),"veedot.jl"))
+end
 
 ## geometric product
 
@@ -101,7 +105,7 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     return Single{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
 
-export ∧, ∨, ⊗
+export ∧, ∨, ⟑, wedgedot, veedot, ⊗
 
 #⊗(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = a∧b
 ⊗(a::A,b::B) where {A<:TensorGraded,B<:TensorGraded} = Dyadic(a,b)
@@ -263,6 +267,10 @@ end
 
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """ Grassmann.:>>>
+
+## anti-product
+
+veedot(a,b) = complementleft(complementright(a)*complementright(b))
 
 ## linear algebra
 
