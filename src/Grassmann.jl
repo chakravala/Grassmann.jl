@@ -36,7 +36,7 @@ import Leibniz: bit2int, indexbits, indices, diffvars, diffmask
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
 
 import Leibniz: hasconformal, hasinf2origin, hasorigin2inf
-import AbstractTensors: valuetype, scalar, isscalar, ⊗, complement
+import AbstractTensors: valuetype, scalar, isscalar, trivector, istrivector, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 
 ## cache

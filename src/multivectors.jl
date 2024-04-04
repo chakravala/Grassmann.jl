@@ -728,8 +728,8 @@ import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
 export basis, grade, antigrade, hasinf, hasorigin, scalar, norm, gdims, betti, χ
-export valuetype, scalar, isscalar, vector, isvector, indices, imaginary
-export antiabs, antiabs2, unitize, geomabs
+export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
+export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
 
 const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
@@ -787,6 +787,9 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline bivector(z::Couple{V,B}) where {V,B} = grade(B)==2 ? Single{V,2,B}(z.v.im) : Zero(V)
 @inline bivector(t::Multivector) = t(Val(2))
 @inline bivector(t::Spinor) = t(Val(2))
+@inline trivector(z::Couple{V,B}) where {V,B} = grade(B)==3 ? Single{V,3,B}(z.v.im) : Zero(V)
+@inline trivector(t::Multivector) = t(Val(3))
+@inline trivector(t::Spinor) = t(Val(3))
 #@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
 @inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(z.v.im) : Zero(V)
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V,grade(V)}(t.v[end])
@@ -794,8 +797,18 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline isscalar(z::Couple) = iszero(z.v.im)
 @inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0
 @inline isscalar(t::Spinor) = AbstractTensors.norm(t.v[2:end]) ≈ 0
+@inline isvector(z::Couple{V,B}) where {V,B} = grade(B)==1 && iszero(z.v.re)
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
 @inline isvector(t::Spinor) = iszero(t)
+@inline isbivector(z::Couple{V,B}) where {V,B} = grade(B)==2 && iszero(z.v.re)
+@inline isbivector(t::Multivector) = norm(t) ≈ norm(bivector(t))
+@inline isbivector(t::Spinor) = norm(t) ≈ norm(bivector(t))
+@inline istrivector(z::Couple{V,B}) where {V,B} = grade(B)==3 && iszero(z.v.re)
+@inline istrivector(t::Multivector) = norm(t) ≈ norm(trivector(t))
+@inline istrivector(t::Spinor) = iszero(t)
+@inline isvolume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) && iszero(z.v.re)
+@inline isvolume(t::Multivector) = norm(t) ≈ norm(volume(t))
+@inline isvolume(t::Spinor) = norm(t) ≈ norm(volume(t))
 @inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
 
 function isscalar(z::Phasor)
