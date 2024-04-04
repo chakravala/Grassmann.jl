@@ -19,9 +19,10 @@ import Leibniz: diffcheck, diffmode, hasinforigin, hasorigininf, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
 
-if VERSION >= v"1.10.0"
-    include(joinpath(dirname(Base.find_package("AbstractTensors")),"veedot.jl"))
-end
+if VERSION >= v"1.10.0"; @eval begin
+    import AbstractTensors.$(Symbol("⟇"))
+    export $(Symbol("⟇"))
+end end
 
 ## geometric product
 
@@ -601,14 +602,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
-                X,Y = UInt(basis(a)),UInt(basis(b))
-                for k ∈ 1:binomial(N,G)
-                    C = ib[k]
-                    if C ∈ (X,Y)
-                        val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
-                        @inbounds setblade!_pre(out,val,C,Val{N}())
-                    end
-                end
+                @inbounds setblade!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+                @inbounds setblade!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
                 return Expr(:block,insert_expr((:t,),VEC)...,
                     :(Chain{V,L}($(Expr(:call,tvec(N,G,:t),out...)))))
             else return quote
@@ -618,6 +613,23 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 setblade!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
                 return Chain{V,L}(out)
             end end
+        elseif iseven(L) && iseven(G)
+            if mdims(V)-1<cache_limit
+                $(insert_expr((:N,),:svecs)...)
+                t = promote_type(valuetype(a),valuetype(b))
+                out,ib = zeros(svecs(N,Any)),indexbasis(N)
+                @inbounds setspin!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+                @inbounds setspin!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
+                return Expr(:block,insert_expr((:t,),VEC)...,
+                    :(Spinor{V}($(Expr(:call,tvecs(N,:t),out...)))))
+            else quote
+                $(insert_expr((:N,),VEC)...)
+                t = promote_type(valuetype(a),valuetype(b))
+                out = zeros(svecs(N,Any))
+                setspin!(out,value(a,t),UInt(basis(a)),Val{N}())
+                setspin!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+                return Spinor{V}(out)
+            end end
         else
             adder2(a,b,op)
         end
@@ -625,16 +637,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder2(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
         left,bop,VEC = addvec(a,b,false,op)
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:ib),:svec)...)
+            $(insert_expr((:N,),:svec)...)
             out,ib = zeros(svec(N,Any)),indexbasis(N)
-            X,Y = UInt(basis(a)),UInt(basis(b))
-            for k ∈ 1:1<<N
-                C = ib[k]
-                if C ∈ (X,Y)
-                    val = C≠X ? :($bop(value(b,t))) : :(value(a,t))
-                    @inbounds setmulti!_pre(out,val,C,Val{N}())
-                end
-            end
+            @inbounds setmulti!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+            @inbounds setmulti!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
             return Expr(:block,insert_expr((:t,),VEC)...,
                 :(Multivector{V}($(Expr(:call,tvec(N,:t),out...)))))
         else quote
@@ -686,17 +692,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
                     @inbounds setspin!_pre(out,val,B,Val(N))
                 end
-                for g ∈ 1:2:N+1
-                    g-1 == G && continue
-                    ib = indexbasis(N,g-1)
-                    @inbounds for i ∈ 1:bn[g]
-                        B = @inbounds ib[i]
-                        if B == X
-                            val = :(@inbounds $left(value(a,$t)))
-                            setspin!_pre(out,val,B,Val(N))
-                        end
-                    end
-                end
+                val = :(@inbounds $left(value(a,$t)))
+                setspin!_pre(out,val,X,Val(N))
                 return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:rr,:bng),VECS)...)
@@ -721,17 +718,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
                     @inbounds setmulti!_pre(out,val,B,Val(N))
                 end
-                for g ∈ 1:N+1
-                    g-1 == G && continue
-                    ib = indexbasis(N,g-1)
-                    @inbounds for i ∈ 1:bn[g]
-                        B = @inbounds ib[i]
-                        if B == X
-                            val = :(@inbounds $left(value(a,$t)))
-                            setmulti!_pre(out,val,B,Val(N))
-                        end
-                    end
-                end
+                val = :(@inbounds $left(value(a,$t)))
+                setmulti!_pre(out,val,X,Val(N))
                 return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
