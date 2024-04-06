@@ -14,11 +14,13 @@
 
 import Leibniz: parityreverse, parityinvolute, parityconj, parityclifford, parityright, parityleft, parityrighthodge, paritylefthodge, odd, even, involute
 import Leibniz: complementleft, complementright, ⋆, complementlefthodge, complementrighthodge, complement, grade_basis
-import DirectSum: antireverse, antiinvolute, anticlifford
+import DirectSum: antireverse, antiinvolute, anticlifford, paritymetric, parityanti
+import DirectSum: complementleftanti, complementrightanti
 
 ## complement
 
 export complementleft, complementright, ⋆, complementlefthodge, complementrighthodge
+export complementleftanti, complementrightanti
 
 ## reverse
 

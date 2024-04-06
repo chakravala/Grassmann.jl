@@ -1221,6 +1221,107 @@ for side ∈ (:left,:right)
         end
     end
 end
+for side ∈ (:metric,:anti)
+    c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
+    @eval begin
+        $c(z::Phasor) = $c(Couple(z))
+        $c(z::Couple{V}) where V = Single{V}(z.v.re) + $c(imaginary(z))
+        @generated function $c(b::Chain{V,G,T}) where {V,G,T}
+            isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            istangent(V) && (return :($$c(Multivector(b))))
+            SUB,VEC,MUL = subvec(b)
+            if binomial(mdims(V),G)<(1<<cache_limit)
+                $(insert_expr((:N,:ib),:svec)...)
+                out = zeros(svec(N,G,Any))
+                for k ∈ 1:binomial(N,G)
+                    B = @inbounds ib[k]
+                    val = :(conj(@inbounds b.v[$k]))
+                    v = Expr(:call,MUL,$p(V,B),val)
+                    setblade!_pre(out,v,B,Val{N}())
+                end
+                return :(Chain{V,G}($(Expr(:call,tvec(N,G,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:ib),:svec)...)
+                out = zeros($VEC(N,G,T))
+                for k ∈ 1:binomial(N,G)
+                    @inbounds val = b.v[k]
+                    if val≠0
+                        @inbounds ibk = ib[k]
+                        v = conj($MUL($$p(V,ibk),val))
+                        setblade!(out,v,ibk,Val{N}())
+                    end
+                end
+                return Chain{V,G}(out)
+            end end
+        end
+        @generated function $c(m::Multivector{V,T}) where {V,T}
+            isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            SUB,VEC = subvec(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:bs,:bn),:svec)...)
+                out = zeros(svec(N,Any))
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        ibi = @inbounds ib[i]
+                        val = :(conj(@inbounds m.v[$(bs[g]+i)]))
+                        v = Expr(:call,:*,$p(V,ibi),val)
+                        @inbounds setmulti!_pre(out,v,ibi,Val{N}())
+                    end
+                end
+                return :(Multivector{V}($(Expr(:call,tvec(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:bs,:bn),:svec)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds val = m.v[bs[g]+i]
+                        if val≠0
+                            ibi = @inbounds ib[i]
+                            v = conj($$p(V,ibi)*val)
+                            setmulti!(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return Multivector{V}(out)
+            end end
+        end
+        @generated function $c(m::Spinor{V,T}) where {V,T}
+            isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            SUB,VEC = subvec(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:rs,:bn),:svec)...)
+                out = zeros((isodd(N) ? svec : svecs)(N,Any))
+                for g ∈ 1:2:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        ibi = @inbounds ib[i]
+                        val = :(conj(@inbounds m.v[$(rs[g]+i)]))
+                        v = Expr(:call,:*,$p(V,ibi),val)
+                        @inbounds (isodd(N) ? setmulti!_pre : setspin!_pre)(out,v,ibi,Val{N}())
+                    end
+                end
+                return :($(isodd(N) ? :Multivector : :Spinor){V}($(Expr(:call,(isodd(N) ? tvec : tvecs)(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:rs,:bn),:svec)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 1:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds val = m.v[rs[g]+i]
+                        if val≠0
+                            ibi = @inbounds ib[i]
+                            v = conj($$p(V,ibi)*val)
+                            $(isodd(N) ? setmulti! : setspin!)(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return $(isodd(N) ? :Multivector : :Spinor){V}(out)
+            end end
+        end
+    end
+end
 for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
     p = Symbol(:parity,reverse≠:antireverse ? reverse : :reverse)
     g = reverse≠:antireverse ? :grade : :antigrade

@@ -14,7 +14,7 @@
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractTensors: ∧, ∨, ⟑, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
-import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
+import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot, antidot
 import Leibniz: diffcheck, diffmode, hasinforigin, hasorigininf, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
@@ -269,9 +269,13 @@ end
 Sandwich product: ω>>>η = ω⊖η⊖(~ω)
 """ Grassmann.:>>>
 
-## anti-product
+## veedot
 
 veedot(a,b) = complementleft(complementright(a)*complementright(b))
+
+## antidot
+
+antidot(a,b) = complementleft(contraction(complementright(a),complementright(b)))
 
 ## linear algebra
 
