@@ -244,7 +244,7 @@ function odd(t::Multivector{V,T}) where {V,T}
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ 3:2:N+1
+    for g ∈ evens(3,N+1)
         @inbounds for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -257,8 +257,9 @@ function even(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = zeros(mvec(N-1,T))
     bs = binomsum_set(N)
-    i = 1
-    for g ∈ 1:2:N+1
+    i = 2
+    @inbounds out[1]≠0 && (out[1] = t.v[1])
+    for g ∈ evens(1,N+1)
         @inbounds for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[i] = t.v[k]
             i += 1
@@ -270,7 +271,7 @@ end
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
-    for g ∈ 2:2:N+1
+    for g ∈ evens(2,2:N+1)
         @inbounds for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -283,7 +284,7 @@ function imag(t::Multivector{V,T}) where {V,T}
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ 2:N+1
+    for g ∈ list(2,N+1)
         @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -294,7 +295,7 @@ function real(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
-    for g ∈ 3:N+1
+    for g ∈ list(3,N+1)
         @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -306,7 +307,7 @@ function imag(t::Spinor{V,T}) where {V,T}
     out = copy(value(t,mvecs(N,T)))
     bs = spinsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ 2:N+1
+    for g ∈ list(2,N+1)
         @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -317,7 +318,7 @@ function real(t::Spinor{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvecs(N,T)))
     bs = spinsum_set(N)
-    for g ∈ 3:N+1
+    for g ∈ list(3,N+1)
         @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end

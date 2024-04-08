@@ -650,15 +650,15 @@ end
 
 function Cramer(N::Int,j=0)
     t = j ≠ 0 ? :T : :t
-    x,y = Values{N}([Symbol(:x,i) for i ∈ 1:N]),Values{N}([Symbol(:y,i) for i ∈ 1:N])
-    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧$t[$(1+i-j)],$t[end-$i]∧$(y[i]))) for i ∈ 1:N-1-j]
+    x,y = Values{N}([Symbol(:x,i) for i ∈ list(1,N)]),Values{N}([Symbol(:y,i) for i ∈ list(1,N)])
+    xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧$t[$(1+i-j)],$t[end-$i]∧$(y[i]))) for i ∈ list(1,N-1-j)]
     return x,y,xy
 end
 
 DirectSum.Λ(x::Chain{V,1,<:Chain{V,1}},G) where V = compound(x,G)
 compound(x,G::T) where T<:Integer = compound(x,Val(G))
 @generated function compound(x::Chain{V,1,<:Chain{V,1}},::Val{G}) where {V,G}
-    Expr(:call,:(Chain{V,G}),Expr(:call,:Values,[Expr(:call,:∧,[:(x[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...))
+    Expr(:call,:(Chain{V,G}),Expr(:call,:Values,[Expr(:call,:∧,[:(@inbounds x[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...))
 end
 
 @generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
@@ -667,7 +667,7 @@ end
         return :(@inbounds Chain{V,1}(Values(v[1]/t[1][1])))
     elseif M == 2 && (V === ℝ2 || V == 2)
         return quote
-            (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
+            @inbounds (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
             x1 = (c-C*(b/B))/(a-A*(b/B))
             return Chain{V,1}(x1,(C-A*x1)/B)
         end
@@ -689,7 +689,7 @@ end
     N<1 && (return :(inv(t)⋅v))
     M > mdims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
     x,y,xy = Grassmann.Cramer(N) # paste this into the REPL for faster eval
-    mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
+    mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ list(1,N-1)]
     out = Expr(:call,:Values,:(v∧$(y[end])),mid...,:($(x[end])∧v))
     detx = :(detx = @inbounds (t[1]∧$(y[end])))
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,detx,
@@ -699,12 +699,12 @@ end
 @generated function Base.in(v::Chain{V,1},t::Values{N,<:Chain{V,1}}) where {V,N}
     if N == mdims(V)
         x,y,xy = Grassmann.Cramer(N-1)
-        mid = [:(s==signbit(@inbounds ($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ 1:N-2]
+        mid = [:(s==signbit(@inbounds ($(x[i])∧v∧$(y[end-i]))[1])) for i ∈ list(1,N-2)]
         out = Values(:(s==signbit(@inbounds (v∧$(y[end]))[1])),mid...,:(s==signbit(@inbounds ($(x[end])∧v)[1])))
         return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(s=signbit(@inbounds (t[1]∧$(y[end]))[1])),ands(out))
     else
         x,y,xy = Grassmann.Cramer(N-1,1)
-        mid = [:(signscalar(($(x[i])∧(v-x1)∧$(y[end-i]))/d)) for i ∈ 1:N-2]
+        mid = [:(signscalar(($(x[i])∧(v-x1)∧$(y[end-i]))/d)) for i ∈ list(1,N-2)]
         out = Values(:(signscalar((v∧∧(vectors(t,v)))/d)),mid...,:(signscalar(($(x[end])∧(v-x1))/d)))
         return Expr(:block,:(T=vectors(t)),:((x1,y1)=@inbounds (t[1],T[end])),xy...,
             :($(x[end])=$(x[end-1])∧T[end-1];d=$(x[end])∧T[end]),ands(out))
@@ -717,11 +717,11 @@ end
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
-        Expr(:call,:Values,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+        Expr(:call,:Values,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ list(1,N-1)]...,x[end])
     elseif M≠mdims(V)
-        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
+        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,:(-$(x[end])))
     else
-        Expr(:call,:Values,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
+        Expr(:call,:Values,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,x[end])
     end
     out = if M≠mdims(V)
         :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
@@ -736,11 +736,11 @@ end
     M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
     val = if iseven(N)
-        Expr(:call,:Values,[:($(y[end-i])∧$(x[i])) for i ∈ 1:N-1]...,x[end])
+        Expr(:call,:Values,[:($(y[end-i])∧$(x[i])) for i ∈ list(1,N-1)]...,x[end])
     elseif M≠mdims(V)
-        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,:(-$(x[end])))
+        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,:(-$(x[end])))
     else
-        Expr(:call,:Values,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ 1:N-1]...,x[end])
+        Expr(:call,:Values,[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,x[end])
     end
     out = if M≠mdims(V)
         :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
@@ -777,7 +777,7 @@ approx(x,y::AbstractVector) = [x^i for i ∈ 0:length(y)-1]⋅y
 vandermonde(x::Array,y::Array,N::Int) = vandermonde(x,N)\y[:] # compute ((inv(X'*X))*X')*y
 function vandermonde(x::Array,N)
     V = zeros(length(x),N)
-    for d ∈ 0:N-1
+    for d ∈ list(0,N-1)
         V[:,d+1] = x.^d
     end
     return V # Vandermonde
@@ -787,7 +787,7 @@ vandermonde(x,y,V) = (length(x)≠mdims(V) ? _vandermonde(x,V) : vandermonde(x,V
 vandermonde(x,V) = transpose(_vandermonde(x,V))
 _vandermonde(x::Chain,V) = _vandermonde(value(x),V)
 @generated _vandermonde(x::Values{N},V) where N = :(Chain{$(Submanifold(N)),1}(polynom.(x,$(Val(mdims(V))))))
-@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(Submanifold(N)),1}),Expr(:call,:Values,[:(x^$i) for i ∈ 0:N-1]...))
+@generated polynom(x,::Val{N}) where N = Expr(:call,:(Chain{$(Submanifold(N)),1}),Expr(:call,:Values,[:(x^$i) for i ∈ list(0,N-1)]...))
 
 function vandermondeinterp(x,y,V,grid) # grid=384
     coef = vandermonde(x,y,V) # Vandermonde ((inv(X'*X))*X')*y
@@ -800,7 +800,7 @@ function vandermondeinterp(x,y,V,grid) # grid=384
 end
 
 @generated function vectors(t,c=columns(t))
-    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ 2:mdims(t)]...)
+    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ list(2,mdims(t))]...)
     quote
         p = points(t)
         M,A = ↓(Manifold(p)),p[c[1]]

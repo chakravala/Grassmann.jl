@@ -110,7 +110,7 @@ Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib,compact = indexbasis(mdims(V),G),get(io,:compact,false)
     @inbounds Leibniz.showvalue(io,V,ib[1],m.v[1])
-    for k ∈ 2:length(ib)
+    for k ∈ list(2,binomial(mdims(V),G))
         @inbounds showterm(io,V,ib[k],m.v[k],compact)
     end
 end
@@ -270,7 +270,7 @@ for var ∈ ((:V,:T),(:T,),())
         N = mdims(V)
         out = zeros(mvec(N,T))
         r = binomsum(N,G)
-        @inbounds out[r+1:r+binomial(N,G)] = v.v
+        @inbounds out[list(r+1,r+binomial(N,G))] = v.v
         return Multivector{V}(out)
     end
 end
@@ -293,7 +293,7 @@ function getindex(m::Multivector{V,T},i::Int) where {V,T}
     N = mdims(V)
     0 <= i <= N || throw(BoundsError(m, i))
     r = binomsum(N,i)
-    return @view m.v[r+1:r+binomial(N,i)]
+    return @view m.v[list(r+1,r+binomial(N,i))]
 end
 getindex(m::Multivector,i::Int,j::Int) = m[i][j]
 getindex(m::Multivector,i::UnitRange{Int}) = m.v[i]
@@ -315,7 +315,7 @@ end
 function show(io::IO, m::Multivector{V,T}) where {V,T}
     N,compact,bases = mdims(V),get(io,:compact,false),true
     bs = binomsum_set(N)
-    print(io,m[0][1])
+    @inbounds print(io,m.v[1])
     for i ∈ list(2,N+1)
         ib = indexbasis(N,i-1)
         for k ∈ 1:length(ib)
@@ -326,24 +326,24 @@ function show(io::IO, m::Multivector{V,T}) where {V,T}
             end
         end
     end
-    bases && (Leibniz.showstar(io,m.v[1]); print(io,pre[1]*'⃖'))
+    bases && (@inbounds Leibniz.showstar(io,m.v[1]); @inbounds print(io,pre[1]*'⃖'))
 end
 
 equal(a::Multivector{V,T},b::Multivector{V,S}) where {V,T,S} = prod(a.v .== b.v)
 function equal(a::Multivector{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     N = mdims(V)
-    r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 2^N+1
-    @inbounds prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
+    r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 1<<N+1
+    @inbounds prod(a[G] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<N)] .== 0)
 end
 equal(a::Chain{V,G,T},b::Multivector{V,S}) where {V,S,G,T} = b == a
 function equal(a::Multivector{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
     i = basisindex(mdims(V),UInt(basis(b)))
-    @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
+    @inbounds a.v[i] == value(b) && prod(a.v[list(1,i-1)] .== 0) && prod(a.v[list(i+1,2<<mdims(V))] .== 0)
 end
 equal(a::T,b::Multivector{V,S} where S) where T<:TensorTerm{V} where V = b==a
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::Multivector{V,S,G} where {V,S}) where {T<:$T,G} = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
+        ==(a::T,b::Multivector{V,S,G} where {V,S}) where {T<:$T,G} = (v=value(b);@inbounds (a==v[1])*prod(0 .== v[list(2,1<<mdims(V))]))
         ==(a::Multivector{V,S,G} where {V,S},b::T) where {T<:$T,G} = b == a
     end
 end
@@ -415,7 +415,7 @@ Spinor(t::Chain{V}) where V = Spinor{V}(t)
 @generated function Spinor{V}(t::Chain{V,G,T}) where {V,G,T}
     isodd(G) && error("$t is not expressible as a Spinor")
     N = mdims(V)
-    :(Spinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(t.v[$i]) for i ∈ 1:binomial(N,g)] : zeros(T,binomial(N,g)) for g ∈ 0:2:N]...)...))))
+    :(Spinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(T,binomial(N,g)) for g ∈ evens(0,N)]...)...))))
 end
 
 @pure log2sub2(N) = log2sub(2N)
@@ -431,7 +431,7 @@ function getindex(m::Spinor{V,T},i::Int) where {V,T}
     0 <= i <= N || throw(BoundsError(m, i))
     isodd(i) && return zeros(svec(N,i,Int))
     r = spinsum(N,i)
-    return @view m.v[r+1:r+binomial(N,i)]
+    return @view m.v[list(r+1,r+binomial(N,i))]
 end
 getindex(m::Spinor,i::Int,j::Int) = m[i][j]
 #getindex(m::Spinor,i::UnitRange{Int}) = m.v[i]
@@ -454,13 +454,13 @@ Multivector(t::Spinor{V}) where V = Multivector{V}(t)
 @generated function Multivector{V}(t::Spinor{V,T}) where {V,T}
     N = mdims(V)
     bs = spinsum_set(N)
-    :(Multivector{V,T}($(Expr(:call,:Values,vcat([iseven(G) ? [:(t.v[$(i+bs[G+1])]) for i ∈ 1:binomial(N,G)] : zeros(T,binomial(N,G)) for G ∈ 0:N]...)...))))
+    :(Multivector{V,T}($(Expr(:call,:Values,vcat([iseven(G) ? [:(@inbounds t.v[$(i+bs[G+1])]) for i ∈ list(1,binomial(N,G))] : zeros(T,binomial(N,G)) for G ∈ list(0,N)]...)...))))
 end
 
 function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
     N,compact = mdims(V),get(io,:compact,false)
     bs = spinsum_set(N)
-    print(io,m.v[1])
+    @inbounds print(io,m.v[1])
     for i ∈ evens(2,N)
         ib = indexbasis(N,i)
         for k ∈ 1:length(ib)
@@ -480,18 +480,18 @@ equal(a::Multivector{V,T},b::Spinor{V,S}) where {V,T,S} = equal(a,Multivector(b)
 function equal(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     isodd(G) && (return iszero(b) && iszero(a))
     N = mdims(V)
-    r,R = spinsum(N,G), N≠G ? spinsum(N,G+1) : 2^N+1
-    @inbounds prod(a[G] .== b.v) && prod(a.v[1:r] .== 0) && prod(a.v[R+1:end] .== 0)
+    r,R = spinsum(N,G), N≠G ? spinsum(N,G+1) : 1<<(N-1)+1
+    @inbounds prod(a[G] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<(N-1))] .== 0)
 end
 equal(a::Chain{V,G,T},b::Spinor{V,S}) where {V,S,G,T} = b == a
 function equal(a::Spinor{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
     i = spinindex(mdims(V),UInt(basis(b)))
-    @inbounds a.v[i] == value(b) && prod(a.v[1:i-1] .== 0) && prod(a.v[i+1:end] .== 0)
+    @inbounds a.v[i] == value(b) && prod(a.v[list(1,i-1)] .== 0) && prod(a.v[list(i+1,1<<(mdims(V)-1))] .== 0)
 end
 equal(a::T,b::Spinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::Spinor{V,S,G} where {V,S}) where {T<:$T,G} = (v=value(b);(a==v[1])*prod(0 .== v[2:end]))
+        ==(a::T,b::Spinor{V,S,G} where {V,S}) where {T<:$T,G} = (v=value(b);@inbounds (a==v[1])*prod(0 .== v[list(2,1<<(mdims(V)-1))]))
         ==(a::Spinor{V,S,G} where {V,S},b::T) where {T<:$T,G} = b == a
     end
 end
@@ -795,8 +795,8 @@ Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) 
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V,grade(V)}(t.v[end])
 @inline volume(t::Spinor{V}) where V = iseven(grade(V)) ? (@inbounds Single{V,grade(V),Submanifold(V)}(t.v[end])) : Zero(V)
 @inline isscalar(z::Couple) = iszero(z.v.im)
-@inline isscalar(t::Multivector) = AbstractTensors.norm(t.v[2:end]) ≈ 0
-@inline isscalar(t::Spinor) = AbstractTensors.norm(t.v[2:end]) ≈ 0
+@inline isscalar(t::Multivector{V}) where V = @inbounds AbstractTensors.norm(t.v[list(2,1<<mdims(V))]) ≈ 0
+@inline isscalar(t::Spinor{V}) where V = @inbounds AbstractTensors.norm(t.v[list(2,1<<(mdims(V)-1))]) ≈ 0
 @inline isvector(z::Couple{V,B}) where {V,B} = grade(B)==1 && iszero(z.v.re)
 @inline isvector(t::Multivector) = norm(t) ≈ norm(vector(t))
 @inline isvector(t::Spinor) = iszero(t)
@@ -821,19 +821,19 @@ end
 
 Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
 function Leibniz.gdims(t::Vector{<:Chain})
-    out = zeros(Variables{mdims(Manifold(points(t)))+1,Int})
+    out = @inbounds zeros(Variables{mdims(Manifold(points(t)))+1,Int})
     @inbounds out[mdims(Manifold(t))+1] = length(t)
     return out
 end
 function Leibniz.gdims(t::Values{N,<:Vector}) where N
-    out = zeros(Variables{mdims(points(t[1]))+1,Int})
+    out = @inbounds zeros(Variables{mdims(points(t[1]))+1,Int})
     for i ∈ list(1,N)
         @inbounds out[mdims(Manifold(t[i]))+1] = length(t[i])
     end
     return out
 end
 function Leibniz.gdims(t::Values{N,<:Tuple}) where N
-    out = zeros(Variables{mdims(points(t[1][1]))+1,Int})
+    out = @inbounds zeros(Variables{mdims(points(t[1][1]))+1,Int})
     for i ∈ list(1,N)
         @inbounds out[mdims(Manifold(t[i][1]))+1] = length(t[i][1])
     end
@@ -852,8 +852,8 @@ function Leibniz.gdims(t::Multivector{V}) where V
     return out
 end
 
-Leibniz.χ(t::Values{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
-Leibniz.χ(t::Values{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ 1:length(B)]))
+Leibniz.χ(t::Values{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
+Leibniz.χ(t::Values{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
 
 ## Adjoint
 

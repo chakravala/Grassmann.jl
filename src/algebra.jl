@@ -75,8 +75,8 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @inline ∧(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∧,a,b)
 @inline ∧(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∧V(b)
 @inline ∧(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∧b
-@generated ∧(t::T) where T<:Values{N} where N = wedges([:(t[$i]) for i ∈ 1:N])
-@generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(@inbounds t[$i]) for i ∈ 1:N])
+@generated ∧(t::T) where T<:Values{N} where N = wedges([:(t[$i]) for i ∈ list(1,N)])
+@generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(@inbounds t[$i]) for i ∈ list(1,N)])
 ∧(::Values{0,<:Chain{V}}) where V = One(V) # ∧() = 1
 ∧(::FixedVector{0,<:Chain{V}}) where V = One(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
@@ -144,8 +144,8 @@ Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(�
 @inline ∨(a::X,b::Y) where {X<:TensorAlgebra,Y<:TensorAlgebra} = interop(∨,a,b)
 @inline ∨(a::TensorAlgebra{V},b::UniformScaling{T}) where {V,T<:Field} = a∨V(b)
 @inline ∨(a::UniformScaling{T},b::TensorAlgebra{V}) where {V,T<:Field} = V(a)∨b
-@generated ∨(t::T) where T<:Values = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
-@generated ∨(t::T) where T<:FixedVector = Expr(:call,:∨,[:(t[$k]) for k ∈ 1:length(t)]...)
+@generated ∨(t::T) where T<:Values = Expr(:call,:∨,[:(t[$k]) for k ∈ list(1,length(t))]...)
+@generated ∨(t::T) where T<:FixedVector = Expr(:call,:∨,[:(t[$k]) for k ∈ list(1,length(t))]...)
 ∨(::Values{0,<:Chain{V}}) where V = Submanifold(V) # ∨() = I
 ∨(::FixedVector{0,<:Chain{V}}) where V = Submanifold(V)
 ∨(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
@@ -352,7 +352,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             fd = norm(d)
             sd = scalar(d)
             norm(sd) ≈ fd && (return $d(rm,sd))
-            for k ∈ 1:mdims(V)
+            for k ∈ list(1,mdims(V))
                 @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
@@ -363,7 +363,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
             sd = scalar(d)
             $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
-            for k ∈ 1:mdims(V)
+            for k ∈ list(1,mdims(V))
                 @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
@@ -374,7 +374,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             fd = norm(d)
             sd = scalar(d)
             norm(sd) ≈ fd && (return $d(rm,sd))
-            for k ∈ 1:2:mdims(V)
+            for k ∈ evens(2,mdims(V))
                 @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
@@ -385,7 +385,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
             sd = scalar(d)
             $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
-            for k ∈ 1:2:mdims(V)
+            for k ∈ evens(2,mdims(V))
                 @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
             end
             throw(error("inv($m) is undefined"))
@@ -606,8 +606,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
-                @inbounds setblade!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-                @inbounds setblade!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
+                setblade!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+                setblade!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
                 return Expr(:block,insert_expr((:t,),VEC)...,
                     :(Chain{V,L}($(Expr(:call,tvec(N,G,:t),out...)))))
             else return quote
@@ -622,8 +622,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 $(insert_expr((:N,),:svecs)...)
                 t = promote_type(valuetype(a),valuetype(b))
                 out,ib = zeros(svecs(N,Any)),indexbasis(N)
-                @inbounds setspin!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-                @inbounds setspin!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
+                setspin!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+                setspin!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
                 return Expr(:block,insert_expr((:t,),VEC)...,
                     :(Spinor{V}($(Expr(:call,tvecs(N,:t),out...)))))
             else quote
@@ -643,8 +643,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         if mdims(V)<cache_limit
             $(insert_expr((:N,),:svec)...)
             out,ib = zeros(svec(N,Any)),indexbasis(N)
-            @inbounds setmulti!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-            @inbounds setmulti!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
+            setmulti!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
+            setmulti!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
             return Expr(:block,insert_expr((:t,),VEC)...,
                 :(Multivector{V}($(Expr(:call,tvec(N,:t),out...)))))
         else quote
@@ -663,7 +663,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svec(N,G,Any))
             X = UInt(basis(a))
-            for k ∈ 1:binomial(N,G)
+            for k ∈ list(1,binomial(N,G))
                 B = @inbounds ib[k]
                 val = :(@inbounds $right(b.v[$k]))
                 val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
@@ -690,7 +690,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 t = promote_type(valuetype(a),valuetype(b))
                 out = zeros(svecs(N,Any))
                 X = UInt(basis(a))
-                for k ∈ 1:binomial(N,G)
+                for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
                     val = :(@inbounds $right(b.v[$k]))
                     val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
@@ -716,7 +716,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 t = promote_type(valuetype(a),valuetype(b))
                 out = zeros(svec(N,Any))
                 X = UInt(basis(a))
-                for k ∈ 1:binomial(N,G)
+                for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
                     val = :(@inbounds $right(b.v[$k]))
                     val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
@@ -745,7 +745,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svec(N,Any))
             X = UInt(basis(a))
-            for g ∈ 1:N+1
+            for g ∈ list(1,N+1)
                 ib = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     B = @inbounds ib[i]
@@ -776,7 +776,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             t = promote_type(valuetype(a),valuetype(b))
             out = zeros(svecs(N,Any))
             X = UInt(basis(a))
-            for g ∈ 1:2:N+1
+            for g ∈ evens(1,N+1)
                 ib = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     B = @inbounds ib[i]
@@ -813,7 +813,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:svec)...)
                 out = zeros(svec(N,t))
                 B = indexbasis(N,L)
-                for i ∈ 1:binomial(N,L)
+                for i ∈ list(1,binomial(N,L))
                     @inbounds v,ibi = :(@inbounds a[$i]),B[i]
                     for j ∈ 1:bng
                         @inbounds geomaddmulti!_pre(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(@inbounds b[$j]),MUL))
@@ -822,7 +822,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             else
                 $(insert_expr((:N,:t,:out,:ib,:μ),:svec)...)
                 U = UInt(basis(a))
-                for i ∈ 1:binomial(N,G)
+                for i ∈ list(1,binomial(N,G))
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Single
                         @inbounds geomaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
@@ -877,9 +877,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 ia = indexbasis(N,L)
                 ib = indexbasis(N,G)
                 out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
-                for i ∈ 1:bnl
+                for i ∈ list(1,bnl)
                     @inbounds v,iai = :(@inbounds a[$i]),ia[i]
-                    for j ∈ 1:bng
+                    for j ∈ list(1,bng)
                         if μ
                             @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL))
                         else
@@ -891,7 +891,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
                 out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
                 U = UInt(basis(a))
-                for i ∈ 1:bng
+                for i ∈ list(1,bng)
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Single
                         if μ
@@ -980,10 +980,10 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                 ib = indexbasis(mdims(W),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
                 CA,CB = isdual(w),isdual(W)
-                for i ∈ 1:binomial(mdims(w),G)
+                for i ∈ list(1,binomial(mdims(w),G))
                     @inbounds v,iai = :(@inbounds a[$i]),ia[i]
                     x = CA ? dual(V,iai) : iai
-                    for j ∈ 1:binomial(mdims(W),L)
+                    for j ∈ list(1,binomial(mdims(W),L))
                         X = @inbounds CB ? dual(V,ib[j]) : ib[j]
                         if μ
                             $grassaddmulti!_pre(V,out,x,X,derive_pre(V,x,X,v,:(@inbounds b[$j]),MUL))
@@ -997,7 +997,7 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                 ib = indexbasis(mdims(R),L)
                 out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
                 C,x = isdual(R),isdual(Q) ? dual(V,UInt(basis(a))) : UInt(basis(a))
-                for i ∈ 1:binomial(mdims(W),L)
+                for i ∈ list(1,binomial(mdims(W),L))
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
                     A,B = swap ? (X,x) : (x,X)
                     if S<:Single
@@ -1092,7 +1092,7 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
             bs = $(inspin ? :spinsum_set : :binomsum_set)(N)
             out = zeros($(outspin ? :(isodd(G) ? svec : svecs) : :svec)(N,Any))
-            for g ∈ $(inspin ? :(1:2:N+1) : :(1:N+1))
+            for g ∈ $(inspin ? :(evens(1,N+1)) : :(list(1,N+1)))
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     if S<:Chain
@@ -1165,11 +1165,11 @@ for com ∈ (:spinor,:spin_multi,:s_m,:m_s,:multivector)
     @eval @noinline function $genloop(V,a,b,MUL,product!,preproduct!,d=nothing)
         if mdims(V)<cache_limit/2
             $(insert_expr((:N,:t,:out,br...,:bn),outspin ? :svecs : :svec)...)
-            for g ∈ $(leftspin ? :(1:2:N+1) : :(1:N+1))
+            for g ∈ $(leftspin ? :(evens(1,N+1)) : :(list(1,N+1)))
                 X = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = nothing≠d ? :(@inbounds $a[$($(leftspin ? :rs : :bs)[g]+i)]/$d) : :(@inbounds $a[$($(leftspin ? :rs : :bs)[g]+i)])
-                    for G ∈ $(rightspin ? :(1:2:N+1) : :(1:N+1))
+                    for G ∈ $(rightspin ? :(evens(1,N+1)) : :(list(1,N+1)))
                         @inbounds R = $(rightspin ? :rs : :bs)[G]
                         Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]

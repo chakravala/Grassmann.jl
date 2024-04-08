@@ -657,13 +657,13 @@ contraction(x::Chain{W,L,<:Multivector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G
 contraction(x::Multivector{W,<:Chain{V,G},N},y::Multivector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
 contraction(x::Multivector{W,<:Multivector{V},N},y::Multivector{V,T,N}) where {W,N,V,T} = Multivector{V}(matmul(value(x),value(y)))
 @inline @generated function matmul(x::Values{N,<:Single{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ 1:N]...)
+    Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ list(1,N)]...)
 end
 @inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ 1:N]...) for j ∈ 1:binomial(mdims(V),G)]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ llist(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
 end
 @inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ 1:N]...) for j ∈ 1:1<<mdims(V)]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)
 end
 
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
@@ -772,7 +772,7 @@ end
             if isdyadic(V)
                 $(insert_expr((:N,:M,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
-                for i ∈ 1:binomial(N,G)
+                for i ∈ list(1,binomial(N,G))
                     @inbounds setblade!_pre(out,:($CONJ(@inbounds m.v[$i])),dual(V,ib[i],M),Val{N}())
                 end
                 return :(Chain{$(dual(V)),G}($(Expr(:call,tvec(N,TF),out...))))
@@ -799,7 +799,7 @@ end
             if isdyadic(V)
                 $(insert_expr((:N,:M,:bs,:bn),:svec)...)
                 out = zeros(svec(N,Any))
-                for g ∈ 1:N+1
+                for g ∈ list(1,N+1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds setmulti!_pre(out,:($CONJ(@inbounds m.v[$(bs[g]+i)])),dual(V,ib[i],M))
@@ -832,7 +832,7 @@ end
             if isdyadic(V)
                 $(insert_expr((:N,:M,:rs,:bn),:svec)...)
                 out = zeros(svecs(N,Any))
-                for g ∈ 1:2:N+1
+                for g ∈ evens(1,N+1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds setspin!_pre(out,:($CONJ(@inbounds m.v[$(rs[g]+i)])),dual(V,ib[i],M))
@@ -911,10 +911,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         @eval begin
             function $po(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[r+1:r+bng] = value(a,$VEC(N,G,t))
+                @inbounds out[list(r+1,r+bng)] = value(a,$VEC(N,G,t))
                 rb = binomsum(N,L)
                 Rb = binomial(N,L)
-                @inbounds out[rb+1:rb+Rb] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
+                @inbounds out[list(rb+1,rb+Rb)] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
                 return Multivector{V}(out)
             end
             function $po(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T<:$Field,S<:$Field}
@@ -929,13 +929,13 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             function $po(a::Chain{V,G,T},b::Multivector{V,S}) where {V,G,T<:$Field,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
                 out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
-                @inbounds $(add_val(:(+=),:(out[r+1:r+bng]),:(value(a,$VEC(N,G,t))),ADD))
+                @inbounds $(add_val(:(+=),:(out[list(r+1,r+bng)]),:(value(a,$VEC(N,G,t))),ADD))
                 return Multivector{V}(out)
             end
             function $po(a::Multivector{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
                 $(insert_expr((:N,:t,:r,:bng),VEC)...)
                 out = value(a,$VEC(N,t))
-                @inbounds $(add_val(eop,:(out[r+1:r+bng]),:(value(b,$VEC(N,G,t))),bop))
+                @inbounds $(add_val(eop,:(out[list(r+1,r+bng)]),:(value(b,$VEC(N,G,t))),bop))
                 return Multivector{V}(out)
             end
             #function $po(a::Spinor{V,T},b::Spinor{V,S}) where {V,T<:$Field,S<:$Field}
@@ -957,7 +957,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 if iseven(G)
                     $(insert_expr((:N,:t,:rr,:bng),VEC)...)
                     out = convert($VECS(N,t),$(bcast(bop,:(value(b,$VECS(N,t)),))))
-                    @inbounds $(add_val(:(+=),:(out[rr+1:rr+bng]),:(value(a,$VEC(N,G,t))),ADD))
+                    @inbounds $(add_val(:(+=),:(out[list(rr+1,rr+bng)]),:(value(a,$VEC(N,G,t))),ADD))
                     return Spinor{V}(out)
                 else
                     return $po(a,Multivector{V}(b))
@@ -967,7 +967,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 if iseven(G)
                     $(insert_expr((:N,:t,:rr,:bng),VEC)...)
                     out = value(a,$VECS(N,t))
-                    @inbounds $(add_val(eop,:(out[rr+1:rr+bng]),:(value(b,$VEC(N,G,t))),bop))
+                    @inbounds $(add_val(eop,:(out[list(rr+1,rr+bng)]),:(value(b,$VEC(N,G,t))),bop))
                     return Spinor{V}(out)
                 else
                     return $po(Multivector{V}(a),b)
@@ -1121,7 +1121,7 @@ for side ∈ (:left,:right)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros(svec(N,G,Any))
                     D = diffvars(V)
-                    for k ∈ 1:binomial(N,G)
+                    for k ∈ list(1,binomial(N,G))
                         B = @inbounds ib[k]
                         val = :(conj(@inbounds b.v[$k]))
                         v = Expr(:call,MUL,$p(V,B),$(c≠h ? :($pnp(V,B,val)) : :val))
@@ -1152,7 +1152,7 @@ for side ∈ (:left,:right)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros(svec(N,Any))
                     D = diffvars(V)
-                    for g ∈ 1:N+1
+                    for g ∈ list(1,N+1)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
@@ -1189,7 +1189,7 @@ for side ∈ (:left,:right)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros((isodd(N) ? svec : svecs)(N,Any))
                     D = diffvars(V)
-                    for g ∈ 1:2:N+1
+                    for g ∈ evens(1,N+1)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
@@ -1204,7 +1204,7 @@ for side ∈ (:left,:right)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros($VEC(N,T))
                     D = diffvars(V)
-                    for g ∈ 1:N+1
+                    for g ∈ 1:2:N+1
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             @inbounds val = m.v[rs[g]+i]
@@ -1233,9 +1233,9 @@ for side ∈ (:metric,:anti)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
-                for k ∈ 1:binomial(N,G)
+                for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
-                    val = :(conj(@inbounds b.v[$k]))
+                    val = :(@inbounds b.v[$k])
                     v = Expr(:call,MUL,$p(V,B),val)
                     setblade!_pre(out,v,B,Val{N}())
                 end
@@ -1247,7 +1247,7 @@ for side ∈ (:metric,:anti)
                     @inbounds val = b.v[k]
                     if val≠0
                         @inbounds ibk = ib[k]
-                        v = conj($MUL($$p(V,ibk),val))
+                        v = $MUL($$p(V,ibk),val)
                         setblade!(out,v,ibk,Val{N}())
                     end
                 end
@@ -1260,11 +1260,11 @@ for side ∈ (:metric,:anti)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:bs,:bn),:svec)...)
                 out = zeros(svec(N,Any))
-                for g ∈ 1:N+1
+                for g ∈ list(1,N+1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
-                        val = :(conj(@inbounds m.v[$(bs[g]+i)]))
+                        val = :(@inbounds m.v[$(bs[g]+i)])
                         v = Expr(:call,:*,$p(V,ibi),val)
                         @inbounds setmulti!_pre(out,v,ibi,Val{N}())
                     end
@@ -1279,7 +1279,7 @@ for side ∈ (:metric,:anti)
                         @inbounds val = m.v[bs[g]+i]
                         if val≠0
                             ibi = @inbounds ib[i]
-                            v = conj($$p(V,ibi)*val)
+                            v = $$p(V,ibi)*val
                             setmulti!(out,v,ibi,Val{N}())
                         end
                     end
@@ -1293,11 +1293,11 @@ for side ∈ (:metric,:anti)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:rs,:bn),:svec)...)
                 out = zeros((isodd(N) ? svec : svecs)(N,Any))
-                for g ∈ 1:2:N+1
+                for g ∈ evens(1,N+1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
-                        val = :(conj(@inbounds m.v[$(rs[g]+i)]))
+                        val = :(@inbounds m.v[$(rs[g]+i)])
                         v = Expr(:call,:*,$p(V,ibi),val)
                         @inbounds (isodd(N) ? setmulti!_pre : setspin!_pre)(out,v,ibi,Val{N}())
                     end
@@ -1306,13 +1306,13 @@ for side ∈ (:metric,:anti)
             else return quote
                 $(insert_expr((:N,:rs,:bn),:svec)...)
                 out = zeros($VEC(N,T))
-                for g ∈ 1:N+1
+                for g ∈ 1:2:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds val = m.v[rs[g]+i]
                         if val≠0
                             ibi = @inbounds ib[i]
-                            v = conj($$p(V,ibi)*val)
+                            v = $$p(V,ibi)*val
                             $(isodd(N) ? setmulti! : setspin!)(out,v,ibi,Val{N}())
                         end
                     end
@@ -1339,7 +1339,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 D==0 && !$p($g(b)) && (return :b)
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros(svec(N,G,Any))
-                for k ∈ 1:binomial(N,G)
+                for k ∈ list(1,binomial(N,G))
                     v = :(@inbounds b.v[$k])
                     if D==0
                         @inbounds setblade!_pre(out,:($SUB($v)),ib[k],Val{N}())
@@ -1370,7 +1370,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:bs,:bn,:D),:svec)...)
                 out = zeros(svec(N,Any))
-                for g ∈ 1:N+1
+                for g ∈ list(1,N+1)
                     pg = $p($(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
@@ -1407,7 +1407,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:rs,:bn,:D),:svec)...)
                 out = zeros(svecs(N,Any))
-                for g ∈ 1:2:N+1
+                for g ∈ evens(1,N+1)
                     pg = $p($(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
