@@ -58,7 +58,8 @@ include("forms.jl")
 
 export cayley, hyperplanes, points, TensorAlgebra
 
-cayley(x) = (y=Vector(Λ(x).b); y*transpose(y))
+cayley(V) = (y=Vector(Λ(V).b); y*transpose(y))
+cayley(V,op) = (b=Vector(Λ(V).b); TensorAlgebra{DirectSum.submanifold(V)}[op(x,y) for x ∈ b, y ∈ b])
 
 @pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 

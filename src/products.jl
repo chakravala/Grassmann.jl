@@ -334,7 +334,7 @@ inv(a::Zero{V}) where V = Infinity(V)
 /(a::One,b::Infinity) = inv(b)
 inv(a::Infinity{V}) where V = Zero(V)
 
-for T ∈ (:TensorTerm,:Couple,:Chain,:Spinor,:Multivector)
+for T ∈ (:TensorTerm,:Couple,:AntiCouple,:Chain,:Spinor,:Multivector)
     for type ∈ (:Zero,:Infinity)
         @eval begin
             ∧(a::T,b::$type) where T<:$T = b
@@ -405,27 +405,35 @@ plus(b::Spinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
 -(a::Multivector{V}) where V = Multivector{V}(-value(a))
 -(a::Spinor{V}) where V = Spinor{V}(-value(a))
 -(a::Couple{V,B}) where {V,B} = Couple{V,B}(-a.v)
+-(a::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}(-a.v)
 times(a::Single{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
 times(a::Chain{V,G},b::Single{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
 times(a::Submanifold{V,0},b::Chain{W,G}) where {V,W,G} = b
 times(a::Chain{V,G},b::Submanifold{W,0}) where {V,W,G} = a
 
-plus(a::Multivector{V},b::Couple{V}) where V = (a+scalar(b))+imaginary(b)
-plus(a::Couple{V},b::Multivector{V}) where V = (b+scalar(a))+imaginary(a)
-minus(a::Multivector{V},b::Couple{V}) where V = (a-scalar(b))-imaginary(b)
-minus(a::Couple{V},b::Multivector{V}) where V = (scalar(a)-b)+imaginary(a)
-plus(a::Chain{V,0},b::Couple{V}) where V = (a+scalar(b))+imaginary(b)
-plus(a::Couple{V},b::Chain{V,0}) where V = (b+scalar(a))+imaginary(a)
-minus(a::Chain{V,0},b::Couple{V}) where V = (a-scalar(b))-imaginary(b)
-minus(a::Couple{V},b::Chain{V,0}) where V = (scalar(a)-b)+imaginary(a)
-plus(a::Chain{V},b::Couple{V}) where V = (a+imaginary(b))+scalar(b)
-plus(a::Couple{V},b::Chain{V}) where V = (b+imaginary(a))+scalar(a)
-minus(a::Chain{V},b::Couple{V}) where V = (a-imaginary(b))-scalar(b)
-minus(a::Couple{V},b::Chain{V}) where V = (imaginary(a)-b)+scalar(a)
+for (couple,calar) ∈ ((:Couple,:scalar),(:AntiCouple,:volume))
+    @eval begin
+        plus(a::Multivector{V},b::$couple{V}) where V = (a+$calar(b))+imaginary(b)
+        plus(a::$couple{V},b::Multivector{V}) where V = (b+$calar(a))+imaginary(a)
+        minus(a::Multivector{V},b::$couple{V}) where V = (a-$calar(b))-imaginary(b)
+        minus(a::$couple{V},b::Multivector{V}) where V = ($calar(a)-b)+imaginary(a)
+        plus(a::Chain{V,0},b::$couple{V}) where V = (a+$calar(b))+imaginary(b)
+        plus(a::$couple{V},b::Chain{V,0}) where V = (b+$calar(a))+imaginary(a)
+        minus(a::Chain{V,0},b::$couple{V}) where V = (a-$calar(b))-imaginary(b)
+        minus(a::$couple{V},b::Chain{V,0}) where V = ($calar(a)-b)+imaginary(a)
+        plus(a::Chain{V},b::$couple{V}) where V = (a+imaginary(b))+$calar(b)
+        plus(a::$couple{V},b::Chain{V}) where V = (b+imaginary(a))+$calar(a)
+        minus(a::Chain{V},b::$couple{V}) where V = (a-imaginary(b))-$calar(b)
+        minus(a::$couple{V},b::Chain{V}) where V = (imaginary(a)-b)+$calar(a)
+    end
+end
 
 for (op,po) ∈ ((:plus,:+),(:minus,:-))
     @eval begin
         $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(a.v,b.v))
+        $op(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}($po(a.v,b.v))
+        $op(a::Couple{V,A},b::AntiCouple{V,B}) where {V,A,B} = $po($po(a,imaginary(b)),volume(b))
+        $op(a::AntiCouple{V,A},b::Couple{V,B}) where {V,A,B} = $po(imaginary(a),b)+volume(a)
         $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($po(Couple(a),Couple(b)))
         $op(a::Couple{V},b::Phasor{V}) where V = $po(a,Couple(b))
         $op(a::Phasor{V},b::Couple{V}) where V = $po(Couple(a),b)
@@ -435,6 +443,10 @@ end
 function times(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(B*B),a.v.re*b.v.im+a.v.im*b.v.re))
 end
+function times(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+    out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
+    Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(B*B)+value(volume(a)*volume(b)),value(out)))
+end
 function times(a::Phasor{V,B},b::Phasor{V,B}) where {V,B}
     Phasor{V,B}(a.v.re*b.v.re,a.v.im+b.v.im)
 end
@@ -442,26 +454,43 @@ end
 function ∧(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re))
 end
+function ∧(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+    grade(B)==0 ? AntiCouple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re)) : Zero(V)
+end
 ∧(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∧Couple(b))
 
 function ∨(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     grade(B)==grade(V) ? Couple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im)) : Zero(V)
+end
+function ∨(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+    AntiCouple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im))
 end
 ∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
 
 function contraction(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(abs2_inv(B)),a.v.im*b.v.re))
 end
+function contraction(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+    out = contraction(volume(a),imaginary(b))
+    Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(abs2_inv(B))+(a.v.im*b.v.im)*value(abs2_inv(V)),value(out)))
+end
 contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Couple(a),Couple(b)))
 
 for op ∈ (:plus,:minus)
-    @eval $op(a::Couple{V},b::Couple{V}) where V = $op(Multivector(a),b)
-    @eval $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
+    @eval begin
+        $op(a::Couple{V},b::Couple{V}) where V = $op($op(a,scalar(b)),imaginary(b))
+        $op(a::AntiCouple{V},b::AntiCouple{V}) where V = $op($op(a,volume(b)),imaginary(b))
+        $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
+    end
 end
-times(a::Couple{V},b::Couple{V}) where V = Multivector(a)*Multivector(b)
-∧(a::Couple{V},b::Couple{V}) where V = Multivector(a)∧b
-∨(a::Couple{V},b::Couple{V}) where V = Multivector(a)∨b
-contraction(a::Couple{V},b::Couple{V}) where V = contraction(Multivector(a),b)
+times(a::Couple{V},b::Couple{V}) where V = a⟑scalar(b)+a⟑imaginary(b)
+times(a::AntiCouple{V},b::AntiCouple{V}) where V = (volume(a)⟑volume(b)+imaginary(a)⟑imaginary(b))+imaginary(a)⟑volume(b)+volume(b)⟑imaginary(a)
+∧(a::Couple{V},b::Couple{V}) where V = a∧scalar(b)+a∧imaginary(b)
+∧(a::AntiCouple{V},b::AntiCouple{V}) where V = imaginary(a)∧imaginary(b)
+∨(a::Couple{V},b::Couple{V}) where V = imaginary(a)∨imaginary(b)
+∨(a::AntiCouple{V},b::AntiCouple{V}) where V = a∨imaginary(b)+a∨volume(b)
+contraction(a::Couple{V},b::Couple{V}) where V = contraction(a,imaginary(b))+contraction(a,volume(b))
+contraction(a::AntiCouple{V},b::AntiCouple{V}) where V = contraction(imaginary(a),b)+contraction(volume(a),b)
 
 plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)+b.v.re,b.v.im))
 plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re+value(b),a.v.im))
@@ -469,14 +498,32 @@ function plus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
         Couple{V,B}(Complex(b.v.re,value(a)+b.v.im))
     else
-        a+(iseven(grade(B)) ? Spinor(b) : Multivector(b))
+        a+multispin(b)
     end
 end
 function plus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
         Couple{V,B}(Complex(a.v.re,a.v.im+value(b)))
     else
-        (iseven(grade(B)) ? Spinor(a) : Multivector(a))+b
+        multispin(a)+b
+    end
+end
+function plus(a::TensorTerm{V},b::AntiCouple{V,B}) where {V,B}
+    if basis(a) == B
+        AntiCouple{V,B}(Complex(value(a)+b.v.re,b.v.im))
+    elseif basis(a) == Subamnifold(V)
+        AntiCouple{V,B}(Complex(b.v.re,value(a)+b.v.im))
+    else
+        a+multispin(b)
+    end
+end
+function plus(a::AntiCouple{V,B},b::TensorTerm{V}) where {V,B}
+    if B == basis(b)
+        AntiCouple{V,B}(Complex(a.v.re+value(b),a.v.im))
+    elseif Submanifold(V) == basis(b)
+        AntiCouple{V,B}(Complex(a.v.re,a.v.im+value(b)))
+    else
+        multispin(a)+b
     end
 end
 
@@ -487,134 +534,157 @@ function minus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
         re = value(a)-b.v.im
         Couple{V,B}(Complex(-oftype(re,b.v.re),re))
     else
-        a-Multivector(b)
+        a-multispin(b)
     end
 end
 function minus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
         Couple{V,B}(Complex(a.v.re,a.v.im-value(b)))
     else
-        Multivector(a)-b
+        multispin(a)-b
+    end
+end
+function minus(a::TensorTerm{V},b::AntiCouple{V,B}) where {V,B}
+    if basis(a) == B
+        re = value(a)-b.v.re
+        AntiCouple{V,B}(Complex(re,-oftype(re,b.v.im)))
+    elseif basis(a) == Submanifold(V)
+        re = value(a)-b.v.im
+        AntiCouple{V,B}(Complex(-oftype(re,b.v.re),re))
+    else
+        a-multispin(b)
+    end
+end
+function minus(a::AntiCouple{V,B},b::TensorTerm{V}) where {V,B}
+    if B == basis(b)
+        AntiCouple{V,B}(Complex(a.v.re-value(b),a.v.im))
+    elseif Submanifold(V) == basis(b)
+        AntiCouple{V,B}(Complex(a.v.re,a.v.im-value(b)))
+    else
+        multispin(a)-b
     end
 end
 
-times(a::Multivector{V},b::Couple{V}) where V = a*Multivector(b)
-#Multivector{V}(value(a)*b.v.re) + a*imaginary(b)
-times(a::Couple{V},b::Multivector{V}) where V = Multivector(a)*b
-#Multivector{V}(a.v.re*value(b)) + imaginary(a)*b
-times(a::Spinor{V},b::Couple{V,B}) where {V,B} = a*(iseven(grade(B)) ? Spinor(b) : Multivector(b))
-times(a::Couple{V,B},b::Spinor{V}) where {V,B} = (iseven(grade(B)) ? Spinor(a) : Multivector(a))*b
-times(a::Chain{V},b::Couple{V}) where V = a*Multivector(b)
-#Chain{V,G}(value(a)*b.v.re) + a*imaginary(b)
-times(a::Couple{V},b::Chain{V}) where V = Multivector(a)*b
-#Chain{V,G}(a.v.re*value(b)) + imaginary(a)*b
+for couple ∈ (:Couple,:AntiCouple)
+    @eval begin
+        times(a::Multivector{V},b::$couple{V}) where V = a⟑multispin(b)
+        #Multivector{V}(value(a)*b.v.re) + a⟑imaginary(b)
+        times(a::$couple{V},b::Multivector{V}) where V = multispin(a)⟑b
+        #Multivector{V}(a.v.re*value(b)) + imaginary(a)⟑b
+        times(a::Spinor{V},b::$couple{V}) where V = a⟑multispin(b)
+        times(a::$couple{V},b::Spinor{V}) where V = multispin(a)⟑b
+        times(a::Chain{V},b::$couple{V}) where V = grade(a)==0 ? scalar(a)⟑b : a⟑multispin(b)
+        #Chain{V,G}(value(a)*b.v.re) + a⟑imaginary(b)
+        times(a::$couple{V},b::Chain{V}) where V = grade(b)==0 ? a⟑scalar(b) : multispin(a)⟑b
+        #Chain{V,G}(a.v.re*value(b)) + imaginary(a)⟑b
+    end
+end
 times(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
 times(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
+times(a::TensorTerm{V,0},b::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
+times(a::AntiCouple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
 
-function times(a::Submanifold{V,G},b::Couple{V,B}) where {V,G,B}
-    if a == B
-        Couple{V,B}(Complex(b.v.im*value(B*B),b.v.re))
-    else
-        Single{V,G,a}(b.v.re) + a*imaginary(b)
-    end
-end
-function times(a::Couple{V,B},b::Submanifold{V,G}) where {V,G,B}
-    if B == b
-        Couple{V,B}(Complex((a.v.im)*value(B*B),a.v.re))
-    else
-        Single{V,G,b}(a.v.re) + imaginary(a)*b
-    end
-end
-function times(a::Single{V,G,A},b::Couple{V,B}) where {V,G,A,B}
-    if A == B
-        Couple{V,B}(Complex((value(a)*b.v.im)*value(B*B),value(a)*b.v.re))
-    else
-        Single{V,G,A}(value(a)*b.v.re) + a*imaginary(b)
-    end
-end
-function times(a::Couple{V,A},b::Single{V,G,B}) where {V,G,A,B}
-    if A == B
-        Couple{V,A}(Complex((a.v.im*value(b))*value(A*A),a.v.re*value(b)))
-    else
-        Single{V,G,B}(a.v.re*value(b)) + imaginary(a)*b
-    end
-end
+times(a::TensorTerm{V},b::Couple{V}) where V = a⟑scalar(b) + a⟑imaginary(b)
+times(a::Couple{V},b::TensorTerm{V}) where V = scalar(a)⟑b + imaginary(a)⟑b
+times(a::TensorTerm{V},b::AntiCouple{V}) where V = a⟑imaginary(b) + a⟑volume(b)
+times(a::AntiCouple{V},b::TensorTerm{V}) where V = imaginary(a)⟑b + volume(a)⟑b
 
-∧(a::Multivector{V},b::Couple{V}) where V = a∧Multivector(b)
-#Multivector{V}(value(a)*b.v.re) + a∧imaginary(b)
-∧(a::Couple{V},b::Multivector{V}) where V = Multivector(a)∧b
-#Multivector{V}(a.v.re*value(b)) + imaginary(a)∧b
-∧(a::Spinor{V},b::Couple{V,B}) where {V,B} = a∧(iseven(grade(B)) ? Spinor(b) : Multivector(b))
-∧(a::Couple{V},b::Spinor{V,B}) where {V,B} = (iseven(grade(B)) ? Spinor(a) : Multivector(a))∧b
-∧(a::Chain{V},b::Couple{V}) where V = a∧Multivector(b)
-#Chain{V,G}(value(a)*b.v.re) + a∧imaginary(b)
-∧(a::Couple{V},b::Chain{V}) where V = Multivector(a)∧b
-#Chain{V,G}(a.v.re*value(b)) + imaginary(a)∧b
-∧(a::TensorTerm{V,0},b::Couple{V}) where V = a*b
-∧(a::Couple{V},b::TensorTerm{V,0}) where V = a*b
+for couple ∈ (:Couple,:AntiCouple)
+    @eval begin
+        ∧(a::Multivector{V},b::$couple{V}) where V = a∧multispin(b)
+        #Multivector{V}(value(a)*b.v.re) + a∧imaginary(b)
+        ∧(a::$couple{V},b::Multivector{V}) where V = multispin(a)∧b
+        #Multivector{V}(a.v.re*value(b)) + imaginary(a)∧b
+        ∧(a::Spinor{V},b::$couple{V}) where V = a∧multispin(b)
+        ∧(a::$couple{V},b::Spinor{V}) where V = multispin(a)∧b
+        ∧(a::Chain{V},b::$couple{V}) where V = a∧multispin(b)
+        #Chain{V,G}(value(a)*b.v.re) + a∧imaginary(b)
+        ∧(a::$couple{V},b::Chain{V}) where V = multispin(a)∧b
+        #Chain{V,G}(a.v.re*value(b)) + imaginary(a)∧b
+        ∧(a::TensorTerm{V,0},b::$couple{V}) where V = a⟑b
+        ∧(a::$couple{V},b::TensorTerm{V,0}) where V = a⟑b
+    end
+end
 function ∧(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
-    if basis(a) == B
-        Couple{V,B}(Complex(0,value(a)*b.v.re))
-    else
-        Single{V,G,basis(a)}(value(a)*b.v.re) + a∧imaginary(b)
-    end
+    basis(a) == B ? a∧scalar(b) : a∧scalar(b) + a∧imaginary(b)
 end
 function ∧(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    if B == basis(b)
-        Couple{V,B}(Complex(0,a.v.re*value(b)))
-    else
-        Single{V,G,basis(b)}(a.v.re*value(b)) + imaginary(a)∧b
-    end
+    B == basis(b) ? scalar(a)∧b : scalar(a)∧b + imaginary(a)∧b
+end
+function ∧(a::TensorTerm{V,G},b::AntiCouple{V,B}) where {V,G,B}
+    basis(a) == B ? Zero(V) : a∧imaginary(b)
+end
+function ∧(a::AntiCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
+    B == basis(b) ? Zero(V) : imaginary(a)∧b
 end
 
-∨(a::Multivector{V},b::Couple{V}) where V = a∨Multivector(b)
-∨(a::Couple{V},b::Multivector{V}) where V = Multivector(a)∨b
-∨(a::Spinor{V},b::Couple{V}) where V = a∨Multivector(b)
-∨(a::Couple{V},b::Spinor{V}) where V = Multivector(a)∨b
-∨(a::Chain{V},b::Couple{V}) where V = a∨Multivector(b)
-∨(a::Couple{V},b::Chain{V}) where V = Multivector(a)∨b
-∨(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? a*b : Zero(V)
-∨(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = grade(B)==grade(V) ? a*b : Zero(V)
+for couple ∈ (:Couple,:AntiCouple)
+    @eval begin
+        ∨(a::Multivector{V},b::$couple{V}) where V = a∨multispin(b)
+        ∨(a::$couple{V},b::Multivector{V}) where V = multispin(a)∨b
+        ∨(a::Spinor{V},b::$couple{V}) where V = a∨multispin(b)
+        ∨(a::$couple{V},b::Spinor{V}) where V = multispin(a)∨b
+        ∨(a::Chain{V},b::$couple{V}) where V = a∨multispin(b)
+        ∨(a::$couple{V},b::Chain{V}) where V = multispin(a)∨b
+    end
+end
+∨(a::TensorTerm{V,0},b::Couple{V}) where V = grade(B)==grade(V) ? a∨imaginary(b) : Zero(V)
+∨(a::Couple{V},b::TensorTerm{V,0}) where V = grade(B)==grade(V) ? imaginary(a)∨b : Zero(V)
+∨(a::TensorTerm{V,0},b::AntiCouple{V}) where V = a∨volume(b)
+∨(a::AntiCouple{V},b::TensorTerm{V,0}) where V = volume(a)∨b
 function ∨(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
-    if basis(a) == B
-        grade(B)==grade(V) ? Couple{V,B}(Complex(0,value(a)*b.v.im)) : Zero(V)
+    if basis(a)==B && grade(B)==grade(V)
+        a∨scalar(b) + a∨imaginary(b)
     else
         a∨imaginary(b)
     end
 end
 function ∨(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    if B == basis(b)
-        grade(B)==grade(V) ? Couple{V,B}(Complex(0,a.v.im*value(b))) : Zero(V)
+    if B == basis(b) && grade(B)==grade(V)
+        scalar(a)∨b + imaginary(a)∨b
     else
         imaginary(a)∨b
     end
 end
+∨(a::TensorTerm{V},b::AntiCouple{V}) where V = a∨imaginary(b) + a∨volume(b)
+∨(a::AntiCouple{V},b::TensorTerm{V}) where V = imaginary(a)∨b + volume(a)∨b
 
-contraction(a::Multivector{V},b::Couple{V}) where V = contraction(a,Multivector(b))
-#Multivector{V}(value(a)*b.v.re) + contraction(a,imaginary(b))
-contraction(a::Couple{V},b::Multivector{V}) where V = contraction(Multivector(a),b)
-#Multivector{V}(a.v.re*value(b)) + contraction(imaginary(a),b)
-contraction(a::Spinor{V},b::Couple{V}) where V = contraction(a,Multivector(b))
-contraction(a::Couple{V},b::Spinor{V}) where V = contraction(Multivector(a),b)
-contraction(a::Chain{V},b::Couple{V}) where V = contraction(a,Multivector(b))
-#Chain{V,G}(value(a)*b.v.re) + contraction(a,imaginary(b))
-contraction(a::Couple{V},b::Chain{V}) where V = contraction(Multivector(a),b)
-#Chain{V,G}(a.v.re*value(b)) + contraction(imaginary(a),b)
-contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*b.v.re)
-contraction(a::Couple{V},b::TensorTerm{V,0}) where V = a*b
-function contraction(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
-    if basis(a) == B
-        Couple{V,B}(Complex((conj(value(a))*b.v.im)*value(abs2_inv(B)),conj(value(a))*b.v.re))
-    else
-        Single{V,G,basis(a)}(value(a)*b.v.re) + contraction(a,imaginary(b))
+for couple ∈ (:Couple,:AntiCouple)
+    @eval begin
+        contraction(a::Multivector{V},b::$couple{V}) where V = contraction(a,multispin(b))
+        #Multivector{V}(value(a)*b.v.re) + contraction(a,imaginary(b))
+        contraction(a::$couple{V},b::Multivector{V}) where V = contraction(multispin(a),b)
+        #Multivector{V}(a.v.re*value(b)) + contraction(imaginary(a),b)
+        contraction(a::Spinor{V},b::$couple{V}) where V = contraction(a,multispin(b))
+        contraction(a::$couple{V},b::Spinor{V}) where V = contraction(multispin(a),b)
+        contraction(a::Chain{V},b::$couple{V}) where V = contraction(a,multispin(b))
+        #Chain{V,G}(value(a)*b.v.re) + contraction(a,imaginary(b))
+        contraction(a::$couple{V},b::Chain{V}) where V = contraction(multispin(a),b)
+        #Chain{V,G}(a.v.re*value(b)) + contraction(imaginary(a),b)
+        contraction(a::$couple{V},b::TensorTerm{V,0}) where V = a⟑b
     end
 end
+contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*b.v.re)
+contraction(a::TensorTerm{V,0},b::AntiCouple{V}) where V = contraction(a,imaginary(b))
+function contraction(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
+    contraction(a,scalar(b)) + contraction(a,imaginary(b))
+end
 function contraction(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    if B == basis(b)
-        Couple{V,B}(Complex((conj(a.v.im)*value(b))*value(abs2_inv(B)),0))
+    if basis(a) == One(V)
+        contraction(scalar(a),b) + contraction(imaginary(a),b)
     else
         contraction(imaginary(a),b)
     end
+end
+function contraction(a::TensorTerm{V,G},b::AntiCouple{V,B}) where {V,G,B}
+    if basis(a) == Submanifold(V)
+        contraction(a,imaginary(b)) + contraction(a,volume(b))
+    else
+        contraction(a,imaginary(b))
+    end
+end
+function contraction(a::AntiCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
+    contraction(imaginary(a),b) + contraction(volume(a),b)
 end
 
 # dyadic products
@@ -718,6 +788,8 @@ for F ∈ Fields
     @eval begin
         *(a::F,b::Couple{V,B}) where {F<:$F,V,B} = Couple{V,B}(a*b.v)
         *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(a.v*b)
+        *(a::F,b::AntiCouple{V,B}) where {F<:$F,V,B} = AntiCouple{V,B}(a*b.v)
+        *(a::AntiCouple{V,B},b::F) where {F<:$F,V,B} = AntiCouple{V,B}(a.v*b)
         *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*b.v.re,b.v.im)
         *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(a.v.re*b,a.v.im)
         *(a::F,b::Multivector{V}) where {F<:$F,V} = Multivector{V}(a*b.v)
@@ -873,8 +945,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     Field ∉ Fields && @eval begin
         *(a::F,b::Submanifold{V}) where {F<:$EF,V} = Single{V}(a,b)
         *(a::Submanifold{V},b::F) where {F<:$EF,V} = Single{V}(b,a)
-        *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = a*Multivector(b)
-        *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = Multivector(a)*b
+        *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
+        *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
+        *(a::F,b::AntiCouple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
+        *(a::AntiCouple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
         *(a::F,b::Multivector{V}) where {F<:$EF,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$EF,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$EF,V} = Spinor{V}(a*b.v)
@@ -1112,6 +1186,7 @@ for side ∈ (:left,:right)
                 G = grade(V)
                 Single{V,G,getbasis(V,UInt(1)<<G-1)}(z.v.re) + $c(imaginary(z))
             end
+            $c(z::AntiCouple{V}) where V = $c(volume(z)) + $c(imaginary(z))
             @generated function $c(b::Chain{V,G,T}) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                 istangent(V) && (return :($$c(Multivector(b))))
@@ -1225,7 +1300,8 @@ for side ∈ (:metric,:anti)
     c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
     @eval begin
         $c(z::Phasor) = $c(Couple(z))
-        $c(z::Couple{V}) where V = Single{V}(z.v.re) + $c(imaginary(z))
+        $c(z::Couple{V}) where V = scalar(z) + $c(imaginary(z))
+        $c(z::AntiCouple{V}) where V = $c(imaginary(z)) + $c(volume(z))
         @generated function $c(b::Chain{V,G,T}) where {V,G,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
             istangent(V) && (return :($$c(Multivector(b))))
@@ -1328,6 +1404,9 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
     @eval begin
         function $reverse(z::Couple{V,B}) where {V,B}
             Couple{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
+        end
+        function $reverse(z::AntiCouple{V,B}) where {V,B}
+            AntiCouple{V,B}(Complex($p($g(V)) ? -z.v.re : z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
         end
         function $reverse(z::Phasor{V,B}) where {V,B}
             Phasor{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))

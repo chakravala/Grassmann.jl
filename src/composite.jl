@@ -23,12 +23,12 @@ Base.expm1(t::Chain) = expm1(Multivector(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B*B)
+        B = basis(t); BB = value(B⟑B)
         if BB == -1
             return Couple{V,B}(expm1(t.v))
         end
     end
-    S,term,f = t,(t^2)/2,norm(t)
+    S,term,f = t,(t⟑t)/2,norm(t)
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 3
     @inbounds while norms[2]<norms[1] || norms[2]>1
@@ -52,7 +52,7 @@ end
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
         S .= B
-        out .= value(b^2)/2
+        out .= value(b⟑b)/2
         norms = FixedVector{3}(nb,norm(out),norm(term))
         k::Int = 3
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -80,7 +80,7 @@ end
         S = zeros(mvecs(N,t))
         term = zeros(mvecs(N,t))
         S .= B
-        out .= value(b^2)/2
+        out .= value(b⟑b)/2
         norms = FixedVector{3}(nb,norm(out),norm(term))
         k::Int = 3
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -98,48 +98,48 @@ end
     end
 end
 
-function Base.exp(t::Multivector)
+function Base.exp(t::Multivector{V}) where V
     st = scalar(t)
     mt = t-st
-    sq = mt*mt
+    sq = mt⟑mt
     if isscalar(sq)
         hint = value(scalar(sq))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
         return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
     end
 end
 
-function Base.exp(t::Spinor)
+function Base.exp(t::Spinor{V}) where V
     st = scalar(t)
     mt = t-st
-    sq = mt*mt
+    sq = mt⟑mt
     if isscalar(sq)
         hint = value(scalar(sq))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
         return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
     end
 end
 
-function Base.exp(t::Multivector,::Val{hint}) where hint
+function Base.exp(t::Multivector{V},::Val{hint}) where {V,hint}
     st = scalar(t)
     mt = t-st
-    sq = mt*mt
+    sq = mt⟑mt
     if isscalar(sq)
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
         return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
     end
 end
 
-Base.expm1(t::Phasor) = exp(t)-1
+Base.expm1(t::Phasor{V}) where V = exp(t)-One(V)
 function Base.exp(t::Phasor{V,B}) where {V,B}
     z = exp(angle(t))
     Phasor{V,B}(exp(radius(t)+z.v.re),z.v.im)
@@ -147,13 +147,28 @@ end
 
 function Base.exp(t::Couple{V,B}) where {V,B}
     st,mt = scalar(t),imaginary(t)
-    if isscalar(B*B)
-        hint = value(scalar(B*B))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(1+t))
+    if isscalar(B⟑B)
+        hint = value(scalar(B⟑B))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
         return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
+    end
+end
+
+function Base.expm1(t::AntiCouple{V}) where V
+    if isscalar(B)
+        exp(t)-One(V)
+    else
+        expm1(multispin(t))
+    end
+end
+function Base.exp(t::AntiCouple{V,B}) where {V,B}
+    if isscalar(B)
+        AntiCouple{V,B}(value(exp(Couple{V,Submanifold(V)}(value(t)))))
+    else
+        exp(multispin(t))
     end
 end
 
@@ -165,46 +180,46 @@ end
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
 
 function Base.exp(t::T) where T<:TensorGraded
-    S,B = T<:Submanifold,T<:TensorTerm
+    S,B,V = T<:Submanifold,T<:TensorTerm,Manifold(t)
     if B && isnull(t)
-        return One(Manifold(t))
-    elseif isR301(Manifold(t)) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
+        return One(V)
+    elseif isR301(V) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
         u = sqrt(abs(abs2(t)[1]))
-        u<1e-5 && (return 1+t)
+        u<1e-5 && (return One(V)+t)
         v,cu,su = (t∧t)*(-0.5/u),cos(u),sin(u)
-        return (cu-v*su)+((su+v*cu)*t)*(inv(u)-v/u^2)
+        return (cu-v*su)+((su+v*cu)*t)*(inv(u)-v/(u*u))
     end # need general inv(u+v) ~ inv(u)-v/u^2
     i = B ? basis(t) : t
-    sq = i*i
+    sq = i⟑i
     if isscalar(sq)
         hint = value(scalar(sq))
-        isnull(hint) && (return 1+t)
+        isnull(hint) && (return One(V)+t)
         grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
     end
 end
 
-function Base.exp(t::T,::Val{hint}) where T<:TensorGraded where hint
+function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     S = T<:Submanifold
     i = T<:TensorTerm ? basis(t) : t
-    sq = i*i
+    sq = i⟑i
     if isscalar(sq)
-        isnull(hint) && (return 1+t)
-        grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        isnull(hint) && (return One(V)+t)
+        grade(t)==0 && (return Single{V}(AbstractTensors.exp(value(S ? t : scalar(t)))))
         θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
         hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
     else
-        return 1+expm1(t)
+        return One(V)+expm1(t)
     end
 end
 
 function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
     V = Manifold(w)
-    w2,f = w^2,norm(w)
-    prod = w*w2
+    w2,f = w⟑w,norm(w)
+    prod = w⟑w2
     S,term = w,prod/3
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 5
@@ -225,13 +240,13 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
-        w2::Multivector{V,T,E} = b^2
+        w2::Multivector{V,T,E} = b⟑b
         B = value(w2)
         S = zeros(mvec(N,t))
         prod = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
         S .= value(b)
-        out .= value(b*w2)
+        out .= value(b⟑w2)
         term .= out/3
         norms = FixedVector{3}(f,norm(term),f)
         k::Int = 5
@@ -257,13 +272,13 @@ end
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
-        w2::Spinor{V,T,E} = b^2
+        w2::Spinor{V,T,E} = b⟑b
         B = value(w2)
         S = zeros(mvecs(N,t))
         prod = zeros(mvecs(N,t))
         term = zeros(mvecs(N,t))
         S .= value(b)
-        out .= value(b*w2)
+        out .= value(b⟑w2)
         term .= out/3
         norms = FixedVector{3}(f,norm(term),f)
         k::Int = 5
@@ -286,13 +301,28 @@ end
 
 Base.log(t::TensorTerm) = log(Couple(t))
 Base.log(t::Phasor) = (r=radius(t); log(r)+angle(t))
-Base.log1p(t::Phasor) = log(1+t)
+Base.log1p(t::Phasor{V}) where V = log(One(V)+t)
 Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : log(radius(t))+angle(t)
-Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(1+t)
-Base.log(t::Quaternion{V}) where V = iszero(metric(V)) ? log(radius(t))+angle(t,r) : qlog((t-1)/(t+1))
-Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(1+t) : qlog(t/(t+2))
-@inline Base.log(t::T) where T<:TensorAlgebra = qlog((t-1)/(t+1))
+Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(One(V)+t)
+Base.log(t::Quaternion{V}) where V = iszero(metric(V)) ? log(radius(t))+angle(t,r) : qlog((t-One(V))/(t+One(V)))
+Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(One(V)+t) : qlog(t/(t+2))
+@inline Base.log(t::T) where T<:TensorAlgebra{V} where V = qlog((t-One(V))/(t+One(V)))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
+
+function Base.log(t::AntiCouple{V,B}) where {V,B}
+    if isscalar(B)
+        AntiCouple{V,B}(value(log(Couple{V,Submanifold(V)}(value(t)))))
+    else
+        log(multispin(t))
+    end
+end
+function Base.log1p(t::AntiCouple{V,B}) where {V,B}
+    if isscalar(B)
+        AntiCouple{V,B}(value(log1p(Couple{V,Submanifold(V)}(value(t)))))
+    else
+        log1p(multispin(t))
+    end
+end
 
 for op ∈ (:log,:exp,:asin,:acos,:atan,:acot,:sinc,:cosc)
     @eval @inline Base.$op(t::T) where T<:TensorGraded{V,0} where V = Single{V}($op(value(t)))
@@ -348,13 +378,13 @@ end
 function Base.cosh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B*B)
+        B = basis(t); BB = value(B⟑B)
         if BB == -1
             return Couple{V,B}(cosh(t.v))
         end
     end
-    τ = t^2
-    S,term = τ/2,(τ^2)/24
+    τ = t⟑t
+    S,term = τ/2,(τ⟑τ)/24
     f = norm(S)
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 6
@@ -366,7 +396,7 @@ function Base.cosh(t::T) where T<:TensorAlgebra
         @inbounds norms .= (norms[2],norm(term),ns)
         k += 2
     end
-    return 1+S
+    return One(V)+S
 end
 
 @eval @generated function Base.cosh(b::Multivector{V,T,E}) where {V,T,E}
@@ -375,12 +405,12 @@ end
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::Multivector{V,T,E} = b^2
+        τ::Multivector{V,T,E} = b⟑b
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
         S .= value(τ)/2
-        out .= value((τ^2))/24
+        out .= value((τ⟑τ))/24
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 6
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -394,7 +424,7 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 2
         end
-        @inbounds S[1] += 1
+        @inbounds S[1] += One(V)
         return Multivector{V}(S)
     end
 end
@@ -405,12 +435,12 @@ end
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
         $(insert_expr(loop[1],:mvecs,:T,Float64)...)
-        τ::Spinor{V,T,E} = b^2
+        τ::Spinor{V,T,E} = b⟑b
         B = value(τ)
         S = zeros(mvecs(N,t))
         term = zeros(mvecs(N,t))
         S .= value(τ)/2
-        out .= value((τ^2))/24
+        out .= value((τ⟑τ))/24
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 6
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -424,7 +454,7 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 2
         end
-        @inbounds S[1] += 1
+        @inbounds S[1] += One(V)
         return Spinor{V}(S)
     end
 end
@@ -435,13 +465,13 @@ end
 function Base.sinh(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B*B)
+        B = basis(t); BB = value(B⟑B)
         if BB == -1
             return Couple{V,B}(sinh(t.v))
         end
     end
-    τ,f = t^2,norm(t)
-    S,term = t,(t*τ)/6
+    τ,f = t⟑t,norm(t)
+    S,term = t,(t⟑τ)/6
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 5
     @inbounds while norms[2]<norms[1] || norms[2]>1
@@ -461,12 +491,12 @@ end
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::Multivector{V,T,E} = b^2
+        τ::Multivector{V,T,E} = b⟑b
         B = value(τ)
         S = zeros(mvec(N,t))
         term = zeros(mvec(N,t))
         S .= value(b)
-        out .= value(b*τ)/6
+        out .= value(b⟑τ)/6
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 5
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -490,12 +520,12 @@ end
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
         $(insert_expr(loop[1],:mvecs,:T,Float64)...)
-        τ::Spinor{V,T,E} = b^2
+        τ::Spinor{V,T,E} = b⟑b
         B = value(τ)
         S = zeros(mvecs(N,t))
         term = zeros(mvecs(N,t))
         S .= value(b)
-        out .= value(b*τ)/6
+        out .= value(b⟑τ)/6
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 5
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000

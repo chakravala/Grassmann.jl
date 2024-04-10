@@ -602,6 +602,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif !istangent(V) && !hasconformal(V) && G == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
             :(Couple{V,basis(a)}(Complex($bop(value(b)),value(a))))
+        elseif !istangent(V) && !hasconformal(V) && L == grade(V) &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            :(AntiCouple{V,basis(b)}(Complex(value(b),$bop(value(a)))))
+        elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            :(AntiCouple{V,basis(a)}(Complex($bop(value(a)),value(b))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
