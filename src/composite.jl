@@ -62,7 +62,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= b/k
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -90,7 +89,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= b/k
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -159,7 +157,7 @@ function Base.exp(t::Couple{V,B}) where {V,B}
     end
 end
 
-function Base.expm1(t::PseudoCouple{V}) where V
+function Base.expm1(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
         exp(t)-One(V)
     else
@@ -261,7 +259,6 @@ qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             prod .= out
-            out .= 0
             # prod *= w2
             $(loop[2])
             term .= out/k
@@ -293,7 +290,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             prod .= out
-            out .= 0
             # prod *= w2
             $(loop[2])
             term .= out/k
@@ -437,7 +433,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= τ/(k*(k-1))
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -467,7 +462,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= τ/(k*(k-1))
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -523,7 +517,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= τ/(k*(k-1))
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -552,7 +545,6 @@ end
             ns = norm(S)
             @inbounds ns ≈ norms[3] && break
             term .= out
-            out .= 0
             # term *= τ/(k*(k-1))
             $(loop[2])
             @inbounds norms .= (norms[2],norm(out),ns)
@@ -1084,9 +1076,9 @@ Base.rand(::AbstractRNG,::SamplerType{Couple}) = rand(Couple{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,Submanifold{V}(UInt(rand(1:1<<mdims(V)-1)))})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,B}(rand(Complex{Float64}))
 Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(rand(Complex{T}))
-Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T} where B}) where {V,T} = rand(Couple{V,rand(Single{V}),T})
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T} where B}) where {V,T} = rand(Couple{V,Submanifold{V}(UInt(rand(1:1<<mdims(V)-1))),T})
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple}) = rand(PseudoCouple{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V}}) where V = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1)))})
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B}}) where {V,B} = PseudoCouple{V,B}(rand(Complex{Float64}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T}}) where {V,B,T} = PseudoCouple{V,B}(rand(Complex{T}))
-Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,rand(Single{V}),T})
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1))),T})
