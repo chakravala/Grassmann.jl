@@ -239,45 +239,29 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
     end
 end
 
-function odd(t::Multivector{V,T}) where {V,T}
-    N = mdims(V)
-    out = copy(value(t,mvec(N,T)))
-    bs = binomsum_set(N)
-    @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ evens(3,N+1)
-        @inbounds for k ∈ bs[g]+1:bs[g+1]
-            @inbounds out[k]≠0 && (out[k] = zero(T))
-        end
-    end
-    Multivector{V}(out)
-end
+Base.iseven(t::Zero) = true
+Base.isodd(t::Zero) = true
+Base.iseven(t::TensorGraded{V,G}) where {V,G} = iseven(G) ? true : iszero(t)
+Base.isodd(t::TensorGraded{V,G}) where {V,G} = isodd(G) ? true : iszero(t)
+Base.iseven(t::Spinor) = true
+Base.iseven(t::AntiSpinor) = iszero(t)
+Base.isodd(t::Spinor) = iszero(t)
+Base.isodd(t::AntiSpinor) = true
+Base.iseven(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? true : iszero(imaginary(t))
+Base.isodd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? iszero(scalar(t)) : iszero(t)
+Base.iseven(t::PseudoCouple{V,B}) where {V,B} = iseven(imaginary(t)) && iseven(volume(t))
+Base.isodd(t::PseudoCouple{V,B}) where {V,B} = isodd(imaginary(t)) && isodd(volume(t))
+Base.iseven(t::Multivector) = norm(t) ≈ norm(even(t))
+Base.isodd(t::Multivector) = norm(t) ≈ norm(odd(t))
+
+even(t::AntiSpinor{V}) where V = Zero{V}()
 odd(t::Spinor{V}) where V = Zero{V}()
 even(t::Spinor) = t
-function even(t::Multivector{V,T}) where {V,T}
-    N = mdims(V)
-    out = zeros(mvec(N-1,T))
-    bs = binomsum_set(N)
-    i = 2
-    @inbounds out[1]≠0 && (out[1] = t.v[1])
-    for g ∈ evens(1,N+1)
-        @inbounds for k ∈ bs[g]+1:bs[g+1]
-            @inbounds out[i] = t.v[k]
-            i += 1
-        end
-    end
-    Spinor{V}(out)
-end
-#=function even(t::Multivector{V,T}) where {V,T}
-    N = mdims(V)
-    out = copy(value(t,mvec(N,T)))
-    bs = binomsum_set(N)
-    for g ∈ evens(2,2:N+1)
-        @inbounds for k ∈ bs[g]+1:bs[g+1]
-            @inbounds out[k]≠0 && (out[k] = zero(T))
-        end
-    end
-    Multivector{V}(out)
-end=#
+odd(t::AntiSpinor) = t
+even(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? t : scalar(t)
+odd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? imaginary(t) : Zero{V}()
+even(t::PseudoCouple{V,B}) where {V,B} = even(imaginary(t)) + even(volume(t))
+odd(t::PseudoCouple{V,B}) where {V,B} = odd(imaginary(t)) + odd(volume(t))
 
 function imag(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
@@ -307,7 +291,7 @@ function imag(t::Spinor{V,T}) where {V,T}
     out = copy(value(t,mvecs(N,T)))
     bs = spinsum_set(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ list(2,N+1)
+    for g ∈ evens(2,N+1)
         @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
@@ -318,7 +302,7 @@ function real(t::Spinor{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvecs(N,T)))
     bs = spinsum_set(N)
-    for g ∈ list(3,N+1)
+    for g ∈ evens(3,N+1)
         @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end

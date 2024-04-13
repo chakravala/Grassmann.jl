@@ -45,6 +45,7 @@ import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 import Leibniz: algebra_limit, sparse_limit, cache_limit, fill_limit
 import Leibniz: binomial, binomial_set, binomsum, binomsum_set, lowerbits, expandbits
 import Leibniz: bladeindex, basisindex, indexbasis, indexbasis_set, loworder, intlog
+import Leibniz: antisum, antisum_set, antiindex, spinindex
 import Leibniz: promote_type, mvec, svec, intlog, insert_expr, supermanifold
 
 include("multivectors.jl")
@@ -58,8 +59,12 @@ include("forms.jl")
 
 export cayley, hyperplanes, points, TensorAlgebra
 
-cayley(V) = (y=Vector(Λ(V).b); y*transpose(y))
-cayley(V,op) = (b=Vector(Λ(V).b); TensorAlgebra{DirectSum.submanifold(V)}[op(x,y) for x ∈ b, y ∈ b])
+cayley(V) = cayley(Vector(Λ(V).b))
+cayley(V,op) = cayley(Vector(Λ(V).b),op)
+cayley(b::AbstractVector) = cayley(b,b)
+cayley(b::AbstractVector,op) = cayley(b,b,op)
+cayley(a::AbstractVector,b::AbstractVector) = a*transpose(b)
+cayley(a::AbstractVector,b::AbstractVector,op) = TensorAlgebra{Manifold(Manifold(eltype(a)))}[op(x,y) for x ∈ a, y ∈ b]
 
 @pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 

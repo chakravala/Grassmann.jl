@@ -12,14 +12,16 @@
 #   https://github.com/chakravala
 #   https://crucialflow.com
 
-export exph, log_fast, logh_fast
+export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudodot, @pseudo
+export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
+export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 
 ## exponential & logarithm function
 
 @inline Base.expm1(t::Submanifold{V,0}) where V = Single{V}(ℯ-1)
 @inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
-Base.expm1(t::Chain) = expm1(Multivector(t))
+Base.expm1(t::Chain) = expm1(multispin(t))
 function Base.expm1(t::T) where T<:TensorAlgebra
     V = Manifold(t)
     if T<:Couple
@@ -157,16 +159,16 @@ function Base.exp(t::Couple{V,B}) where {V,B}
     end
 end
 
-function Base.expm1(t::AntiCouple{V}) where V
+function Base.expm1(t::PseudoCouple{V}) where V
     if isscalar(B)
         exp(t)-One(V)
     else
         expm1(multispin(t))
     end
 end
-function Base.exp(t::AntiCouple{V,B}) where {V,B}
+function Base.exp(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        AntiCouple{V,B}(value(exp(Couple{V,Submanifold(V)}(value(t)))))
+        PseudoCouple{V,B}(value(exp(Couple{V,Submanifold(V)}(value(t)))))
     else
         exp(multispin(t))
     end
@@ -216,6 +218,8 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     end
 end
 
+qlog(b::PseudoCouple,x::Int=10000) = qlog(multispin(b),x)
+qlog(b::AntiSpinor,x::Int=10000) = qlog(Multivector(b),x)
 function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
     V = Manifold(w)
     w2,f = w⟑w,norm(w)
@@ -235,6 +239,8 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
+qlog_fast(b::PseudoCouple,x::Int=10000) = qlog_fast(multispin(b),x)
+qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
 @eval @generated function qlog_fast(b::Multivector{V,T,E},x::Int=10000) where {V,T,E}
     loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
     return quote
@@ -309,18 +315,31 @@ Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(One(V)+t) : qlog(
 @inline Base.log(t::T) where T<:TensorAlgebra{V} where V = qlog((t-One(V))/(t+One(V)))
 @inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
 
-function Base.log(t::AntiCouple{V,B}) where {V,B}
+function Base.log(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        AntiCouple{V,B}(value(log(Couple{V,Submanifold(V)}(value(t)))))
+        PseudoCouple{V,B}(value(log(Couple{V,Submanifold(V)}(value(t)))))
     else
         log(multispin(t))
     end
 end
-function Base.log1p(t::AntiCouple{V,B}) where {V,B}
+function Base.log1p(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        AntiCouple{V,B}(value(log1p(Couple{V,Submanifold(V)}(value(t)))))
+        PseudoCouple{V,B}(value(log1p(Couple{V,Submanifold(V)}(value(t)))))
     else
         log1p(multispin(t))
+    end
+end
+
+Base.exp(t::AntiSpinor) = exp(Multivector(t))
+Base.expm1(t::AntiSpinor) = expm1(Multivector(t))
+Base.log(t::AntiSpinor) = log(Multivector(t))
+Base.log1p(t::AntiSpinor) = log1p(Multivector(t))
+log_fast(t::AntiSpinor) = log_fast(Multivector(t))
+logh_fast(t::AntiSpinor) = logh_fast(Multivector(t))
+for op ∈ (:cosh,:sinh)
+    @eval begin
+        Base.$op(t::PseudoCouple) = $op(multispin(t))
+        Base.$op(t::AntiSpinor) = $op(Multivector(t))
     end
 end
 
@@ -976,24 +995,36 @@ end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin
-        Base.$op(a::Couple{V,B},m) where {V,B} = Couple{V,B}($op.(value(a),m))
+        Base.$op(a::Couple{V,B},m) where {V,B} = Couple{V,B}($op(value(a),m))
+        Base.$op(a::PseudoCouple{V,B},m) where {V,B} = PseudoCouple{V,B}($op(value(a),m))
         Base.$op(a::Chain{V,G,T},m) where {V,G,T} = Chain{V,G}($op.(value(a),m))
         Base.$op(a::Spinor{V,T},m) where {T,V} = Spinor{V}($op.(value(a),m))
+        Base.$op(a::AntiSpinor{V,T},m) where {T,V} = AntiSpinor{V}($op.(value(a),m))
         Base.$op(a::Multivector{V,T},m) where {T,V} = Multivector{V}($op.(value(a),m))
     end
 end
 for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
     @eval begin
         Base.$op(a::Couple{V,B};args...) where {V,B} = Couple{V,B}($op(value(a);args...))
+        Base.$op(a::PseudoCouple{V,B};args...) where {V,B} = PseudoCouple{V,B}($op(value(a);args...))
         Base.$op(a::Chain{V,G,T};args...) where {V,G,T} = Chain{V,G}($op.(value(a);args...))
         Base.$op(a::Spinor{V,T};args...) where {V,T} = Spinor{V}($op.(value(a);args...))
+        Base.$op(a::AntiSpinor{V,T};args...) where {V,T} = AntiSpinor{V}($op.(value(a);args...))
         Base.$op(a::Multivector{V,T};args...) where {V,T} = Multivector{V}($op.(alue(a);args...))
     end
 end
 Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
+Base.isfinite(a::Spinor) = prod(isfinite.(value(a)))
+Base.isfinite(a::AntiSpinor) = prod(isfinite.(value(a)))
 Base.isfinite(a::Multivector) = prod(isfinite.(value(a)))
+Base.isfinite(a::Couple) = isfinite(value(a))
+Base.isfinite(a::PseudoCouple) = isfinite(value(a))
 Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Multivector{V,T};tol::Real=eps(T)) where {V,T} = Multivector{V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::Spinor{V,T};tol::Real=eps(T)) where {V,T} = Spinor{V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::AntiSpinor{V,T};tol::Real=eps(T)) where {V,T} = AntiSpinor{V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::Couple{V,B};tol::Real=eps(T)) where {V,B} = Couple{V,B}(rationalize(t,value(a),tol))
+Base.rationalize(t::Type,a::PseudoCouple{V,B};tol::Real=eps(T)) where {V,B} = PseudoCouple{V,B}(rationalize(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
 
 *(A::SparseMatrixCSC{TA,S}, x::StridedVector{Chain{V,G,𝕂,X}}) where {TA,S,V,G,𝕂,X} =
@@ -1028,9 +1059,11 @@ end
 
 Base.map(fn, x::Multivector{V}) where V = Multivector{V}(map(fn, value(x)))
 Base.map(fn, x::Spinor{V}) where V = Spinor{V}(map(fn, value(x)))
+Base.map(fn, x::AntiSpinor{V}) where V = AntiSpinor{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
-Base.map(fn, x::Single{V,G,B}) where {V,G,B} = fn(value(x))*B
+Base.map(fn, x::TensorTerm) = fn(value(x))*basis(x)
 Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
+Base.map(fn, x::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
 
 import Random: SamplerType, AbstractRNG
 Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})
@@ -1044,8 +1077,16 @@ Base.rand(::AbstractRNG,::SamplerType{Multivector{V,T}}) where {V,T} = Multivect
 Base.rand(::AbstractRNG,::SamplerType{Spinor}) = rand(Spinor{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Spinor{V}}) where V = Spinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Spinor{V,T}}) where {V,T} = Spinor{V}(rand(svecs(mdims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{AntiSpinor}) = rand(AntiSpinor{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{AntiSpinor{V}}) where V = AntiSpinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{AntiSpinor{V,T}}) where {V,T} = AntiSpinor{V}(rand(svecs(mdims(V),T)))
 Base.rand(::AbstractRNG,::SamplerType{Couple}) = rand(Couple{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,rand(Single{V})})
-Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,G}(rand(Complex{Float64}))
-Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T}}) where {V,B,T} = Couple{V,G}(rand(Complex{T}))
+Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,Submanifold{V}(UInt(rand(1:1<<mdims(V)-1)))})
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,B}(rand(Complex{Float64}))
+Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(rand(Complex{T}))
 Base.rand(::AbstractRNG,::SamplerType{Couple{V,B,T} where B}) where {V,T} = rand(Couple{V,rand(Single{V}),T})
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple}) = rand(PseudoCouple{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V}}) where V = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1)))})
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B}}) where {V,B} = PseudoCouple{V,B}(rand(Complex{Float64}))
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T}}) where {V,B,T} = PseudoCouple{V,B}(rand(Complex{T}))
+Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,rand(Single{V}),T})

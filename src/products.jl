@@ -140,7 +140,7 @@ add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Exp
 
 function generate_mutators(M,F,set_val,SUB,MUL,i,B)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-        for (s,index) ∈ ((Symbol(op,:multi!),:basisindex),(Symbol(op,:blade!),:bladeindex),(Symbol(op,:spin!),:spinindex))
+        for (s,index) ∈ ((Symbol(op,:multi!),:basisindex),(Symbol(op,:blade!),:bladeindex),(Symbol(op,:spin!),:spinindex),(Symbol(op,:anti!),:antiindex))
             spre = Symbol(s,:_pre)
             @eval begin
                 @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
@@ -170,7 +170,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
     generate_mutators(M,F,set_val,SUB,MUL,:i,UInt)
     generate_mutators(M,F,set_val,SUB,MUL,:(UInt(i)),Submanifold)
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-        for s ∈ (Symbol(op,:multi!),Symbol(op,:blade!),Symbol(op,:spin!))
+        for s ∈ (Symbol(op,:multi!),Symbol(op,:blade!),Symbol(op,:spin!),Symbol(op,:anti!))
             @eval @inline function $s(out::$M,val::S,i) where {M,T,S}
                 @inbounds $(set_val(set,:(out[i]),:val))
                 return out
@@ -281,9 +281,11 @@ end
 @inline exteraddmulti!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!(V,out,α,β,γ)
 @inline exteraddblade!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
 @inline exteraddspin!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!(V,out,α,β,γ)
+@inline exteraddanti!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddanti!(V,out,α,β,γ)
 @inline exteraddmulti!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!_pre(V,out,α,β,γ)
 @inline exteraddblade!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
 @inline exteraddspin!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!_pre(V,out,α,β,γ)
+@inline exteraddanti!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddanti!_pre(V,out,α,β,γ)
 
 # algebra
 
@@ -334,7 +336,7 @@ inv(a::Zero{V}) where V = Infinity(V)
 /(a::One,b::Infinity) = inv(b)
 inv(a::Infinity{V}) where V = Zero(V)
 
-for T ∈ (:TensorTerm,:Couple,:AntiCouple,:Chain,:Spinor,:Multivector)
+for T ∈ (:TensorTerm,:Couple,:PseudoCouple,:Chain,:Spinor,:AntiSpinor,:Multivector)
     for type ∈ (:Zero,:Infinity)
         @eval begin
             ∧(a::T,b::$type) where T<:$T = b
@@ -400,18 +402,21 @@ plus(b::Multivector{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Multivector{V},a::Single{V,G}) where {V,G} = plus(a,b)
 plus(b::Spinor{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Spinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
+plus(b::AntiSpinor{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
+plus(b::AntiSpinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
 -(t::Submanifold) = Single(-value(t),t)
 -(a::Chain{V,G}) where {V,G} = Chain{V,G}(-value(a))
 -(a::Multivector{V}) where V = Multivector{V}(-value(a))
 -(a::Spinor{V}) where V = Spinor{V}(-value(a))
+-(a::AntiSpinor{V}) where V = AntiSpinor{V}(-value(a))
 -(a::Couple{V,B}) where {V,B} = Couple{V,B}(-a.v)
--(a::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}(-a.v)
+-(a::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(-a.v)
 times(a::Single{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
 times(a::Chain{V,G},b::Single{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
 times(a::Submanifold{V,0},b::Chain{W,G}) where {V,W,G} = b
 times(a::Chain{V,G},b::Submanifold{W,0}) where {V,W,G} = a
 
-for (couple,calar) ∈ ((:Couple,:scalar),(:AntiCouple,:volume))
+for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
         plus(a::Multivector{V},b::$couple{V}) where V = (a+$calar(b))+imaginary(b)
         plus(a::$couple{V},b::Multivector{V}) where V = (b+$calar(a))+imaginary(a)
@@ -431,19 +436,24 @@ end
 for (op,po) ∈ ((:plus,:+),(:minus,:-))
     @eval begin
         $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(a.v,b.v))
-        $op(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}($po(a.v,b.v))
-        $op(a::Couple{V,A},b::AntiCouple{V,B}) where {V,A,B} = $po($po(a,imaginary(b)),volume(b))
-        $op(a::AntiCouple{V,A},b::Couple{V,B}) where {V,A,B} = $po(imaginary(a),b)+volume(a)
-        $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($po(Couple(a),Couple(b)))
-        $op(a::Couple{V},b::Phasor{V}) where V = $po(a,Couple(b))
-        $op(a::Phasor{V},b::Couple{V}) where V = $po(Couple(a),b)
+        $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}($po(a.v,b.v))
+        $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($op(Couple(a),Couple(b)))
+        $op(a::Couple{V},b::Phasor{V}) where V = $op(a,Couple(b))
+        $op(a::Phasor{V},b::Couple{V}) where V = $op(Couple(a),b)
+        $op(a::Couple{V},b::Couple{V}) where V = $op($op(a,scalar(b)),imaginary(b))
+        $op(a::PseudoCouple{V},b::PseudoCouple{V}) where V = $op($op(a,volume(b)),imaginary(b))
+        $op(a::Couple{V},b::PseudoCouple{V}) where V = $op($op(a,imaginary(b)),volume(b))
+        $op(a::PseudoCouple{V},b::Couple{V}) where V = $op(imaginary(a),b)+volume(a)
+        $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
+        $op(a::Spinor{V},b::AntiSpinor{V}) where V = $op(Multivector(a),Multivector(b))
+        $op(a::AntiSpinor{V},b::Spinor{V}) where V = $op(Multivector(a),Multivector(b))
     end
 end
 
 function times(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(B*B),a.v.re*b.v.im+a.v.im*b.v.re))
 end
-function times(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+function times(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
     Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(B*B)+value(volume(a)*volume(b)),value(out)))
 end
@@ -454,43 +464,44 @@ end
 function ∧(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re))
 end
-function ∧(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
-    grade(B)==0 ? AntiCouple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re)) : Zero(V)
+function ∧(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
+    grade(B)==0 ? PseudoCouple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re)) : Zero(V)
 end
 ∧(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∧Couple(b))
 
 function ∨(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     grade(B)==grade(V) ? Couple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im)) : Zero(V)
 end
-function ∨(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
-    AntiCouple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im))
+function ∨(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
+    PseudoCouple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im))
 end
 ∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
 
 function contraction(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(abs2_inv(B)),a.v.im*b.v.re))
 end
-function contraction(a::AntiCouple{V,B},b::AntiCouple{V,B}) where {V,B}
+function contraction(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     out = contraction(volume(a),imaginary(b))
     Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(abs2_inv(B))+(a.v.im*b.v.im)*value(abs2_inv(V)),value(out)))
 end
 contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Couple(a),Couple(b)))
 
-for op ∈ (:plus,:minus)
-    @eval begin
-        $op(a::Couple{V},b::Couple{V}) where V = $op($op(a,scalar(b)),imaginary(b))
-        $op(a::AntiCouple{V},b::AntiCouple{V}) where V = $op($op(a,volume(b)),imaginary(b))
-        $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
-    end
-end
-times(a::Couple{V},b::Couple{V}) where V = a⟑scalar(b)+a⟑imaginary(b)
-times(a::AntiCouple{V},b::AntiCouple{V}) where V = (volume(a)⟑volume(b)+imaginary(a)⟑imaginary(b))+imaginary(a)⟑volume(b)+volume(b)⟑imaginary(a)
-∧(a::Couple{V},b::Couple{V}) where V = a∧scalar(b)+a∧imaginary(b)
-∧(a::AntiCouple{V},b::AntiCouple{V}) where V = imaginary(a)∧imaginary(b)
+times(a::Couple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
+times(a::PseudoCouple{V},b::PseudoCouple{V}) where V = ((volume(a)⟑volume(b))+(imaginary(a)⟑imaginary(b)))+(imaginary(a)⟑volume(b))+(volume(b)⟑imaginary(a))
+times(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)⟑b)+(imaginary(a)⟑b)
+times(a::PseudoCouple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
+∧(a::Couple{V},b::Couple{V}) where V = (a∧scalar(b))+(a∧imaginary(b))
+∧(a::PseudoCouple{V},b::PseudoCouple{V}) where V = imaginary(a)∧imaginary(b)
+∧(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∧b)+(imaginary(a)∧imaginary(b))
+∧(a::PseudoCouple{V},b::Couple{V}) where V = (a∧scalar(b))+(imaginary(a)∧imaginary(b))
 ∨(a::Couple{V},b::Couple{V}) where V = imaginary(a)∨imaginary(b)
-∨(a::AntiCouple{V},b::AntiCouple{V}) where V = a∨imaginary(b)+a∨volume(b)
+∨(a::PseudoCouple{V},b::PseudoCouple{V}) where V = (a∨imaginary(b))+(a∨volume(b))
+∨(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∨volume(b))+(imaginary(a)∨b)
+∨(a::PseudoCouple{V},b::Couple{V}) where V = (volume(a)∨scalar(b))+(a∨imaginary(b))
 contraction(a::Couple{V},b::Couple{V}) where V = contraction(a,imaginary(b))+contraction(a,volume(b))
-contraction(a::AntiCouple{V},b::AntiCouple{V}) where V = contraction(imaginary(a),b)+contraction(volume(a),b)
+contraction(a::PseudoCouple{V},b::PseudoCouple{V}) where V = contraction(imaginary(a),b)+contraction(volume(a),b)
+contraction(a::Couple{V},b::PseudoCouple{V}) where V = contraction(scalar(a),imaginary(b))+contraction(imaginary(a),b)
+contraction(a::PseudoCouple{V},b::Couple{V}) where V = contraction(a,scalar(b))+contraction(a,imaginary(b))
 
 plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)+b.v.re,b.v.im))
 plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re+value(b),a.v.im))
@@ -508,20 +519,20 @@ function plus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
         multispin(a)+b
     end
 end
-function plus(a::TensorTerm{V},b::AntiCouple{V,B}) where {V,B}
+function plus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
-        AntiCouple{V,B}(Complex(value(a)+b.v.re,b.v.im))
+        PseudoCouple{V,B}(Complex(value(a)+b.v.re,b.v.im))
     elseif basis(a) == Subamnifold(V)
-        AntiCouple{V,B}(Complex(b.v.re,value(a)+b.v.im))
+        PseudoCouple{V,B}(Complex(b.v.re,value(a)+b.v.im))
     else
         a+multispin(b)
     end
 end
-function plus(a::AntiCouple{V,B},b::TensorTerm{V}) where {V,B}
+function plus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        AntiCouple{V,B}(Complex(a.v.re+value(b),a.v.im))
+        PseudoCouple{V,B}(Complex(a.v.re+value(b),a.v.im))
     elseif Submanifold(V) == basis(b)
-        AntiCouple{V,B}(Complex(a.v.re,a.v.im+value(b)))
+        PseudoCouple{V,B}(Complex(a.v.re,a.v.im+value(b)))
     else
         multispin(a)+b
     end
@@ -544,28 +555,28 @@ function minus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
         multispin(a)-b
     end
 end
-function minus(a::TensorTerm{V},b::AntiCouple{V,B}) where {V,B}
+function minus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
         re = value(a)-b.v.re
-        AntiCouple{V,B}(Complex(re,-oftype(re,b.v.im)))
+        PseudoCouple{V,B}(Complex(re,-oftype(re,b.v.im)))
     elseif basis(a) == Submanifold(V)
         re = value(a)-b.v.im
-        AntiCouple{V,B}(Complex(-oftype(re,b.v.re),re))
+        PseudoCouple{V,B}(Complex(-oftype(re,b.v.re),re))
     else
         a-multispin(b)
     end
 end
-function minus(a::AntiCouple{V,B},b::TensorTerm{V}) where {V,B}
+function minus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        AntiCouple{V,B}(Complex(a.v.re-value(b),a.v.im))
+        PseudoCouple{V,B}(Complex(a.v.re-value(b),a.v.im))
     elseif Submanifold(V) == basis(b)
-        AntiCouple{V,B}(Complex(a.v.re,a.v.im-value(b)))
+        PseudoCouple{V,B}(Complex(a.v.re,a.v.im-value(b)))
     else
         multispin(a)-b
     end
 end
 
-for couple ∈ (:Couple,:AntiCouple)
+for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         times(a::Multivector{V},b::$couple{V}) where V = a⟑multispin(b)
         #Multivector{V}(value(a)*b.v.re) + a⟑imaginary(b)
@@ -573,6 +584,8 @@ for couple ∈ (:Couple,:AntiCouple)
         #Multivector{V}(a.v.re*value(b)) + imaginary(a)⟑b
         times(a::Spinor{V},b::$couple{V}) where V = a⟑multispin(b)
         times(a::$couple{V},b::Spinor{V}) where V = multispin(a)⟑b
+        times(a::AntiSpinor{V},b::$couple{V}) where V = a⟑multispin(b)
+        times(a::$couple{V},b::AntiSpinor{V}) where V = multispin(a)⟑b
         times(a::Chain{V},b::$couple{V}) where V = grade(a)==0 ? scalar(a)⟑b : a⟑multispin(b)
         #Chain{V,G}(value(a)*b.v.re) + a⟑imaginary(b)
         times(a::$couple{V},b::Chain{V}) where V = grade(b)==0 ? a⟑scalar(b) : multispin(a)⟑b
@@ -581,15 +594,15 @@ for couple ∈ (:Couple,:AntiCouple)
 end
 times(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
 times(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
-times(a::TensorTerm{V,0},b::AntiCouple{V,B}) where {V,B} = AntiCouple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
-times(a::AntiCouple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
+times(a::TensorTerm{V,0},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
+times(a::PseudoCouple{V,B},b::TensorTerm{V,0}) where {V,B} = PseudoCouple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
 
-times(a::TensorTerm{V},b::Couple{V}) where V = a⟑scalar(b) + a⟑imaginary(b)
-times(a::Couple{V},b::TensorTerm{V}) where V = scalar(a)⟑b + imaginary(a)⟑b
-times(a::TensorTerm{V},b::AntiCouple{V}) where V = a⟑imaginary(b) + a⟑volume(b)
-times(a::AntiCouple{V},b::TensorTerm{V}) where V = imaginary(a)⟑b + volume(a)⟑b
+times(a::TensorTerm{V},b::Couple{V}) where V = (a⟑scalar(b)) + (a⟑imaginary(b))
+times(a::Couple{V},b::TensorTerm{V}) where V = (scalar(a)⟑b) + (imaginary(a)⟑b)
+times(a::TensorTerm{V},b::PseudoCouple{V}) where V = (a⟑imaginary(b)) + (a⟑volume(b))
+times(a::PseudoCouple{V},b::TensorTerm{V}) where V = (imaginary(a)⟑b) + (volume(a)⟑b)
 
-for couple ∈ (:Couple,:AntiCouple)
+for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         ∧(a::Multivector{V},b::$couple{V}) where V = a∧multispin(b)
         #Multivector{V}(value(a)*b.v.re) + a∧imaginary(b)
@@ -597,6 +610,8 @@ for couple ∈ (:Couple,:AntiCouple)
         #Multivector{V}(a.v.re*value(b)) + imaginary(a)∧b
         ∧(a::Spinor{V},b::$couple{V}) where V = a∧multispin(b)
         ∧(a::$couple{V},b::Spinor{V}) where V = multispin(a)∧b
+        ∧(a::AntiSpinor{V},b::$couple{V}) where V = a∧multispin(b)
+        ∧(a::$couple{V},b::AntiSpinor{V}) where V = multispin(a)∧b
         ∧(a::Chain{V},b::$couple{V}) where V = a∧multispin(b)
         #Chain{V,G}(value(a)*b.v.re) + a∧imaginary(b)
         ∧(a::$couple{V},b::Chain{V}) where V = multispin(a)∧b
@@ -606,50 +621,52 @@ for couple ∈ (:Couple,:AntiCouple)
     end
 end
 function ∧(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
-    basis(a) == B ? a∧scalar(b) : a∧scalar(b) + a∧imaginary(b)
+    basis(a) == B ? a∧scalar(b) : (a∧scalar(b)) + (a∧imaginary(b))
 end
 function ∧(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    B == basis(b) ? scalar(a)∧b : scalar(a)∧b + imaginary(a)∧b
+    B == basis(b) ? scalar(a)∧b : (scalar(a)∧b) + (imaginary(a)∧b)
 end
-function ∧(a::TensorTerm{V,G},b::AntiCouple{V,B}) where {V,G,B}
+function ∧(a::TensorTerm{V,G},b::PseudoCouple{V,B}) where {V,G,B}
     basis(a) == B ? Zero(V) : a∧imaginary(b)
 end
-function ∧(a::AntiCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
+function ∧(a::PseudoCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
     B == basis(b) ? Zero(V) : imaginary(a)∧b
 end
 
-for couple ∈ (:Couple,:AntiCouple)
+for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         ∨(a::Multivector{V},b::$couple{V}) where V = a∨multispin(b)
         ∨(a::$couple{V},b::Multivector{V}) where V = multispin(a)∨b
         ∨(a::Spinor{V},b::$couple{V}) where V = a∨multispin(b)
         ∨(a::$couple{V},b::Spinor{V}) where V = multispin(a)∨b
+        ∨(a::AntiSpinor{V},b::$couple{V}) where V = a∨multispin(b)
+        ∨(a::$couple{V},b::AntiSpinor{V}) where V = multispin(a)∨b
         ∨(a::Chain{V},b::$couple{V}) where V = a∨multispin(b)
         ∨(a::$couple{V},b::Chain{V}) where V = multispin(a)∨b
     end
 end
 ∨(a::TensorTerm{V,0},b::Couple{V}) where V = grade(B)==grade(V) ? a∨imaginary(b) : Zero(V)
 ∨(a::Couple{V},b::TensorTerm{V,0}) where V = grade(B)==grade(V) ? imaginary(a)∨b : Zero(V)
-∨(a::TensorTerm{V,0},b::AntiCouple{V}) where V = a∨volume(b)
-∨(a::AntiCouple{V},b::TensorTerm{V,0}) where V = volume(a)∨b
+∨(a::TensorTerm{V,0},b::PseudoCouple{V}) where V = a∨volume(b)
+∨(a::PseudoCouple{V},b::TensorTerm{V,0}) where V = volume(a)∨b
 function ∨(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
     if basis(a)==B && grade(B)==grade(V)
-        a∨scalar(b) + a∨imaginary(b)
+        (a∨scalar(b)) + (a∨imaginary(b))
     else
         a∨imaginary(b)
     end
 end
 function ∨(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
     if B == basis(b) && grade(B)==grade(V)
-        scalar(a)∨b + imaginary(a)∨b
+        (scalar(a)∨b) + (imaginary(a)∨b)
     else
         imaginary(a)∨b
     end
 end
-∨(a::TensorTerm{V},b::AntiCouple{V}) where V = a∨imaginary(b) + a∨volume(b)
-∨(a::AntiCouple{V},b::TensorTerm{V}) where V = imaginary(a)∨b + volume(a)∨b
+∨(a::TensorTerm{V},b::PseudoCouple{V}) where V = (a∨imaginary(b)) + (a∨volume(b))
+∨(a::PseudoCouple{V},b::TensorTerm{V}) where V = (imaginary(a)∨b) + (volume(a)∨b)
 
-for couple ∈ (:Couple,:AntiCouple)
+for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         contraction(a::Multivector{V},b::$couple{V}) where V = contraction(a,multispin(b))
         #Multivector{V}(value(a)*b.v.re) + contraction(a,imaginary(b))
@@ -657,6 +674,8 @@ for couple ∈ (:Couple,:AntiCouple)
         #Multivector{V}(a.v.re*value(b)) + contraction(imaginary(a),b)
         contraction(a::Spinor{V},b::$couple{V}) where V = contraction(a,multispin(b))
         contraction(a::$couple{V},b::Spinor{V}) where V = contraction(multispin(a),b)
+        contraction(a::AntiSpinor{V},b::$couple{V}) where V = contraction(a,multispin(b))
+        contraction(a::$couple{V},b::AntiSpinor{V}) where V = contraction(multispin(a),b)
         contraction(a::Chain{V},b::$couple{V}) where V = contraction(a,multispin(b))
         #Chain{V,G}(value(a)*b.v.re) + contraction(a,imaginary(b))
         contraction(a::$couple{V},b::Chain{V}) where V = contraction(multispin(a),b)
@@ -665,7 +684,7 @@ for couple ∈ (:Couple,:AntiCouple)
     end
 end
 contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*b.v.re)
-contraction(a::TensorTerm{V,0},b::AntiCouple{V}) where V = contraction(a,imaginary(b))
+contraction(a::TensorTerm{V,0},b::PseudoCouple{V}) where V = contraction(a,imaginary(b))
 function contraction(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
     contraction(a,scalar(b)) + contraction(a,imaginary(b))
 end
@@ -676,14 +695,14 @@ function contraction(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
         contraction(imaginary(a),b)
     end
 end
-function contraction(a::TensorTerm{V,G},b::AntiCouple{V,B}) where {V,G,B}
+function contraction(a::TensorTerm{V,G},b::PseudoCouple{V,B}) where {V,G,B}
     if basis(a) == Submanifold(V)
         contraction(a,imaginary(b)) + contraction(a,volume(b))
     else
         contraction(a,imaginary(b))
     end
 end
-function contraction(a::AntiCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
+function contraction(a::PseudoCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
     contraction(imaginary(a),b) + contraction(volume(a),b)
 end
 
@@ -788,14 +807,16 @@ for F ∈ Fields
     @eval begin
         *(a::F,b::Couple{V,B}) where {F<:$F,V,B} = Couple{V,B}(a*b.v)
         *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(a.v*b)
-        *(a::F,b::AntiCouple{V,B}) where {F<:$F,V,B} = AntiCouple{V,B}(a*b.v)
-        *(a::AntiCouple{V,B},b::F) where {F<:$F,V,B} = AntiCouple{V,B}(a.v*b)
+        *(a::F,b::PseudoCouple{V,B}) where {F<:$F,V,B} = PseudoCouple{V,B}(a*b.v)
+        *(a::PseudoCouple{V,B},b::F) where {F<:$F,V,B} = PseudoCouple{V,B}(a.v*b)
         *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*b.v.re,b.v.im)
         *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(a.v.re*b,a.v.im)
         *(a::F,b::Multivector{V}) where {F<:$F,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$F,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$F,V} = Spinor{V}(a*b.v)
         *(a::Spinor{V},b::F) where {F<:$F,V} = Spinor{V}(a.v*b)
+        *(a::F,b::AntiSpinor{V}) where {F<:$F,V} = AntiSpinor{V}(a*b.v)
+        *(a::AntiSpinor{V},b::F) where {F<:$F,V} = AntiSpinor{V}(a.v*b)
         *(a::F,b::Chain{V,G}) where {F<:$F,V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::F) where {F<:$F,V,G} = Chain{V,G}(a.v*b)
         *(a::F,b::Single{V,G,B,T} where B) where {F<:$F,V,G,T} = Single{V,G}($Sym.:∏(a,b.v),basis(b))
@@ -829,11 +850,15 @@ for (op,po) ∈ ((:+,:plus),(:-,:minus))
         @generated function $po(a::TensorTerm{V,G},b::Spinor{V,T}) where {V,G,T}
             adder(a,b,$(QuoteNode(op)))
         end
+        @generated function $po(a::TensorTerm{V,G},b::AntiSpinor{V,T}) where {V,G,T}
+            adder(a,b,$(QuoteNode(op)))
+        end
     end
 end
 @generated minus(b::Chain{V,G,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 @generated minus(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,T,L} = adder(a,b,:-,true)
 @generated minus(b::Spinor{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
+@generated minus(b::AntiSpinor{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 @generated minus(b::Multivector{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 
 @eval begin
@@ -921,13 +946,46 @@ end
                 for g ∈ 1:2:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds setmulti!(out,$CONJ(m.v[rs[g]+i]),dual(V,ib[i],M))
+                        @inbounds setspin!(out,$CONJ(m.v[rs[g]+i]),dual(V,ib[i],M))
                     end
                 end
             else
                 out = $CONJ.(value(m))
             end
             Spinor{dual(V)}(out)
+        end end
+    end
+    @generated function Base.adjoint(m::AntiSpinor{V,T}) where {V,T}
+        CONJ,VEC = conjvec(m)
+        TF = T ∉ FieldsBig ? :Any : :T
+        if mdims(V)<cache_limit
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:ps,:bn),:svec)...)
+                out = zeros(svecs(N,Any))
+                for g ∈ evens(2,N+1)
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds setanti!_pre(out,:($CONJ(@inbounds m.v[$(ps[g]+i)])),dual(V,ib[i],M))
+                    end
+                end
+                return :(AntiSpinor{$(dual(V))}($(Expr(:call,tvecs(N,TF),out...))))
+            else
+                return :(AntiSpinor{$(dual(V))}($CONJ.(value(m))))
+            end
+        else return quote
+            if isdyadic(V)
+                $(insert_expr((:N,:M,:ps,:bn),:svec)...)
+                out = zeros($VECS(N,$TF))
+                for g ∈ 2:2:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds setanti!(out,$CONJ(m.v[ps[g]+i]),dual(V,ib[i],M))
+                    end
+                end
+            else
+                out = $CONJ.(value(m))
+            end
+            AntiSpinor{dual(V)}(out)
         end end
     end
 end
@@ -947,12 +1005,14 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         *(a::Submanifold{V},b::F) where {F<:$EF,V} = Single{V}(b,a)
         *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
         *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
-        *(a::F,b::AntiCouple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
-        *(a::AntiCouple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
+        *(a::F,b::PseudoCouple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
+        *(a::PseudoCouple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
         *(a::F,b::Multivector{V}) where {F<:$EF,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$EF,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$EF,V} = Spinor{V}(a*b.v)
         *(a::Spinor{V},b::F) where {F<:$EF,V} = Spinor{V}(a.v*b)
+        *(a::F,b::AntiSpinor{V}) where {F<:$EF,V} = AntiSpinor{V}(a*b.v)
+        *(a::AntiSpinor{V},b::F) where {F<:$EF,V} = AntiSpinor{V}(a.v*b)
         *(a::F,b::Chain{V,G}) where {F<:$EF,V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::F) where {F<:$EF,V,G} = Chain{V,G}(a.v*b)
         *(a::F,b::Single{V,G,B,T} where B) where {F<:$EF,V,G,T} = Single{V,G}($Sym.:∏(a,b.v),basis(b))
@@ -1021,10 +1081,22 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 $(add_val(eop,:out,:(value(b,$VECS(N,t))),bop))
                 return Spinor{V}(out)
             end
+            function $po(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T<:$Field,S<:$Field}
+                $(insert_expr((:N,:t),VEC)...)
+                out = value(a,$VECS(N,t))
+                $(add_val(eop,:out,:(value(b,$VECS(N,t))),bop))
+                return AntiSpinor{V}(out)
+            end
             function $po(a::Spinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(Multivector{V}(a),b)
             end
             function $po(a::Multivector{V,T},b::Spinor{V,S}) where {V,T<:$Field,S<:$Field}
+                return $po(a,Multivector{V}(b))
+            end
+            function $po(a::AntiSpinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
+                return $po(Multivector{V}(a),b)
+            end
+            function $po(a::Multivector{V,T},b::AntiSpinor{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(a,Multivector{V}(b))
             end
             function $po(a::Chain{V,G,T},b::Spinor{V,S}) where {V,G,T<:$Field,S<:$Field}
@@ -1043,6 +1115,26 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     out = value(a,$VECS(N,t))
                     @inbounds $(add_val(eop,:(out[list(rr+1,rr+bng)]),:(value(b,$VEC(N,G,t))),bop))
                     return Spinor{V}(out)
+                else
+                    return $po(Multivector{V}(a),b)
+                end
+            end
+            function $po(a::Chain{V,G,T},b::AntiSpinor{V,S}) where {V,G,T<:$Field,S<:$Field}
+                if isodd(G)
+                    $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
+                    out = convert($VECS(N,t),$(bcast(bop,:(value(b,$VECS(N,t)),))))
+                    @inbounds $(add_val(:(+=),:(out[list(rrr+1,rrr+bng)]),:(value(a,$VEC(N,G,t))),ADD))
+                    return AntiSpinor{V}(out)
+                else
+                    return $po(a,Multivector{V}(b))
+                end
+            end
+            function $po(a::AntiSpinor{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
+                if isodd(G)
+                    $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
+                    out = value(a,$VECS(N,t))
+                    @inbounds $(add_val(eop,:(out[list(rrr+1,rrr+bng)]),:(value(b,$VEC(N,G,t))),bop))
+                    return AntiSpinor{V}(out)
                 else
                     return $po(Multivector{V}(a),b)
                 end
@@ -1125,6 +1217,28 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:times,:geomaddmulti!),
             end end
 
         end
+        @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S}) where {V,T,S}
+            MUL,VEC = mulvec(a,b)
+            loop = generate_loop_a_m(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            if mdims(V)<cache_limit/2
+                return insert_t(:(Multivector{V}($(loop[2].args[2]))))
+            else return quote
+                $(insert_expr(loop[1],VEC)...)
+                $(loop[2])
+                return Multivector{V,t}(out)
+            end end
+        end
+        @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+            MUL,VEC = mulvec(a,b)
+            loop = generate_loop_m_a(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            if mdims(V)<cache_limit/2
+                return insert_t(:(Multivector{V}($(loop[2].args[2]))))
+            else return quote
+                $(insert_expr(loop[1],VEC)...)
+                $(loop[2])
+                return Multivector{V,t}(out)
+            end end
+        end
     end
 end
 for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
@@ -1138,9 +1252,15 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
         @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S}) where {V,G,S}
             Grassmann.$prop(a,b)
         end
+        @generated function $op(b::AntiSpinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
+            Grassmann.$prop(a,b,true)
+        end
+        @generated function $op(a::TensorGraded{V,G},b::AntiSpinor{V,S}) where {V,G,S}
+            Grassmann.$prop(a,b)
+        end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!))
+for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),(:contraction,:skewaddspin!))
     preproduct! = Symbol(product!,:_pre)
     prop = op≠:times ? Symbol(:product_,op) : :product
     @eval begin
@@ -1155,24 +1275,90 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!))
                 return Spinor{V,t}(out)
             end end
         end
-    end
-end
-for (op,product!) ∈ ((:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
-    preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
-    @eval begin
-        @generated function $op(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
+        @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_spin_multi(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            loop = generate_loop_anti(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
             if mdims(V)<cache_limit/2
-                return insert_t(:(Multivector{V}($(loop[2].args[2]))))
+                return insert_t(:(Spinor{V}($(loop[2].args[2]))))
             else return quote
                 $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
                 $(loop[2])
-                return Multivector{V,t}(out)
+                return Spinor{V,t}(out)
             end end
         end
     end
+end
+for (op,product!) ∈ ((:∧,:exteraddanti!),(:times,:geomaddanti!),(:contraction,:skewaddanti!))
+    preproduct! = Symbol(product!,:_pre)
+    prop = op≠:times ? Symbol(:product_,op) : :product
+    @eval begin
+        @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+            MUL,VEC = mulvec(a,b)
+            loop = generate_loop_s_a(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            if mdims(V)<cache_limit/2
+                return insert_t(:(AntiSpinor{V}($(loop[2].args[2]))))
+            else return quote
+                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+                $(loop[2])
+                return AntiSpinor{V,t}(out)
+            end end
+        end
+        @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
+            MUL,VEC = mulvec(a,b)
+            loop = generate_loop_a_s(V,:(a.v),:(b.v),MUL,$product!,$preproduct!)
+            if mdims(V)<cache_limit/2
+                return insert_t(:(AntiSpinor{V}($(loop[2].args[2]))))
+            else return quote
+                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+                $(loop[2])
+                return AntiSpinor{V,t}(out)
+            end end
+        end
+    end
+end
+@generated function ∨(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
+    MUL,VEC = mulvec(a,b)
+    loop = generate_loop_spinor(V,:(a.v),:(b.v),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
+    if mdims(V)<cache_limit/2
+        return insert_t(:($(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V}($(loop[2].args[2]))))
+    else return quote
+        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+        $(loop[2])
+        return  $(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V,t}(out)
+    end end
+end
+@generated function ∨(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+    MUL,VEC = mulvec(a,b)
+    loop = generate_loop_anti(V,:(a.v),:(b.v),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
+    if mdims(V)<cache_limit/2
+        return insert_t(:($(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V}($(loop[2].args[2]))))
+    else return quote
+        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+        $(loop[2])
+        return $(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V,t}(out)
+    end end
+end
+@generated function ∨(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+    MUL,VEC = mulvec(a,b)
+    loop = generate_loop_s_a(V,:(a.v),:(b.v),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
+    if mdims(V)<cache_limit/2
+        return insert_t(:($(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V}($(loop[2].args[2]))))
+    else return quote
+        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+        $(loop[2])
+        return $(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V,t}(out)
+    end end
+end
+@generated function ∨(a::AntiSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
+    MUL,VEC = mulvec(a,b)
+    loop = generate_loop_a_s(V,:(a.v),:(b.v),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
+    if mdims(V)<cache_limit/2
+        return insert_t(:($(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V}($(loop[2].args[2]))))
+    else return quote
+        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
+        $(loop[2])
+        return $(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V,t}(out)
+    end end
 end
 
 for side ∈ (:left,:right)
@@ -1186,7 +1372,7 @@ for side ∈ (:left,:right)
                 G = grade(V)
                 Single{V,G,getbasis(V,UInt(1)<<G-1)}(z.v.re) + $c(imaginary(z))
             end
-            $c(z::AntiCouple{V}) where V = $c(volume(z)) + $c(imaginary(z))
+            $c(z::PseudoCouple{V}) where V = $c(volume(z)) + $c(imaginary(z))
             @generated function $c(b::Chain{V,G,T}) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                 istangent(V) && (return :($$c(Multivector(b))))
@@ -1258,11 +1444,11 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::Spinor{V,T}) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                SUB,VEC = subvec(m)
+                SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:rs,:bn),:svec)...)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
-                    out = zeros((isodd(N) ? svec : svecs)(N,Any))
+                    out = zeros(svecs(N,Any))
                     D = diffvars(V)
                     for g ∈ evens(1,N+1)
                         ib = indexbasis(N,g-1)
@@ -1270,10 +1456,10 @@ for side ∈ (:left,:right)
                             ibi = @inbounds ib[i]
                             val = :(conj(@inbounds m.v[$(rs[g]+i)]))
                             v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
-                            @inbounds (isodd(N) ? setmulti!_pre : setspin!_pre)(out,v,complement(N,ibi,D,P),Val{N}())
+                            @inbounds (isodd(N) ? setanti!_pre : setspin!_pre)(out,v,complement(N,ibi,D,P),Val{N}())
                         end
                     end
-                    return :($(isodd(N) ? :Multivector : :Spinor){V}($(Expr(:call,(isodd(N) ? tvec : tvecs)(N,:T),out...))))
+                    return :($(isodd(N) ? :AntiSpinor : :Spinor){V}($(Expr(:call,tvecs(N,:T),out...))))
                 else return quote
                     $(insert_expr((:N,:rs,:bn),:svec)...)
                     P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
@@ -1286,13 +1472,85 @@ for side ∈ (:left,:right)
                             if val≠0
                                 ibi = @inbounds ib[i]
                                 v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
-                                $(isodd(N) ? setmulti! : setspin!)(out,v,complement(N,ibi,D,P),Val{N}())
+                                $(isodd(N) ? setanti! : setspin!)(out,v,complement(N,ibi,D,P),Val{N}())
                             end
                         end
                     end
-                    return $(isodd(N) ? :Multivector : :Spinor){V}(out)
+                    return $(isodd(N) ? :AntiSpinor : :Spinor){V}(out)
                 end end
             end
+            @generated function $c(m::AntiSpinor{V,T}) where {V,T}
+                isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                SUB,VEC = subvecs(m)
+                if mdims(V)<cache_limit
+                    $(insert_expr((:N,:ps,:bn),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    out = zeros(svecs(N,Any))
+                    D = diffvars(V)
+                    for g ∈ evens(2,N+1)
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            ibi = @inbounds ib[i]
+                            val = :(conj(@inbounds m.v[$(ps[g]+i)]))
+                            v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
+                            @inbounds (isodd(N) ? setspin!_pre : setanti!_pre)(out,v,complement(N,ibi,D,P),Val{N}())
+                        end
+                    end
+                    return :($(isodd(N) ? :Spinor : :AntiSpinor){V}($(Expr(:call,tvecs(N,:T),out...))))
+                else return quote
+                    $(insert_expr((:N,:ps,:bn),:svec)...)
+                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    out = zeros($VEC(N,T))
+                    D = diffvars(V)
+                    for g ∈ 2:2:N+1
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds val = m.v[ps[g]+i]
+                            if val≠0
+                                ibi = @inbounds ib[i]
+                                v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                $(isodd(N) ? setspin! : setanti!)(out,v,complement(N,ibi,D,P),Val{N}())
+                            end
+                        end
+                    end
+                    return $(isodd(N) ? :Spinor : :AntiSpinor){V}(out)
+                end end
+            end
+        end
+    end
+end
+for c ∈ (:even,:odd)
+    anti = c ≠ :even
+    @eval begin
+        @generated function $c(m::Multivector{V,T}) where {V,T}
+            SUB,VEC = subvecs(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:bs,:bn),:svec)...)
+                out = zeros(svecs(N,Any))
+                for g ∈ $(anti ? :(evens(2,N+1)) : :(evens(1,N+1)))
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        ibi = @inbounds ib[i]
+                        v = :(@inbounds m.v[$(bs[g]+i)])
+                        @inbounds $(anti ? :setanti!_pre : :setspin!_pre)(out,v,ibi,Val{N}())
+                    end
+                end
+                return :($$(anti ? :AntiSpinor : :Spinor){V}($(Expr(:call,tvecs(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:bs,:bn),:svecs)...)
+                out = zeros($VEC(N,T))
+                for g ∈ $(anti ? :(2:2:N+1) : :(1:2:N+1))
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds v = m.v[bs[g]+i]
+                        if v≠0
+                            ibi = @inbounds ib[i]
+                            $(anti ? :setanti! : :setspin!)(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return $(anti ? :AntiSpinor : :Spinor){V}(out)
+            end end
         end
     end
 end
@@ -1301,7 +1559,7 @@ for side ∈ (:metric,:anti)
     @eval begin
         $c(z::Phasor) = $c(Couple(z))
         $c(z::Couple{V}) where V = scalar(z) + $c(imaginary(z))
-        $c(z::AntiCouple{V}) where V = $c(imaginary(z)) + $c(volume(z))
+        $c(z::PseudoCouple{V}) where V = $c(imaginary(z)) + $c(volume(z))
         @generated function $c(b::Chain{V,G,T}) where {V,G,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
             istangent(V) && (return :($$c(Multivector(b))))
@@ -1365,20 +1623,20 @@ for side ∈ (:metric,:anti)
         end
         @generated function $c(m::Spinor{V,T}) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            SUB,VEC = subvec(m)
+            SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:rs,:bn),:svec)...)
-                out = zeros((isodd(N) ? svec : svecs)(N,Any))
+                out = zeros(svecs(N,Any))
                 for g ∈ evens(1,N+1)
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
                         val = :(@inbounds m.v[$(rs[g]+i)])
                         v = Expr(:call,:*,$p(V,ibi),val)
-                        @inbounds (isodd(N) ? setmulti!_pre : setspin!_pre)(out,v,ibi,Val{N}())
+                        @inbounds setspin!_pre(out,v,ibi,Val{N}())
                     end
                 end
-                return :($(isodd(N) ? :Multivector : :Spinor){V}($(Expr(:call,(isodd(N) ? tvec : tvecs)(N,:T),out...))))
+                return :(Spinor{V}($(Expr(:call,tvecs(N,:T),out...))))
             else return quote
                 $(insert_expr((:N,:rs,:bn),:svec)...)
                 out = zeros($VEC(N,T))
@@ -1389,11 +1647,44 @@ for side ∈ (:metric,:anti)
                         if val≠0
                             ibi = @inbounds ib[i]
                             v = $$p(V,ibi)*val
-                            $(isodd(N) ? setmulti! : setspin!)(out,v,ibi,Val{N}())
+                            setspin!(out,v,ibi,Val{N}())
                         end
                     end
                 end
-                return $(isodd(N) ? :Multivector : :Spinor){V}(out)
+                return Spinor{V}(out)
+            end end
+        end
+        @generated function $c(m::AntiSpinor{V,T}) where {V,T}
+            isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            SUB,VEC = subvecs(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:ps,:bn),:svec)...)
+                out = zeros(svecs(N,Any))
+                for g ∈ evens(2,N+1)
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        ibi = @inbounds ib[i]
+                        val = :(@inbounds m.v[$(ps[g]+i)])
+                        v = Expr(:call,:*,$p(V,ibi),val)
+                        @inbounds setanti!_pre(out,v,ibi,Val{N}())
+                    end
+                end
+                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:ps,:bn),:svec)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 2:2:N+1
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds val = m.v[ps[g]+i]
+                        if val≠0
+                            ibi = @inbounds ib[i]
+                            v = $$p(V,ibi)*val
+                            setanti!(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return AntiSpinor{V}(out)
             end end
         end
     end
@@ -1405,8 +1696,8 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
         function $reverse(z::Couple{V,B}) where {V,B}
             Couple{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
         end
-        function $reverse(z::AntiCouple{V,B}) where {V,B}
-            AntiCouple{V,B}(Complex($p($g(V)) ? -z.v.re : z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
+        function $reverse(z::PseudoCouple{V,B}) where {V,B}
+            PseudoCouple{V,B}(Complex($p($g(B)) ? -z.v.re : z.v.re,$p($g(V)) ? -z.v.im : z.v.im))
         end
         function $reverse(z::Phasor{V,B}) where {V,B}
             Phasor{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
@@ -1517,6 +1808,43 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                     end
                 end
                 return Spinor{V}(out)
+            end end
+        end
+        @generated function $reverse(m::AntiSpinor{V,T}) where {V,T}
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:ps,:bn,:D),:svec)...)
+                out = zeros(svecs(N,Any))
+                for g ∈ evens(2,N+1)
+                    pg = $p($(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        v = :(@inbounds m.v[$(@inbounds ps[g]+i)])
+                        if D==0
+                            @inbounds setanti!(out,pg ? :($SUB($v)) : v,ib[i],Val{N}())
+                        else
+                            @inbounds B = ib[i]
+                            setanti!(out,$p($g(V,B)) ? :($SUB($v)) : v,B,Val{N}())
+                        end
+                    end
+                end
+                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,:T),out...))))
+            else return quote
+                $(insert_expr((:N,:ps,:bn,:D),:svec)...)
+                out = zeros($VECS(N,T))
+                for g ∈ 2:2:N+1
+                    pg = $$p($$(reverse≠:antireverse ? :(g-1) : :(N+1-g)))
+                    ib = indexbasis(N,g-1)
+                    @inbounds for i ∈ 1:bn[g]
+                        @inbounds v = m.v[ps[g]+i]
+                        v≠0 && if D==0
+                            @inbounds setanti!(out,pg ? $SUB(v) : v,ib[i],Val{N}())
+                        else
+                            @inbounds B = ib[i]
+                            setanti!(out,$$p($$g(V,B)) ? $SUB(v) : v,B,Val{N}())
+                        end
+                    end
+                end
+                return AntiSpinor{V}(out)
             end end
         end
     end
