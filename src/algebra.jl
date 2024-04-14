@@ -607,10 +607,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             :(Couple{V,basis(a)}(Complex($bop(value(b)),value(a))))
         elseif !istangent(V) && !hasconformal(V) && L == grade(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(PseudoCouple{V,basis(b)}(Complex(value(b),$bop(value(a)))))
+            :(PseudoCouple{V,basis(b)}(Complex($bop(value(b)),value(a))))
         elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(PseudoCouple{V,basis(a)}(Complex($bop(value(a)),value(b))))
+            :(PseudoCouple{V,basis(a)}(Complex(value(a),$bop(value(b)))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
