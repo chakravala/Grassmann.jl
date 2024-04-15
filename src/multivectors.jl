@@ -128,20 +128,22 @@ equal(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value
 isapprox(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .≈ b.v)
 isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ value(b))
 
-function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
+@generated function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
-    Chain{V,G}(setblade!(zeros(mvec(N,G,𝕂)),val,UInt(v),Val(N)))
+    b = bladeindex(N,UInt(basis(v)))
+    if N<cache_limit
+        :(Chain{V,G,𝕂}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:binomial(N,G)]...))))
+    else
+        :(Chain{V,G}(setblade!(zeros(mvec($N,G,𝕂)),val,UInt(v),$(Val(N)))))
+    end
 end
 Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(val,v)
 Chain(v::Submanifold) = Chain(one(Int),v)
 Chain(v::Single) = Chain(v.v,basis(v))
 Chain{V,G,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
-Chain{V,G,𝕂}(v::Single{V}) where {V,G,𝕂} = Chain{V,G,𝕂}(v.v,basis(v))
+Chain{V,G,𝕂}(v::Single{V}) where {V,G,𝕂} = Chain{V,G,𝕂}(value(v),basis(v))
 Chain{V,G,T,X}(x::Single{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
-function Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v}
-    N = mdims(V)
-    Chain{V,0}(setblade!(zeros(mvec(N,0,T)),value(x),UInt(v),Val(N)))
-end
+Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v} = Chain{V,0,T}(value(x),basis(x))
 
 Single(m::Chain{V,0,T,1} where {V,T}) = scalar(m)
 Single(m::Chain{V,G,T,1} where {V,G,T}) = volume(m)
@@ -266,12 +268,18 @@ Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
 """
 Multivector{V}(v::S) where {V,S<:AbstractVector{T}} where T = Multivector{V,T}(v)
 for var ∈ ((:V,:T),(:T,),())
-    @eval function Multivector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
+    @eval @generated function Multivector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
         N = mdims(V)
-        out = zeros(mvec(N,T))
-        r = binomsum(N,G)
-        @inbounds out[list(r+1,r+binomial(N,G))] = v.v
-        return Multivector{V}(out)
+        r,b = binomsum(N,G),binomial(N,G)
+        if N<cache_limit
+            :(Multivector{V}(Values($([i>r&&i≤r+b ? :(@inbounds v.v[$(i-r)]) : zero(T) for i ∈ 1:1<<N]...))))
+        else
+            quote
+                out = zeros(mvec($N,T))
+                @inbounds out[list($(r+1),$(r+b))] = v.v
+                return Multivector{V}(out)
+            end
+        end
     end
 end
 
@@ -283,6 +291,7 @@ end
     end)
 end
 
+Multivector(val::TensorAlgebra{V}) where V = Multivector{V}(val)
 Multivector{V}(val::NTuple{N,T}) where {V,N,T} = Multivector{V}(Values{N,T}(val))
 Multivector{V}(val::NTuple{N,Any}) where {V,N} = Multivector{V}(Values{N}(val))
 Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(val))
@@ -355,9 +364,14 @@ Base.one(t::Type{Multivector{V,T,X}}) where {V,T,X} = zero(t)+one(V)
 
 Single(v,b::Multivector) = v*b
 
-function Multivector(val::T,v::Submanifold{V,G}) where {V,T,G}
+@generated function Multivector(val::T,v::Submanifold{V,G}) where {V,T,G}
     N = mdims(V)
-    Multivector{V}(setmulti!(zeros(mvec(N,T)),val,UInt(v),Val{N}()))
+    b = basisindex(N,UInt(basis(v)))
+    if N<cache_limit
+        :(Multivector{V}(Values($([i==b ? :val : zero(T) for i ∈ 1:1<<N]...))))
+    else
+        :(Multivector{V}(setmulti!(zeros(mvec(N,T)),val,UInt(v),Val{N}())))
+    end
 end
 Multivector(v::Submanifold{V,G}) where {V,G} = Multivector(one(Int),v)
 for var ∈ ((:V,:T),(:T,))
@@ -433,10 +447,15 @@ Spinor (`even` grade) type with pseudoscalar `V::Manifold` and scalar field `�
 """
 Spinor{V}(val::Submanifold{V}) where V = Spinor{V,Int}(1,val)
 Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
-function Spinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
-    isodd(G) && error("$(typeof(v)) is not expressible as a Spinor")
+@generated function Spinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
+    isodd(G) && error("$v is not expressible as a Spinor")
     N = mdims(V)
-    Spinor{V,𝕂}(setspin!(zeros(mvecs(N,𝕂)),val,UInt(v),Val(N)))
+    b = spinindex(N,UInt(basis(v)))
+    if N<cache_limit
+        :(Spinor{V}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:1<<(N-1)]...))))
+    else
+        :(Spinor{V,𝕂}(setspin!(zeros(mvecs($N,𝕂)),val,UInt(v),$(Val(N)))))
+    end
 end
 
 """
@@ -446,10 +465,15 @@ PsuedoSpinor (`odd` grade) type with pseudoscalar `V::Manifold` and scalar `𝕂
 """
 AntiSpinor{V}(val::Submanifold{V}) where V = AntiSpinor{V,Int}(1,val)
 AntiSpinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = AntiSpinor{V,𝕜}(1,v)
-function AntiSpinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
-    iseven(G) && error("$(typeof(v)) is not expressible as a AntiSpinor")
+@generated function AntiSpinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
+    iseven(G) && error("$v is not expressible as an AntiSpinor")
     N = mdims(V)
-    AntiSpinor{V,𝕂}(setanti!(zeros(mvecs(N,𝕂)),val,UInt(v),Val(N)))
+    b = antiindex(N,UInt(basis(v)))
+    if N<cache_limit
+        :(AntiSpinor{V}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:1<<(N-1)]...))))
+    else
+        :(AntiSpinor{V,𝕂}(setanti!(zeros(mvecs($N,𝕂)),val,UInt(v),$(Val(N)))))
+    end
 end
 
 @generated function Spinor{V}(t::Chain{V,G,T}) where {V,G,T}
@@ -610,35 +634,17 @@ Couple(m::TensorTerm{V}) where V = Couple{V,basis(m)}(Complex(m))
 Couple(m::TensorTerm{V,0}) where V = Couple{V,Submanifold(V)}(Complex(m))
 PseudoCouple(m::TensorTerm{V,G}) where {V,G} = G==grade(V) ? PseudoCouple{V,One(V)}(value(m)*im) : PseudoCouple{V,basis(m)}(Complex(value(m)))
 
-@generated Multivector{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adder2(a,b,:+)
+@generated Multivector{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = addermulti(a,b,:+)
 Multivector{V,T}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))
 Multivector{V,T}(z::PseudoCouple{V,B,T}) where {V,B,T} = Multivector{V}(imaginary(z), volume(z))
 
-function Spinor{V,𝕂}(val::Couple{V,B,𝕂}) where {V,B,𝕂}
-    isodd(grade(B)) && error("$B is not expressible as Spinor")
-    N = mdims(V)
-    out = zeros(mvecs(N,𝕂))
-    setspin!(out,val.v.re,UInt(0),Val(N))
-    setspin!(out,val.v.im,UInt(B),Val(N))
-    Spinor{V,𝕂}(out)
-end
-function Spinor{V,𝕂}(val::PseudoCouple{V,B,𝕂}) where {V,B,𝕂}
-    (isodd(grade(B)) | isodd(grade(V))) && error("$B and $(Submanifold(V)) are not expressible as Spinor")
-    N = mdims(V)
-    out = zeros(mvecs(N,𝕂))
-    setspin!(out,val.v.re,UInt(B),Val(N))
-    setspin!(out,val.v.im,UInt(V),Val(N))
-    Spinor{V,𝕂}(out)
-end
+@generated Spinor{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adderspin(a,b,:+)
+Spinor{V,𝕂}(z::Couple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V}(scalar(z), imaginary(z))
+Spinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V}(imaginary(z), volume(z))
+
+@generated AntiSpinor{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adderanti(a,b,:+)
 AntiSpinor{V}(val::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V,𝕂}(val)
-function AntiSpinor{V,𝕂}(val::PseudoCouple{V,B,𝕂}) where {V,B,𝕂}
-    (iseven(grade(B)) | iseven(grade(V))) && error("$B and $(Submanifold(V)) are not expressible as AntiSpinor")
-    N = mdims(V)
-    out = zeros(mvecs(N,𝕂))
-    setanti!(out,val.v.re,UInt(B),Val(N))
-    setanti!(out,val.v.im,UInt(V),Val(N))
-    AntiSpinor{V,𝕂}(out)
-end
+AntiSpinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V}(imaginary(z),volume(z))
 
 function Base.show(io::IO,z::Couple{V,B}) where {V,B}
     r, i = reim(z)
@@ -871,7 +877,8 @@ import AbstractTensors: antiabs, antiabs2, geomabs, unit, unitize, unitnorm
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
-export basis, grade, antigrade, hasinf, hasorigin, scalar, norm, gdims, betti, χ, unitnorm
+export gdims, betti, χ
+export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
 export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
 
@@ -898,6 +905,10 @@ const ScalarIrrational = Union{AbstractIrrational,Single{V,G,B,<:AbstractIrratio
 (::Type{Complex})(m::Imaginary) = Complex(value(m)...)
 (::Type{Complex{T}})(m::Imaginary) where T<:Real = Complex{T}(value(m)...)
 Couple(m::Imaginary{V}) where V = Couple{V,Submanifold(V)}(Complex(m))
+
+Spinor{V}(t::Spinor{V}) where V = t
+AntiSpinor{V}(t::AntiSpinor{V}) where V = t
+Multivector{V}(t::Multivector{V}) where V = t
 
 multispin(t::Multivector) = t
 multispin(t::Spinor) = t

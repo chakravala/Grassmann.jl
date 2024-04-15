@@ -565,8 +565,6 @@ end
 
 ### Algebra Constructors
 
-insert_t(x) = Expr(:block,:(t=promote_type(valuetype(a),valuetype(b))),x)
-
 addvec(a,b,s,o) = o ≠ :+ ? subvec(a,b,s) : addvec(a,b,s)
 addvec(a,b,s) = isfixed(a,b) ? (:($Sym.:∑),:($Sym.:∑),:svec) : (:+,:+,:mvec)
 subvec(a,b,s) = isfixed(a,b) ? (s ? (:($Sym.:-),:($Sym.:∑),:svec) : (:($Sym.:∑),:($Sym.:-),:svec)) : (s ? (:-,:+,:mvec) : (:+,:-,:mvec))
@@ -613,12 +611,11 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             :(PseudoCouple{V,basis(a)}(Complex(value(a),$bop(value(b)))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
-                $(insert_expr((:N,:ib),:svec)...)
-                out = zeros(svec(N,G,Any))
-                setblade!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-                setblade!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
-                return Expr(:block,insert_expr((:t,),VEC)...,
-                    :(Chain{V,L}($(Expr(:call,tvec(N,G,:t),out...)))))
+                $(insert_expr((:N,:ib,:t),:mvec)...)
+                out = svec(N,G,Any)(zeros(svec(N,G,t)))
+                setblade!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
+                setblade!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
+                return :(Chain{V,L}($(Expr(:call,tvec(N,G,t),out...))))
             else return quote
                 $(insert_expr((:N,:t))...)
                 out = zeros($VEC(N,L,t))
@@ -627,55 +624,57 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 return Chain{V,L}(out)
             end end
         elseif iseven(L) && iseven(G)
-            if mdims(V)-1<cache_limit
-                $(insert_expr((:N,),:svecs)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out,ib = zeros(svecs(N,Any)),indexbasis(N)
-                setspin!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-                setspin!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
-                return Expr(:block,insert_expr((:t,),VEC)...,
-                    :(Spinor{V}($(Expr(:call,tvecs(N,:t),out...)))))
-            else quote
-                $(insert_expr((:N,),VEC)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out = zeros(svecs(N,Any))
-                setspin!(out,value(a,t),UInt(basis(a)),Val{N}())
-                setspin!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-                return Spinor{V}(out)
-            end end
+            adderspin(a,b,op)
         elseif isodd(L) && isodd(G)
-            if mdims(V)-1<cache_limit
-                $(insert_expr((:N,),:svecs)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out,ib = zeros(svecs(N,Any)),indexbasis(N)
-                setanti!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-                setanti!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
-                return Expr(:block,insert_expr((:t,),VEC)...,
-                    :(AntiSpinor{V}($(Expr(:call,tvecs(N,:t),out...)))))
-            else quote
-                $(insert_expr((:N,),VEC)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out = zeros(svecs(N,Any))
-                setanti!(out,value(a,t),UInt(basis(a)),Val{N}())
-                setanti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-                return AntiSpinor{V}(out)
-            end end
+            adderanti(a,b,op)
         else
-            adder2(a,b,op)
+            addermulti(a,b,op)
         end
     end
-    @noinline function adder2(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
+    @noinline function adderspin(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
+        (isodd(L) || isodd(G)) && (return :(error("$(basis(a)) and $(basis(b)) are not expressible as Spinor")))
+        left,bop,VEC = addvec(a,b,false,op)
+        if mdims(V)-1<cache_limit
+            $(insert_expr((:N,:t),:mvecs)...)
+            out,ib = svecs(N,Any)(zeros(svecs(N,t))),indexbasis(N)
+            setspin!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
+            setspin!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
+            return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+        else quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = zeros(mvecs(N,t))
+            setspin!(out,value(a,t),UInt(basis(a)),Val{N}())
+            setspin!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+            return Spinor{V}(out)
+        end end
+    end
+    @noinline function adderanti(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
+        (iseven(L) || iseven(G)) && (return :(error("$(basis(a)) and $(basis(b)) are not expressible as AntiSpinor")))
+        left,bop,VEC = addvec(a,b,false,op)
+        if mdims(V)-1<cache_limit
+            $(insert_expr((:N,),:svecs)...)
+            t = promote_type(valuetype(a),valuetype(b))
+            out,ib = svecs(N,Any)(zeros(svecs(N,t))),indexbasis(N)
+            setanti!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
+            setanti!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
+            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t),out...))))
+        else quote
+            $(insert_expr((:N,:t),VEC)...)
+            out = zeros(mvecs(N,t))
+            setanti!(out,value(a,t),UInt(basis(a)),Val{N}())
+            setanti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
+            return AntiSpinor{V}(out)
+        end end
+    end
+    @noinline function addermulti(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
         left,bop,VEC = addvec(a,b,false,op)
         if mdims(V)<cache_limit
-            $(insert_expr((:N,),:svec)...)
-            out,ib = zeros(svec(N,Any)),indexbasis(N)
-            setmulti!_pre(out,:(value(a,t)),UInt(basis(a)),Val{N}())
-            setmulti!_pre(out,:($bop(value(b,t))),UInt(basis(b)),Val{N}())
-            return Expr(:block,insert_expr((:t,),VEC)...,
-                :(Multivector{V}($(Expr(:call,tvec(N,:t),out...)))))
+            $(insert_expr((:N,:t),:mvec)...)
+            out,ib = svec(N,Any)(zeros(svec(N,t))),indexbasis(N)
+            setmulti!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
+            setmulti!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
+            return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
         else quote
-            #@warn("sparse MultiGrade{V} objects not properly handled yet")
-            #return MultiGrade{V}(a,b)
             $(insert_expr((:N,:t,:out),VEC)...)
             setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
             setmulti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
@@ -685,9 +684,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
         if binomial(mdims(V),G)<(1<<cache_limit)
-            $(insert_expr((:N,:ib),:svec)...)
-            t = promote_type(valuetype(a),valuetype(b))
-            out = zeros(svec(N,G,Any))
+            $(insert_expr((:N,:ib,:t),:mvec)...)
+            out = svec(N,G,Any)(zeros(svec(N,G,t)))
             X = UInt(basis(a))
             for k ∈ list(1,binomial(N,G))
                 B = @inbounds ib[k]
@@ -733,9 +731,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             end
         elseif iseven(L) && iseven(G)
             if mdims(V)-1<cache_limit
-                $(insert_expr((:N,:ib,:bn),:svecs)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out = zeros(svecs(N,Any))
+                $(insert_expr((:N,:ib,:bn,:t),:mvecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,t)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -759,9 +756,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             end end end
         elseif isodd(L) && isodd(G)
             if mdims(V)-1<cache_limit
-                $(insert_expr((:N,:ib,:bn),:svecs)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out = zeros(svecs(N,Any))
+                $(insert_expr((:N,:ib,:bn,:t),:mvecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,t)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -785,9 +781,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             end end end
         else
             if mdims(V)<cache_limit
-                $(insert_expr((:N,:ib,:bn),:svec)...)
-                t = promote_type(valuetype(a),valuetype(b))
-                out = zeros(svec(N,Any))
+                $(insert_expr((:N,:ib,:bn,:t),:mvec)...)
+                out = svec(N,Any)(zeros(svec(N,t)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -814,9 +809,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:Multivector{V,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:bs,:bn),:svec)...)
-            t = promote_type(valuetype(a),valuetype(b))
-            out = zeros(svec(N,Any))
+            $(insert_expr((:N,:bs,:bn,:t),:mvec)...)
+            out = svec(N,Any)(zeros(svec(N,t)))
             X = UInt(basis(a))
             for g ∈ list(1,N+1)
                 ib = indexbasis(N,g-1)
@@ -845,9 +839,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         VECS = Symbol(string(VEC)*"s")
         !iseven(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:rs,:bn),:svec)...)
-            t = promote_type(valuetype(a),valuetype(b))
-            out = zeros(svecs(N,Any))
+            $(insert_expr((:N,:rs,:bn,:t),:mvecs)...)
+            out = svecs(N,Any)(zeros(svecs(N,t)))
             X = UInt(basis(a))
             for g ∈ evens(1,N+1)
                 ib = indexbasis(N,g-1)
@@ -876,9 +869,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         VECS = Symbol(string(VEC)*"s")
         !isodd(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
         if mdims(V)<cache_limit
-            $(insert_expr((:N,:ps,:bn),:svec)...)
-            t = promote_type(valuetype(a),valuetype(b))
-            out = zeros(svecs(N,Any))
+            $(insert_expr((:N,:ps,:bn,:t),:mvecs)...)
+            out = svecs(N,Any)(zeros(svecs(N,t)))
             X = UInt(basis(a))
             for g ∈ evens(2,N+1)
                 ib = indexbasis(N,g-1)
@@ -916,8 +908,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return swap ? :(b[1]*complementlefthodge(~a)) : S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
-                $(insert_expr((:N,:t,:bng,:ib,:μ),:svecs)...)
-                out = zeros(svecs(N,t))
+                $(insert_expr((:N,:t,:bng,:ib,:μ),:mvecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,t)))
                 B = indexbasis(N,L)
                 for i ∈ list(1,binomial(N,L))
                     @inbounds v,ibi = :(@inbounds a[$i]),B[i]
@@ -926,7 +918,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     end
                 end
             else
-                $(insert_expr((:N,:t,:out,:ib,:μ),:svecs)...)
+                $(insert_expr((:N,:t,:ib,:μ),:mvecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,t)))
                 U = UInt(basis(a))
                 for i ∈ list(1,binomial(N,G))
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
@@ -937,7 +930,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     end
                 end
             end
-            return insert_t(:($type{V}($(Expr(:call,tvecs(N,μ),out...)))))
+            return :($type{V}($(Expr(:call,tvecs(N,t),out...))))
         elseif S<:Chain; return quote
             $(insert_expr((:N,:t,:bng,:ib,:μ),VEC)...)
             out = zeros($VEC(N,t))
@@ -981,11 +974,11 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         GL = swap ? G-L : L-G
         if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
-                $(insert_expr((:N,:t,:bng,:bnl),:svec)...)
+                $(insert_expr((:N,:t,:bng,:bnl),:mvec)...)
                 μ = istangent(V)|hasconformal(V)
                 ia = indexbasis(N,L)
                 ib = indexbasis(N,G)
-                out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
+                out = (μ ? svec(N,Any) : svec(N,GL,Any))(zeros(μ ? svec(N,t) : svec(N,GL,t)))
                 for i ∈ list(1,bnl)
                     @inbounds v,iai = :(@inbounds a[$i]),ia[i]
                     for j ∈ list(1,bng)
@@ -997,8 +990,8 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     end
                 end
             else
-                $(insert_expr((:N,:t,:ib,:bng,:μ),:svec)...)
-                out = zeros(μ ? svec(N,Any) : svec(N,GL,Any))
+                $(insert_expr((:N,:t,:ib,:bng,:μ),:mvec)...)
+                out = (μ ? svec(N,Any) : svec(N,GL,Any))(zeros(μ ? svec(N,t) : svec(N,GL,t)))
                 U = UInt(basis(a))
                 for i ∈ list(1,bng)
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
@@ -1019,9 +1012,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             end
             #return :(value_diff(Single{V,0,$(getbasis(V,0))}($(value(mv)))))
             return if μ
-                insert_t(:(Multivector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
+                :(Multivector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,t),out...))))
             else
-                insert_t(:(value_diff(Chain{$V,$GL}($(Expr(:call,tvec(N,GL,:t),out...))))))
+                :(value_diff(Chain{$V,$GL}($(Expr(:call,tvec(N,GL,t),out...)))))
             end
         elseif S<:Chain; return quote
             $(insert_expr((:N,:t,:bng,:bnl,:μ),VEC)...)
@@ -1087,10 +1080,11 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
         end
         if binomial(mdims(W),L)*(S<:Chain ? binomial(mdims(w),G) : 1)<(1<<cache_limit)
             if S<:Chain
-                $(insert_expr((:N,:t,:μ),:mvec,:T,:S)...)
+                $(insert_expr((:N,:μ),:mvec,:T,:S)...)
+                t = promote_type(valuetype(a),valuetype(b))
                 ia = indexbasis(mdims(w),G)
                 ib = indexbasis(mdims(W),L)
-                out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
+                out = (μ ? svec(N,Any) : svec(N,$GL,Any))(zeros(μ ? svec(N,t) : svec(N,$GL,t)))
                 CA,CB = isdual(w),isdual(W)
                 for i ∈ list(1,binomial(mdims(w),G))
                     @inbounds v,iai = :(@inbounds a[$i]),ia[i]
@@ -1105,9 +1099,10 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                     end
                 end
             else
-                $(insert_expr((:N,:t,:μ),:mvec,Int,:T)...)
+                $(insert_expr((:N,:μ),:mvec,Int,:T)...)
+                t = promote_type(valuetype(a),valuetype(b))
                 ib = indexbasis(mdims(R),L)
-                out = zeros(μ ? svec(N,Any) : svec(N,$GL,Any))
+                out = (μ ? svec(N,Any) : svec(N,$GL,Any))(zeros(μ ? svec(N,t) : svec(N,$GL,t)))
                 C,x = isdual(R),isdual(Q) ? dual(V,UInt(basis(a))) : UInt(basis(a))
                 for i ∈ list(1,binomial(mdims(W),L))
                     X = @inbounds C ? dual(V,ib[i]) : ib[i]
@@ -1128,9 +1123,9 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
                 end
             end
             return if μ
-                insert_t(:(Multivector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,:t),out...)))))
+                :(Multivector{$V}($(Expr(:call,istangent(V) ? tvec(N) : tvec(N,t),out...))))
             else
-                insert_t(:(Chain{$V,$$GL}($(Expr(:call,tvec(N,$GL,:t),out...)))))
+                :(Chain{$V,$$GL}($(Expr(:call,tvec(N,$GL,t),out...))))
             end
         elseif S<:Chain; return quote
             V = $V
@@ -1234,7 +1229,7 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
             bs = $(inspin ? :spinsum_set : inanti ? :antisum_set : :binomsum_set)(N)
-            out = zeros($(outmulti ? :svec : :svecs)(N,Any))
+            out = $(outmulti ? :svec : :svecs)(N,Any)(zeros($(outmulti ? :svec : :svecs)(N,t)))
             for g ∈ $(inspin ? :(evens(1,N+1)) : inanti ? :(evens(2,N+1)) : :(list(1,N+1)))
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
@@ -1257,9 +1252,10 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                     end
                 end
             end
-            return insert_t(:($$outype{V}($(Expr(:call,$(outmulti ? :tvec : :tvecs)(N,μ),out...)))))
+            return :($$outype{V}($(Expr(:call,$(outmulti ? :tvec : :tvecs)(N,t),out...))))
         else return quote
-            $(insert_expr((:N,:t,:out,:ib,:bn,:μ),VECS)...)
+            $(insert_expr((:N,:t,:ib,:bn,:μ),VECS)...)
+            out = zeros($(outmulti ? :svec : :svecs)(N,t)) # VECS
             bs = $(inspin ? :spinsum_set : inanti ? :antisum_set : :binomsum_set)(N)
             for g ∈ $(inspin ? :(1:2:N+1) : inanti ? :(2:2:N+1) : :(1:N+1))
                 ia = indexbasis(N,g-1)
@@ -1338,10 +1334,12 @@ end
 for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
     outspin = com ∈ (:spinor,:anti,:s_a,:a_s)
     left,leftspin,right,rightspin,br = leftrightsym(com)
+    VEC = outspin ? :svecs : :svec
     genloop = Symbol(:generate_loop_,com)
-    @eval @noinline function $genloop(V,a,b,MUL,product!,preproduct!,d=nothing)
+    @eval @noinline function $genloop(V,a,b,t,MUL,product!,preproduct!,d=nothing)
         if mdims(V)<cache_limit/2
-            $(insert_expr((:N,:t,:out,br...,:bn),outspin ? :svecs : :svec)...)
+            $(insert_expr((:N,br...,:bn),:mvec)...)
+            out = $VEC(N,Any)(zeros($VEC(N,t)))
             for g ∈ $leftspin
                 X = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
@@ -1355,7 +1353,7 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                     end
                 end
             end
-            (:N,:t,:out), :(out = $(Expr(:call,$(outspin ? :tvecs : :tvec)(N,:t),out...)))
+            (:N,:t,:out), :(out = $(Expr(:call,$(outspin ? :tvecs : :tvec)(N,t),out...)))
         else
             (:N,:t,:out,br...,:bn,:μ), quote
                 for g ∈ $leftspin

@@ -12,7 +12,7 @@
 #   https://github.com/chakravala
 #   https://crucialflow.com
 
-export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudodot, @pseudo
+export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudometric, pseudodot, @pseudo
 export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 
@@ -45,7 +45,7 @@ function Base.expm1(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.expm1(b::Multivector{V,T}) where {V,T}
-    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:k)
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:k)
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
@@ -72,7 +72,7 @@ end
 end
 
 @eval @generated function Base.expm1(b::Spinor{V,T}) where {V,T}
-    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:k)
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:k)
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
@@ -240,7 +240,7 @@ end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 qlog_fast(b::PseudoCouple,x::Int=10000) = qlog_fast(multispin(b),x)
 qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
 @eval @generated function qlog_fast(b::Multivector{V,T,E},x::Int=10000) where {V,T,E}
-    loop = generate_loop_multivector(V,:prod,:B,:*,:geomaddmulti!,geomaddmulti!_pre)
+    loop = generate_loop_multivector(V,:prod,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre)
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
@@ -271,7 +271,7 @@ qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
 end
 
 @eval @generated function qlog_fast(b::Spinor{V,T,E},x::Int=10000) where {V,T,E}
-    loop = generate_loop_spinor(V,:prod,:B,:*,:geomaddspin!,geomaddspin!_pre)
+    loop = generate_loop_spinor(V,:prod,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre)
     return quote
         $(insert_expr(loop[1],:mvec,:T,Float64)...)
         f = norm(b)
@@ -415,7 +415,7 @@ function Base.cosh(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.cosh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
@@ -444,7 +444,7 @@ end
 end
 
 @eval @generated function Base.cosh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
@@ -499,7 +499,7 @@ function Base.sinh(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.sinh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
@@ -527,7 +527,7 @@ end
 end
 
 @eval @generated function Base.sinh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))

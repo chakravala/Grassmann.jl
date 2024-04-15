@@ -25,7 +25,7 @@ export complementleftanti, complementrightanti
 ## reverse
 
 import Base: reverse, conj, ~
-export involute, clifford, antireverse, antiinvolute, anticlifford
+export involute, clifford, pseudoreverse, antireverse
 
 ## product parities
 
