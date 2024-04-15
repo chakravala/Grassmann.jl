@@ -622,7 +622,7 @@ end
 
 function Base.abs2(z::PseudoCouple{V,B}) where {V,B}
     out = abs2(z.v.re)*abs2_inv(B) + abs2(z.v.im)*abs2_inv(V)
-    if parityreverse(grade(B)) ≠ parityreverse(grade(V))
+    if (~B)*basis(V) ≠ (~basis(V))*B
         return out
     else
         out + (2complementrighthodge(B))*(z.v.re*z.v.im)
