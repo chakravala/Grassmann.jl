@@ -877,6 +877,7 @@ export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, 
 
 const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
+const AntiQuaternion{V,T} = AntiSpinor{V,T,4}
 const LipschitzInteger{V,T<:Integer} = Quaternion{V,T}
 const GaussianInteger{V,B,T<:Integer} = Couple{V,B,T}
 const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
@@ -916,7 +917,12 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
 end
 
 export quaternion
+quaternion(qijk::Values{4}) = quaternion(Submanifold(3),qijk)
+quaternion(q,i,j,k) = quaternion(Submanifold(3),Values(q,i,j,k))
+quaternion(V,q,i,j,k) = quaternion(V,Values(q,i,-j,k))
+quaternion(V,qijk::Values{4}) = Quaternion{V}(qijk)
 quaternion(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
+quaternion(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::Multivector{V,T} where V) where T = T
@@ -969,6 +975,7 @@ Base.isapprox(a::S,b::T) where {S<:AntiSpinor,T<:AntiSpinor} = Manifold(a)==Mani
 @inline trivector(t::Spinor{V}) where V = Zero(V)
 @inline trivector(t::AntiSpinor) = t(Val(3))
 #@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
+@inline volume(t::Chain{V,G,T,1}) where {V,G,T} = @inbounds Single{V,G,basis(V)}(t.v[1])
 @inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(z.v.im) : Zero(V)
 @inline volume(z::PseudoCouple{V}) where V = Single{V,mdims(V),Submanifold(V)}(z.v.im)
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])
@@ -976,6 +983,8 @@ Base.isapprox(a::S,b::T) where {S<:AntiSpinor,T<:AntiSpinor} = Manifold(a)==Mani
 @inline volume(t::AntiSpinor{V}) where V = isodd(grade(V)) ? (@inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])) : Zero(V)
 @inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
 @inline imaginary(z::PseudoCouple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.re)
+@inline imaginary(z::Quaternion) = bivector(z)
+@inline imaginary(z::AntiQuaternion) = vector(z)
 @inline isscalar(t) = norm(t) ≈ norm(scalar(t))
 @inline isvector(t) = norm(t) ≈ norm(vector(t))
 @inline isbivector(t) = norm(t) ≈ norm(bivector(t))
@@ -989,6 +998,49 @@ function isscalar(z::Phasor)
         isscalar(Couple(z))
     end
 end
+
+@pure maxgrade(t::TensorGraded) = grade(t)
+@pure maxgrade(t::Couple{V,B}) where {V,B} = grade(B)
+@pure maxgrade(t::PseudoCouple{V}) where V = grade(V)
+@pure maxgrade(t::Spinor{V}) where V = isodd(mdims(V)) ? mdims(V)-1 : mdims(V)
+@pure maxgrade(t::AntiSpinor{V}) where V = isodd(mdims(V)) ? mdims(V) : mdims(V)-1
+@pure maxgrade(t::Multivector{V}) where V = mdims(V)
+@pure mingrade(t::TensorGraded) = grade(t)
+@pure mingrade(t::Couple) = 0
+@pure mingrade(t::PseudoCouple{V,B}) where {V,B} = grade(B)
+@pure mingrade(t::Spinor) = 0
+@pure mingrade(t::AntiSpinor) = 1
+@pure mingrade(t::Multivector) = 0
+
+@pure maxgrade(t::Type{<:TensorGraded}) = grade(t)
+@pure maxgrade(t::Type{<:Couple{V,B}}) where {V,B} = grade(B)
+@pure maxgrade(t::Type{<:PseudoCouple{V}}) where V = grade(V)
+@pure maxgrade(t::Type{<:Spinor{V}}) where V = isodd(mdims(V)) ? mdims(V)-1 : mdims(V)
+@pure maxgrade(t::Type{<:AntiSpinor{V}}) where V = isodd(mdims(V)) ? mdims(V) : mdims(V)-1
+@pure maxgrade(t::Type{<:Multivector{V}}) where V = mdims(V)
+@pure mingrade(t::Type{<:TensorGraded}) = grade(t)
+@pure mingrade(t::Type{<:Couple}) = 0
+@pure mingrade(t::Type{<:PseudoCouple{V,B}}) where {V,B} = grade(B)
+@pure mingrade(t::Type{<:Spinor}) = 0
+@pure mingrade(t::Type{<:AntiSpinor}) = 1
+@pure mingrade(t::Type{<:Multivector}) = 0
+
+@pure nextgrade(t::Spinor) = 2
+@pure nextgrade(t::AntiSpinor) = 2
+@pure nextgrade(t::Multivector) = 1
+@pure nextgrade(t::Type{<:Spinor}) = 2
+@pure nextgrade(t::Type{<:AntiSpinor}) = 2
+@pure nextgrade(t::Type{<:Multivector}) = 1
+@pure nextmingrade(t) = mingrade(t)+nextgrade(t)
+@pure nextmaxgrade(t) = maxgrade(t)-nextgrade(t)
+
+@pure maxpseudograde(t::Multivector) = maxgrade(t)
+@pure maxpseudograde(t::Spinor{V}) where V = mdims(V)
+@pure maxpseudograde(t::AntiSpinor{V}) where V = mdims(V)-1
+@pure maxpseudograde(t::Type{<:Multivector}) = maxgrade(t)
+@pure maxpseudograde(t::Type{<:Spinor{V}}) where V = mdims(V)
+@pure maxpseudograde(t::Type{<:AntiSpinor{V}}) where V = mdims(V)-1
+@pure nextmaxpseudograde(t) = maxpseudograde(t)-nextgrade(t)
 
 Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
 function Leibniz.gdims(t::Vector{<:Chain})

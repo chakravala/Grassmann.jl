@@ -710,7 +710,28 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     end
     @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T,L}
         left,right,VEC = addvec(a,b,swap,op)
-        if iseven(L) && iseven(G)
+        if !istangent(V) && !hasconformal(V) && L == 0 && G == mdims(V) &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            if swap
+                :(Couple{V,basis(V)}(Complex($right(value(a)),b.v[1])))
+            else
+                :(Couple{V,basis(V)}(Complex(value(a),$right(b.v[1]))))
+            end
+        elseif !istangent(V) && !hasconformal(V) && G == 0 &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            if swap
+                :(Couple{V,basis(a)}(Complex(b.v[1],$right(value(a)))))
+            else
+                :(Couple{V,basis(a)}(Complex($right(b.v[1]),value(a))))
+            end
+        elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
+                valuetype(a)<:Real && valuetype(b)<:Real
+            if swap
+                :(PseudoCouple{V,basis(a)}(Complex($right(value(a)),b.v[1])))
+            else
+                :(PseudoCouple{V,basis(a)}(Complex(value(a),$right(b.v[1]))))
+            end
+        elseif iseven(L) && iseven(G)
             if mdims(V)-1<cache_limit
                 $(insert_expr((:N,:ib,:bn),:svecs)...)
                 t = promote_type(valuetype(a),valuetype(b))
@@ -886,7 +907,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         anti = isodd(L) ≠ isodd(G)
         type = anti ? :AntiSpinor : :Spinor
         if G == 0
-            return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(@inbounds b[1])))) : swap ? :(@inbounds b[1]*a) : :(@inbounds a*b[1])
+            return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(@inbounds b[1])))) : swap ? :(Single(b)⟑a) : :(a⟑Single(b))
         elseif S<:Chain && L == 0
             return :(Chain{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
@@ -954,6 +975,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,contr=:contraction) where S<:TensorGraded{V,L} where {V,G,T,L}
         MUL,VEC = mulvec(a,b,contr)
         (swap ? G<L : L<G) && (!istangent(V)) && (return Zero(V))
+        if (G==0 || G==mdims(V)) && (!istangent(V))
+            return swap ? :(contraction(Single(b),a)) : :(contraction(a,Single(b)))
+        end
         GL = swap ? G-L : L-G
         if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
@@ -1058,6 +1082,9 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
         w,W = swap ? (R,Q) : (Q,R)
         V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
         $po(G+L,mdims(V)) && (!istangent(V)) && (return Zero(V))
+        if (L==0 || L==mdims(V)) && (!istangent(V))
+            return swap ? :($$op(Single(b),a)) : :($$op(a,Single(b)))
+        end
         if binomial(mdims(W),L)*(S<:Chain ? binomial(mdims(w),G) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:μ),:mvec,:T,:S)...)
@@ -1173,9 +1200,37 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
     preproduct! = outmulti ? Symbol(product,:multi!_pre) : outspin ? :($(inspin ? :isodd : :iseven)(G) ? $(Symbol(product,:anti!_pre)) : $(Symbol(product,:spin!_pre))) : :(isodd(G)⊻isodd(N) ? $(Symbol(product,outspin⊻inspin ? :anti!_pre : :spin!_pre)) : $(Symbol(product,outspin⊻inspin ? :spin!_pre : :anti!_pre)))
     prop = op≠:* ? Symbol(:product_,op) : :product
     outmulti && @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
+    mgrade,nmgrade = op≠:∧ ? (:maxgrade,:nextmaxgrade) : (:mingrade,:nextmingrade)
     @eval @noinline function $prop(a::Type{S},b::Type{<:$input{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
         MUL,VEC = mulvec(a,b,$(QuoteNode(op)))
         VECS = isodd(G) ? VEC : string(VEC)*"s"
+        $(if op ∈ (:∧,:∨); quote
+            if $(op≠:∧ ? :(<(G+maxgrade(b),mdims(V))) : :(>(G+mingrade(b),mdims(V)))) && (!istangent(V))
+                return Zero(V)
+            elseif G+$mgrade(b)==mdims(V) && (!istangent(V))
+                return swap ? :($$op(b(Val($$mgrade(b))),a)) : :($$op(a,b(Val($$mgrade(b)))))
+            elseif G+$nmgrade(b)==mdims(V) && (!istangent(V))
+                return swap ? :($$op(b(Val($$mgrade(b))),a)+$$op(b(Val($$nmgrade(b))),a)) : :($$op(a,b(Val($$mgrade(b))))+$$op(a,b(Val($$nmgrade(b)))))
+            end
+        end; elseif op == :contraction; quote
+            if (swap ? maxgrade(b)<G : G<mingrade(b)) && (!istangent(V))
+                return Zero(V)
+            elseif (swap ? maxgrade(b)==G : G+maxpseudograde(b)==mdims(V)) && (!istangent(V))
+                return swap ? :($$op(b(Val(maxgrade(b))),a)) : :($$op(a,b(Val(mingrade(b)))))
+            elseif (swap ? nextmaxgrade(b)==G : G+nextmaxpseudograde(b)==mdims(V)) && (!istangent(V))
+                return swap ? :($$op(b(Val(maxgrade(b))),a)+$$op(b(Val(nextmaxgrade(b))),a)) : :($$op(a,b(Val(mingrade(b))))+$$op(a,b(Val(nextmingrade(b)))))
+            end
+        end; elseif op == :*; quote
+            if S<:Chain && G == 0
+                return :($input{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
+            elseif G == mdims(V) && !istangent(V)
+                return if swap
+                    S<:Single ? :(⋆(~b)*value(a)) : :(⋆(~b))
+                else
+                    S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
+                end
+            end
+        end; else nothing end)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
             bs = $(inspin ? :spinsum_set : inanti ? :antisum_set : :binomsum_set)(N)
