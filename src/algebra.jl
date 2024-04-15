@@ -342,6 +342,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         @pure $d(a::N,b::T) where {N<:Number,T<:TensorAlgebra} = a*$nv(b)
         @pure $d(a::S,b::UniformScaling) where S<:TensorGraded = a*$nv(Manifold(a)(b))
         @pure $d(a::S,b::UniformScaling) where S<:TensorMixed = a*$nv(Manifold(a)(b))
+        $nv(a::PseudoCouple) = ~a/abs2(a)
         function $nv(a::Chain)
             r,v,q = ~a,abs2(a),diffvars(Manifold(a))≠0
             q&&!(typeof(v)<:TensorGraded && grade(v)==0) ? $d(r,v) : $d(r,value(scalar(v)))
@@ -368,28 +369,34 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             end
             throw(error("inv($m) is undefined"))
         end
-        function $nv(m::Spinor{V,T}) where {V,T}
-            rm = ~m
-            d = rm*m
-            fd = norm(d)
-            sd = scalar(d)
-            norm(sd) ≈ fd && (return $d(rm,sd))
-            for k ∈ evens(2,mdims(V))
-                @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+    end
+    for pinor ∈ (:Spinor,:AntiSpinor)
+        @eval begin
+            function $nv(m::$pinor{V,T}) where {V,T}
+                rm = ~m
+                d = rm*m
+                fd = norm(d)
+                sd = scalar(d)
+                norm(sd) ≈ fd && (return $d(rm,sd))
+                for k ∈ evens(2,mdims(V))
+                    @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                end
+                throw(error("inv($m) is undefined"))
             end
-            throw(error("inv($m) is undefined"))
-        end
-        function $nv(m::Spinor{V,Any}) where V
-            rm = ~m
-            d = rm*m
-            fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
-            sd = scalar(d)
-            $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
-            for k ∈ evens(2,mdims(V))
-                @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
+            function $nv(m::$pinor{V,Any}) where V
+                rm = ~m
+                d = rm*m
+                fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
+                sd = scalar(d)
+                $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
+                for k ∈ evens(2,mdims(V))
+                    @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
+                end
+                throw(error("inv($m) is undefined"))
             end
-            throw(error("inv($m) is undefined"))
         end
+    end
+    @eval begin
         @pure $nv(b::Submanifold{V,0} where V) = b
         @pure function $nv(b::Submanifold{V,G,B}) where {V,G,B}
             $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
