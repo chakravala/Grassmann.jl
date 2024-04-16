@@ -165,6 +165,15 @@ function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
     Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[i])
 end
 
+@pure function Base.getproperty(a::Chain{V,G,T},v::Symbol) where {V,G,T}
+    return if v == :v
+        getfield(a,:v)
+    else
+        B = getproperty(Λ(V),v)
+        G == grade(B) ? a.v[bladeindex(mdims(V),UInt(B))]*B : zero(T)*B
+    end
+end
+
 function equal(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
     i = bladeindex(mdims(V),UInt(basis(b)))
     @inbounds a[i] == value(b) && (prod(a[1:i-1].==0) && prod(a[i+1:end].==0))
@@ -301,21 +310,41 @@ Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
-function grade_src(N,G,r=binomsum(N,G))
+function grade_src_chain(N,G,r=binomsum(N,G),is=isdir,T=Int)
+    :(Chain{V,$G,T}($(grade_src(N,G,r,is,T))))
+end
+function grade_src(N,G,r=binomsum(N,G),is=isdir,T=Int)
     b = binomial(N,G)
-    return if N<cache_limit
+    return if is(G)
+        zeros(Values{b,T})
+    elseif N<cache_limit
         :(Values($([:(@inbounds t.v[$(i+r)]) for i ∈ 1:b]...)))
     else
         :(@view t.v[list($(r+1),$(r+b))])
     end
 end
+for fun ∈ (:grade_src,:grade_src_chain)
+    nex = Symbol(fun,:_next)
+    @eval function $nex(N,G,r=binomsum,is=isdir,T=Int)
+        Expr(:elseif,:(G==$(N-G)),($fun(N,N-G,r(N,G),is,T),G-1≥0 ? $nex(N,G-1,r,is,T) : nothing)...)
+    end
+end
 
-@generated function getindex(t::Multivector{V},::Val{G}) where {V,G} # m(g)
+@generated function (t::Multivector{V,T})(G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        Expr(:if,:(G==0),grade_src_chain(N,0),grade_src_chain_next(N,N-1)))
+end
+@generated function getindex(t::Multivector{V,T},G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        Expr(:if,:(G==0),grade_src(N,0),grade_src_next(N,N-1)))
+end
+@generated function getindex(t::Multivector{V},::Val{G}) where {V,G}
     N = mdims(V)
     0 <= G <= N || throw(BoundsError(t, G))
     return grade_src(N,G)
 end
-getindex(m::Multivector,i::Int) = m[Val(i)]
 getindex(m::Multivector,i::Int,j::Int) = m[i][j]
 getindex(m::Multivector,i::UnitRange{Int}) = m.v[i]
 getindex(m::Multivector,i::T) where T<:AbstractVector = m.v[i]
@@ -323,11 +352,19 @@ setindex!(m::Multivector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k
 Base.firstindex(m::Multivector) = 0
 Base.lastindex(m::Multivector{V,T} where T) where V = mdims(V)
 
-(m::Multivector{V,T})(g::Int) where {T,V} = m(Val(g))
 (m::Multivector{V,T})(g::Val{G}) where {V,T,G} = Chain{V,G,T}(m[g])
-(m::Multivector{V,T})(g::Int,i::Int) where {V,T} = m(Val(g),i)
+(m::Multivector{V,T})(g::Int,i) where {V,T} = m(Val(g),i)
 function (m::Multivector{V,T})(g::Val{G},i::Int) where {V,T,G}
     Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[g][i])
+end
+
+@pure function Base.getproperty(a::Multivector{V},v::Symbol) where V
+    return if v == :v
+        getfield(a,:v)
+    else
+        B = getproperty(Λ(V),v)
+        a.v[bladeindex(mdims(V),UInt(B))]*B
+    end
 end
 
 function show(io::IO, m::Multivector{V,T}) where {V,T}
@@ -351,7 +388,7 @@ equal(a::Multivector{V,T},b::Multivector{V,S}) where {V,T,S} = prod(a.v .== b.v)
 function equal(a::Multivector{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     N = mdims(V)
     r,R = binomsum(N,G), N≠G ? binomsum(N,G+1) : 1<<N+1
-    @inbounds prod(a[G] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<N)] .== 0)
+    @inbounds prod(a[Val(G)] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<N)] .== 0)
 end
 equal(a::Chain{V,G,T},b::Multivector{V,S}) where {V,S,G,T} = b == a
 function equal(a::Multivector{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
@@ -429,7 +466,6 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         $pinor(val::NTuple{N,T}) where {N,T} = $pinor{log2sub2(N)}(Values{N,T}(val))
         $pinor(val::NTuple{N,Any}) where N = $pinor{log2sub2(N)}(Values{N}(val))
         @inline (::Type{T})(x...) where {T<:$pinor} = T(x)
-        getindex(m::$pinor,i::Int) = m[Val(i)]
         getindex(m::$pinor,i::Int,j::Int) = m[i][j]
         #getindex(m::$pinor,i::UnitRange{Int}) = m.v[i]
         #getindex(m::$pinor,i::T) where T<:AbstractVector = m.v[i]
@@ -437,7 +473,6 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         Base.firstindex(m::$pinor) = 0
         Base.lastindex(m::$pinor{V,T} where T) where V = mdims(V)
         grade(m::$pinor,g::Val) = m(g)
-        (m::$pinor{V,T})(g::Int) where {T,V} = m(Val(g))
         (m::$pinor{V,T})(g::Int,i::Int) where {T,V} = m(Val(g),i)
         Multivector(t::$pinor{V}) where V = Multivector{V}(t)
         Base.zero(::$pinor{V,T}) where {V,T} = $pinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
@@ -497,16 +532,38 @@ end
     chain_src(N,G,T,evens(1,N),:AntiSpinor)
 end
 
+@generated function (t::Spinor{V,T})(G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        :(isodd(G) && return Zero(V)),
+        Expr(:if,:(G==0),grade_src_chain(N,0,0),grade_src_chain_next(N,N-1,spinsum,isodd,T)))
+end
+@generated function (t::AntiSpinor{V,T})(G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        :(iseven(G) && return Zero(V)),
+        Expr(:if,:(G==0),grade_src_chain(N,0,0,iseven),grade_src_chain_next(N,N-1,antisum,iseven,T)))
+end
+@generated function getindex(t::Spinor{V,T},G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        Expr(:if,:(G==0),grade_src(N,0,0),grade_src_next(N,N-1,spinsum,isodd,T)))
+end
+@generated function getindex(t::AntiSpinor{V,T},G::Int) where {V,T}
+    N = mdims(V)
+    Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
+        Expr(:if,:(G==0),grade_src(N,0,0,iseven),grade_src_next(N,N-1,antisum,iseven,T)))
+end
 @generated function getindex(t::Spinor{V,T},::Val{G}) where {V,T,G}
     N = mdims(V)
     0 <= G <= N || throw(BoundsError(t, G))
-    isodd(G) && return :(zeros($(svec(N,G,Int))))
+    isodd(G) && return zeros(svec(N,G,T))
     return grade_src(N,G,spinsum(N,G))
 end
 @generated function getindex(t::AntiSpinor{V,T},::Val{G}) where {V,T,G}
     N = mdims(V)
     0 <= G <= N || throw(BoundsError(t, G))
-    iseven(G) && return :(zeros($(svec(N,G,Int))))
+    iseven(G) && return zeros(svec(N,G,T))
     return grade_src(N,G,antisum(N,G))
 end
 
@@ -536,6 +593,23 @@ end
     N = mdims(V)
     bs = antisum_set(N)
     :(Multivector{V,T}($(Expr(:call,:Values,vcat([isodd(G) ? [:(@inbounds t.v[$(i+bs[G+1])]) for i ∈ list(1,binomial(N,G))] : zeros(T,binomial(N,G)) for G ∈ list(0,N)]...)...))))
+end
+
+@pure function Base.getproperty(a::Spinor{V,T},v::Symbol) where {V,T}
+    return if v == :v
+        getfield(a,:v)
+    else
+        B = getproperty(Λ(V),v)
+        iseven(grade(B)) ? a.v[bladeindex(mdims(V),UInt(B))]*B : zero(T)*B
+    end
+end
+@pure function Base.getproperty(a::AntiSpinor{V,T},v::Symbol) where {V,T}
+    return if v == :v
+        getfield(a,:v)
+    else
+        B = getproperty(Λ(V),v)
+        isodd(grade(B)) ? a.v[bladeindex(mdims(V),UInt(B))]*B : zero(T)*B
+    end
 end
 
 function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
@@ -571,7 +645,7 @@ function equal(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     isodd(G) && (return iszero(b) && iszero(a))
     N = mdims(V)
     r,R = spinsum(N,G), N≠G ? spinsum(N,G+1) : 1<<(N-1)+1
-    @inbounds prod(a[G] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<(N-1))] .== 0)
+    @inbounds prod(a[Val(G)] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<(N-1))] .== 0)
 end
 function equal(a::Spinor{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
     i = spinindex(mdims(V),UInt(basis(b)))
@@ -581,7 +655,7 @@ function equal(a::AntiSpinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     iseven(G) && (return iszero(b) && iszero(a))
     N = mdims(V)
     r,R = antisum(N,G), N≠G ? antisum(N,G+1) : 1<<(N-1)+1
-    @inbounds prod(a[G] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<(N-1))] .== 0)
+    @inbounds prod(a[Val(G)] .== b.v) && prod(a.v[list(1,r)] .== 0) && prod(a.v[list(R+1,1<<(N-1))] .== 0)
 end
 function equal(a::AntiSpinor{V,S} where S,b::T) where T<:TensorTerm{V,G} where {V,G}
     i = antiindex(mdims(V),UInt(basis(b)))
@@ -649,6 +723,35 @@ Spinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V}(imaginary
 @generated AntiSpinor{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adderanti(a,b,:+)
 AntiSpinor{V}(val::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V,𝕂}(val)
 AntiSpinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V}(imaginary(z),volume(z))
+
+@pure function Base.getproperty(a::Couple{V,B,T},v::Symbol) where {V,B,T}
+    return if v == :v
+        getfield(a,:v)
+    else
+        b = getproperty(Λ(V),v)
+        if basis(b) == B
+            a.v.im*b
+        elseif grade(b) == 0
+            a.v.re*b
+        else
+            zero(T)*b
+        end
+    end
+end
+@pure function Base.getproperty(a::PseudoCouple{V,B,T},v::Symbol) where {V,B,T}
+    return if v == :v
+        getfield(a,:v)
+    else
+        b = getproperty(Λ(V),v)
+        if basis(b) == B
+            a.v.re*b
+        elseif grade(b) == mdims(V)
+            a.v.im*b
+        else
+            zero(T)*b
+        end
+    end
+end
 
 function Base.show(io::IO,z::Couple{V,B}) where {V,B}
     r, i = reim(z)
@@ -931,13 +1034,16 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
     end
 end
 
-export quaternion
-quaternion(qijk::Values{4}) = quaternion(Submanifold(3),qijk)
-quaternion(q,i,j,k) = quaternion(Submanifold(3),Values(q,i,j,k))
-quaternion(V,q,i,j,k) = quaternion(V,Values(q,i,-j,k))
-quaternion(V,qijk::Values{4}) = Quaternion{V}(qijk)
-quaternion(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
-quaternion(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
+export quaternion, quatvalues
+quaternion(sijk::NTuple{4}) = quaternion(Values(sijk))
+quaternion(s,ijk::NTuple{3}) = quaternion(s,ijk...)
+quaternion(sijk::Values{4}) = quaternion(Submanifold(3),sijk)
+quaternion(s,ijk::Values{3}) = quaternion(Submanifold(3),s,ijk...)
+quaternion(s::T=0,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(Submanifold(3),Values(s,i,j,k))
+quaternion(V::Submanifold,s::T,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(V,Values(s,i,-j,k))
+quaternion(V,sijk::Values{4}) = Quaternion{V}(sijk)
+quatvalues(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
+quatvalues(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
 
 @pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
 @pure valuetype(::Multivector{V,T} where V) where T = T
