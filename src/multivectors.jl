@@ -162,7 +162,7 @@ getindex(m::Chain{V,G},i::Submanifold{V,G}) where {V,G} = m[bladeindex(mdims(V),
 getindex(m::Chain{V,G,T},i::Submanifold{V}) where {V,G,T} = zero(T)
 
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
-    Single{V,G,Submanifold{V}(indexbasis(mdims(V),G)[i]),T}(m[i])
+    Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[i])
 end
 
 function equal(a::Chain{V,G},b::T) where T<:TensorTerm{V,G} where {V,G}
@@ -268,17 +268,20 @@ Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
 """
 Multivector{V}(v::S) where {V,S<:AbstractVector{T}} where T = Multivector{V,T}(v)
 for var ∈ ((:V,:T),(:T,),())
-    @eval @generated function Multivector{$(var...)}(v::Chain{V,G,T}) where {V,G,T}
+    @eval @generated function Multivector{$(var...)}(t::Chain{V,G,T}) where {V,G,T}
         N = mdims(V)
-        r,b = binomsum(N,G),binomial(N,G)
-        if N<cache_limit
-            :(Multivector{V}(Values($([i>r&&i≤r+b ? :(@inbounds v.v[$(i-r)]) : zero(T) for i ∈ 1:1<<N]...))))
-        else
-            quote
-                out = zeros(mvec($N,T))
-                @inbounds out[list($(r+1),$(r+b))] = v.v
-                return Multivector{V}(out)
-            end
+        chain_src(N,G,T,list(0,N))
+    end
+end
+
+function chain_src(N,G,T,grades,type=:Multivector)
+    if N<cache_limit
+        :($type{V,$T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(T,binomial(N,g)) for g ∈ grades]...)...))))
+    else
+        quote
+            out = zeros(mvec($N,T))
+            @inbounds out[list($(r+1),$(r+b))] = v.v
+            return Multivector{V,T}(out)
         end
     end
 end
@@ -298,12 +301,21 @@ Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
-function getindex(m::Multivector{V,T},i::Int) where {V,T}
-    N = mdims(V)
-    0 <= i <= N || throw(BoundsError(m, i))
-    r = binomsum(N,i)
-    return @view m.v[list(r+1,r+binomial(N,i))]
+function grade_src(N,G,r=binomsum(N,G))
+    b = binomial(N,G)
+    return if N<cache_limit
+        :(Values($([:(@inbounds t.v[$(i+r)]) for i ∈ 1:b]...)))
+    else
+        :(@view t.v[list($(r+1),$(r+b))])
+    end
 end
+
+@generated function getindex(t::Multivector{V},::Val{G}) where {V,G} # m(g)
+    N = mdims(V)
+    0 <= G <= N || throw(BoundsError(t, G))
+    return grade_src(N,G)
+end
+getindex(m::Multivector,i::Int) = m[Val(i)]
 getindex(m::Multivector,i::Int,j::Int) = m[i][j]
 getindex(m::Multivector,i::UnitRange{Int}) = m.v[i]
 getindex(m::Multivector,i::T) where T<:AbstractVector = m.v[i]
@@ -311,14 +323,11 @@ setindex!(m::Multivector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k
 Base.firstindex(m::Multivector) = 0
 Base.lastindex(m::Multivector{V,T} where T) where V = mdims(V)
 
-grade(m::Multivector,g::Val) = m(g)
-
 (m::Multivector{V,T})(g::Int) where {T,V} = m(Val(g))
-function (m::Multivector{V,T})(::Val{g}) where {V,T,g}
-    Chain{V,g,T}(m[g])
-end
-function (m::Multivector{V,T})(g::Int,i::Int) where {V,T}
-    Single{V,g,DirectSum.getbasis(V,indexbasis(mdims(V),g)[i]),T}(m[g][i])
+(m::Multivector{V,T})(g::Val{G}) where {V,T,G} = Chain{V,G,T}(m[g])
+(m::Multivector{V,T})(g::Int,i::Int) where {V,T} = m(Val(g),i)
+function (m::Multivector{V,T})(g::Val{G},i::Int) where {V,T,G}
+    Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[g][i])
 end
 
 function show(io::IO, m::Multivector{V,T}) where {V,T}
@@ -420,6 +429,7 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         $pinor(val::NTuple{N,T}) where {N,T} = $pinor{log2sub2(N)}(Values{N,T}(val))
         $pinor(val::NTuple{N,Any}) where N = $pinor{log2sub2(N)}(Values{N}(val))
         @inline (::Type{T})(x...) where {T<:$pinor} = T(x)
+        getindex(m::$pinor,i::Int) = m[Val(i)]
         getindex(m::$pinor,i::Int,j::Int) = m[i][j]
         #getindex(m::$pinor,i::UnitRange{Int}) = m.v[i]
         #getindex(m::$pinor,i::T) where T<:AbstractVector = m.v[i]
@@ -479,48 +489,42 @@ end
 @generated function Spinor{V}(t::Chain{V,G,T}) where {V,G,T}
     isodd(G) && error("$t is not expressible as a Spinor")
     N = mdims(V)
-    :(Spinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(T,binomial(N,g)) for g ∈ evens(0,N)]...)...))))
+    chain_src(N,G,T,evens(0,N),:Spinor)
 end
 @generated function AntiSpinor{V}(t::Chain{V,G,T}) where {V,G,T}
     iseven(G) && error("$t is not expressible as a AntiSpinor")
     N = mdims(V)
-    :(AntiSpinor{V,T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(T,binomial(N,g)) for g ∈ evens(1,N)]...)...))))
+    chain_src(N,G,T,evens(1,N),:AntiSpinor)
 end
 
-function getindex(m::Spinor{V,T},i::Int) where {V,T}
+@generated function getindex(t::Spinor{V,T},::Val{G}) where {V,T,G}
     N = mdims(V)
-    0 <= i <= N || throw(BoundsError(m, i))
-    isodd(i) && return zeros(svec(N,i,Int))
-    r = spinsum(N,i)
-    return @view m.v[list(r+1,r+binomial(N,i))]
+    0 <= G <= N || throw(BoundsError(t, G))
+    isodd(G) && return :(zeros($(svec(N,G,Int))))
+    return grade_src(N,G,spinsum(N,G))
 end
-function getindex(m::AntiSpinor{V,T},i::Int) where {V,T}
+@generated function getindex(t::AntiSpinor{V,T},::Val{G}) where {V,T,G}
     N = mdims(V)
-    0 <= i <= N || throw(BoundsError(m, i))
-    iseven(i) && return zeros(svec(N,i,Int))
-    r = antisum(N,i)
-    return @view m.v[list(r+1,r+binomial(N,i))]
+    0 <= G <= N || throw(BoundsError(t, G))
+    iseven(G) && return :(zeros($(svec(N,G,Int))))
+    return grade_src(N,G,antisum(N,G))
 end
 
-function (m::Spinor{V,T})(::Val{g},i::Int) where {V,T,g}
-    if isodd(g)
+(m::Spinor{V,T})(g::Val{G}) where {V,T,G} = isodd(G) ? Zero(V) : Chain{V,G,T}(m[g])
+(m::AntiSpinor{V,T})(g::Val{G}) where {V,T,G} = iseven(G) ? Zero(V) : Chain{V,G,T}(m[g])
+function (m::Spinor{V,T})(g::Val{G},i::Int) where {V,T,G}
+    if isodd(G)
         return Zero(V)
     else
-        Single{V,g,DirectSum.getbasis(V,indexbasis(mdims(V),g)[i]),T}(m[g][i])
+        Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[g][i])
     end
 end
-function (m::Spinor{V,T})(::Val{g}) where {V,T,g}
-    isodd(g) ? Zero(V) : Chain{V,g,T}(m[g])
-end
-function (m::AntiSpinor{V,T})(::Val{g},i::Int) where {V,T,g}
-    if iseven(g)
+function (m::AntiSpinor{V,T})(g::Val{G},i::Int) where {V,T,G}
+    if iseven(G)
         return Zero(V)
     else
-        Single{V,g,DirectSum.getbasis(V,indexbasis(mdims(V),g)[i]),T}(m[g][i])
+        Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[g][i])
     end
-end
-function (m::AntiSpinor{V,T})(::Val{g}) where {V,T,g}
-    iseven(g) ? Zero(V) : Chain{V,g,T}(m[g])
 end
 
 @generated function Multivector{V}(t::Spinor{V,T}) where {V,T}
