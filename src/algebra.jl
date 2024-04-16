@@ -910,7 +910,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif S<:Chain && L == 0
             return :(Chain{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Single ? :(⋆(~b)*value(a)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
+            return swap ? (S<:Single ? :(⋆(~b)*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
             return swap ? :(b[1]*complementlefthodge(~a)) : S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
@@ -1227,7 +1227,7 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                 return :($input{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
             elseif G == mdims(V) && !istangent(V)
                 return if swap
-                    S<:Single ? :(⋆(~b)*value(a)) : :(⋆(~b))
+                    S<:Single ? :(⋆(~b)*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b)) : :(⋆(~b))
                 else
                     S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
                 end
