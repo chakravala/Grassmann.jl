@@ -310,10 +310,10 @@ Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
-function grade_src_chain(N,G,r=binomsum(N,G),is=isdir,T=Int)
+function grade_src_chain(N,G,r=binomsum(N,G),is=isempty,T=Int)
     :(Chain{V,$G,T}($(grade_src(N,G,r,is,T))))
 end
-function grade_src(N,G,r=binomsum(N,G),is=isdir,T=Int)
+function grade_src(N,G,r=binomsum(N,G),is=isempty,T=Int)
     b = binomial(N,G)
     return if is(G)
         zeros(Values{b,T})
@@ -325,7 +325,7 @@ function grade_src(N,G,r=binomsum(N,G),is=isdir,T=Int)
 end
 for fun ∈ (:grade_src,:grade_src_chain)
     nex = Symbol(fun,:_next)
-    @eval function $nex(N,G,r=binomsum,is=isdir,T=Int)
+    @eval function $nex(N,G,r=binomsum,is=isempty,T=Int)
         Expr(:elseif,:(G==$(N-G)),($fun(N,N-G,r(N,G),is,T),G-1≥0 ? $nex(N,G-1,r,is,T) : nothing)...)
     end
 end
@@ -535,13 +535,13 @@ end
 @generated function (t::Spinor{V,T})(G::Int) where {V,T}
     N = mdims(V)
     Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
-        :(isodd(G) && return Zero(V)),
+        #:(isodd(G) && return Zero(V)),
         Expr(:if,:(G==0),grade_src_chain(N,0,0),grade_src_chain_next(N,N-1,spinsum,isodd,T)))
 end
 @generated function (t::AntiSpinor{V,T})(G::Int) where {V,T}
     N = mdims(V)
     Expr(:block,:(0 <= G <= $N || throw(BoundsError(t, G))),
-        :(iseven(G) && return Zero(V)),
+        #:(iseven(G) && return Zero(V)),
         Expr(:if,:(G==0),grade_src_chain(N,0,0,iseven),grade_src_chain_next(N,N-1,antisum,iseven,T)))
 end
 @generated function getindex(t::Spinor{V,T},G::Int) where {V,T}
@@ -1042,6 +1042,7 @@ quaternion(s,ijk::Values{3}) = quaternion(Submanifold(3),s,ijk...)
 quaternion(s::T=0,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(Submanifold(3),Values(s,i,j,k))
 quaternion(V::Submanifold,s::T,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(V,Values(s,i,-j,k))
 quaternion(V,sijk::Values{4}) = Quaternion{V}(sijk)
+quatvalues(q::TensorAlgebra) = quatvalues(Spinor(even(q)))
 quatvalues(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
 quatvalues(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
 
