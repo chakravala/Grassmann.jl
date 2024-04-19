@@ -1057,9 +1057,9 @@ quatvalues(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2
 @pure valuetype(::Type{<:Multivector{V,T} where V}) where T = T
 @pure valuetype(::Type{<:Spinor{V,T} where V}) where T = T
 @pure valuetype(::Type{<:AntiSpinor{V,T} where V}) where T = T
-@pure valuetype(::Type{Couple{V,B,T} where {V,B}}) where T = T
-@pure valuetype(::Type{PseudoCouple{V,B,T} where {V,B}}) where T = T
-@pure valuetype(::Type{Phasor{V,B,T} where {V,B}}) where T = T
+@pure valuetype(::Type{<:Couple{V,B,T} where {V,B}}) where T = T
+@pure valuetype(::Type{<:PseudoCouple{V,B,T} where {V,B}}) where T = T
+@pure valuetype(::Type{<:Phasor{V,B,T} where {V,B}}) where T = T
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v

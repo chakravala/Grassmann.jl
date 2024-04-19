@@ -241,30 +241,47 @@ end
 
 export ⊘, sandwich, pseudosandwich
 
-⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = clifford(y)*x*y
-⊘(x::TensorTerm{V},y::TensorTerm{V}) where V = clifford(y)*x*y
-⊘(x::TensorGraded{V},y::Couple{V}) where V = x⊘multispin(y)
-⊘(x::TensorGraded{V},y::PseudoCouple{V}) where V = x⊘multispin(y)
-@generated ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L}) where {V,G,L} = product_sandwich(a,b)
+⊘(x::TensorTerm{V},y::TensorTerm{V}) where V = reverse(y)*x*involute(y)
+⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = reverse(y)*x*involute(y)
+⊘(x::Couple{V},y::TensorAlgebra{V}) where V = (scalar(x)⊘y)+(imaginary(x)⊘y)
+⊘(x::PseudoCouple{V},y::TensorAlgebra{V}) where V = (imaginary(x)⊘y)+(volume(x)⊘y)
 @generated ⊘(a::TensorGraded{V,G},b::Spinor{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::AntiSpinor{V}) where {V,G} = product_sandwich(a,b)
+@generated ⊘(a::TensorGraded{V,G},b::Couple{V}) where {V,G} = product_sandwich(a,b)
+@generated ⊘(a::TensorGraded{V,G},b::PseudoCouple{V}) where {V,G} = product_sandwich(a,b)
+@generated ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L}) where {V,G,L} = product_sandwich(a,b)
+#=for t ∈ (:Spinor,:AntiSpinor)
+    @eval quote
+        @generated ⊘(a::Spinor{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
+        @generated ⊘(a::AntiSpinor{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
+        @generated ⊘(a::Multivector{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
+    end
+end=#
 
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
 
-General sandwich product: ω⊘η = clifford(η)⊖ω⊖η
+General sandwich product: ω⊘η = reverse(η)⊖ω⊖involute(η)
 
 For normalized even grade η it is ω⊘η = (~η)⊖ω⊖η
 """ Grassmann.:⊘
 
-for X ∈ TAG, Y ∈ TAG
-    @eval >>>(x::$X{V},y::$Y{V}) where V = y⊘clifford(x) # x * y * ~x
-end
+>>>(y::TensorTerm{V},x::TensorTerm{V}) where V = y*x*clifford(y)
+>>>(y::TensorAlgebra{V},x::TensorAlgebra{V}) where V = y*x*clifford(y)
+>>>(y::TensorAlgebra{V},x::Couple{V}) where V = (y>>>scalar(x))+(y>>>imaginary(x))
+>>>(y::TensorAlgebra{V},x::PseudoCouple{V}) where V = (y>>>imaginary(x))+(y>>>volume(x))
+@generated >>>(b::Spinor{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
+@generated >>>(b::AntiSpinor{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
+@generated >>>(b::Couple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
+@generated >>>(b::PseudoCouple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
+@generated >>>(b::TensorGraded{V,L},a::TensorGraded{V,G}) where {V,G,L} = product_sandwich(a,b,true)
 
 @doc """
     >>>(ω::TensorAlgebra,η::TensorAlgebra)
 
-Sandwich product: ω>>>η = ω⊖η⊖(~ω)
+Traditional sandwich product: ω>>>η = ω⊖η⊖clifford(ω)
+
+For normalized even grade η it is ω>>>η = ω⊖η⊖(~ω)
 """ Grassmann.:>>>
 
 ## veedot
@@ -1317,20 +1334,20 @@ for input ∈ (:Spinor,:AntiSpinor)
             out = svecs(N,Any)(zeros(svecs(N,t)))
             for g ∈ $(inspin ? :(evens(1,N+1)) : :(evens(2,N+1)))
                 ia = indexbasis(N,g-1)
-                par = parityclifford(g-1)
+                par = swap ? false : parityclifford(g-1)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = par ? :(@inbounds -b.v[$(bs[g]+i)]) : :(@inbounds b.v[$(bs[g]+i)])
                     if S<:Chain
                         for j ∈ 1:bn[G+1]
-                            A,B = swapper(ib[j],ia[i],!swap)
-                            X,Y = swapper(:(@inbounds a[$j]),val,!swap)
+                            A,B = swapper(ib[j],ia[i],true)
+                            X,Y = swapper(:(@inbounds a[$j]),val,true)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     else
                         U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],!swap)
+                        A,B = swapper(U,ia[i],true)
                         if S<:Single
-                            X,Y = swapper(:(a.v),val,!swap)
+                            X,Y = swapper(:(a.v),val,true)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
@@ -1344,11 +1361,13 @@ for input ∈ (:Spinor,:AntiSpinor)
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = out[bs2[g]+i]
-                    for g2 ∈ $(inspin ? :(evens(1,N+1)) : :(evens(2,N+1)))
+                    !isnull(val) && for g2 ∈ $(inspin ? :(evens(1,N+1)) : :(evens(2,N+1)))
                         io = indexbasis(N,g2-1)
+                        par = swap ? parityclifford(g2-1) : false
                         for j ∈ 1:bn[g2]
-                            A,B = swapper(io[j],ia[i],!swap)
-                            X,Y = swapper(:(@inbounds b.v[$(bs[g2]+j)]),val,!swap)
+                            val2 = :(b.v[$(bs[g2]+j)])
+                            A,B = swapper(io[j],ia[i],true)
+                            X,Y = swapper(par ? :(@inbounds -$val2) : :(@inbounds $val2),val,true)
                             $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     end
@@ -1399,8 +1418,8 @@ for input ∈ (:Spinor,:AntiSpinor)
 end
 
 for input ∈ (:Chain,)
-    product! = :((iseven(G) ? isodd : iseven)(G) ? geomaddanti! : geomaddspin!)
-    preproduct! = :((iseven(G) ? isodd : iseven)(G) ? geomaddanti!_pre : geomaddspin!_pre)
+    product! = :((iseven(L) ? isodd : iseven)(G) ? geomaddanti! : geomaddspin!)
+    preproduct! = :((iseven(L) ? isodd : iseven)(G) ? geomaddanti!_pre : geomaddspin!_pre)
     product2! = :(isodd(G) ? geomaddanti! : geomaddspin!)
     preproduct2! = :(isodd(G) ? geomaddanti!_pre : geomaddspin!_pre)
     @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false) where {S<:TensorGraded{V,G},Q<:TensorGraded{V,L}} where {V,G,L}
@@ -1408,24 +1427,24 @@ for input ∈ (:Chain,)
         VECS = isodd(G) ? VEC : string(VEC)*"s"
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
-            bs = (iseven(G) ? spinsum_set : antisum_set)(N)
+            bs = (iseven(L) ? spinsum_set : antisum_set)(N)
             out = svecs(N,Any)(zeros(svecs(N,t)))
             par = parityclifford(L)
             if Q <: Chain
                 ia = indexbasis(N,L)
                 @inbounds for i ∈ 1:bn[L+1]
-                    @inbounds val = par ? :(@inbounds -b.v[$i]) : :(@inbounds b.v[$i])
+                    @inbounds val = (swap ? false : par) ? :(@inbounds -b.v[$i]) : :(@inbounds b.v[$i])
                     if S<:Chain
                         for j ∈ 1:bn[G+1]
-                            A,B = swapper(ib[j],ia[i],!swap)
-                            X,Y = swapper(:(@inbounds a[$j]),val,!swap)
+                            A,B = swapper(ib[j],ia[i],true)
+                            X,Y = swapper(:(@inbounds a[$j]),val,true)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     else
                         U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],!swap)
+                        A,B = swapper(U,ia[i],true)
                         if S<:Single
-                            X,Y = swapper(:(a.v),val,!swap)
+                            X,Y = swapper(:(a.v),val,true)
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
@@ -1434,45 +1453,102 @@ for input ∈ (:Chain,)
                 end
             else
                 U2 = UInt(basis(b))
-                @inbounds val = par ? :(@inbounds -value(b)) : :(@inbounds value(b))
+                @inbounds val = (swap ? false : par) ? :(@inbounds -value(b)) : :(@inbounds value(b))
                 if S<:Chain
                     for j ∈ 1:bn[G+1]
-                        A,B = swapper(ib[j],U2,!swap)
-                        X,Y = swapper(:(@inbounds a[$j]),val,!swap)
+                        A,B = swapper(ib[j],U2,true)
+                        X,Y = swapper(:(@inbounds a[$j]),val,true)
                         @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                     end
                 else
                     U = UInt(basis(a))
-                    A,B = swapper(U,U2,!swap)
+                    A,B = swapper(U,U2,true)
                     if S<:Single
-                        X,Y = swapper(:(a.v),val,!swap)
+                        X,Y = swapper(:(a.v),val,true)
                         @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                     else
                         @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
                     end
                 end
             end
-            bs2 = ((iseven(G) ? isodd : iseven)(G) ? antisum_set : spinsum_set)(N)
+            bs2 = ((iseven(L) ? isodd : iseven)(G) ? antisum_set : spinsum_set)(N)
             out2 = svecs(N,Any)(zeros(svecs(N,t)))
-            for g ∈ ((iseven(G) ? isodd : iseven)(G) ? evens(2,N+1) : evens(1,N+1))
+            for g ∈ ((iseven(L) ? isodd : iseven)(G) ? evens(2,N+1) : evens(1,N+1))
                 ia = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = out[bs2[g]+i]
-                    if S<:Chain
+                    !isnull(val) && if Q<:Chain
                         for j ∈ 1:bn[L+1]
-                            A,B = swapper(ib[j],ia[i],!swap)
-                            X,Y = swapper(:(@inbounds b[$j]),val,!swap)
+                            A,B = swapper(ib[j],ia[i],true)
+                            X,Y = swapper((swap ? par : false) ? :(@inbounds -b[$j]) : :(@inbounds b[$j]),val,true)
                             @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     else
-                        U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],!swap)
-                        if S<:Single
-                            X,Y = swapper(:(value(b)),val,!swap)
+                        U = UInt(basis(b))
+                        A,B = swapper(U,ia[i],true)
+                        if Q<:Single
+                            X,Y = swapper((swap ? par : false) ? :(-value(b)) : :(value(b)),val,true)
                             @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
                             @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,false))
                         end
+                    end
+                end
+            end
+            bs3 = (isodd(G) ? antisum : spinsum)(N,G)
+            return :(Chain{V,G}($(Expr(:call,tvec(N,G,t),out2[bs3+1:bs3+binomial(N,G)]...))))
+        #=else return quote
+        end=# end
+    end
+end
+
+for input ∈ (:Couple,:PseudoCouple)
+    product! = :((inspin ? isodd : iseven)(G) ? geomaddanti! : geomaddspin!)
+    preproduct! = :((inspin ? isodd : iseven)(G) ? geomaddanti!_pre : geomaddspin!_pre)
+    product2! = :(isodd(G) ? geomaddanti! : geomaddspin!)
+    preproduct2! = :(isodd(G) ? geomaddanti!_pre : geomaddspin!_pre)
+    calar = input == :Couple ? :scalar : :volume
+    pg = input == :Couple ? 0 : :N
+    @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false) where {S<:TensorGraded{V,G},Q<:$input{V,BB}} where {V,G,BB}
+        MUL,VEC = mulvec(a,b,:*)
+        N = mdims(V)
+        $(if input == :Couple
+            :(isodd(grade(BB)) && return :(a⊘multispin(b)))
+        else
+            :(isodd(grade(BB))≠isodd(N) && return :(a⊘multispin(b)))
+        end)
+        inspin = iseven(grade(BB))
+        VECS = isodd(G) ? VEC : string(VEC)*"s"
+        if N<cache_limit
+            $(insert_expr((:t,:ib,:bn,:μ))...)
+            out = svecs(N,Any)(zeros(svecs(N,t)))
+            for (U2,val) ∈ ((UInt(BB),(swap ? false : parityclifford(grade(BB))) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? false : parityclifford($pg)) ? :(-value($$calar(b))) : :(value($$calar(b)))))
+                if S<:Chain
+                    for j ∈ 1:bn[G+1]
+                        A,B = swapper(ib[j],U2,true)
+                        X,Y = swapper(:(@inbounds a[$j]),val,true)
+                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                    end
+                else
+                    U = UInt(basis(a))
+                    A,B = swapper(U,U2,true)
+                    if S<:Single
+                        X,Y = swapper(:(a.v),val,true)
+                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                    else
+                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                    end
+                end
+            end
+            bs2 = ((inspin ? isodd : iseven)(G) ? antisum_set : spinsum_set)(N)
+            out2 = svecs(N,Any)(zeros(svecs(N,t)))
+            for g ∈ ((inspin ? isodd : iseven)(G) ? evens(2,N+1) : evens(1,N+1))
+                ia = indexbasis(N,g-1)
+                @inbounds for i ∈ 1:bn[g]
+                    @inbounds val = out[bs2[g]+i]
+                    !isnull(val) && for (B,val2) ∈ ((UInt(BB),(swap ? parityclifford(grade(BB)) : false) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? parityclifford($pg) : false) ? :(-value($$calar(b))) : :(value($$calar(b)))))
+                        A = ia[i] #A,B = swapper(U,ia[i],true)
+                        @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,val2,MUL))
                     end
                 end
             end
@@ -1543,12 +1619,12 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
             end
             (:N,:t,:out), :(out = $(Expr(:call,$(outspin ? :tvecs : :tvec)(N,t),out...)))
         else
-            (:N,:t,:out,br...,:bn,:μ), quote
-                for g ∈ $leftspin
+            (:N,:t,:out,$br...,:bn,:μ), quote
+                for g ∈ $$leftspin
                     X = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         @inbounds val = $(nothing≠d ? :(@inbounds $a[$left[g]+i]/$d) : :(@inbounds $a[$left[g]+i]))
-                        val≠0 && for G ∈ $rightspin
+                        val≠0 && for G ∈ $$rightspin
                             @inbounds R = $right[G]
                             Y = indexbasis(N,G-1)
                             @inbounds for j ∈ 1:bn[G]
