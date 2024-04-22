@@ -1082,3 +1082,25 @@ Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V}}) where V = rand(PseudoCou
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B}}) where {V,B} = PseudoCouple{V,B}(rand(Complex{Float64}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T}}) where {V,B,T} = PseudoCouple{V,B}(rand(Complex{T}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1))),T})
+
+# Dyadic
+
+export operator, gradedoperator
+
+@generated function operator(t::TensorAlgebra{V},::Val{G}=Val(1)) where {V,G}
+    N = mdims(V)
+    r,b = binomsum(N,G),binomial(N,G)
+    bas = Λ(V).b[list(r+1,r+b)]
+    :(Chain{V,G}($bas .⊘ Ref(t)))
+end
+operator(t::TensorAlgebra,G::Int) = operator(t,Val(G))
+gradedoperator(t::TensorAlgebra{V}) where V = Multivector{V}(Λ(V).b .⊘ Ref(t))
+
+@generated function operator(fun,V,::Val{G}=Val(1)) where G
+    N = mdims(V)
+    r,b = binomsum(N,G),binomial(N,G)
+    bas = Λ(V()).b[list(r+1,r+b)]
+    :(Chain{V,G}(fun.($bas)))
+end
+operator(fun,V,G::Int) = operator(fun,V,Val(G))
+gradedoperator(fun,V) = Multivector{V}(fun.(Λ(V).b))
