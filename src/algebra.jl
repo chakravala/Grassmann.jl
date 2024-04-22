@@ -1257,17 +1257,16 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                 @inbounds for i ∈ 1:bn[g]
                     if S<:Chain
                         @inbounds val = :(@inbounds b.v[$(bs[g]+i)])
-                        for j ∈ 1:bn[G+1]
-                            A,B = swapper(ib[j],ia[i],swap)
+                        @inbounds for j ∈ 1:bn[G+1]
+                            @inbounds A,B = swapper(ib[j],ia[i],swap)
                             X,Y = swapper(:(@inbounds a[$j]),val,swap)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         end
                     else
-                        U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],swap)
+                        @inbounds A,B = swapper(UInt(basis(a)),ia[i],swap)
                         if S<:Single
                             X,Y = swapper(:(a.v),:(@inbounds b.v[$(bs[g]+i)]),swap)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
                         else
                             @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(@inbounds b.v[$(bs[g]+i)]),false))
                         end
@@ -1288,9 +1287,9 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                             A,B = $(swap ? :(@inbounds (ia[i],ib[j])) : :(@inbounds (ib[j],ia[i])))
                             X,Y = $(swap ? :((val,@inbounds a[j])) : :((@inbounds a[j],val)))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
-                            if @inbounds $$product!(V,out,A,B,dm)&μ
+                            if $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,A,B,dm)
+                                $$product!(V,out,A,B,dm)
                             end
                         end end
                     else quote
@@ -1298,9 +1297,9 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                         $(if S<:Single; quote
                             X,Y=$(swap ? :((b.v[bs[g]+1],a.v)) : :((a.v,@inbounds b.v[rs[g]+1])))
                             dm = derive_mul(V,A,B,X,Y,$MUL)
-                            if @inbounds $$product!(V,out,A,B,dm)&μ
+                            if $$product!(V,out,A,B,dm)&μ
                                 $(insert_expr((:out,);mv=:out)...)
-                                @inbounds $$product!(V,out,A,B,dm)
+                                $$product!(V,out,A,B,dm)
                             end end
                         else
                             :(if @inbounds $$product!(V,out,A,B,derive_mul(V,A,B,b.v[rs[g]+i],false))&μ
@@ -1338,19 +1337,16 @@ for input ∈ (:Spinor,:AntiSpinor)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = par ? :(@inbounds -b.v[$(bs[g]+i)]) : :(@inbounds b.v[$(bs[g]+i)])
                     if S<:Chain
-                        for j ∈ 1:bn[G+1]
-                            A,B = swapper(ib[j],ia[i],true)
-                            X,Y = swapper(:(@inbounds a[$j]),val,true)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        @inbounds for j ∈ 1:bn[G+1]
+                            @inbounds A,B = ia[i],ib[j]
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
                         end
                     else
-                        U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],true)
+                        @inbounds A,B = ia[i],UInt(basis(a))
                         if S<:Single
-                            X,Y = swapper(:(a.v),val,true)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
                         else
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
                         end
                     end
                 end
@@ -1364,11 +1360,11 @@ for input ∈ (:Spinor,:AntiSpinor)
                     !isnull(val) && for g2 ∈ $(inspin ? :(evens(1,N+1)) : :(evens(2,N+1)))
                         io = indexbasis(N,g2-1)
                         par = swap ? parityclifford(g2-1) : false
-                        for j ∈ 1:bn[g2]
+                        @inbounds for j ∈ 1:bn[g2]
                             val2 = :(b.v[$(bs[g2]+j)])
-                            A,B = swapper(io[j],ia[i],true)
-                            X,Y = swapper(par ? :(@inbounds -$val2) : :(@inbounds $val2),val,true)
-                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            @inbounds A,B = ia[i],io[j]
+                            Y = par ? :(@inbounds -$val2) : :(@inbounds $val2)
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
                         end
                     end
                 end
@@ -1427,47 +1423,41 @@ for input ∈ (:Chain,)
         VECS = isodd(G) ? VEC : string(VEC)*"s"
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
+            il = indexbasis(N,L)
             bs = (iseven(L) ? spinsum_set : antisum_set)(N)
             out = svecs(N,Any)(zeros(svecs(N,t)))
             par = parityclifford(L)
             if Q <: Chain
-                ia = indexbasis(N,L)
                 @inbounds for i ∈ 1:bn[L+1]
                     @inbounds val = (swap ? false : par) ? :(@inbounds -b.v[$i]) : :(@inbounds b.v[$i])
                     if S<:Chain
-                        for j ∈ 1:bn[G+1]
-                            A,B = swapper(ib[j],ia[i],true)
-                            X,Y = swapper(:(@inbounds a[$j]),val,true)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        @inbounds for j ∈ 1:bn[G+1]
+                            @inbounds A,B = il[i],ib[j]
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
                         end
                     else
-                        U = UInt(basis(a))
-                        A,B = swapper(U,ia[i],true)
+                        @inbounds A,B = il[i],UInt(basis(a))
                         if S<:Single
-                            X,Y = swapper(:(a.v),val,true)
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
                         else
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
                         end
                     end
                 end
             else
-                U2 = UInt(basis(b))
-                @inbounds val = (swap ? false : par) ? :(@inbounds -value(b)) : :(@inbounds value(b))
+                A = UInt(basis(b))
+                val = (swap ? false : par) ? :(-value(b)) : :(value(b))
                 if S<:Chain
-                    for j ∈ 1:bn[G+1]
-                        A,B = swapper(ib[j],U2,true)
-                        X,Y = swapper(:(@inbounds a[$j]),val,true)
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                    @inbounds for j ∈ 1:bn[G+1]
+                        @inbounds B = ib[j]
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
                     end
                 else
-                    U = UInt(basis(a))
-                    A,B = swapper(U,U2,true)
+                    B = UInt(basis(a))
                     if S<:Single
-                        X,Y = swapper(:(a.v),val,true)
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
                     else
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
                     end
                 end
             end
@@ -1478,19 +1468,18 @@ for input ∈ (:Chain,)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = out[bs2[g]+i]
                     !isnull(val) && if Q<:Chain
-                        for j ∈ 1:bn[L+1]
-                            A,B = swapper(ib[j],ia[i],true)
-                            X,Y = swapper((swap ? par : false) ? :(@inbounds -b[$j]) : :(@inbounds b[$j]),val,true)
-                            @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        @inbounds for j ∈ 1:bn[L+1]
+                            @inbounds A,B = ia[i],il[j]
+                            Y = (swap ? par : false) ? :(@inbounds -b[$j]) : :(@inbounds b[$j])
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
                         end
                     else
-                        U = UInt(basis(b))
-                        A,B = swapper(U,ia[i],true)
+                        @inbounds A,B = ia[i],UInt(basis(b))
                         if Q<:Single
-                            X,Y = swapper((swap ? par : false) ? :(-value(b)) : :(value(b)),val,true)
-                            @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            Y = swapper((swap ? par : false) ? :(-value(b)) : :(value(b)),val,true)
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
                         else
-                            @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,false))
                         end
                     end
                 end
@@ -1522,21 +1511,18 @@ for input ∈ (:Couple,:PseudoCouple)
         if N<cache_limit
             $(insert_expr((:t,:ib,:bn,:μ))...)
             out = svecs(N,Any)(zeros(svecs(N,t)))
-            for (U2,val) ∈ ((UInt(BB),(swap ? false : parityclifford(grade(BB))) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? false : parityclifford($pg)) ? :(-value($$calar(b))) : :(value($$calar(b)))))
+            for (A,val) ∈ ((UInt(BB),(swap ? false : parityclifford(grade(BB))) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? false : parityclifford($pg)) ? :(-value($$calar(b))) : :(value($$calar(b)))))
                 if S<:Chain
-                    for j ∈ 1:bn[G+1]
-                        A,B = swapper(ib[j],U2,true)
-                        X,Y = swapper(:(@inbounds a[$j]),val,true)
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                    @inbounds for j ∈ 1:bn[G+1]
+                        @inbounds B = ib[j]
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
                     end
                 else
-                    U = UInt(basis(a))
-                    A,B = swapper(U,U2,true)
+                    B = UInt(basis(a))
                     if S<:Single
-                        X,Y = swapper(:(a.v),val,true)
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
                     else
-                        @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
                     end
                 end
             end
@@ -1547,8 +1533,8 @@ for input ∈ (:Couple,:PseudoCouple)
                 @inbounds for i ∈ 1:bn[g]
                     @inbounds val = out[bs2[g]+i]
                     !isnull(val) && for (B,val2) ∈ ((UInt(BB),(swap ? parityclifford(grade(BB)) : false) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? parityclifford($pg) : false) ? :(-value($$calar(b))) : :(value($$calar(b)))))
-                        A = ia[i] #A,B = swapper(U,ia[i],true)
-                        @inbounds $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,val2,MUL))
+                        @inbounds A = ia[i]
+                        $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,val2,MUL))
                     end
                 end
             end

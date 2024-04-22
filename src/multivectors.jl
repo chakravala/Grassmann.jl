@@ -85,6 +85,14 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
 DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
 
+Base.Matrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = hcat(value.(value(m))...)
+DyadicChain(m::Matrix) = Chain{Submanifold(size(m)[1]),1}(m)
+function Chain{V,G}(m::Matrix) where {V,G}
+    N = size(m)[2]
+    Chain{V,G,Chain{N≠mdims(V) ? Submanifold(N) : V,G}}(m)
+end
+Chain{V,G,Chain{W,G}}(m::Matrix) where {V,W,G} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
+
 export Chain, DyadicProduct, DyadicChain
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
@@ -310,6 +318,16 @@ Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
+DyadicMultivector{V,T,N} = Multivector{V,Multivector{V,T,N},N}
+
+Base.Matrix(m::Multivector{V,<:Multivector{W}}) where {V,W} = hcat(value.(value(m))...)
+DyadicMultivector(m::Matrix) = Multivector{log2sub(size(m)[1]),1}(m)
+function Multivector{V}(m::Matrix) where V
+    N = size(m)[2]
+    Multivector{V,Multivector{Int(log2(N))≠mdims(V) ? log2sub(N) : V}}(m)
+end
+Multivector{V,Chain{W}}(m::Matrix) where {V,W} = Multivector{V}(Multivector{W}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
+
 function grade_src_chain(N,G,r=binomsum(N,G),is=isempty,T=Int)
     :(Chain{V,$G,T}($(grade_src(N,G,r,is,T))))
 end
@@ -326,7 +344,7 @@ end
 for fun ∈ (:grade_src,:grade_src_chain)
     nex = Symbol(fun,:_next)
     @eval function $nex(N,G,r=binomsum,is=isempty,T=Int)
-        Expr(:elseif,:(G==$(N-G)),($fun(N,N-G,r(N,G),is,T),G-1≥0 ? $nex(N,G-1,r,is,T) : nothing)...)
+        Expr(:elseif,:(G==$(N-G)),($fun(N,N-G,r(N,N-G),is,T),G-1≥0 ? $nex(N,G-1,r,is,T) : nothing)...)
     end
 end
 
@@ -450,6 +468,7 @@ abstract type AbstractSpinor{V} <: TensorMixed{V} end
 @pure log2sub2(N) = log2sub(2N)
 
 for pinor ∈ (:Spinor,:AntiSpinor)
+    dpinor = Symbol(:Dyadic,pinor)
     @eval begin
         @computed struct $pinor{V,𝕂} <: AbstractSpinor{V}
             v::Values{1<<(mdims(V)-1),𝕂}
@@ -482,6 +501,14 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         equal(a::Multivector{V,T},b::$pinor{V,S}) where {V,T,S} = equal(a,Multivector(b))
         equal(a::Chain{V,G,T},b::$pinor{V,S}) where {V,S,G,T} = b == a
         equal(a::T,b::$pinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
+        $dpinor{V,T,N} = $pinor{V,$pinor{V,T,N},N}
+        Base.Matrix(m::$pinor{V,<:$pinor{W}}) where {V,W} = hcat(value.(value(m))...)
+        $pinor(m::Matrix) = $pinor{log2sub(size(m)[1]),1}(m)
+        function $pinor{V}(m::Matrix) where V
+            N = size(m)[2]
+            $pinor{V,$pinor{Int(log2(N))≠mdims(V) ? log2sub(N) : V}}(m)
+        end
+        $pinor{V,$pinor{W}}(m::Matrix) where {V,W} = $pinor{V}($pinor{W}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
     end
 end
 
@@ -723,6 +750,11 @@ Spinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V}(imaginary
 @generated AntiSpinor{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = adderanti(a,b,:+)
 AntiSpinor{V}(val::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V,𝕂}(val)
 AntiSpinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V}(imaginary(z),volume(z))
+
+(t::Couple{V,B})(G::Int) where {V,B} = grade(B) == G ? imaginary(t) : iszero(G) ? scalar(t) : Zero(V)
+(t::PseudoCouple{V,B})(G::Int) where {V,B} = grade(B) == G ? imaginary(t) : iszero(G) ? volume(t) : Zero(V)
+(t::Couple{V,B})(::Val{G}) where {V,B,G} = grade(B) == G ? imaginary(t) : iszero(G) ? scalar(t) : Zero(V)
+(t::PseudoCouple{V,B})(::Val{G}) where {V,B,G} = grade(B) == G ? imaginary(t) : iszero(G) ? volume(t) : Zero(V)
 
 @pure function Base.getproperty(a::Couple{V,B,T},v::Symbol) where {V,B,T}
     return if v == :v
@@ -984,7 +1016,7 @@ import AbstractTensors: antiabs, antiabs2, geomabs, unit, unitize, unitnorm
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
 import LinearAlgebra: rank, norm
-export gdims, betti, χ
+export gdims, betti, χ, unit
 export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
 export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
