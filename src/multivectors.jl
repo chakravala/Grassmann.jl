@@ -23,7 +23,7 @@ import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
 import Leibniz: grade, antigrade, showvalue, basis, order
 
 export TensorNested
-abstract type TensorNested{V} <: Manifold{V} end
+abstract type TensorNested{V,T} <: Manifold{V,T} end
 
 for op ∈ (:(Base.:+),:(Base.:-))
     @eval begin
@@ -59,15 +59,15 @@ export UniformScaling, I, points
 
 ## Chain{V,G,𝕂}
 
-@computed struct Chain{V,G,𝕂} <: TensorGraded{V,G}
-    v::Values{binomial(mdims(V),G),𝕂}
-    Chain{V,G,𝕂}(v) where {V,G,𝕂} = new{DirectSum.submanifold(V),G,𝕂}(v)
+@computed struct Chain{V,G,T} <: TensorGraded{V,G,T}
+    v::Values{binomial(mdims(V),G),T}
+    Chain{V,G,T}(v) where {V,G,T} = new{DirectSum.submanifold(V),G,T}(v)
 end
 
 """
-    Chain{V,G,𝕂} <: TensorGraded{V,G} <: TensorAlgebra{V}
+    Chain{V,G,T} <: TensorGraded{V,G,T} <: TensorAlgebra{V,T}
 
-Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `𝕂::Type`.
+Chain type with pseudoscalar `V::Manifold`, grade/rank `G::Int`, scalar field `T::Type`.
 """
 Chain{V,G}(val::S) where {V,G,S<:AbstractVector{𝕂}} where 𝕂 = Chain{V,G,𝕂}(val)
 Chain{V,G}(val::NTuple{N,T}) where {V,G,N,T} = Chain{V,G}(Values{N,T}(val))
@@ -85,6 +85,7 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
 DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
 
+Base.Matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,W,G} = hcat(value.(Chain.(value(m)))...)
 Base.Matrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = hcat(value.(value(m))...)
 DyadicChain(m::Matrix) = Chain{Submanifold(size(m)[1]),1}(m)
 function Chain{V,G}(m::Matrix) where {V,G}
@@ -203,12 +204,12 @@ Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T<:Chain,X} = Chain{V,G,T}(ones.(nt
 ⊗(a::Type{<:Chain{V,1}},b::Type{<:Chain{W,1,T}}) where {V,W,T} = Chain{V,1,Chain{W,1,T,mdims(W)},mdims(V)}
 
 """
-    ChainBundle{V,G,P} <: Manifold{V} <: TensorAlgebra{V}
+    ChainBundle{V,G,T,P} <: Manifold{V,T} <: TensorAlgebra{V,T}
 
 Subsets of a bundle cross-section over a `Manifold` topology.
 """
-struct ChainBundle{V,G,𝕂,Points} <: Manifold{V}
-    @pure ChainBundle{V,G,𝕂,P}() where {V,G,𝕂,P} = new{DirectSum.submanifold(V),G,𝕂,P}()
+struct ChainBundle{V,G,T,Points} <: Manifold{V,T}
+    @pure ChainBundle{V,G,T,P}() where {V,G,T,P} = new{DirectSum.submanifold(V),G,T,P}()
 end
 
 const bundle_cache = (Vector{Chain{V,G,T,X}} where {V,G,T,X})[]
@@ -253,7 +254,6 @@ end
 
 value(c::Vector{<:Chain}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(mdims(V),G)}})
-AbstractTensors.valuetype(::ChainBundle{V,G,T} where {V,G}) where T = T
 
 getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
 getindex(m::ChainBundle,i) = getindex(value(m),i)
@@ -271,17 +271,17 @@ Base.display(m::ChainBundle) = (print(showbundle(m));display(value(m)))
 Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
 @pure showbundle(m::ChainBundle{V,G}) where {V,G} = "$(iscell(m) ? 'C' : islocal(m) ? 'I' : 'Λ')$(DirectSum.sups[G])$V×"
 
-## Multivector{V,𝕂}
+## Multivector{V,T}
 
-@computed struct Multivector{V,𝕂} <: TensorMixed{V}
-    v::Values{1<<mdims(V),𝕂}
-    Multivector{V,𝕂}(v) where {V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
+@computed struct Multivector{V,T} <: TensorMixed{V,T}
+    v::Values{1<<mdims(V),T}
+    Multivector{V,T}(v) where {V,T} = new{DirectSum.submanifold(V),T}(v)
 end
 
 """
-    Multivector{V,𝕂} <: TensorMixed{V} <: TensorAlgebra{V}
+    Multivector{V,T} <: TensorMixed{V,T} <: TensorAlgebra{V,T}
 
-Chain type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
+Chain type with pseudoscalar `V::Manifold` and scalar field `T::Type`.
 """
 Multivector{V}(v::S) where {V,S<:AbstractVector{T}} where T = Multivector{V,T}(v)
 for var ∈ ((:V,:T),(:T,),())
@@ -320,6 +320,7 @@ Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val)
 
 DyadicMultivector{V,T,N} = Multivector{V,Multivector{V,T,N},N}
 
+Base.Matrix(m::Multivector{V,<:TensorAlgebra{W}}) where {V,W} = hcat(value.(Multivector.(value(m)))...)
 Base.Matrix(m::Multivector{V,<:Multivector{W}}) where {V,W} = hcat(value.(value(m))...)
 DyadicMultivector(m::Matrix) = Multivector{log2sub(size(m)[1]),1}(m)
 function Multivector{V}(m::Matrix) where V
@@ -457,11 +458,11 @@ getindex(m::Multivector{V},i::Submanifold{V}) where V = m[basisindex(mdims(V),UI
 ## AbstractSpinor{V}
 
 """
-    AbstractSpinor{V} <: TensorMixed{V} <: TensorAlgebra{V}
+    AbstractSpinor{V,T} <: TensorMixed{V,T} <: TensorAlgebra{V,T}
 
 Elements of `TensorAlgebra` having non-homogenous grade being a spinor in the abstract.
 """
-abstract type AbstractSpinor{V} <: TensorMixed{V} end
+abstract type AbstractSpinor{V,T} <: TensorMixed{V,T} end
 
 ## Spinor{V}, PsuedoSpinor
 
@@ -470,9 +471,9 @@ abstract type AbstractSpinor{V} <: TensorMixed{V} end
 for pinor ∈ (:Spinor,:AntiSpinor)
     dpinor = Symbol(:Dyadic,pinor)
     @eval begin
-        @computed struct $pinor{V,𝕂} <: AbstractSpinor{V}
-            v::Values{1<<(mdims(V)-1),𝕂}
-            $pinor{V,𝕂}(v::Values{N,𝕂}) where {N,V,𝕂} = new{DirectSum.submanifold(V),𝕂}(v)
+        @computed struct $pinor{V,T} <: AbstractSpinor{V,T}
+            v::Values{1<<(mdims(V)-1),T}
+            $pinor{V,T}(v::Values{N,T}) where {N,V,T} = new{DirectSum.submanifold(V),T}(v)
         end
         $pinor{V,T}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
         $pinor{V}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(v)
@@ -502,6 +503,7 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         equal(a::Chain{V,G,T},b::$pinor{V,S}) where {V,S,G,T} = b == a
         equal(a::T,b::$pinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
         $dpinor{V,T,N} = $pinor{V,$pinor{V,T,N},N}
+        Base.Matrix(m::$pinor{V,<:TensorAlgebra{W}}) where {V,W} = hcat(value.($pinor.(value(m)))...)
         Base.Matrix(m::$pinor{V,<:$pinor{W}}) where {V,W} = hcat(value.(value(m))...)
         $pinor(m::Matrix) = $pinor{log2sub(size(m)[1]),1}(m)
         function $pinor{V}(m::Matrix) where V
@@ -513,9 +515,9 @@ for pinor ∈ (:Spinor,:AntiSpinor)
 end
 
 """
-    Spinor{V,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+    Spinor{V,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-Spinor (`even` grade) type with pseudoscalar `V::Manifold` and scalar field `𝕂::Type`.
+Spinor (`even` grade) type with pseudoscalar `V::Manifold` and scalar field `T::Type`.
 """
 Spinor{V}(val::Submanifold{V}) where V = Spinor{V,Int}(1,val)
 Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
@@ -531,9 +533,9 @@ Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
 end
 
 """
-    AntiSpinor{V,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+    AntiSpinor{V,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-PsuedoSpinor (`odd` grade) type with pseudoscalar `V::Manifold` and scalar `𝕂::Type`.
+PsuedoSpinor (`odd` grade) type with pseudoscalar `V::Manifold` and scalar `T::Type`.
 """
 AntiSpinor{V}(val::Submanifold{V}) where V = AntiSpinor{V,Int}(1,val)
 AntiSpinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = AntiSpinor{V,𝕜}(1,v)
@@ -697,14 +699,14 @@ for T ∈ Fields
     end
 end
 
-## Couple{V,B}, PseudoCouple{V,B}
+## Couple{V,B,T}, PseudoCouple{V,B,T}
 
 """
-    Couple{V,B,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+    Couple{V,B,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-`Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field of `𝕂::Type`.
+`Complex{T}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field of `T::Type`.
 """
-struct Couple{V,B,T} <: AbstractSpinor{V}
+struct Couple{V,B,T} <: AbstractSpinor{V,T}
     v::Complex{T}
     Couple{V,B}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     Couple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
@@ -715,11 +717,11 @@ Base.abs2(z::Couple{V,B}) where {V,B} = abs2(z.v.re) + abs2(z.v.im)*abs2_inv(B)
 grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v.re : Zero(V)
 
 """
-    PseudoCouple{V,B,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+    PseudoCouple{V,B,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-`Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, pseudoscalar of `𝕂::Type`.
+`Complex{T}` wrapper with `V::Manifold`, basis `B::Submanifold`, pseudoscalar of `T::Type`.
 """
-struct PseudoCouple{V,B,T} <: AbstractSpinor{V}
+struct PseudoCouple{V,B,T} <: AbstractSpinor{V,T}
     v::Complex{T}
     PseudoCouple{V,B}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     PseudoCouple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
@@ -872,11 +874,11 @@ end
 export Phasor, ∠, radius
 
 """
-    Phasor{V,B,𝕂} <: AbstractSpinor{V} <: TensorAlgebra{V}
+    Phasor{V,B,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-`Complex{𝕂}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field `𝕂::Type`.
+`Complex{T}` wrapper with `V::Manifold`, basis `B::Submanifold`, scalar field `T::Type`.
 """
-struct Phasor{V,B,T} <: AbstractSpinor{V}
+struct Phasor{V,B,T} <: AbstractSpinor{V,T}
     v::Complex{T}
     Phasor{V,B}(r::T,iθ::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(r,iθ))
     Phasor{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
@@ -956,7 +958,7 @@ end
 
 export Projector, Dyadic, Proj
 
-struct Projector{V,T,Λ} <: TensorNested{V}
+struct Projector{V,T,Λ} <: TensorNested{V,T}
     v::T
     λ::Λ
     Projector{V,T,Λ}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
@@ -987,7 +989,7 @@ DyadicChain{V,1,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:Chain}} = sum(outer.(va
 DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
 DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
 
-struct Dyadic{V,X,Y} <: TensorNested{V}
+struct Dyadic{V,X,Y} <: TensorNested{V,X}
     x::X
     y::Y
     Dyadic{V,X,Y}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{DirectSum.submanifold(V),X,Y}(x,y)
@@ -1077,21 +1079,6 @@ quaternion(V,sijk::Values{4}) = Quaternion{V}(sijk)
 quatvalues(q::TensorAlgebra) = quatvalues(Spinor(even(q)))
 quatvalues(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
 quatvalues(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
-
-@pure valuetype(::Chain{V,G,T} where {V,G}) where T = T
-@pure valuetype(::Multivector{V,T} where V) where T = T
-@pure valuetype(::Spinor{V,T} where V) where T = T
-@pure valuetype(::AntiSpinor{V,T} where V) where T = T
-@pure valuetype(::Couple{V,B,T} where {V,B}) where T = T
-@pure valuetype(::PseudoCouple{V,B,T} where {V,B}) where T = T
-@pure valuetype(::Phasor{V,B,T} where {V,B}) where T = T
-@pure valuetype(::Type{<:Chain{V,G,T} where {V,G}}) where T = T
-@pure valuetype(::Type{<:Multivector{V,T} where V}) where T = T
-@pure valuetype(::Type{<:Spinor{V,T} where V}) where T = T
-@pure valuetype(::Type{<:AntiSpinor{V,T} where V}) where T = T
-@pure valuetype(::Type{<:Couple{V,B,T} where {V,B}}) where T = T
-@pure valuetype(::Type{<:PseudoCouple{V,B,T} where {V,B}}) where T = T
-@pure valuetype(::Type{<:Phasor{V,B,T} where {V,B}}) where T = T
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
