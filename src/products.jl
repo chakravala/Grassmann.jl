@@ -734,7 +734,7 @@ contraction(x::Multivector{W,<:Multivector{V},N},y::Multivector{V,T,N}) where {W
     Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ list(1,N)]...)
 end
 @inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ llist(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
 end
 @inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
     Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)

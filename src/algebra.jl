@@ -1588,8 +1588,8 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
     VEC = outspin ? :svecs : :svec
     genloop = Symbol(:generate_loop_,com)
     @eval @noinline function $genloop(V,a,b,t,MUL,product!,preproduct!,d=nothing)
+        $(insert_expr((:N,br...,:bn),:mvec)...)
         if mdims(V)<cache_limit/2
-            $(insert_expr((:N,br...,:bn),:mvec)...)
             out = $VEC(N,Any)(zeros($VEC(N,t)))
             for g ∈ $leftspin
                 X = indexbasis(N,g-1)
@@ -1610,9 +1610,9 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                 for g ∈ $$leftspin
                     X = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = $(nothing≠d ? :(@inbounds $a[$left[g]+i]/$d) : :(@inbounds $a[$left[g]+i]))
+                        @inbounds val = $(nothing≠d ? :(@inbounds $a[$left[g]+i]/$d) : :(@inbounds $a[$$left[g]+i]))
                         val≠0 && for G ∈ $$rightspin
-                            @inbounds R = $right[G]
+                            @inbounds R = $$right[G]
                             Y = indexbasis(N,G-1)
                             @inbounds for j ∈ 1:bn[G]
                                 dm = derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL)
