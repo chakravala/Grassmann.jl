@@ -1068,17 +1068,18 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
     end
 end
 
-export quaternion, quatvalues
-quaternion(sijk::NTuple{4}) = quaternion(Values(sijk))
-quaternion(s,ijk::NTuple{3}) = quaternion(s,ijk...)
-quaternion(sijk::Values{4}) = quaternion(Submanifold(3),sijk)
+export quaternion, quatvalue, quatvalues
+quaternion(sijk::NTuple{4}) = quaternion(Submanifold(3),sijk...)
+quaternion(s,ijk::NTuple{3}) = quaternion(Submanifold(3),s,ijk...)
+quaternion(sijk::Values{4}) = quaternion(Submanifold(3),sijk...)
 quaternion(s,ijk::Values{3}) = quaternion(Submanifold(3),s,ijk...)
-quaternion(s::T=0,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(Submanifold(3),Values(s,i,j,k))
-quaternion(V::Submanifold,s::T,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(V,Values(s,i,-j,k))
-quaternion(V,sijk::Values{4}) = Quaternion{V}(sijk)
-quatvalues(q::TensorAlgebra) = quatvalues(Spinor(even(q)))
-quatvalues(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
-quatvalues(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
+quaternion(s::T=0,i=zero(T),j=zero(T),k=zero(T)) where T = quaternion(Submanifold(3),s,i,j,k)
+quaternion(V::Submanifold,s::T,i=zero(T),j=zero(T),k=zero(T)) where T = Spinor{V}(Values(s,i,-j,k))
+quaternion(V::Submanifold,sijk::Values{4}) = quaternion(V,sijk...)
+quatvalue(q::TensorAlgebra) = quatvalues(Spinor(even(q)))
+quatvalue(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.v[4])
+quatvalue(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
+const quatvalues = quatvalue
 
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v

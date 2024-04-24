@@ -14,7 +14,8 @@
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractTensors: ∧, ∨, ⟑, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
-import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot, antidot
+import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
+import AbstractTensors: pseudosandwich, antisandwich, antidot
 import Leibniz: diffcheck, diffmode, hasinforigin, hasorigininf, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
@@ -239,7 +240,7 @@ end
 
 ## sandwich product
 
-export ⊘, sandwich, pseudosandwich
+export ⊘, sandwich, pseudosandwich, antisandwich
 
 ⊘(x::TensorTerm{V},y::TensorTerm{V}) where V = reverse(y)*x*involute(y)
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = reverse(y)*x*involute(y)
