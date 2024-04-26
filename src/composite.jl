@@ -216,6 +216,109 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     end
 end
 
+@inline Base.expm1(A::DyadicChain) = exp(A)-I
+@inline Base.exp(A::DyadicChain{V,G,T,1}) where {V,G,T} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
+
+@inline function Base.exp(A::DyadicChain{V,G,<:Real,2}) where {V,G}
+    T = typeof(exp(zero(valuetype(A))))
+    @inbounds a = A[1][1]
+    @inbounds c = A[1][2]
+    @inbounds b = A[2][1]
+    @inbounds d = A[2][2]
+    v = (a-d)^2 + 4*b*c
+    if v > 0
+        z = sqrt(v)
+        z1 = cosh(z / 2)
+        z2 = sinh(z / 2) / z
+    elseif v < 0
+        z = sqrt(-v)
+        z1 = cos(z / 2)
+        z2 = sin(z / 2) / z
+    else # if v == 0
+        z1 = T(1.0)
+        z2 = T(0.5)
+    end
+    r = exp((a + d) / 2)
+    m11 = r * (z1 + (a - d) * z2)
+    m12 = r * 2b * z2
+    m21 = r * 2c * z2
+    m22 = r * (z1 - (a - d) * z2)
+    Chain{V,G}(Chain{V,G}(m11, m21), Chain{V,G}(m12, m22))
+end
+
+@inline function Base.exp(A::DyadicChain{V,G,<:Complex,2}) where {V,G}
+    T = typeof(exp(zero(valuetype(A))))
+    @inbounds a = A[1][1]
+    @inbounds c = A[1][2]
+    @inbounds b = A[2][1]
+    @inbounds d = A[2][2]
+    z = sqrt((a - d)*(a - d) + 4*b*c )
+    e = expm1((a + d - z) / 2)
+    f = expm1((a + d + z) / 2)
+    ϵ = eps()
+    g = abs2(z) < ϵ^2 ? exp((a + d) / 2) * (1 + z^2 / 24) : (f - e) / z
+    m11 = (g * (a - d) + f + e) / 2 + 1
+    m12 = g * b
+    m21 = g * c
+    m22 = (-g * (a - d) + f + e) / 2 + 1
+    Chain{V,G}(Chain{V,G}(m11, m21), Chain{V,G}(m12, m22))
+end
+
+# Adapted from implementation in Base; algorithm from
+# Higham, "Functions of Matrices: Theory and Computation", SIAM, 2008
+function Base.exp(_A::DyadicChain{W,G,T,N}) where {W,G,T,N}
+    S = typeof((zero(T)*zero(T) + zero(T)*zero(T))/one(T))
+    A = Chain{W,G}(map.(S,value(_A)))
+    # omitted: matrix balancing, i.e., LAPACK.gebal!
+    nA = maximum(sum.(value.(map.(abs,value(A)))))
+    # marginally more performant than norm(A, 1)
+    ## For sufficiently small nA, use lower order Padé-Approximations
+    if (nA <= 2.1)
+        A2 = A*A
+        if nA > 0.95
+            U = S(8821612800)*I+A2*(S(302702400)*I+A2*(S(2162160)*I+A2*(S(3960)*I+A2)))
+            U = A*U
+            V = S(17643225600)*I+A2*(S(2075673600)*I+A2*(S(30270240)*I+A2*(S(110880)*I+S(90)*A2)))
+        elseif nA > 0.25
+            U = S(8648640)*I+A2*(S(277200)*I+A2*(S(1512)*I+A2))
+            U = A*U
+            V = S(17297280)*I+A2*(S(1995840)*I+A2*(S(25200)*I+S(56)*A2))
+        elseif nA > 0.015
+            U = S(15120)*I+A2*(S(420)*I+A2)
+            U = A*U
+            V = S(30240)*I+A2*(S(3360)*I+S(30)*A2)
+        else
+            U = S(60)*I+A2
+            U = A*U
+            V = S(120)*I+S(12)*A2
+        end
+        expA = (V - U) \ (V + U)
+    else
+        s  = log2(nA/5.4)               # power of 2 later reversed by squaring
+        if s > 0
+            si = ceil(Int,s)
+            A = A / S(2^si)
+        end
+        A2 = A*A
+        A4 = A2*A2
+        A6 = A2*A4
+        U = A6*(A6 + S(16380)*A4 + S(40840800)*A2) +
+            (S(33522128640)*A6 + S(10559470521600)*A4 + S(1187353796428800)*A2) +
+            S(32382376266240000)*I
+        U = A*U
+        V = A6*(S(182)*A6 + S(960960)*A4 + S(1323241920)*A2) +
+            (S(670442572800)*A6 + S(129060195264000)*A4 + S(7771770303897600)*A2) +
+            S(64764752532480000)*I
+        expA = (V - U) \ (V + U)
+        if s > 0            # squaring to reverse dividing by power of 2
+            for t=1:si
+                expA = expA*expA
+            end
+        end
+    end
+    expA
+end
+
 qlog(b::PseudoCouple,x::Int=10000) = qlog(multispin(b),x)
 qlog(b::AntiSpinor,x::Int=10000) = qlog(Multivector(b),x)
 function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
@@ -804,6 +907,7 @@ function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
     mdims(M) < mdims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
 end
 
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = Chain{V,1}(t.\value(v))
 Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))

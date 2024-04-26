@@ -37,6 +37,18 @@ end
 import Leibniz: Fields, parval, mixed, mvecs, svecs, spinsum, spinsum_set
 parsym = (Symbol,parval...)
 
+"""
+    compactio(::Bool)
+
+Toggles compact numbers for extended `Grassmann` elements (enabled by default)
+"""
+compact = ( () -> begin
+        io=true
+        return (tf=io)->(io≠tf && (io=tf); return io)
+    end)()
+
+compactio(io::IO) = compact() ? IOContext(io, :compact => true) : io
+
 function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
     if !(|(broadcast(<:,T,parsym)...)) && signbit(i) && !isnan(i)
         print(io, compact ? "-" : " - ")
@@ -84,17 +96,24 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 
 DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
 DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
+#TriadicProduct{V,W,G,T,N} = Chain{V,G,DyadicChain{W,G,T,N},N}
+#DyadicChain{V,G,T,N} = Chain{V,G,Chain{V,G,T,N},N}
+#TriadicChain{V,G,T,N,M} = Chain{V,G,DyadicChain{V,1,T,M},N}
 
 Base.Matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,W,G} = hcat(value.(Chain.(value(m)))...)
 Base.Matrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = hcat(value.(value(m))...)
-DyadicChain(m::Matrix) = Chain{Submanifold(size(m)[1]),1}(m)
+Chain{V}(m::Matrix) where V = Chain{V,1}(m)
 function Chain{V,G}(m::Matrix) where {V,G}
     N = size(m)[2]
     Chain{V,G,Chain{N≠mdims(V) ? Submanifold(N) : V,G}}(m)
 end
 Chain{V,G,Chain{W,G}}(m::Matrix) where {V,W,G} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
+DyadicChain{V,G}(m::Matrix) where {V,G} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
+DyadicChain{V}(m::Matrix) where V = DyadicChain{V,1}(m)
+DyadicChain(m::Matrix) = DyadicChain{Submanifold(size(m)[1])}(m)
+Base.log(A::DyadicChain{V,G}) where {V,G} = DyadicChain{V,G}(log(Matrix(A)))
 
-export Chain, DyadicProduct, DyadicChain
+export Chain, DyadicChain, TriadicChain, DyadicProduct
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
@@ -118,6 +137,7 @@ Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib,compact = indexbasis(mdims(V),G),get(io,:compact,false)
+    io = compactio(io)
     @inbounds Leibniz.showvalue(io,V,ib[1],m.v[1])
     for k ∈ list(2,binomial(mdims(V),G))
         @inbounds showterm(io,V,ib[k],m.v[k],compact)
@@ -370,6 +390,7 @@ getindex(m::Multivector,i::T) where T<:AbstractVector = m.v[i]
 setindex!(m::Multivector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::Multivector) = 0
 Base.lastindex(m::Multivector{V,T} where T) where V = mdims(V)
+@pure Base.length(m::Multivector{V}) where V = 1<<mdims(V)
 
 (m::Multivector{V,T})(g::Val{G}) where {V,T,G} = Chain{V,G,T}(m[g])
 (m::Multivector{V,T})(g::Int,i) where {V,T} = m(Val(g),i)
@@ -388,6 +409,7 @@ end
 
 function show(io::IO, m::Multivector{V,T}) where {V,T}
     N,compact,bases = mdims(V),get(io,:compact,false),true
+    io = compactio(io)
     bs = binomsum_set(N)
     @inbounds print(io,m.v[1])
     for i ∈ list(2,N+1)
@@ -492,6 +514,7 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         #setindex!(m::$pinor{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
         Base.firstindex(m::$pinor) = 0
         Base.lastindex(m::$pinor{V,T} where T) where V = mdims(V)
+        @pure Base.length(m::$pinor{V}) where V = 1<<(mdims(V)-1)
         grade(m::$pinor,g::Val) = m(g)
         (m::$pinor{V,T})(g::Int,i::Int) where {T,V} = m(Val(g),i)
         Multivector(t::$pinor{V}) where V = Multivector{V}(t)
@@ -643,6 +666,7 @@ end
 
 function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
     N,compact = mdims(V),get(io,:compact,false)
+    io = compactio(io)
     bs = spinsum_set(N)
     @inbounds print(io,m.v[1])
     for i ∈ evens(2,N)
@@ -654,6 +678,7 @@ function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
 end
 function Base.show(io::IO, m::AntiSpinor{V,T}) where {V,T}
     N,compact = mdims(V),get(io,:compact,false)
+    io = compactio(io)
     bs = antisum_set(N)
     for i ∈ evens(1,N)
         ib = indexbasis(N,i)
@@ -866,6 +891,7 @@ for couple ∈ (:Couple,:PseudoCouple)
         Spinor{V}(val::$couple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V,𝕂}(val)
         Base.zero(::$couple{V,B,T}) where {V,B,T} = $couple{V,B}(zero(Complex{T}))
         Base.zero(::Type{$couple{V,B,T}}) where {V,B,T} = $couple{V,B}(zero(Complex{T}))
+        @pure Base.length(m::$couple) = 2
     end
 end
 
@@ -1007,6 +1033,7 @@ getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
 show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
 
 DyadicChain(P::Dyadic{V}) where V = DyadicProduct{V}(P)
+#DyadicChain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 DyadicChain{V}(P::Dyadic{V}) where V = DyadicProduct{V}(p)
 DyadicProduct(P::Dyadic{V}) where V = DyadicProduct{V}(P)
 DyadicProduct{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
@@ -1184,27 +1211,27 @@ end
 @pure maxpseudograde(t::Type{<:AntiSpinor{V}}) where V = mdims(V)-1
 @pure nextmaxpseudograde(t) = maxpseudograde(t)-nextgrade(t)
 
-Leibniz.gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = gdims(t[1][findall(x->!iszero(x),t[2])])
-function Leibniz.gdims(t::Vector{<:Chain})
+Leibniz.count_gdims(t::Tuple{Vector{<:Chain},Vector{Int}}) = count_gdims(t[1][findall(x->!iszero(x),t[2])])
+function Leibniz.count_gdims(t::Vector{<:Chain})
     out = @inbounds zeros(Variables{mdims(Manifold(points(t)))+1,Int})
     @inbounds out[mdims(Manifold(t))+1] = length(t)
     return out
 end
-function Leibniz.gdims(t::Values{N,<:Vector}) where N
+function Leibniz.count_gdims(t::Values{N,<:Vector}) where N
     out = @inbounds zeros(Variables{mdims(points(t[1]))+1,Int})
     for i ∈ list(1,N)
         @inbounds out[mdims(Manifold(t[i]))+1] = length(t[i])
     end
     return out
 end
-function Leibniz.gdims(t::Values{N,<:Tuple}) where N
+function Leibniz.count_gdims(t::Values{N,<:Tuple}) where N
     out = @inbounds zeros(Variables{mdims(points(t[1][1]))+1,Int})
     for i ∈ list(1,N)
         @inbounds out[mdims(Manifold(t[i][1]))+1] = length(t[i][1])
     end
     return out
 end
-function Leibniz.gdims(t::Multivector{V}) where V
+function Leibniz.count_gdims(t::Multivector{V}) where V
     N = mdims(V)
     out = zeros(Variables{N+1,Int})
     bs = binomsum_set(N)
@@ -1217,8 +1244,8 @@ function Leibniz.gdims(t::Multivector{V}) where V
     return out
 end
 
-Leibniz.χ(t::Values{N,<:Vector}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
-Leibniz.χ(t::Values{N,<:Tuple}) where N = (B=gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
+Leibniz.χ(t::Values{N,<:Vector}) where N = (B=count_gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
+Leibniz.χ(t::Values{N,<:Tuple}) where N = (B=count_gdims(t);sum([B[t]*(-1)^t for t ∈ list(1,length(B))]))
 
 ## Adjoint
 

@@ -26,12 +26,12 @@ import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, Submanifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent, metric, antimetric
-export hodge, wedge, vee, complement, dot, antidot
+export hodge, wedge, vee, complement, dot, antidot, istangent
 
 import Base: @pure, ==, isapprox
 import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
 import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual, Zero, One, Zero, One
-import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims
+import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims, gdims
 import Leibniz: bit2int, indexbits, indices, diffvars, diffmask
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
 import DirectSum: antimetric
@@ -117,8 +117,8 @@ end
 d(ω::T) where T<:TensorAlgebra = Manifold(ω)(∇)∧ω
 δ(ω::T) where T<:TensorAlgebra = -∂(ω)
 
-function boundary_rank(t,d=gdims(t))
-    out = gdims(∂(t))
+function boundary_rank(t,d=count_gdims(t))
+    out = count_gdims(∂(t))
     out[1] = 0
     for k ∈ 2:length(out)-1
         @inbounds out[k] = min(out[k],d[k+1])
@@ -127,7 +127,7 @@ function boundary_rank(t,d=gdims(t))
 end
 
 function boundary_null(t)
-    d = gdims(t)
+    d = count_gdims(t)
     r = boundary_rank(t,d)
     l = length(d)
     out = zeros(Variables{l,Int})
@@ -143,7 +143,7 @@ end
 Compute the Betti numbers.
 """
 function betti(t::T) where T<:TensorAlgebra
-    d = gdims(t)
+    d = count_gdims(t)
     r = boundary_rank(t,d)
     l = length(d)-1
     out = zeros(Variables{l,Int})
@@ -569,8 +569,7 @@ function __init__()
         DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
         Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Chain{V,G,Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        Base.exp(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(exp(StaticArrays.SMatrix(A)))
-        Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(log(StaticArrays.SMatrix(A)))
+        #Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(log(StaticArrays.SMatrix(A)))
         LinearAlgebra.eigvals(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Values{binomial(mdims(V),G)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
         LinearAlgebra.eigvecs(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Chain.(Values{binomial(mdims(A),G)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,binomial(mdims(A),G))))))
         function LinearAlgebra.eigen(A::Chain{V,G,<:Chain{V,G}}) where {V,G}
