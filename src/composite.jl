@@ -216,10 +216,10 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     end
 end
 
-@inline Base.expm1(A::DyadicChain) = exp(A)-I
-@inline Base.exp(A::DyadicChain{V,G,T,1}) where {V,G,T} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
+@inline Base.expm1(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = exp(A)-I
+@inline Base.exp(A::Chain{V,G,<:Chain{V,G},1}) where {V,G} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
 
-@inline function Base.exp(A::DyadicChain{V,G,<:Real,2}) where {V,G}
+@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Real,2},2}) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -246,7 +246,7 @@ end
     Chain{V,G}(Chain{V,G}(m11, m21), Chain{V,G}(m12, m22))
 end
 
-@inline function Base.exp(A::DyadicChain{V,G,<:Complex,2}) where {V,G}
+@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Complex,2},2}) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -266,7 +266,7 @@ end
 
 # Adapted from implementation in Base; algorithm from
 # Higham, "Functions of Matrices: Theory and Computation", SIAM, 2008
-function Base.exp(_A::DyadicChain{W,G,T,N}) where {W,G,T,N}
+function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N}) where {W,G,T,N}
     S = typeof((zero(T)*zero(T) + zero(T)*zero(T))/one(T))
     A = Chain{W,G}(map.(S,value(_A)))
     # omitted: matrix balancing, i.e., LAPACK.gebal!

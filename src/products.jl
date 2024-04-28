@@ -766,20 +766,26 @@ minus(a::TensorNested,b::TensorNested) = a+(-b)
 @inline times(a::TensorGraded{V,0},b::Proj{V,<:Chain{V,1,<:TensorNested}}) where V = Proj{V}(a*b.v)
 @inline times(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj{V}(a.v*b)
 
-@inline times(a::DyadicChain,b::DyadicChain) = a⋅b
-@inline times(a::DyadicChain,b::Chain) = a⋅b
-@inline times(a::DyadicChain,b::TensorTerm) = a⋅b
-@inline times(a::TensorGraded,b::DyadicChain) = a⋅b
-@inline times(a::DyadicChain,b::TensorNested) = a⋅b
-@inline times(a::TensorNested,b::DyadicChain) = a⋅b
+@inline times(a::Chain,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
+@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::Chain) = contraction(a,b)
+@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorTerm) = contraction(a,b)
+@inline times(a::TensorGraded,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
+@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorNested) = contraction(a,b)
+@inline times(a::TensorNested,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
 
 # dyadic identity element
 
-Base.:+(t::LinearAlgebra.UniformScaling,g::TensorNested) = t+DyadicChain(g)
-Base.:+(g::TensorNested,t::LinearAlgebra.UniformScaling) = DyadicChain(g)+t
+for op ∈ (:(Base.:+),:(Base.:-))
+    for tensor ∈ (:Projector,:Dyadic)
+        @eval begin
+            $op(a::A,b::B) where {A<:$tensor,B<:TensorAlgebra} = $op(Chain(a),b)
+            $op(a::A,b::B) where {A<:TensorAlgebra,B<:$tensor} = $op(a,Chain(b))
+            $op(t::LinearAlgebra.UniformScaling,g::$tensor) = $op(t,Chain(g))
+            $op(g::$tensor,t::LinearAlgebra.UniformScaling) = $op(Chain(g),t)
+        end
+    end
+end
 Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
-Base.:-(t::LinearAlgebra.UniformScaling,g::TensorNested) = t-DyadicChain(g)
-Base.:-(g::TensorNested,t::LinearAlgebra.UniformScaling) = DyadicChain(g)-t
 @generated Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
 @generated Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
 @generated Base.:-(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))

@@ -566,9 +566,9 @@ function __init__()
     end=#
     @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
         StaticArrays.SMatrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = StaticArrays.SMatrix{binomial(mdims(W),G),binomial(mdims(V),G)}(vcat(value.(value(m))...))
-        DyadicChain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
+        Chain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
         Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        Chain{V,G,Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
+        Chain{V,G,<:Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         #Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(log(StaticArrays.SMatrix(A)))
         LinearAlgebra.eigvals(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Values{binomial(mdims(V),G)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
         LinearAlgebra.eigvecs(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Chain.(Values{binomial(mdims(A),G)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,binomial(mdims(A),G))))))

@@ -25,13 +25,6 @@ import Leibniz: grade, antigrade, showvalue, basis, order
 export TensorNested
 abstract type TensorNested{V,T} <: Manifold{V,T} end
 
-for op ∈ (:(Base.:+),:(Base.:-))
-    @eval begin
-        $op(a::A,b::B) where {A<:TensorNested,B<:TensorAlgebra} = $op(DyadicChain(a),b)
-        $op(a::A,b::B) where {A<:TensorAlgebra,B<:TensorNested} = $op(a,DyadicChain(b))
-    end
-end
-
 # symbolic print types
 
 import Leibniz: Fields, parval, mixed, mvecs, svecs, spinsum, spinsum_set
@@ -94,26 +87,21 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 #Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 @inline (::Type{T})(x...) where {T<:Chain} = T(x)
 
-DyadicProduct{V,W,G,T,N} = Chain{V,G,Chain{W,G,T,N},N}
-DyadicChain{V,G,T,N} = DyadicProduct{V,V,G,T,N}
-#TriadicProduct{V,W,G,T,N} = Chain{V,G,DyadicChain{W,G,T,N},N}
-#DyadicChain{V,G,T,N} = Chain{V,G,Chain{V,G,T,N},N}
-#TriadicChain{V,G,T,N,M} = Chain{V,G,DyadicChain{V,1,T,M},N}
+#Simplex{V,W,T<:GradedVector{W},N} = Chain{V,1,T,N}
+Simplex{V,T<:GradedVector,N} = Chain{V,1,T,N}
 
 Base.Matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,W,G} = hcat(value.(Chain.(value(m)))...)
 Base.Matrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = hcat(value.(value(m))...)
+Chain(m::Matrix) = DyadicChain{Submanifold(size(m)[1])}(m)
 Chain{V}(m::Matrix) where V = Chain{V,1}(m)
 function Chain{V,G}(m::Matrix) where {V,G}
     N = size(m)[2]
     Chain{V,G,Chain{N≠mdims(V) ? Submanifold(N) : V,G}}(m)
 end
-Chain{V,G,Chain{W,G}}(m::Matrix) where {V,W,G} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
-DyadicChain{V,G}(m::Matrix) where {V,G} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
-DyadicChain{V}(m::Matrix) where V = DyadicChain{V,1}(m)
-DyadicChain(m::Matrix) = DyadicChain{Submanifold(size(m)[1])}(m)
-Base.log(A::DyadicChain{V,G}) where {V,G} = DyadicChain{V,G}(log(Matrix(A)))
+Chain{V,G,<:Chain{W,G}}(m::Matrix) where {V,W,G} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
+Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
 
-export Chain, DyadicChain, TriadicChain, DyadicProduct
+export Chain, Simplex
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
@@ -1009,11 +997,10 @@ Leibniz.extend_parnot(Projector)
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ} = print(io,"(",P.λ,")Proj(",P.v,")")
 
-DyadicChain{V,1,T}(P::Proj{V,T}) where {V,T} = outer(P.v*P.λ,P.v)
-DyadicChain{V,1,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:Chain}} = sum(outer.(value(P.v).*value(P.λ),P.v))
-#DyadicChain{V,T}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(DyadicChain.(value(P.v)))
-DyadicChain{V}(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
-DyadicChain(P::Proj{V,T}) where {V,T} = DyadicChain{V,1,T}(P)
+#Chain{V}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(Chain.(value(P.v)))
+Chain{V}(P::Proj{V,T}) where {V,T<:Simplex{V}} = sum(outer.(value(P.v).*value(P.λ),P.v))
+Chain{V}(P::Proj{V}) where V = outer(P.v*P.λ,P.v)
+Chain(P::Proj{V}) where V = Chain{V}(P)
 
 struct Dyadic{V,X,Y} <: TensorNested{V,X}
     x::X
@@ -1032,11 +1019,8 @@ getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
 
 show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
 
-DyadicChain(P::Dyadic{V}) where V = DyadicProduct{V}(P)
-#DyadicChain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
-DyadicChain{V}(P::Dyadic{V}) where V = DyadicProduct{V}(p)
-DyadicProduct(P::Dyadic{V}) where V = DyadicProduct{V}(P)
-DyadicProduct{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
+Chain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
+Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
 ## Generic
 
