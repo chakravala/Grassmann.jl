@@ -142,7 +142,7 @@ end
 Base.expm1(t::Phasor{V}) where V = exp(t)-One(V)
 function Base.exp(t::Phasor{V,B}) where {V,B}
     z = exp(angle(t))
-    Phasor{V,B}(exp(radius(t)+z.v.re),z.v.im)
+    Phasor{V,B}(exp(radius(t)+realvalue(z)),imagvalue(z))
 end
 
 function Base.exp(t::Couple{V,B}) where {V,B}
@@ -166,7 +166,8 @@ function Base.expm1(t::PseudoCouple{V,B}) where {V,B}
 end
 function Base.exp(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        PseudoCouple{V,B}(value(exp(Couple{V,Submanifold(V)}(value(t)))))
+        out = exp(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
+        PseudoCouple{V,B}(realvalue(out),imagvalue(out))
     else
         exp(multispin(t))
     end
@@ -404,11 +405,12 @@ end
     end
 end
 
+Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
 Base.log(t::TensorTerm) = log(Couple(t))
 Base.log(t::Phasor) = (r=radius(t); log(r)+angle(t))
 Base.log1p(t::Phasor{V}) where V = log(One(V)+t)
-Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(t.v)) : log(radius(t))+angle(t)
-Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(t.v)) : log(One(V)+t)
+Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(Complex(t))) : log(radius(t))+angle(t)
+Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(Complex(t))) : log(One(V)+t)
 Base.log(t::Quaternion{V}) where V = iszero(metric(V)) ? log(radius(t))+angle(t,r) : qlog((t-One(V))/(t+One(V)))
 Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(One(V)+t) : qlog(t/(t+2))
 @inline Base.log(t::T) where T<:TensorAlgebra{V} where V = qlog((t-One(V))/(t+One(V)))
@@ -416,14 +418,16 @@ Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(One(V)+t) : qlog(
 
 function Base.log(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        PseudoCouple{V,B}(value(log(Couple{V,Submanifold(V)}(value(t)))))
+        out = log(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
+        PseudoCouple{V,B}(realvalue(out),imagvalue(out))
     else
         log(multispin(t))
     end
 end
 function Base.log1p(t::PseudoCouple{V,B}) where {V,B}
     if isscalar(B)
-        PseudoCouple{V,B}(value(log1p(Couple{V,Submanifold(V)}(value(t)))))
+        out = log1p(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
+        PseudoCouple{V,B}(realvalue(out),imagvalue(out))
     else
         log1p(multispin(t))
     end
@@ -480,7 +484,7 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
             iszero(metric(V)) ? $qrt(radius(t))*exp(angle(t)/$n) : exp(log(t)/$n)
         end
         @inline function Base.$qrt(t::Couple{V,B}) where {V,B}
-            value(B*B)==-1 ? Couple{V,B}($qrt(t.v)) :
+            value(B*B)==-1 ? Couple{V,B}($qrt(Complex(t))) :
                 $qrt(radius(t))*exp(angle(t)/$n)
         end
         @inline Base.$qrt(t::Phasor) = Phasor($qrt(radius(t)),angle(t)/$n)
@@ -705,11 +709,10 @@ end
 end=#
 
 function Base.angle(z::Couple{V,B}) where {V,B}
-    c = value(z)
     if value(B^2) == -1
-        atan(imag(c),real(c))*B
+        atan(imagvalue(z),realvalue(z))*B
     elseif value(B^2) == 1
-        atanh(imag(c),real(c))*B
+        atanh(imagvalue(z),realvalue(z))*B
     else
         error("Unsupported trigonometric angle")
     end
@@ -907,9 +910,11 @@ function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
     mdims(M) < mdims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
 end
 
-Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = Chain{V,1}(t.\value(v))
+Base.:\(t::LinearAlgebra.UniformScaling,v::Chain{V,G,<:Chain}) where {V,G} = inv(v)#value(Chain{V,G}(t))\v
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = t*inv(v)#Chain{V,1}(t.\value(v))
 Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
+#Base.inv(t::Chain{V,1,<:Chain{V,G}}) where {V,G} = value(Chain{V,G}(I))\t
 Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
 grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
 
@@ -1186,33 +1191,3 @@ Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V}}) where V = rand(PseudoCou
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B}}) where {V,B} = PseudoCouple{V,B}(rand(Complex{Float64}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T}}) where {V,B,T} = PseudoCouple{V,B}(rand(Complex{T}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1))),T})
-
-# Dyadic
-
-export operator, gradedoperator, evenoperator, oddoperator
-
-@generated function operator(t::TensorAlgebra{V},::Val{G}=Val(1)) where {V,G}
-    N = mdims(V)
-    r,b = binomsum(N,G),binomial(N,G)
-    bas = Λ(V).b[list(r+1,r+b)]
-    :(Chain{V,G}($bas .⊘ Ref(t)))
-end
-operator(t::TensorAlgebra,G::Int) = operator(t,Val(G))
-gradedoperator(t::TensorAlgebra{V}) where V = Multivector{V}(Λ(V).b .⊘ Ref(t))
-
-@generated function operator(fun,V,::Val{G}=Val(1)) where G
-    N = mdims(V)
-    r,b = binomsum(N,G),binomial(N,G)
-    bas = Λ(V()).b[list(r+1,r+b)]
-    :(Chain{V,G}(fun.($bas)))
-end
-operator(fun,V,G::Int) = operator(fun,V,Val(G))
-gradedoperator(fun,V) = Multivector{V}(fun.(Λ(V).b))
-
-@pure function evenbasis(V,even=true)
-    N = mdims(V)
-    r,b = binomsum_set(N),binomial_set(N)
-    vcat([Λ(V).b[list(r[g]+1,r[g]+b[g])] for g ∈ evens(even ? 1 : 2,N+1)]...)
-end
-evenoperator(t::TensorAlgebra{V}) where V = Spinor{V}(evenbasis(V) .⊘ Ref(t))
-oddoperator(t::TensorAlgebra{V}) where V = AntiSpinor{V}(evenbasis(V,false) .⊘ Ref(t))

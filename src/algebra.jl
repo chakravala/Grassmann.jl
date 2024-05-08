@@ -32,7 +32,7 @@ end end
 
 Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω⊕η))
 """
-@pure times(a::Submanifold{V},b::Submanifold{V}) where V = mul(a,b)
+@pure ⟑(a::Submanifold{V},b::Submanifold{V}) where V = mul(a,b)
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
 @pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
@@ -46,12 +46,12 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
     return cc ? (v=value(out);out+Single{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻UInt(d)))) : out
 end
 
-function times(a::Single{V},b::Submanifold{V}) where V
+function ⟑(a::Single{V},b::Submanifold{V}) where V
     v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
     bas = mul(basis(a),b,v)
     order(a.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
 end
-function times(a::Submanifold{V},b::Single{V}) where V
+function ⟑(a::Submanifold{V},b::Single{V}) where V
     v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
     order(b.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
@@ -251,13 +251,6 @@ export ⊘, sandwich, pseudosandwich, antisandwich
 @generated ⊘(a::TensorGraded{V,G},b::Couple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::PseudoCouple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L}) where {V,G,L} = product_sandwich(a,b)
-#=for t ∈ (:Spinor,:AntiSpinor)
-    @eval quote
-        @generated ⊘(a::Spinor{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
-        @generated ⊘(a::AntiSpinor{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
-        @generated ⊘(a::Multivector{V,G},b::$$t{V}) where {V,G} = product_sandwich(a,b)
-    end
-end=#
 
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
@@ -427,20 +420,20 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     end
 end
 
-/(a::TensorTerm{V,0},b::Couple{V,B,S}) where {V,B,S} = (T = promote_type(valuetype(a),S); Couple{V,B}(value(a)*inv(T(b.v))))
-/(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re/value(b),a.v.im/value(b)))
+/(a::TensorTerm{V,0},b::Couple{V,B,S}) where {V,B,S} = a*inv(b)
+/(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)/value(b),imagvalue(a)/value(b))
 
 function /(a::Couple{V,B,T}, b::Couple{V,B,T}) where {V,B,T<:Real}
     are,aim = reim(a); bre,bim = reim(b)
     B2 = value(abs2_inv(B))
-    Couple{V,B}(if abs(bre) <= abs(bim)
+    (rout,iout) = if abs(bre) <= abs(bim)
         if isinf(bre) && isinf(bim)
             r = sign(bre)/sign(bim)
         else
             r = bre / bim
         end
         den = bim*B2 + r*bre
-        Complex((are*r + aim*B2)/den, (aim*r - are)/den)
+        ((are*r + aim*B2)/den, (aim*r - are)/den)
     else
         if isinf(bre) && isinf(bim)
             r = sign(bim)/sign(bre)
@@ -448,15 +441,16 @@ function /(a::Couple{V,B,T}, b::Couple{V,B,T}) where {V,B,T<:Real}
             r = bim / bre
         end
         den = bre + (r*bim)*B2
-        Complex((are + (aim*r)*B2)/den, (aim - are*r)/den)
-    end)
+        ((are + (aim*r)*B2)/den, (aim - are*r)/den)
+    end
+    Chain{V,B}(rout,iout)
 end
 
-inv(z::Couple{V,B,<:Union{Float16,Float32}}) where {V,B} =
-    (w = inv(widen(z)); Couple{V,B}(oftype(z.v,w.v)))
+inv(z::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
+    (w = inv(widen(z)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
 
 /(z::Couple{V,B,T}, w::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
-    (w = widen(z)*inv(widen(w)); Couple{V,B}(oftype(z.v, w.v)))
+    (w = widen(z)*inv(widen(w)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
 
 # robust complex division for double precision
 # variables are scaled & unscaled to avoid over/underflow, if necessary
@@ -477,7 +471,7 @@ function /(z::Couple{V,B,Float64}, w::Couple{V,B,Float64}) where {V,B}
     else
         p,q = cdiv(a,b,c,d,e)
     end
-    return Couple{V,B}(ComplexF64(p,q))
+    return Couple{V,B,Float64}(p,q)
 end
 
 # sub-functionality for /(z::ComplexF64, w::ComplexF64)
@@ -622,16 +616,16 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             :(Single{V,L}($bop(value(a),value(b)),basis(a)))
         elseif !istangent(V) && !hasconformal(V) && L == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(Couple{V,basis(b)}(Complex(value(a),$bop(value(b)))))
+            :(Couple{V,basis(b)}(value(a),$bop(value(b))))
         elseif !istangent(V) && !hasconformal(V) && G == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(Couple{V,basis(a)}(Complex($bop(value(b)),value(a))))
+            :(Couple{V,basis(a)}($bop(value(b)),value(a)))
         elseif !istangent(V) && !hasconformal(V) && L == grade(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(PseudoCouple{V,basis(b)}(Complex($bop(value(b)),value(a))))
+            :(PseudoCouple{V,basis(b)}($bop(value(b)),value(a)))
         elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
-            :(PseudoCouple{V,basis(a)}(Complex(value(a),$bop(value(b)))))
+            :(PseudoCouple{V,basis(a)}(value(a),$bop(value(b))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib,:t),:mvec)...)
@@ -734,23 +728,23 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         if !istangent(V) && !hasconformal(V) && L == 0 && G == mdims(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
             if swap
-                :(Couple{V,basis(V)}(Complex($right(value(a)),b.v[1])))
+                :(Couple{V,basis(V)}($right(value(a)),b.v[1]))
             else
-                :(Couple{V,basis(V)}(Complex(value(a),$right(b.v[1]))))
+                :(Couple{V,basis(V)}(value(a),$right(b.v[1])))
             end
         elseif !istangent(V) && !hasconformal(V) && G == 0 &&
                 valuetype(a)<:Real && valuetype(b)<:Real
             if swap
-                :(Couple{V,basis(a)}(Complex(b.v[1],$right(value(a)))))
+                :(Couple{V,basis(a)}(b.v[1],$right(value(a))))
             else
-                :(Couple{V,basis(a)}(Complex($right(b.v[1]),value(a))))
+                :(Couple{V,basis(a)}($right(b.v[1]),value(a)))
             end
         elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
                 valuetype(a)<:Real && valuetype(b)<:Real
             if swap
-                :(PseudoCouple{V,basis(a)}(Complex($right(value(a)),b.v[1])))
+                :(PseudoCouple{V,basis(a)}($right(value(a)),b.v[1]))
             else
-                :(PseudoCouple{V,basis(a)}(Complex(value(a),$right(b.v[1]))))
+                :(PseudoCouple{V,basis(a)}(value(a),$right(b.v[1])))
             end
         elseif iseven(L) && iseven(G)
             if mdims(V)-1<cache_limit

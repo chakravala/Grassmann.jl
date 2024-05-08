@@ -59,13 +59,6 @@ include("forms.jl")
 
 export cayley, hyperplanes, points, TensorAlgebra
 
-cayley(V) = cayley(Vector(Λ(V).b))
-cayley(V,op) = cayley(Vector(Λ(V).b),op)
-cayley(b::AbstractVector) = cayley(b,b)
-cayley(b::AbstractVector,op) = cayley(b,b,op)
-cayley(a::AbstractVector,b::AbstractVector) = a*transpose(b)
-cayley(a::AbstractVector,b::AbstractVector,op) = TensorAlgebra{Manifold(Manifold(eltype(a)))}[op(x,y) for x ∈ a, y ∈ b]
-
 @pure hyperplanes(V::Manifold) = map(n->UniformScaling{Bool}(false)*getbasis(V,1<<n),0:rank(V)-1-diffvars(V))
 
 for M ∈ (:Signature,:DiagonalForm)

@@ -22,9 +22,6 @@ import AbstractTensors: Scalar, GradedVector, Bivector, Trivector
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
 import Leibniz: grade, antigrade, showvalue, basis, order
 
-export TensorNested
-abstract type TensorNested{V,T} <: Manifold{V,T} end
-
 # symbolic print types
 
 import Leibniz: Fields, parval, mixed, mvecs, svecs, spinsum, spinsum_set
@@ -90,17 +87,6 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 #Simplex{V,W,T<:GradedVector{W},N} = Chain{V,1,T,N}
 Simplex{V,T<:GradedVector,N} = Chain{V,1,T,N}
 
-Base.Matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,W,G} = hcat(value.(Chain.(value(m)))...)
-Base.Matrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = hcat(value.(value(m))...)
-Chain(m::Matrix) = DyadicChain{Submanifold(size(m)[1])}(m)
-Chain{V}(m::Matrix) where V = Chain{V,1}(m)
-function Chain{V,G}(m::Matrix) where {V,G}
-    N = size(m)[2]
-    Chain{V,G,Chain{N≠mdims(V) ? Submanifold(N) : V,G}}(m)
-end
-Chain{V,G,<:Chain{W,G}}(m::Matrix) where {V,W,G} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
-Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
-
 export Chain, Simplex
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
@@ -114,14 +100,6 @@ Base.zero(::Type{<:Chain{V,G,T}}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V)
 Base.zero(::Chain{V,G,T}) where {V,G,T} = Chain{V,G}(zeros(svec(mdims(V),G,T)))
 Base.one(::Type{<:Chain{V,G,T}} where G) where {V,T} = Chain{V,0}(ones(svec(mdims(V),0,T)))
 Base.one(::Chain{V,G,T} where G) where {V,T} = Chain{V,0}(ones(svec(mdims(V),0,T)))
-
-transpose_row(t::Values{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
-transpose_row(t::FixedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
-transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
-@generated _transpose(t::Values{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(list(1,mdims(V))),W)))
-@generated _transpose(t::FixedVector{N,<:Chain{V,1}},W=V) where {N,V} = :(Chain{V,1}(transpose_row.(Ref(t),$(list(1,mdims(V))),W)))
-Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
-Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 
 function show(io::IO, m::Chain{V,G,T}) where {V,G,T}
     ib,compact = indexbasis(mdims(V),G),get(io,:compact,false)
@@ -326,17 +304,6 @@ Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
 
-DyadicMultivector{V,T,N} = Multivector{V,Multivector{V,T,N},N}
-
-Base.Matrix(m::Multivector{V,<:TensorAlgebra{W}}) where {V,W} = hcat(value.(Multivector.(value(m)))...)
-Base.Matrix(m::Multivector{V,<:Multivector{W}}) where {V,W} = hcat(value.(value(m))...)
-DyadicMultivector(m::Matrix) = Multivector{log2sub(size(m)[1]),1}(m)
-function Multivector{V}(m::Matrix) where V
-    N = size(m)[2]
-    Multivector{V,Multivector{Int(log2(N))≠mdims(V) ? log2sub(N) : V}}(m)
-end
-Multivector{V,Chain{W}}(m::Matrix) where {V,W} = Multivector{V}(Multivector{W}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
-
 function grade_src_chain(N,G,r=binomsum(N,G),is=isempty,T=Int)
     :(Chain{V,$G,T}($(grade_src(N,G,r,is,T))))
 end
@@ -449,12 +416,8 @@ Single(v,b::Multivector) = v*b
     end
 end
 Multivector(v::Submanifold{V,G}) where {V,G} = Multivector(one(Int),v)
-for var ∈ ((:V,:T),(:T,))
-    @eval function Multivector{$(var...)}(v::Submanifold{V,G}) where {V,T,G}
-        return Multivector(one(T),v)
-    end
-end
-for var ∈ ((:V,:T),(:T,),())
+Multivector{V,T}(v::Submanifold{V,G}) where {V,T,G} = Multivector(one(T),v)
+for var ∈ ((:V,:T),())
     @eval begin
         function Multivector{$(var...)}(v::Single{V,G,B,T}) where {V,G,B,T}
             return Multivector(v.v,basis(v))
@@ -514,14 +477,6 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         equal(a::Chain{V,G,T},b::$pinor{V,S}) where {V,S,G,T} = b == a
         equal(a::T,b::$pinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
         $dpinor{V,T,N} = $pinor{V,$pinor{V,T,N},N}
-        Base.Matrix(m::$pinor{V,<:TensorAlgebra{W}}) where {V,W} = hcat(value.($pinor.(value(m)))...)
-        Base.Matrix(m::$pinor{V,<:$pinor{W}}) where {V,W} = hcat(value.(value(m))...)
-        $pinor(m::Matrix) = $pinor{log2sub(size(m)[1]),1}(m)
-        function $pinor{V}(m::Matrix) where V
-            N = size(m)[2]
-            $pinor{V,$pinor{Int(log2(N))≠mdims(V) ? log2sub(N) : V}}(m)
-        end
-        $pinor{V,$pinor{W}}(m::Matrix) where {V,W} = $pinor{V}($pinor{W}.(getindex.(Ref(m),:,list(1,size(m)[2]))))
     end
 end
 
@@ -531,7 +486,7 @@ end
 Spinor (`even` grade) type with pseudoscalar `V::Manifold` and scalar field `T::Type`.
 """
 Spinor{V}(val::Submanifold{V}) where V = Spinor{V,Int}(1,val)
-Spinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Spinor{V,𝕜}(1,v)
+Spinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = Spinor{V,T}(one(T),v)
 @generated function Spinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     isodd(G) && error("$v is not expressible as a Spinor")
     N = mdims(V)
@@ -549,7 +504,7 @@ end
 PsuedoSpinor (`odd` grade) type with pseudoscalar `V::Manifold` and scalar `T::Type`.
 """
 AntiSpinor{V}(val::Submanifold{V}) where V = AntiSpinor{V,Int}(1,val)
-AntiSpinor{V,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = AntiSpinor{V,𝕜}(1,v)
+AntiSpinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = AntiSpinor{V,T}(one(T),v)
 @generated function AntiSpinor{V,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     iseven(G) && error("$v is not expressible as an AntiSpinor")
     N = mdims(V)
@@ -721,13 +676,16 @@ end
 """
 struct Couple{V,B,T} <: AbstractSpinor{V,T}
     v::Complex{T}
+    #re::T
+    #im::T
+    Couple{V,B,T}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     Couple{V,B}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     Couple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
 Couple(a,b) = (V=Submanifold(2); Couple{V,Submanifold(V)}(a,b))
-Base.abs2(z::Couple{V,B}) where {V,B} = abs2(z.v.re) + abs2(z.v.im)*abs2_inv(B)
-grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v.re : Zero(V)
+Base.abs2(z::Couple{V,B}) where {V,B} = abs2(realvalue(z)) + abs2(imagvalue(z))*abs2_inv(B)
+grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? imagvalue(z) : G==0 ? realvalue(z) : Zero(V)
 
 """
     PseudoCouple{V,B,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
@@ -736,19 +694,20 @@ grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.im : G==0 ? z.v
 """
 struct PseudoCouple{V,B,T} <: AbstractSpinor{V,T}
     v::Complex{T}
+    PseudoCouple{V,B,T}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     PseudoCouple{V,B}(a::T,b::T) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(Complex{T}(a,b))
     PseudoCouple{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
 function Base.abs2(z::PseudoCouple{V,B}) where {V,B}
-    out = abs2(z.v.re)*abs2_inv(B) + abs2(z.v.im)*abs2_inv(V)
+    out = abs2(realvalue(z))*abs2_inv(B) + abs2(imagvalue(z))*abs2_inv(V)
     if (~B)*basis(V) ≠ (~basis(V))*B
         return out
     else
-        out + (2complementrighthodge(B))*(z.v.re*z.v.im)
+        out + (2complementrighthodge(B))*(realvalue(z)*imagvalue(z))
     end
 end
-grade(z::PseudoCouple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? z.v.re : G==mdims(V) ? z.v.im : Zero(V)
+grade(z::PseudoCouple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? realvalue(z) : G==mdims(V) ? imagvalue(z) : Zero(V)
 
 Couple(m::TensorTerm{V}) where V = Couple{V,basis(m)}(Complex(m))
 Couple(m::TensorTerm{V,0}) where V = Couple{V,Submanifold(V)}(Complex(m))
@@ -777,9 +736,9 @@ AntiSpinor{V,𝕂}(z::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = AntiSpinor{V}(i
     else
         b = getproperty(Λ(V),v)
         if basis(b) == B
-            a.v.im*b
+            imagvalue(a)*b
         elseif grade(b) == 0
-            a.v.re*b
+            realvalue(a)*b
         else
             zero(T)*b
         end
@@ -791,9 +750,9 @@ end
     else
         b = getproperty(Λ(V),v)
         if basis(b) == B
-            a.v.re*b
+            realvalue(a)*b
         elseif grade(b) == mdims(V)
-            a.v.im*b
+            imagvalue(a)*b
         else
             zero(T)*b
         end
@@ -814,40 +773,40 @@ end
 Base.one(t::Couple{V,B,T}) where {V,B,T} = Couple{V,B}(one(Complex{T}))
 Base.one(t::Type{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(one(Complex{T}))
 
-equal(a::Couple{V},b::Couple{V}) where V = a.v.re==b.v.re && a.v.im==b.v.im==0
-isapprox(a::Couple{V},b::Couple{V}) where V = a.v.re≈b.v.re && a.v.im≈b.v.im≈0
-equal(a::PseudoCouple{V},b::PseudoCouple{V}) where V = a.v.im==b.v.im && a.v.re==b.v.re==0
-isapprox(a::PseudoCouple{V},b::PseudoCouple{V}) where V = a.v.im≈b.v.im && a.v.re≈b.v.re≈0
+equal(a::Couple{V},b::Couple{V}) where V = realvalue(a)==realvalue(b) && imagvalue(a)==imagvalue(b)==0
+isapprox(a::Couple{V},b::Couple{V}) where V = realvalue(a)≈realvalue(b) && imagvalue(a)≈imagvalue(b)≈0
+equal(a::PseudoCouple{V},b::PseudoCouple{V}) where V = imagvalue(a)==imagvalue(b) && realvalue(a)==realvalue(b)==0
+isapprox(a::PseudoCouple{V},b::PseudoCouple{V}) where V = imagvalue(a)≈imagvalue(b) && realvalue(a)≈imagvalue(b)≈0
 
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::Couple) where T<:$T = isscalar(b) && a == b.v.re
+        ==(a::T,b::Couple) where T<:$T = isscalar(b) && a == realvalue(b)
         ==(a::Couple,b::T) where T<:$T = b == a
-        ==(a::T,b::PseudoCouple) where T<:$T = isscalar(b) && a == b.v.re
+        ==(a::T,b::PseudoCouple) where T<:$T = isscalar(b) && a == realvalue(b)
         ==(a::PseudoCouple,b::T) where T<:$T = b == a
     end
 end
 
 for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     @eval begin
-        $qe(a::Couple{V,B},b::Couple{V,B}) where {V,B} = $eq(a.v,b.v)
-        $qe(a::Couple{V},b::TensorTerm{V,0}) where V = isscalar(a) && $eq(a.v.re, value(b))
-        $qe(a::TensorTerm{V,0},b::Couple{V}) where V = isscalar(b) && $eq(b.v.re,value(a))
-        $qe(a::Couple{V,B},b::TensorTerm{V}) where {V,B} = B == basis(b) && iszero(a.v.re) && $eq(a.v.im,value(b))
-        $qe(a::TensorTerm{V},b::Couple{V,B}) where {V,B} = B == basis(a) && iszero(b.v.re) && $eq(b.v.im,value(a))
-        $qe(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = $eq(a.v,b.v)
+        $qe(a::Couple{V,B},b::Couple{V,B}) where {V,B} = $eq(realvalue(a),realvalue(b)) & $eq(imagvalue(a),imagvalue(b))
+        $qe(a::Couple{V},b::TensorTerm{V,0}) where V = isscalar(a) && $eq(realvalue(a), value(b))
+        $qe(a::TensorTerm{V,0},b::Couple{V}) where V = isscalar(b) && $eq(realvalue(b),value(a))
+        $qe(a::Couple{V,B},b::TensorTerm{V}) where {V,B} = B == basis(b) && iszero(realvalue(a)) && $eq(imagvalue(a),value(b))
+        $qe(a::TensorTerm{V},b::Couple{V,B}) where {V,B} = B == basis(a) && iszero(realvalue(b)) && $eq(imagvalue(b),value(a))
+        $qe(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = $eq(realvalue(a),realvalue(b)) & $eq(imagvalue(a),imagvalue(b))
         function $qe(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
             if Submanifold(V) == basis(b)
-                iszero(a.v.re) && $eq(b.v.im,value(b))
+                iszero(realvalue(a)) && $eq(imagvalue(b),value(b))
             else
-                B == basis(b) && iszero(a.v.im) && $eq(a.v.re,value(b))
+                B == basis(b) && iszero(imagvalue(a)) && $eq(realvalue(a),value(b))
             end
         end
         function $qe(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
             if Submanifold(V) == basis(b)
-                iszero(b.v.re) && $eq(b.v.im,value(a))
+                iszero(realvalue(b)) && $eq(imagvalue(b),value(a))
             else
-                B == basis(a) && iszero(b.v.im) && $eq(b.v.re,value(a))
+                B == basis(a) && iszero(imagvalue(b)) && $eq(realvalue(b),value(a))
             end
         end
     end
@@ -868,17 +827,21 @@ end
 for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         export $couple
-        $couple{V,B}(a,b) where {V,B} = $couple{V,B}(Complex(a,b))
+        $couple{V,B}(a,b) where {V,B} = $couple{V,B}(promote(a,b)...)
+        @inline realvalue(z::$couple) = z.v.re#z.re
+        @inline imagvalue(z::$couple) = z.v.im#z.im
         DirectSum.basis(::$couple{V,B}) where {V,B} = B
-        Base.reim(z::$couple) = reim(z.v)
-        Base.widen(z::$couple{V,B}) where {V,B} = $couple{V,B}(widen(z.v))
-        (::Type{Complex})(m::$couple) = value(m)
-        (::Type{Complex{T}})(m::$couple) where T<:Real = Complex{T}(value(m))
+        Base.reim(z::$couple) = (realvalue(z),imagvalue(z))
+        Base.widen(z::$couple{V,B}) where {V,B} = $couple{V,B}(widen(Complex(z)))
+        (::Type{Complex})(m::$couple) = m.v
+        (::Type{Complex{T}})(m::$couple) where T<:Real = Complex{T}(m.v)
+        #(::Type{Complex})(m::$couple) = Complex(realvalue(m),imagvalue(m))
+        #(::Type{Complex{T}})(m::$couple) where T<:Real = Complex{T}(realvalue(m),imagvalue(m))
         Multivector{V}(z::$couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
         Multivector(z::$couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
         Spinor{V}(val::$couple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V,𝕂}(val)
-        Base.zero(::$couple{V,B,T}) where {V,B,T} = $couple{V,B}(zero(Complex{T}))
-        Base.zero(::Type{$couple{V,B,T}}) where {V,B,T} = $couple{V,B}(zero(Complex{T}))
+        Base.zero(::$couple{V,B,T}) where {V,B,T} = $couple{V,B}(zero(T),zero(T))
+        Base.zero(::Type{$couple{V,B,T}}) where {V,B,T} = $couple{V,B}(zero(T),zero(T))
         @pure Base.length(m::$couple) = 2
     end
 end
@@ -898,13 +861,16 @@ struct Phasor{V,B,T} <: AbstractSpinor{V,T}
     Phasor{V,B}(v::Complex{T}) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
+@inline realvalue(z::Phasor) = z.v.re
+@inline imagvalue(z::Phasor) = z.v.im
+
 Phasor{V,B}(a,b) where {V,B} = Couple{V,B}(Complex(a,b))
 Phasor(a,b) = (V=Submanifold(2); Couple{V,Submanifold(V)}(a,b))
 
 const ∠ = Phasor
 @pure DirectSum.basis(::Phasor{V,B}) where {V,B} = B
-Base.reim(z::Phasor) = reim(z.v)
-Base.widen(z::Phasor{V,B}) where {V,B} = Phasor{V,B}(widen(z.v))
+Base.reim(z::Phasor) = (realvalue(z),imagvalue(z))
+Base.widen(z::Phasor{V,B}) where {V,B} = Phasor{V,B}(widen(Complex(z)))
 function Base.abs2(z::Phasor{V,B}) where {V,B}
     if B*B == -1
         Single{V}(radius(z)*radius(z))
@@ -913,9 +879,9 @@ function Base.abs2(z::Phasor{V,B}) where {V,B}
     end
 end
 
-Base.angle(z::Phasor) = z.v.im*basis(z)
-radius(z::Phasor) = z.v.re
-radius(z::Couple{V,B}) where {V,B} = sqrt(z.v.re^2 - z.v.im^2*value(B*B))
+Base.angle(z::Phasor) = imagvalue(z)*basis(z)
+radius(z::Phasor) = realvalue(z)
+radius(z::Couple{V,B}) where {V,B} = sqrt(realvalue(z)^2 - imagvalue(z)^2*value(B*B))
 
 Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = a
 
@@ -932,7 +898,7 @@ Phasor(r::TensorTerm{V,0} where V,iθ) = Phasor(value(r),iθ)
 Couple(z::Phasor{V,B}) where {V,B} = radius(z)*exp(angle(z))
 Couple{V,B,T}(z::Phasor{V,B}) where {V,B,T} = Couple(z)
 
-(z::Phasor{V,B})(ωt) where {V,B} = Phasor{V,B}(radius(z),ωt+z.v.im)
+(z::Phasor{V,B})(ωt) where {V,B} = Phasor{V,B}(radius(z),ωt+imagvalue(z))
 
 Multivector{V,T}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V,T}(Couple(z))
 Multivector{V}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V}(Couple(z))
@@ -950,77 +916,23 @@ Base.one(t::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(one(Complex{T}))
 Base.zero(::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(zero(Complex{T}))
 Base.one(t::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(one(Complex{T}))
 
-equal(a::Phasor{V},b::Phasor{V}) where V = a.v.re==b.v.re && a.v.im==b.v.im==0
-isapprox(a::Phasor{V},b::Phasor{V}) where V = a.v.re≈b.v.re && a.v.im≈b.v.im≈0
+equal(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)==realvalue(b) && imagvalue(a)==imagvalue(b)==0
+isapprox(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)≈realvalue(b) && imagvalue(a)≈imagvalue(b)≈0
 
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::Phasor) where T<:$T = isscalar(b) && a == b.v.re
+        ==(a::T,b::Phasor) where T<:$T = isscalar(b) && a == realvalue(b)
         ==(a::Phasor,b::T) where T<:$T = b == a
     end
 end
 
 for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     @eval begin
-        $qe(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = $eq(a.v,b.v)
+        $qe(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = (realvalue(a) == realvalue(b)) & (imagvalue(a) == imagvalue(b))
         $qe(a::Phasor{V,B},b::Couple{V,B}) where {V,B} = $eq(Couple(a),b)
         $qe(a::Couple{V,B},b::Phasor{V,B}) where {V,B} = $eq(a,Couple(b))
     end
 end
-
-# Dyadic
-
-export Projector, Dyadic, Proj
-
-struct Projector{V,T,Λ} <: TensorNested{V,T}
-    v::T
-    λ::Λ
-    Projector{V,T,Λ}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
-    Projector{V,T}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
-    Projector{V}(v::T,λ::Λ=1) where {T<:Manifold{V},Λ} where V = new{DirectSum.submanifold(V),T,Λ}(v,λ)
-end
-
-const Proj = Projector
-
-Proj(v::T,λ=1) where T<:TensorGraded{V} where V = Proj{V}(v/abs(v),λ)
-Proj(v::Chain{W,1,<:Chain{V}},λ=1) where {V,W} = Proj{V}(Chain(value(v)./abs.(value(v))),λ)
-#Proj(v::Chain{V,1,<:TensorNested},λ=1) where V = Proj{V}(v,λ)
-
-(P::Projector)(x) = contraction(P,x)
-
-getindex(P::Proj,i::Int,j::Int) = P.v[i]*P.v[j]
-getindex(P::Proj{V,<:Chain{W,1,<:Chain}} where {V,W},i::Int,j::Int) = sum(column(P.v,i).*column(P.v,j))
-#getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
-
-Leibniz.extend_parnot(Projector)
-
-show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
-show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ} = print(io,"(",P.λ,")Proj(",P.v,")")
-
-#Chain{V}(P::Proj{V,T}) where {V,T<:Chain{V,1,<:TensorNested}} = sum(Chain.(value(P.v)))
-Chain{V}(P::Proj{V,T}) where {V,T<:Simplex{V}} = sum(outer.(value(P.v).*value(P.λ),P.v))
-Chain{V}(P::Proj{V}) where V = outer(P.v*P.λ,P.v)
-Chain(P::Proj{V}) where V = Chain{V}(P)
-
-struct Dyadic{V,X,Y} <: TensorNested{V,X}
-    x::X
-    y::Y
-    Dyadic{V,X,Y}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{DirectSum.submanifold(V),X,Y}(x,y)
-    Dyadic{V}(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = new{DirectSum.submanifold(V),X,Y}(x,y)
-end
-
-Dyadic(x::X,y::Y) where {X<:TensorGraded,Y<:TensorGraded{V}} where V = Dyadic{V}(x,y)
-Dyadic(P::Projector) = Dyadic(P.v,P.v)
-Dyadic(D::Dyadic) = D
-
-(P::Dyadic)(x) = contraction(P,x)
-
-getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
-
-show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
-
-Chain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
-Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
 ## Generic
 
@@ -1096,8 +1008,8 @@ const quatvalues = quatvalue
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Spinor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::AntiSpinor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
-@inline value(m::Couple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
-@inline value(m::PseudoCouple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
+@inline value(m::Couple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},Complex(m)) : Complex(m)
+@inline value(m::PseudoCouple,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},Complex(m)) : Complex(m)
 #@inline value(m::Phasor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(Complex{T},m.v) : m.v
 @inline value_diff(m::Chain{V,0} where V) = (v=value(m)[1];istensor(v) ? v : m)
 @inline value_diff(m::Chain) = m
@@ -1106,36 +1018,37 @@ Base.isapprox(a::S,b::T) where {S<:Multivector,T<:Multivector} = Manifold(a)==Ma
 Base.isapprox(a::S,b::T) where {S<:Spinor,T<:Spinor} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
 Base.isapprox(a::S,b::T) where {S<:AntiSpinor,T<:AntiSpinor} = Manifold(a)==Manifold(b) && DirectSum.:≈(value(a),value(b))
 
-@inline scalar(z::Couple{V}) where V = Single{V}(z.v.re)
-@inline scalar(z::PseudoCouple{V,B}) where {V,B} = grade(B)==0 ? Single{V}(z.v.re) : Zero(V)
+@inline scalar(z::Couple{V}) where V = Single{V}(realvalue(z))
+@inline scalar(z::PseudoCouple{V,B}) where {V,B} = grade(B)==0 ? Single{V}(realvalue(z)) : Zero(V)
 @inline scalar(z::Phasor) = scalar(Couple(z))
 @inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
 @inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
 @inline scalar(t::AntiSpinor{V}) where V = Zero(V)
-@inline vector(z::Couple{V,B}) where {V,B} = grade(B)==1 ? Single{V}(z.v.im) : Zero(V)
+@inline vector(z::Couple{V,B}) where {V,B} = grade(B)==1 ? imaginary(z) : Zero(V)
+@inline vector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==1 ? imaginary(z) : grade(V)==1 ? volume(z) : Zero(V)
 @inline vector(t::Multivector) = t(Val(1))
 @inline vector(t::Spinor{V}) where V = Zero(V)
 @inline vector(t::AntiSpinor) = t(Val(1))
-@inline bivector(z::Couple{V,B}) where {V,B} = grade(B)==2 ? Single{V,2,B}(z.v.im) : Zero(V)
-@inline bivector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==2 ? Single{V,2,B}(z.v.re) : Zero(V)
+@inline bivector(z::Couple{V,B}) where {V,B} = grade(B)==2 ? imaginary(z) : Zero(V)
+@inline bivector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==2 ? imaginary(z) : grade(V)==2 ? volume(z) : Zero(V)
 @inline bivector(t::Multivector) = t(Val(2))
 @inline bivector(t::Spinor) = t(Val(2))
 @inline bivector(t::AntiSpinor{V}) where V = Zero(V)
-@inline trivector(z::Couple{V,B}) where {V,B} = grade(B)==3 ? Single{V,3,B}(z.v.im) : Zero(V)
-@inline trivector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==3 ? Single{V,3,B}(z.v.re) : Zero(V)
+@inline trivector(z::Couple{V,B}) where {V,B} = grade(B)==3 ? imaginarya(z) : Zero(V)
+@inline trivector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==3 ? imaginary(z) : grade(V)==3 ? volume(z) : Zero(V)
 @inline trivector(t::Multivector) = t(Val(3))
 @inline trivector(t::Spinor{V}) where V = Zero(V)
 @inline trivector(t::AntiSpinor) = t(Val(3))
 #@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
 @inline volume(t::Chain{V,G,T,1}) where {V,G,T} = @inbounds Single{V,G,basis(V)}(t.v[1])
-@inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(z.v.im) : Zero(V)
-@inline volume(z::PseudoCouple{V}) where V = Single{V,mdims(V),Submanifold(V)}(z.v.im)
+@inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(imagvalue(z)) : Zero(V)
+@inline volume(z::PseudoCouple{V}) where V = Single{V,mdims(V),Submanifold(V)}(imagvalue(z))
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])
 @inline volume(t::Spinor{V}) where V = iseven(grade(V)) ? (@inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])) : Zero(V)
 @inline volume(t::AntiSpinor{V}) where V = isodd(grade(V)) ? (@inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])) : Zero(V)
-@inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.im)
-@inline imaginary(z::PseudoCouple{V,B}) where {V,B} = Single{V,grade(B),B}(z.v.re)
+@inline imaginary(z::Couple{V,B}) where {V,B} = Single{V,grade(B),B}(imagvalue(z))
+@inline imaginary(z::PseudoCouple{V,B}) where {V,B} = Single{V,grade(B),B}(realvalue(z))
 @inline imaginary(z::Quaternion) = bivector(z)
 @inline imaginary(z::AntiQuaternion) = vector(z)
 @inline isscalar(t) = norm(t) ≈ norm(scalar(t))

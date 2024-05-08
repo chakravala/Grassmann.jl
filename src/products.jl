@@ -411,10 +411,10 @@ plus(b::AntiSpinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
 -(a::AntiSpinor{V}) where V = AntiSpinor{V}(-value(a))
 -(a::Couple{V,B}) where {V,B} = Couple{V,B}(-a.v)
 -(a::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(-a.v)
-times(a::Single{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
-times(a::Chain{V,G},b::Single{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
-times(a::Submanifold{V,0},b::Chain{W,G}) where {V,W,G} = b
-times(a::Chain{V,G},b::Submanifold{W,0}) where {V,W,G} = a
+⟑(a::Single{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
+⟑(a::Chain{V,G},b::Single{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
+⟑(a::Submanifold{V,0},b::Chain{W,G}) where {V,W,G} = b
+⟑(a::Chain{V,G},b::Submanifold{W,0}) where {V,W,G} = a
 
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
@@ -435,8 +435,8 @@ end
 
 for (op,po) ∈ ((:plus,:+),(:minus,:-))
     @eval begin
-        $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(a.v,b.v))
-        $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}($po(a.v,b.v))
+        $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(realvalue(a),realvalue(b)),$po(imagvalue(a),imagvalue(b)))
+        $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}($po(realvalue(a),imagvalue(b)),$po(imagvalue(a),imagvalue(b)))
         $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($op(Couple(a),Couple(b)))
         $op(a::Couple{V},b::Phasor{V}) where V = $op(a,Couple(b))
         $op(a::Phasor{V},b::Couple{V}) where V = $op(Couple(a),b)
@@ -450,46 +450,46 @@ for (op,po) ∈ ((:plus,:+),(:minus,:-))
     end
 end
 
-function times(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(B*B),a.v.re*b.v.im+a.v.im*b.v.re))
+function ⟑(a::Couple{V,B},b::Couple{V,B}) where {V,B}
+    Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value(B*B),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b))
 end
-function times(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
+function ⟑(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
-    Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(B*B)+value(volume(a)*volume(b)),value(out)))
+    Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(B*B)+value(volume(a)*volume(b)),value(out))
 end
-function times(a::Phasor{V,B},b::Phasor{V,B}) where {V,B}
-    Phasor{V,B}(a.v.re*b.v.re,a.v.im+b.v.im)
+function ⟑(a::Phasor{V,B},b::Phasor{V,B}) where {V,B}
+    Phasor{V,B}(realvalue(a)*realvalue(b),imagvalue(a)+imagvalue(b))
 end
 
 function ∧(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    Couple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re))
+    Couple{V,B}(realvalue(a)*realvalue(b),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b))
 end
 function ∧(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
-    grade(B)==0 ? PseudoCouple{V,B}(Complex(a.v.re*b.v.re,a.v.re*b.v.im+a.v.im*b.v.re)) : Zero(V)
+    grade(B)==0 ? PseudoCouple{V,B}(realvalue(a)*realvalue(b),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b)) : Zero(V)
 end
 ∧(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∧Couple(b))
 
 function ∨(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    grade(B)==grade(V) ? Couple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im)) : Zero(V)
+    grade(B)==grade(V) ? Couple{V,B}(realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b),imagvalue(a)*imagvalue(b)) : Zero(V)
 end
 function ∨(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
-    PseudoCouple{V,B}(Complex(a.v.re*b.v.im+a.v.im*b.v.re,a.v.im*b.v.im))
+    PseudoCouple{V,B}(realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b),imagvalue(a)*imagvalue(b))
 end
 ∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
 
 function contraction(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    Couple{V,B}(Complex(a.v.re*b.v.re+(a.v.im*b.v.im)*value(abs2_inv(B)),a.v.im*b.v.re))
+    Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value(abs2_inv(B)),imagvalue(a)*realvalue(b))
 end
 function contraction(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     out = contraction(volume(a),imaginary(b))
-    Couple{V,basis(out)}(Complex((a.v.re*b.v.re)*value(abs2_inv(B))+(a.v.im*b.v.im)*value(abs2_inv(V)),value(out)))
+    Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(abs2_inv(B))+(imagvalue(a)*imagvalue(b))*value(abs2_inv(V)),value(out))
 end
 contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Couple(a),Couple(b)))
 
-times(a::Couple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
-times(a::PseudoCouple{V},b::PseudoCouple{V}) where V = ((volume(a)⟑volume(b))+(imaginary(a)⟑imaginary(b)))+(imaginary(a)⟑volume(b))+(volume(b)⟑imaginary(a))
-times(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)⟑b)+(imaginary(a)⟑b)
-times(a::PseudoCouple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
+⟑(a::Couple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
+⟑(a::PseudoCouple{V},b::PseudoCouple{V}) where V = ((volume(a)⟑volume(b))+(imaginary(a)⟑imaginary(b)))+(imaginary(a)⟑volume(b))+(volume(b)⟑imaginary(a))
+⟑(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)⟑b)+(imaginary(a)⟑b)
+⟑(a::PseudoCouple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
 ∧(a::Couple{V},b::Couple{V}) where V = (a∧scalar(b))+(a∧imaginary(b))
 ∧(a::PseudoCouple{V},b::PseudoCouple{V}) where V = imaginary(a)∧imaginary(b)
 ∧(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∧b)+(imaginary(a)∧imaginary(b))
@@ -503,74 +503,74 @@ contraction(a::PseudoCouple{V},b::PseudoCouple{V}) where V = contraction(imagina
 contraction(a::Couple{V},b::PseudoCouple{V}) where V = contraction(scalar(a),imaginary(b))+contraction(imaginary(a),b)
 contraction(a::PseudoCouple{V},b::Couple{V}) where V = contraction(a,scalar(b))+contraction(a,imaginary(b))
 
-plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)+b.v.re,b.v.im))
-plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re+value(b),a.v.im))
+plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(value(a)+realvalue(b),imagvalue(b))
+plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)+value(b),imagvalue(a))
 function plus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
-        Couple{V,B}(Complex(b.v.re,value(a)+b.v.im))
+        Couple{V,B}(realvalue(b),value(a)+imagvalue(b))
     else
         a+multispin(b)
     end
 end
 function plus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        Couple{V,B}(Complex(a.v.re,a.v.im+value(b)))
+        Couple{V,B}(realvalue(a),imagvalue(a)+value(b))
     else
         multispin(a)+b
     end
 end
 function plus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
-        PseudoCouple{V,B}(Complex(value(a)+b.v.re,b.v.im))
+        PseudoCouple{V,B}(value(a)+realvalue(b),imagvalue(b))
     elseif basis(a) == Subamnifold(V)
-        PseudoCouple{V,B}(Complex(b.v.re,value(a)+b.v.im))
+        PseudoCouple{V,B}(realvalue(b),value(a)+imagvalue(b))
     else
         a+multispin(b)
     end
 end
 function plus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        PseudoCouple{V,B}(Complex(a.v.re+value(b),a.v.im))
+        PseudoCouple{V,B}(realvalue(a)+value(b),imagvalue(a))
     elseif Submanifold(V) == basis(b)
-        PseudoCouple{V,B}(Complex(a.v.re,a.v.im+value(b)))
+        PseudoCouple{V,B}(Complex(realvalue(a),imagvalue(a)+value(b)))
     else
         multispin(a)+b
     end
 end
 
-minus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = (re = value(a)-b.v.re; Couple{V,B}(Complex(re,-oftype(re,b.v.im))))
-minus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re-value(b),a.v.im))
+minus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = (re = value(a)-realvalue(b); Couple{V,B}(re,-oftype(re,imagvalue(b))))
+minus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)-value(b),imagvalue(a))
 function minus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
-        re = value(a)-b.v.im
-        Couple{V,B}(Complex(-oftype(re,b.v.re),re))
+        re = value(a)-imagvalue(b)
+        Couple{V,B}(-oftype(re,realvalue(b)),re)
     else
         a-multispin(b)
     end
 end
 function minus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        Couple{V,B}(Complex(a.v.re,a.v.im-value(b)))
+        Couple{V,B}(realvalue(a),imagvalue(a)-value(b))
     else
         multispin(a)-b
     end
 end
 function minus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
-        re = value(a)-b.v.re
-        PseudoCouple{V,B}(Complex(re,-oftype(re,b.v.im)))
+        re = value(a)-realvalue(b)
+        PseudoCouple{V,B}(re,-oftype(re,imagvalue(b)))
     elseif basis(a) == Submanifold(V)
-        re = value(a)-b.v.im
-        PseudoCouple{V,B}(Complex(-oftype(re,b.v.re),re))
+        re = value(a)-imagvalue(b)
+        PseudoCouple{V,B}(-oftype(re,realvalue(b)),re)
     else
         a-multispin(b)
     end
 end
 function minus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        PseudoCouple{V,B}(Complex(a.v.re-value(b),a.v.im))
+        PseudoCouple{V,B}(realvalue(a)-value(b),imagvalue(a))
     elseif Submanifold(V) == basis(b)
-        PseudoCouple{V,B}(Complex(a.v.re,a.v.im-value(b)))
+        PseudoCouple{V,B}(realvalue(a),imagvalue(a)-value(b))
     else
         multispin(a)-b
     end
@@ -578,22 +578,22 @@ end
 
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
-        times(a::Multivector{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        times(a::$couple{V},b::Multivector{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        times(a::Spinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        times(a::$couple{V},b::Spinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        times(a::AntiSpinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        times(a::$couple{V},b::AntiSpinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        times(a::Chain{V,G},b::$couple{V}) where {V,G} = (G==0 || G==mdims(V)) ? Single(a)⟑b : (a⟑$calar(b)) + (a⟑imaginary(b))
-        times(a::$couple{V},b::Chain{V,G}) where {V,G} = (G==0 || G==mdims(V)) ? a⟑Single(b) : ($calar(a)⟑b) + (imaginary(a)⟑b)
-        times(a::TensorTerm{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        times(a::$couple{V},b::TensorTerm{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
+        ⟑(a::Multivector{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
+        ⟑(a::$couple{V},b::Multivector{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
+        ⟑(a::Spinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
+        ⟑(a::$couple{V},b::Spinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
+        ⟑(a::AntiSpinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
+        ⟑(a::$couple{V},b::AntiSpinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
+        ⟑(a::Chain{V,G},b::$couple{V}) where {V,G} = (G==0 || G==mdims(V)) ? Single(a)⟑b : (a⟑$calar(b)) + (a⟑imaginary(b))
+        ⟑(a::$couple{V},b::Chain{V,G}) where {V,G} = (G==0 || G==mdims(V)) ? a⟑Single(b) : ($calar(a)⟑b) + (imaginary(a)⟑b)
+        ⟑(a::TensorTerm{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
+        ⟑(a::$couple{V},b::TensorTerm{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
     end
 end
-times(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
-times(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
-times(a::TensorTerm{V,0},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(Complex(value(a)*b.v.re,value(a)*b.v.im))
-times(a::PseudoCouple{V,B},b::TensorTerm{V,0}) where {V,B} = PseudoCouple{V,B}(Complex(a.v.re*value(b),a.v.im*value(b)))
+⟑(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
+⟑(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
+⟑(a::TensorTerm{V,0},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
+⟑(a::PseudoCouple{V,B},b::TensorTerm{V,0}) where {V,B} = PseudoCouple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
 
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
@@ -668,7 +668,7 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
         contraction(a::$couple{V},b::TensorTerm{V,0}) where V = a⟑b
     end
 end
-contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*b.v.re)
+contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*realvalue(b))
 contraction(a::TensorTerm{V,0},b::PseudoCouple{V}) where V = contraction(a,imaginary(b))
 function contraction(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
     contraction(a,scalar(b)) + contraction(a,imaginary(b))
@@ -691,118 +691,16 @@ function contraction(a::PseudoCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
     contraction(imaginary(a),b) + contraction(volume(a),b)
 end
 
-# dyadic products
-
-export outer
-
-outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
-outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
-outer(a::Chain{W},b::Chain{V,1}) where {W,V} = Chain{V,1}(a.*value(b))
-
-contraction(a::Proj,b::TensorGraded) = a.v⊗(a.λ*(a.v⋅b))
-contraction(a::Dyadic,b::TensorGraded) = a.x⊗(a.y⋅b)
-contraction(a::TensorGraded,b::Dyadic) = (a⋅b.x)⊗b.y
-contraction(a::TensorGraded,b::Proj) = ((a⋅b.v)*b.λ)⊗b.v
-contraction(a::Dyadic,b::Dyadic) = (a.x*(a.y⋅b.x))⊗b.y
-contraction(a::Dyadic,b::Proj) = (a.x*((a.y⋅b.v)*b.λ))⊗b.v
-contraction(a::Proj,b::Dyadic) = (a.v*(a.λ*(a.v⋅b.x)))⊗b.y
-contraction(a::Proj,b::Proj) = (a.v*((a.λ*b.λ)*(a.v⋅b.v)))⊗b.v
-contraction(a::Dyadic{V},b::TensorGraded{V,0}) where V = Dyadic{V}(a.x*b,a.y)
-contraction(a::Proj{V},b::TensorTerm{V,0}) where V = Proj{V}(a.v,a.λ*value(b))
-contraction(a::Proj{V},b::Chain{V,0}) where V = Proj{V}(a.v,a.λ*(@inbounds b[1]))
-contraction(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj(Chain{V,1}(contraction.(value(a.v),b)))
-#contraction(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅b)
-contraction(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = Chain{W,1}(value(a).⋅Ref(b))
-contraction(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}},b::Chain{V,1}) where {W,V} = a.v:b
-contraction(a::Chain{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(value.(Single.(Ref(a).⋅value(b))))
-contraction(a::Chain{W,L,<:Chain,N},b::Chain{V,G,<:Chain{W,L},M}) where {W,L,G,V,N,M} = Chain{V,G}(value.(Ref(a).⋅value(b)))
-contraction(a::Multivector{W,<:Multivector},b::Multivector{V,<:Multivector{W}}) where {W,V} = Multivector{V}(column(Ref(a).⋅value(b)))
-Base.:(:)(a::Chain{V,1,<:Chain},b::Chain{V,1,<:Chain}) where V = sum(value(a).⋅value(b))
-Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).⋅Ref(b))
-#Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
-
-contraction(a::Submanifold{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(a::Single{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
-contraction(x::Chain{V,G,<:Chain},y::Single{V,G}) where {V,G} = value(y)*x[bladeindex(mdims(V),UInt(basis(y)))]
-contraction(x::Chain{V,G,<:Chain},y::Submanifold{V,G}) where {V,G} = x[bladeindex(mdims(V),UInt(y))]
-contraction(a::Chain{V,L,<:Chain{V,G},N},b::Chain{V,G,<:Chain{V},M}) where {V,G,L,N,M} = Chain{V,G}(contraction.(Ref(a),value(b)))
-contraction(x::Chain{V,L,<:Chain{V,G},N},y::Chain{V,G,<:Chain{V,L},N}) where {L,N,V,G} = Chain{V,G}(contraction.(Ref(x),value(y)))
-contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
-contraction(x::Chain{W,L,<:Multivector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Multivector{V}(matmul(value(x),value(y)))
-contraction(x::Multivector{W,<:Chain{V,G},N},y::Multivector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
-contraction(x::Multivector{W,<:Multivector{V},N},y::Multivector{V,T,N}) where {W,N,V,T} = Multivector{V}(matmul(value(x),value(y)))
-@inline @generated function matmul(x::Values{N,<:Single{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ list(1,N)]...)
-end
-@inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
-end
-@inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)
-end
-
-contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
-contraction(a::Dyadic{V,<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(a.y.⋅b))
-contraction(a::Dyadic{V,T,<:Chain{V,1,<:Chain}} where {V,T},b::TensorGraded) = sum(a.x.⊗(value(a.y).⋅b))
-contraction(a::Proj{V,<:Chain{W,1,<:Chain} where W} where V,b::TensorGraded) = sum(value(a.v).⊗(value(a.λ).*value(a.v).⋅b))
-contraction(a::Proj{V,<:Chain{W,1,<:Chain{V,1}} where W},b::TensorGraded{V,1}) where V = sum(value(a.v).⊗(value(a.λ).*column(value(a.v).⋅b)))
-
-+(a::Proj{V}...) where V = Proj{V}(Chain(Values(eigvec.(a)...)),Chain(Values(eigval.(a)...)))
-+(a::Dyadic{V}...) where V = Proj(Chain(a...))
-+(a::TensorNested{V}...) where V = Proj(Chain(Dyadic.(a)...))
-plus(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(value(a.v)...,b)
-plus(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
-+(a::Proj{M,<:Chain{M,1,<:TensorNested{V}}} where M,b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(value(a.v)...,value(b.v)...)
-+(a::Proj{M,<:Chain{M,1,<:Chain{V}}} where M,b::Proj{W,<:Chain{W,1,<:Chain{V}}} where W) where V = Chain(Values(value(a.v)...,value(b.v)...))
-#+(a::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W,b::TensorNested{V}) where V = +(b,Proj.(value(a.v),value(a.λ))...)
-#+(a::TensorNested{V},b::Proj{W,<:Chain{W,1,<:TensorNested{V}}} where W) where V = +(a,value(b.v)...)
-
--(a::TensorNested) = -1a
-minus(a::TensorNested,b::TensorNested) = a+(-b)
-*(a::Number,b::TensorNested{V}) where V = (a*One(V))*b
-*(a::TensorNested{V},b::Number) where V = a*(b*One(V))
-@inline times(a::TensorGraded{V,0},b::TensorNested{V}) where V = b⋅a
-@inline times(a::TensorNested{V},b::TensorGraded{V,0}) where V = a⋅b
-@inline times(a::TensorGraded{V,0},b::Proj{V,<:Chain{V,1,<:TensorNested}}) where V = Proj{V}(a*b.v)
-@inline times(a::Proj{V,<:Chain{V,1,<:TensorNested}},b::TensorGraded{V,0}) where V = Proj{V}(a.v*b)
-
-@inline times(a::Chain,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
-@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::Chain) = contraction(a,b)
-@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorTerm) = contraction(a,b)
-@inline times(a::TensorGraded,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
-@inline times(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorNested) = contraction(a,b)
-@inline times(a::TensorNested,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
-
-# dyadic identity element
-
-for op ∈ (:(Base.:+),:(Base.:-))
-    for tensor ∈ (:Projector,:Dyadic)
-        @eval begin
-            $op(a::A,b::B) where {A<:$tensor,B<:TensorAlgebra} = $op(Chain(a),b)
-            $op(a::A,b::B) where {A<:TensorAlgebra,B<:$tensor} = $op(a,Chain(b))
-            $op(t::LinearAlgebra.UniformScaling,g::$tensor) = $op(t,Chain(g))
-            $op(g::$tensor,t::LinearAlgebra.UniformScaling) = $op(Chain(g),t)
-        end
-    end
-end
-Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
-@generated Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
-@generated Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).+value(g)))
-@generated Base.:-(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}($(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
-@generated Base.:-(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = :(Chain{V,1}(t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)]).-value(g)))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling{Bool}) where V = :(Chain{V,1}(value(g).-$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
-@generated Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = :(Chain{V,1}(value(g).-t.λ*$(getalgebra(V).b[Grassmann.list(2,mdims(V)+1)])))
-
 # more algebra
 
 for F ∈ Fields
     @eval begin
-        *(a::F,b::Couple{V,B}) where {F<:$F,V,B} = Couple{V,B}(a*b.v)
-        *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(a.v*b)
-        *(a::F,b::PseudoCouple{V,B}) where {F<:$F,V,B} = PseudoCouple{V,B}(a*b.v)
-        *(a::PseudoCouple{V,B},b::F) where {F<:$F,V,B} = PseudoCouple{V,B}(a.v*b)
-        *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*b.v.re,b.v.im)
-        *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(a.v.re*b,a.v.im)
+        *(a::F,b::Couple{V,B}) where {F<:$F,V,B} = Couple{V,B}(a*realvalue(b),a*imagvalue(b))
+        *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(realvalue(a)*b,imagvalue(a)*b)
+        *(a::F,b::PseudoCouple{V,B}) where {F<:$F,V,B} = PseudoCouple{V,B}(a*realvalue(b),a*imagvalue(b))
+        *(a::PseudoCouple{V,B},b::F) where {F<:$F,V,B} = PseudoCouple{V,B}(realvalue(a)*b,imagvalue(a)*b)
+        *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*realvalue(b),imagvalue(b))
+        *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(realvalue(a)*b,imagvalue(a))
         *(a::F,b::Multivector{V}) where {F<:$F,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$F,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$F,V} = Spinor{V}(a*b.v)
@@ -1020,7 +918,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end=#
     @eval begin
         Base.:-(a::Single{V,G,B,T}) where {V,G,B,T<:$Field} = Single{V,G,B,$TF}($SUB(value(a)))
-        function times(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
+        function ⟑(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
             Single(v,mul(ba,bb,v))
@@ -1143,7 +1041,7 @@ end
 @generated function contraction2(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
     product_contraction(a,b,false,:product)
 end
-for (op,prop) ∈ ((:times,:product),(:contraction,:product_contraction))
+for (op,prop) ∈ ((:⟑,:product),(:contraction,:product_contraction))
     @eval begin
         @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,L,T}
             $prop(a,b,true)
@@ -1167,10 +1065,10 @@ for op ∈ (:∧,:∨)
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddmulti!),(:times,:geomaddmulti!),
+for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
                      (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
+    prop = op≠:⟑ ? Symbol(:product_,op) : :product
     @eval begin
         @generated function $op(b::Multivector{V,T},a::TensorGraded{V,G}) where {V,T,G}
             $prop(a,b,true)
@@ -1236,10 +1134,10 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:times,:geomaddmulti!),
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
+for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),
                      (:∨,:meetaddspin!),(:contraction,:skewaddspin!))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
+    prop = op≠:⟑ ? Symbol(:product_,op) : :product
     @eval begin
         @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
             Grassmann.$prop(a,b,true)
@@ -1255,9 +1153,9 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),(:contraction,:skewaddspin!))
+for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),(:contraction,:skewaddspin!))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
+    prop = op≠:⟑ ? Symbol(:product_,op) : :product
     @eval begin
         @generated function $op(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
             MUL,VEC = mulvec(a,b)
@@ -1283,9 +1181,9 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:times,:geomaddspin!),(:contractio
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddanti!),(:times,:geomaddanti!),(:contraction,:skewaddanti!))
+for (op,product!) ∈ ((:∧,:exteraddanti!),(:⟑,:geomaddanti!),(:contraction,:skewaddanti!))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:times ? Symbol(:product_,op) : :product
+    prop = op≠:⟑ ? Symbol(:product_,op) : :product
     @eval begin
         @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
             MUL,VEC = mulvec(a,b)
@@ -1365,7 +1263,7 @@ for side ∈ (:left,:right)
             $c(z::Phasor) = $c(Couple(z))
             function $c(z::Couple{V}) where V
                 G = grade(V)
-                Single{V,G,getbasis(V,UInt(1)<<G-1)}(z.v.re) + $c(imaginary(z))
+                Single{V,G,getbasis(V,UInt(1)<<G-1)}(realvalue(z)) + $c(imaginary(z))
             end
             $c(z::PseudoCouple{V}) where V = $c(volume(z)) + $c(imaginary(z))
             @generated function $c(b::Chain{V,G,T}) where {V,G,T}
@@ -1689,13 +1587,13 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
     g = reverse≠:antireverse ? :grade : :antigrade
     @eval begin
         function $reverse(z::Couple{V,B}) where {V,B}
-            Couple{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
+            Couple{V,B}(Complex(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z)))
         end
         function $reverse(z::PseudoCouple{V,B}) where {V,B}
-            PseudoCouple{V,B}(Complex($p($g(B)) ? -z.v.re : z.v.re,$p($g(V)) ? -z.v.im : z.v.im))
+            PseudoCouple{V,B}(Complex($p($g(B)) ? -realvalue(z) : reavalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z)))
         end
         function $reverse(z::Phasor{V,B}) where {V,B}
-            Phasor{V,B}(Complex(z.v.re,$p($g(B)) ? -z.v.im : z.v.im))
+            Phasor{V,B}(Complex(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z)))
         end
         @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
             SUB,VEC = subvec(b)
