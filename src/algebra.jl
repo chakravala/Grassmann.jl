@@ -36,25 +36,33 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
 @pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
-    ba,bb = UInt(a),UInt(b)
-    (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
-    A,B,Q,Z = symmetricmask(V,ba,bb)
-    pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-    d = getbasis(V,bas|Q)
-    out = (typeof(V)<:Signature || count_ones(A&B)==0) ? (parity(a,b)⊻pcc ? Single{V}(-1,d) : d) : Single{V}((pcc ? -1 : 1)*parityinner(V,A,B),d)
-    diffvars(V)≠0 && !iszero(Z) && (out = Single{V}(getbasis(loworder(V),Z),out))
-    return cc ? (v=value(out);out+Single{V}(hasinforigin(V,A,B) ? -(v) : v,getbasis(V,conformalmask(V)⊻UInt(d)))) : out
+    if isdiag(V)
+        ba,bb = UInt(a),UInt(b)
+        (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
+        A,B,Q,Z = symmetricmask(V,ba,bb)
+        d = getbasis(V,(A⊻B)|Q)
+        out = if typeof(V)<:Signature || count_ones(A&B)==0
+            (parity(a,b) ? Single{V}(-1,d) : d)
+        else
+            Single{V}(signbool(parityinner(V,A,B)),d)
+        end
+        diffvars(V)≠0 && !iszero(Z) && (out = Single{V}(getbasis(loworder(V),Z),out))
+        return out
+    else
+        out = paritygeometric(V,UInt(a),UInt(b))
+        isempty(out) ? Zero(V) : +(Single{V}.(out)...)
+    end
 end
 
 function ⟑(a::Single{V},b::Submanifold{V}) where V
     v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
     bas = mul(basis(a),b,v)
-    order(a.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
+    order(a.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 function ⟑(a::Submanifold{V},b::Single{V}) where V
     v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
-    order(b.v)+order(bas)>diffmode(V) ? Zero(V) : Single{V}(v,bas)
+    order(b.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 
 export ∗, ⊛, ⊖
@@ -173,24 +181,43 @@ export ⋅
 Interior (right) contraction product: ω⋅η = ω∨⋆η
 """
 @pure function contraction(a::Submanifold{V},b::Submanifold{V}) where V
-    g,C,t,Z = interior(a,b)
-    (!t || iszero(derive_mul(V,UInt(a),UInt(b),1,true))) && (return Zero(V))
-    d = getbasis(V,C)
-    istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
-    return isone(g) ? d : Single{V}(g,d)
+    iszero(derive_mul(V,UInt(a),UInt(b),1,true)) && (return Zero(V))
+    if isdiag(V) || hasconformal(V)
+        g,C,t,Z = interior(a,b)
+        (!t) && (return Zero(V))
+        d = getbasis(V,C)
+        istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+        return isone(g) ? d : Single{V}(g,d)
+    else
+        Cg,Z = parityinterior(V,UInt(a),UInt(b),Val(true))
+        #d = getbasis(V,C)
+        #istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+        return isempty(Cg) ? Zero(V) : +(Single{V}.(Cg)...)
+    end
 end
 
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = UInt(basis(a)),UInt(basis(b))
-    g,C,t,Z = interior(V,ba,bb)
-    !t && (return Zero(V))
-    v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
-    if istangent(V) && !iszero(Z)
-        _,_,Q,_ = symmetricmask(V,ba,bb)
-        v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
-        count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
+    if isdiag(V) || hasconformal(V)
+        g,C,t,Z = interior(V,ba,bb)
+        !t && (return Zero(V))
+        v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
+        if istangent(V) && !iszero(Z)
+            _,_,Q,_ = symmetricmask(V,ba,bb)
+            v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
+            count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
+        end
+        return Single{V}(g*v,getbasis(V,C))
+    else
+        Cg,Z = parityinterior(V,ba,bb,Val(true))
+        v = derive_mul(V,ba,bb,value(a),value(b),AbstractTensors.dot)
+        if istangent(V) && !iszero(Z)
+            _,_,Q,_ = symmetricmask(V,ba,bb)
+            v = !(typeof(v)<:TensorTerm) ? Single{V}(v,getbasis(V,Z)) : Single{V}(v,getbasis(loworder(V),Z))
+            count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
+        end
+        return isempty(Cg) ? Zero(V) : (+(Single{V}.(Cg)...))*v
     end
-    return Single{V}(g*v,getbasis(V,C))
 end
 
 export ⨼, ⨽

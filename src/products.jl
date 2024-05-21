@@ -187,7 +187,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        val = $MUL(parityinner(V,A,B),v)
+                        val = $MUL(parityinner(grade(V),A,B),v)
                         if diffvars(V)≠0
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
@@ -199,7 +199,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        val = :($$MUL($(parityinner(V,A,B)),$v))
+                        val = :($$MUL($(parityinner(grade(V),A,B)),$v))
                         if diffvars(V)≠0
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                             val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
@@ -211,28 +211,52 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:geom,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                        val = $MUL(parityinner(V,A,B),pcc ? $SUB(v) : v)
-                        if istangent(V)
-                            !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
-                            count_ones(Q)+order(val)>diffmode(V) && (return false)
+                        if isdiag(V)
+                            pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
+                            g = parityinner(V,A,B)
+                            val = $MUL(g,pcc ? $SUB(v) : v)
+                            if istangent(V)
+                                !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
+                                count_ones(Q)+order(val)>diffmode(V) && (return false)
+                            end
+                            $s(m,val,bas|Q,Val(mdims(V)))
+                            cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
+                        else
+                            for (bas,g) ∈ paritygeometric(V,A,B)
+                                val = $MUL(g,v)
+                                if istangent(V)
+                                    !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
+                                    count_ones(Q)+order(val)>diffmode(V) && (return false)
+                                end
+                                $s(m,val,bas|Q,Val(mdims(V)))
+                            end
                         end
-                        $s(m,val,bas|Q,Val(mdims(V)))
-                        cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
                     end
                     return false
                 end
                 @inline function $(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                        val = :($$MUL($(parityinner(V,A,B)),$(pcc ? :($$SUB($v)) : v)))
-                        if istangent(V)
-                            !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
-                            val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                        if isdiag(V)
+                            pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
+                            g = parityinner(V,A,B)
+                            val = :($$MUL($g,$(pcc ? :($$SUB($v)) : v)))
+                            if istangent(V)
+                                !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
+                                val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            end
+                            $spre(m,val,bas|Q,Val(mdims(V)))
+                            cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
+                        else
+                            for (bas,g) ∈ paritygeometric(V,A,B)
+                                val = :($$MUL($g,$v))
+                                if istangent(V)
+                                    !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
+                                    val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                                end
+                                $spre(m,val,bas|Q,Val(mdims(V)))
+                            end
                         end
-                        $spre(m,val,bas|Q,Val(mdims(V)))
-                        cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
                     end
                     return false
                 end
@@ -246,28 +270,55 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @eval begin
                     @inline function $(Symbol(prod,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
                         if val ≠ 0
-                            g,C,t,Z = $uct(V,A,B)
-                            v = val
-                            if istangent(V) && !iszero(Z)
-                                T≠Any && (return true)
-                                _,_,Q,_ = symmetricmask(V,A,B)
-                                v *= getbasis(loworder(V),Z)
-                                count_ones(Q)+order(v)>diffmode(V) && (return false)
+                            if isdiag(V)
+                                g,C,t,Z = $uct(V,A,B)
+                                v = val
+                                if istangent(V) && !iszero(Z)
+                                    T≠Any && (return true)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v *= getbasis(loworder(V),Z)
+                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
+                                end
+                                t && $s(m,$MUL(g,v),C,Val(mdims(V)))
+                            else
+                                Cg,Z = $(Symbol(:parity,uct))(V,A,B,Val(true))
+                                v = val
+                                if istangent(V) && !iszero(Z)
+                                    T≠Any && (return true)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v *= getbasis(loworder(V),Z)
+                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
+                                end
+                                for (C,g) ∈ Cg
+                                    $s(m,$MUL(g,v),C,Val(mdims(V)))
+                                end
                             end
-                            t && $s(m,$MUL(g,v),C,Val(mdims(V)))
                         end
                         return false
                     end
                     @inline function $(Symbol(prod,spre))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
                         if val ≠ 0
-                            g,C,t,Z = $uct(V,A,B)
-                            v = val
-                            if istangent(V) && !iszero(Z)
-                                _,_,Q,_ = symmetricmask(V,A,B)
-                                v = Expr(:call,:*,v,getbasis(loworder(V),Z))
-                                v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            if isdiag(V)
+                                g,C,t,Z = $uct(V,A,B)
+                                v = val
+                                if istangent(V) && !iszero(Z)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                                end
+                                t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                            else
+                                Cg,Z = $(Symbol(:parity,uct))(V,A,B,Val(true))
+                                v = val
+                                if istangent(V) && !iszero(Z)
+                                    _,_,Q,_ = symmetricmask(V,A,B)
+                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                                end
+                                for (C,g) ∈ Cg
+                                    $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                                end
                             end
-                            t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
                         end
                         return false
                     end
@@ -277,7 +328,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
     end
 end
 
-@inline exterbits(V,α,β) = diffvars(V)≠0 ? ((a,b)=symmetricmask(V,α,β);count_ones(a&b)==0) : count_ones(α&β)==0
+@inline exterbits(V,α,β) = diffvars(V)≠0 ? ((a,b)=symmetricmask(V,α,β);iszero(a&b)) : iszero(α&β)
 @inline exteraddmulti!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!(V,out,α,β,γ)
 @inline exteraddblade!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
 @inline exteraddspin!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!(V,out,α,β,γ)
@@ -921,7 +972,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         function ⟑(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
             v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
-            Single(v,mul(ba,bb,v))
+            v*mul(ba,bb,v)
         end
         ∧(a::$Field,b::$Field) = $MUL(a,b)
         ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Single{V,G}(a,b)
@@ -1255,10 +1306,10 @@ end
 end
 
 for side ∈ (:left,:right)
-    c,p = Symbol(:complement,side),Symbol(:parity,side)
-    h,pg,pn = Symbol(c,:hodge),Symbol(p,:hodge),Symbol(p,:null)
+    cc,p = Symbol(:complement,side),Symbol(:parity,side)
+    h,pg,pn = Symbol(cc,:hodge),Symbol(p,:hodge),Symbol(p,:null)
     pnp = :(Leibniz.$(Symbol(pn,:pre)))
-    for (c,p) ∈ ((c,p),(h,pg))
+    for (c,p) ∈ ((cc,p),(h,pg))
         @eval begin
             $c(z::Phasor) = $c(Couple(z))
             function $c(z::Couple{V}) where V
@@ -1269,30 +1320,31 @@ for side ∈ (:left,:right)
             @generated function $c(b::Chain{V,G,T}) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                 istangent(V) && (return :($$c(Multivector(b))))
+                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(b)))) ))
                 SUB,VEC,MUL = subvec(b)
                 if binomial(mdims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:ib,:D),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = svec(N,G,Any)(zeros(svec(N,G,T)))
                     D = diffvars(V)
                     for k ∈ list(1,binomial(N,G))
                         B = @inbounds ib[k]
                         val = :(conj(@inbounds b.v[$k]))
-                        v = Expr(:call,MUL,$p(V,B),$(c≠h ? :($pnp(V,B,val)) : :val))
-                        setblade!_pre(out,v,complement(N,B,D,P),Val{N}())
+                        v = Expr(:call,MUL,$p(V,B),val)#$(c≠h ? :($pnp(V,B,val)) : :val))
+                        setblade!_pre(out,v,complement(N,B,D),Val{N}())
                     end
                     return :(Chain{V,$(N-G)}($(Expr(:call,tvec(N,N-G,T),out...))))
                 else return quote
                     $(insert_expr((:N,:ib,:D),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros($VEC(N,G,T))
                     D = diffvars(V)
                     for k ∈ 1:binomial(N,G)
                         @inbounds val = b.v[k]
                         if val≠0
                             @inbounds ibk = ib[k]
-                            v = conj($MUL($$p(V,ibk),$(c≠h ? :($$pn(V,ibk,val)) : :val)))
-                            setblade!(out,v,complement(N,ibk,D,P),Val{N}())
+                            v = conj($MUL($$p(V,ibk),val))#$(c≠h ? :($$pn(V,ibk,val)) : :val)))
+                            setblade!(out,v,complement(N,ibk,D),Val{N}())
                         end
                     end
                     return Chain{V,N-G}(out)
@@ -1300,10 +1352,11 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::Multivector{V,T}) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
                 SUB,VEC = subvec(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:bs,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = svec(N,Any)(zeros(svec(N,T)))
                     D = diffvars(V)
                     for g ∈ list(1,N+1)
@@ -1311,14 +1364,14 @@ for side ∈ (:left,:right)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
                             val = :(conj(@inbounds m.v[$(bs[g]+i)]))
-                            v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
-                            @inbounds setmulti!_pre(out,v,complement(N,ibi,D,P),Val{N}())
+                            v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
+                            @inbounds setmulti!_pre(out,v,complement(N,ibi,D),Val{N}())
                         end
                     end
                     return :(Multivector{V}($(Expr(:call,tvec(N,T),out...))))
                 else return quote
                     $(insert_expr((:N,:bs,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros($VEC(N,T))
                     D = diffvars(V)
                     for g ∈ 1:N+1
@@ -1327,8 +1380,8 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[bs[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
-                                setmulti!(out,v,complement(N,ibi,D,P),Val{N}())
+                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                setmulti!(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
                     end
@@ -1337,10 +1390,11 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::Spinor{V,T}) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:rs,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = svecs(N,Any)(zeros(svecs(N,T)))
                     D = diffvars(V)
                     for g ∈ evens(1,N+1)
@@ -1348,14 +1402,14 @@ for side ∈ (:left,:right)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
                             val = :(conj(@inbounds m.v[$(rs[g]+i)]))
-                            v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
-                            @inbounds (isodd(N) ? setanti!_pre : setspin!_pre)(out,v,complement(N,ibi,D,P),Val{N}())
+                            v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
+                            @inbounds (isodd(N) ? setanti!_pre : setspin!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
                     end
                     return :($(isodd(N) ? :AntiSpinor : :Spinor){V}($(Expr(:call,tvecs(N,T),out...))))
                 else return quote
                     $(insert_expr((:N,:rs,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros($VEC(N,T))
                     D = diffvars(V)
                     for g ∈ 1:2:N+1
@@ -1364,8 +1418,8 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[rs[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
-                                $(isodd(N) ? setanti! : setspin!)(out,v,complement(N,ibi,D,P),Val{N}())
+                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                $(isodd(N) ? setanti! : setspin!)(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
                     end
@@ -1374,10 +1428,11 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::AntiSpinor{V,T}) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:ps,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = svecs(N,Any)(zeros(svecs(N,T)))
                     D = diffvars(V)
                     for g ∈ evens(2,N+1)
@@ -1385,14 +1440,14 @@ for side ∈ (:left,:right)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
                             val = :(conj(@inbounds m.v[$(ps[g]+i)]))
-                            v = Expr(:call,:*,$p(V,ibi),$(c≠h ? :($pnp(V,ibi,val)) : :val))
-                            @inbounds (isodd(N) ? setspin!_pre : setanti!_pre)(out,v,complement(N,ibi,D,P),Val{N}())
+                            v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
+                            @inbounds (isodd(N) ? setspin!_pre : setanti!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
                     end
                     return :($(isodd(N) ? :Spinor : :AntiSpinor){V}($(Expr(:call,tvecs(N,T),out...))))
                 else return quote
                     $(insert_expr((:N,:ps,:bn),:svec)...)
-                    P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
+                    #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
                     out = zeros($VEC(N,T))
                     D = diffvars(V)
                     for g ∈ 2:2:N+1
@@ -1401,8 +1456,8 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[ps[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*$(c≠h ? :($$pn(V,ibi,val)) : :val))
-                                $(isodd(N) ? setspin! : setanti!)(out,v,complement(N,ibi,D,P),Val{N}())
+                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                $(isodd(N) ? setspin! : setanti!)(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
                     end
@@ -1449,6 +1504,8 @@ for c ∈ (:even,:odd)
 end
 for side ∈ (:metric,:anti)
     c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
+    tens,tensfull = Symbol(side,:tensor),Symbol(side,:full)
+    tenseven,tensodd = Symbol(side,:even),Symbol(side,:odd)
     @eval begin
         $c(z::Phasor) = $c(Couple(z))
         $c(z::Couple{V}) where V = scalar(z) + $c(imaginary(z))
@@ -1456,6 +1513,7 @@ for side ∈ (:metric,:anti)
         @generated function $c(b::Chain{V,G,T}) where {V,G,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
             istangent(V) && (return :($$c(Multivector(b))))
+            (!isdiag(V)) && (return :(contraction($($tens(V,G)),b)))
             SUB,VEC,MUL = subvec(b)
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib),:svec)...)
@@ -1463,7 +1521,12 @@ for side ∈ (:metric,:anti)
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
                     val = :(@inbounds b.v[$k])
-                    v = Expr(:call,MUL,$p(V,B),val)
+                    par = $p(V,B)
+                    v = if typeof(par)==Bool
+                        par ? :($SUB($val)) : val
+                    else
+                        Expr(:call,MUL,par,val)
+                    end
                     setblade!_pre(out,v,B,Val{N}())
                 end
                 return :(Chain{V,G}($(Expr(:call,tvec(N,G,T),out...))))
@@ -1474,7 +1537,12 @@ for side ∈ (:metric,:anti)
                     @inbounds val = b.v[k]
                     if val≠0
                         @inbounds ibk = ib[k]
-                        v = $MUL($$p(V,ibk),val)
+                        par = $$p(V,ibk)
+                        v = if typeof(par)==Bool
+                            par ? $SUB(val) : val
+                        else
+                            $MUL(par,val)
+                        end
                         setblade!(out,v,ibk,Val{N}())
                     end
                 end
@@ -1483,6 +1551,7 @@ for side ∈ (:metric,:anti)
         end
         @generated function $c(m::Multivector{V,T}) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            (!isdiag(V)) && (return :(contraction($($tensfull(V)),m)))
             SUB,VEC = subvec(m)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:bs,:bn),:svec)...)
@@ -1492,7 +1561,12 @@ for side ∈ (:metric,:anti)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
                         val = :(@inbounds m.v[$(bs[g]+i)])
-                        v = Expr(:call,:*,$p(V,ibi),val)
+                        par = $p(V,ibi)
+                        v = if typeof(par)==Bool
+                            par ? :($SUB($val)) : val
+                        else
+                            Expr(:call,:*,par,val)
+                        end
                         @inbounds setmulti!_pre(out,v,ibi,Val{N}())
                     end
                 end
@@ -1506,7 +1580,12 @@ for side ∈ (:metric,:anti)
                         @inbounds val = m.v[bs[g]+i]
                         if val≠0
                             ibi = @inbounds ib[i]
-                            v = $$p(V,ibi)*val
+                            par = $$p(V,ibi)
+                            v = if typeof(par)==Bool
+                                par ? $SUB(val) : val
+                            else
+                                par*val
+                            end
                             setmulti!(out,v,ibi,Val{N}())
                         end
                     end
@@ -1516,6 +1595,7 @@ for side ∈ (:metric,:anti)
         end
         @generated function $c(m::Spinor{V,T}) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            (!isdiag(V)) && (return :(contraction($($tenseven(V)),m)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:rs,:bn),:svecs)...)
@@ -1525,7 +1605,12 @@ for side ∈ (:metric,:anti)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
                         val = :(@inbounds m.v[$(rs[g]+i)])
-                        v = Expr(:call,:*,$p(V,ibi),val)
+                        par = $p(V,ibi)
+                        v = if typeof(par)==Bool
+                            par ? :($SUB($val)) : val
+                        else
+                            Expr(:call,:*,par,val)
+                        end
                         @inbounds setspin!_pre(out,v,ibi,Val{N}())
                     end
                 end
@@ -1539,7 +1624,12 @@ for side ∈ (:metric,:anti)
                         @inbounds val = m.v[rs[g]+i]
                         if val≠0
                             ibi = @inbounds ib[i]
-                            v = $$p(V,ibi)*val
+                            par = $$p(V,ibi)
+                            v = if typeof(par)==Bool
+                                par ? $SUB(val) : val
+                            else
+                                par*val
+                            end
                             setspin!(out,v,ibi,Val{N}())
                         end
                     end
@@ -1549,6 +1639,7 @@ for side ∈ (:metric,:anti)
         end
         @generated function $c(m::AntiSpinor{V,T}) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            (!isdiag(V)) && (return :(contraction($($tensodd(V)),m)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:ps,:bn),:svecs)...)
@@ -1558,7 +1649,12 @@ for side ∈ (:metric,:anti)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
                         val = :(@inbounds m.v[$(ps[g]+i)])
-                        v = Expr(:call,:*,$p(V,ibi),val)
+                        par = $p(V,ibi)
+                        v = if typeof(par)==Bool
+                            par ? :($SUB($val)) : val
+                        else
+                            Expr(:call,:*,par,val)
+                        end
                         @inbounds setanti!_pre(out,v,ibi,Val{N}())
                     end
                 end
@@ -1572,7 +1668,12 @@ for side ∈ (:metric,:anti)
                         @inbounds val = m.v[ps[g]+i]
                         if val≠0
                             ibi = @inbounds ib[i]
-                            v = $$p(V,ibi)*val
+                            par = $$p(V,ibi)
+                            v = if typeof(par)==Bool
+                                par ? $SUB(val) : val
+                            else
+                                par*val
+                            end
                             setanti!(out,v,ibi,Val{N}())
                         end
                     end

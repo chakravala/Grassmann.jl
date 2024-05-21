@@ -189,6 +189,11 @@ Base.ones(::Type{Chain{V,G,T,X}}) where {V,G,T<:Chain,X} = Chain{V,G,T}(ones.(nt
 ⊗(a::Type{<:Chain{V,1}},b::Type{<:Chain{W,1}}) where {V,W} = Chain{V,1,Chain{W,1,Float64,mdims(W)},mdims(V)}
 ⊗(a::Type{<:Chain{V,1}},b::Type{<:Chain{W,1,T}}) where {V,W,T} = Chain{V,1,Chain{W,1,T,mdims(W)},mdims(V)}
 
+function single(t::Chain)
+    i = findfirst(x->!isnull(x),value(t))
+    norm(t[i]) == norm(t) ? t(i) : t
+end
+
 """
     ChainBundle{V,G,T,P} <: Manifold{V,T} <: TensorAlgebra{V,T}
 
@@ -297,6 +302,7 @@ end
     end)
 end
 
+Multivector(::Zero{V}) where V = Multivector{V}(zeros(tvec(mdims(V),Int)))
 Multivector(val::TensorAlgebra{V}) where V = Multivector{V}(val)
 Multivector{V}(val::NTuple{N,T}) where {V,N,T} = Multivector{V}(Values{N,T}(val))
 Multivector{V}(val::NTuple{N,Any}) where {V,N} = Multivector{V}(Values{N}(val))
@@ -442,18 +448,16 @@ abstract type AbstractSpinor{V,T} <: TensorMixed{V,T} end
 @pure log2sub2(N) = log2sub(2N)
 
 for pinor ∈ (:Spinor,:AntiSpinor)
-    dpinor = Symbol(:Dyadic,pinor)
     @eval begin
         @computed struct $pinor{V,T} <: AbstractSpinor{V,T}
             v::Values{1<<(mdims(V)-1),T}
-            $pinor{V,T}(v::Values{N,T}) where {N,V,T} = new{DirectSum.submanifold(V),T}(v)
+            $pinor{V,T}(v) where {V,T} = new{DirectSum.submanifold(V),T}(v)
         end
-        $pinor{V,T}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(Values{1<<(mdims(V)-1),T}(v))
+        #$pinor{V,T}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(Values{1<<(mdims(V)-1),T}(v)
         $pinor{V}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(v)
         $pinor{V,𝕂}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = $pinor{V,𝕂}(val.v,B)
         $pinor{V}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = $pinor{V,𝕂}(val)
         $pinor(val::TensorAlgebra{V}) where V = $pinor{V}(val)
-        $pinor(t::Chain{V}) where V = $pinor{V}(t)
         $pinor{V}(val::NTuple{N,T}) where {V,N,T} = $pinor{V}(Values{N,T}(val))
         $pinor{V}(val::NTuple{N,Any}) where {V,N} = $pinor{V}(Values{N}(val))
         $pinor(val::NTuple{N,T}) where {N,T} = $pinor{log2sub2(N)}(Values{N,T}(val))
@@ -476,7 +480,6 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         equal(a::Multivector{V,T},b::$pinor{V,S}) where {V,T,S} = equal(a,Multivector(b))
         equal(a::Chain{V,G,T},b::$pinor{V,S}) where {V,S,G,T} = b == a
         equal(a::T,b::$pinor{V,S} where S) where T<:TensorTerm{V} where V = b==a
-        $dpinor{V,T,N} = $pinor{V,$pinor{V,T,N},N}
     end
 end
 
@@ -516,15 +519,17 @@ AntiSpinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = AntiSpinor{V,T}(one(T),v)
     end
 end
 
-@generated function Spinor{V}(t::Chain{V,G,T}) where {V,G,T}
-    isodd(G) && error("$t is not expressible as a Spinor")
-    N = mdims(V)
-    chain_src(N,G,T,evens(0,N),:Spinor)
-end
-@generated function AntiSpinor{V}(t::Chain{V,G,T}) where {V,G,T}
-    iseven(G) && error("$t is not expressible as a AntiSpinor")
-    N = mdims(V)
-    chain_src(N,G,T,evens(1,N),:AntiSpinor)
+for var ∈ ((:V,:T),(:T,),())
+    @eval @generated function Spinor{$(var...)}(t::Chain{V,G,T}) where {V,G,T}
+        isodd(G) && error("$t is not expressible as a Spinor")
+        N = mdims(V)
+        chain_src(N,G,T,evens(0,N),:Spinor)
+    end
+    @eval @generated function AntiSpinor{$(var...)}(t::Chain{V,G,T}) where {V,G,T}
+        iseven(G) && error("$t is not expressible as a AntiSpinor")
+        N = mdims(V)
+        chain_src(N,G,T,evens(1,N),:AntiSpinor)
+    end
 end
 
 @generated function (t::Spinor{V,T})(G::Int) where {V,T}
@@ -712,6 +717,9 @@ grade(z::PseudoCouple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? realvalue(z) 
 Couple(m::TensorTerm{V}) where V = Couple{V,basis(m)}(Complex(m))
 Couple(m::TensorTerm{V,0}) where V = Couple{V,Submanifold(V)}(Complex(m))
 PseudoCouple(m::TensorTerm{V,G}) where {V,G} = G==grade(V) ? PseudoCouple{V,One(V)}(value(m)*im) : PseudoCouple{V,basis(m)}(Complex(value(m)))
+
+Couple{V,B}(m::TensorTerm{V}) where {V,B} = Couple{V,B}(Complex(m))
+Couple{V,B}(m::TensorTerm{V,0}) where {V,B} = Couple{V,B}(Complex(m))
 
 @generated Multivector{V}(a::Single{V,L},b::Single{V,G}) where {V,L,G} = addermulti(a,b,:+)
 Multivector{V,T}(z::Couple{V,B,T}) where {V,B,T} = Multivector{V}(scalar(z), imaginary(z))

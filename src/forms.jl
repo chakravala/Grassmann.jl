@@ -339,12 +339,12 @@ for pinor ∈ (:Spinor,:AntiSpinor)#,:Multivector)
     end
 end
 
-display_matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,G,W} = vcat(transpose([V,chainbasis(V,G)...]),hcat(chainbasis(W,G),matrix(m)))
-display_matrix(m::TensorGraded{V,G,<:Spinor{W}}) where {V,G,W} = vcat(transpose([V,evenbasis(V)...]),hcat(evenbasis(W),matrix(m)))
-display_matrix(m::TensorGraded{V,G,<:AntiSpinor{W}}) where {V,G,W} = vcat(transpose([V,oddbasis(V)...]),hcat(oddbasis(W),matrix(m)))
-display_matrix(m::TensorAlgebra{V,<:Multivector{W}}) where {V,W} = vcat(transpose([V,fullbasis(V)...]),hcat(fullbasis(W),matrix(m)))
+display_matrix(m::Chain{V,G,<:TensorGraded{W,G}}) where {V,G,W} = vcat(transpose([Submanifold(V),chainbasis(V,G)...]),hcat(chainbasis(W,G),matrix(m)))
+display_matrix(m::TensorGraded{V,G,<:Spinor{W}}) where {V,G,W} = vcat(transpose([Submanifold(V),evenbasis(V)...]),hcat(evenbasis(W),matrix(m)))
+display_matrix(m::TensorGraded{V,G,<:AntiSpinor{W}}) where {V,G,W} = vcat(transpose([Submanifold(V),oddbasis(V)...]),hcat(oddbasis(W),matrix(m)))
+display_matrix(m::TensorAlgebra{V,<:Multivector{W}}) where {V,W} = vcat(transpose([Submanifold(V),fullbasis(V)...]),hcat(fullbasis(W),matrix(m)))
 for (pinor,bas) ∈ ((:Spinor,:evenbasis),(:AntiSpinor,:oddbasis),(:Multivector,:fullbasis))
-    @eval display_matrix(m::$pinor{V,<:TensorAlgebra{W}}) where {V,W} = vcat(transpose([V,$bas(V)...]),hcat($bas(W),matrix(m)))
+    @eval display_matrix(m::$pinor{V,<:TensorAlgebra{W}}) where {V,W} = vcat(transpose([Submanifold(V),$bas(V)...]),hcat($bas(W),matrix(m)))
 end
 
 export Projector, Dyadic, Proj
@@ -401,6 +401,15 @@ Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
 export TensorOperator, Endomorphism
 
+#=struct TensorOperator{V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} <: TensorNested{V,S}
+    v::T
+    TensorOperator{V,W}(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
+    TensorOperator{V}(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
+    TensorOperator(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
+end
+
+Endomorphism{V,S<:TensorAlgebra{V},T<:TensorAlgebra{V,S}} = TensorOperator{V,V,S,T}=#
+
 struct TensorOperator{V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} <: TensorNested{V,T}
     v::T
     TensorOperator{V,W}(t::T) where {V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} = new{V,W,T}(t)
@@ -412,6 +421,8 @@ Endomorphism{V,T<:TensorAlgebra{V,<:TensorAlgebra{V}}} = TensorOperator{V,V,T}
 
 value(t::TensorOperator) = t.v
 matrix(m::TensorOperator) = matrix(value(m))
+compound(m::TensorOperator,g) = TensorOperator(compound(value(m),g))
+compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 
 for op ∈ (:(Base.inv),)
@@ -432,6 +443,9 @@ function show(io::IO, ::MIME"text/plain", t::TensorOperator)
     if isempty(X) && get(io, :compact, false)::Bool
         return show(io, X)
     end
+    show_matrix(io, t, X)
+end
+function show_matrix(io::IO, t, X)
     # 0) show summary before setting :compact
     summary(io, t)
     isempty(X) && return
@@ -544,6 +558,15 @@ end
 @inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
     Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)
 end
+@inline @generated function matmul(x::Values{N,<:Spinor{V}},y::Values{N}) where {N,V}
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
+end
+@inline @generated function matmul(x::Values{N,<:AntiSpinor{V}},y::Values{N}) where {N,V}
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
+end
+
+contraction(x::Spinor{W,<:Spinor{V},N},y::Spinor{V,T,N}) where {W,N,V,T} = Spinor{V}(matmul(value(x),value(y)))
+contraction(x::AntiSpinor{W,<:AntiSpinor{V},N},y::AntiSpinor{V,T,N}) where {W,N,V,T} = AntiSpinor{V}(matmul(value(x),value(y)))
 
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain},<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(value(a.y).⋅b))
 contraction(a::Dyadic{V,<:Chain{V,1,<:Chain}} where V,b::TensorGraded) = sum(value(a.x).⊗(a.y.⋅b))
@@ -632,7 +655,7 @@ end
 @pure fulldyad(V) = Multivector.(fullbasis(V))
 @pure fullbasis(V) = Λ(V).b
 
-@pure chaindyad(V,G) = Chain.(chainbasis(V,G))
+@pure chaindyad(V,G=1) = Chain.(chainbasis(V,G))
 @pure function chainbasis(V,G=1)
     N = mdims(V)
     r,b = binomsum(N,G),binomial(N,G)
@@ -661,3 +684,96 @@ gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
 end
 evenoperator(t::TensorAlgebra{V}) where V = TensorOperator(Spinor{V}(evenbasis(V) .⊘ Ref(t)))
 oddoperator(t::TensorAlgebra{V}) where V = TensorOperator(AntiSpinor{V}(oddbasis(V) .⊘ Ref(t)))
+
+# metric tensor
+
+antimetrictensor(V,G) = compound(metrictensor(V),grade(V)-G)
+antimetrictensor(V,::Val{G}=Val(1)) where G = compound(metrictensor(V),Val(grade(V)-G))
+metrictensor(V::TensorBundle) = TensorOperator(map(Chain,value(metricdyad(V))))
+metrictensor(V::Int) = TensorOperator(map(Chain,value(metricdyad(V))))
+metricdyad(V::TensorBundle) = metricdyad(Submanifold(V))
+metricdyad(V::Int) = metricdyad(Submanifold(V))
+function metricdyad(V)
+    if hasconformal(V)
+        N = mdims(V)
+        TensorOperator(Chain{V}(Single{V}((UInt(2),-1)),Single{V}((UInt(1),-1)),[Single{V}((UInt(1)<<i,1)) for i ∈ list(2,N-1)]...))
+    else
+        cayley(V,1,(x,y)->value(contraction(x,y)))
+    end
+end
+
+metricfull(V) = TensorOperator(Multivector{V}(vcat(value.(map.(Multivector,value.(metrictensor.(V,list(0,mdims(V))))))...)))
+metriceven(V) = TensorOperator(Spinor{V}(vcat(value.(map.(Spinor,value.(metrictensor.(V,evens(0,mdims(V))))))...)))
+metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(value.(map.(AntiSpinor,value.(metrictensor.(V,evens(1,mdims(V))))))...)))
+
+struct MetricTensor{n,ℙ,g,Vars,Diff,Name} <: TensorBundle{n,ℙ,g,Vars,Diff,Name}
+    @pure MetricTensor{N,M,S,F,D,L}() where {N,M,S,F,D,L} = new{N,M,S,F,D,L}()
+end
+
+export MetricTensor, metrictensor
+@pure MetricTensor{N,M,S,F,D}() where {N,M,S,F,D} = MetricTensor{N,M,S,F,D,1}()
+@pure MetricTensor{N,M,S}() where {N,M,S} = MetricTensor{N,M,S,0,0}()
+@pure MetricTensor{N,M}(b::Values{N,<:Tuple}) where {N,M} = MetricTensor{N,M,metricsig(M,Values.(b))}()
+@pure MetricTensor{N,M}(b::Values{N,<:Values}) where {N,M} = MetricTensor{N,M,metricsig(M,b)}()
+@pure MetricTensor{N,M}(b::Values{N,<:Chain}) where {N,M} = MetricTensor{N,M,metricsig(M,value.(b))}()
+@pure MetricTensor{N,M}(b::Values{N,<:AbstractVector}) where {N,M} = MetricTensor{N,M,metricsig(M,Values{N}.(b))}()
+MetricTensor{N,M}(b::Vector) where {N,M} = MetricTensor{N,M}(Values(b...))
+@pure MetricTensor(b::Tuple) = MetricTensor(Values(b))
+@pure MetricTensor(b::Values{N}) where N = MetricTensor{N,0}(b)
+MetricTensor(b::Values{N,<:Real}) where N = DiagonalForm(b)
+MetricTensor(b::AbstractVector{<:Real}) = DiagonalForm(b)
+MetricTensor(b::AbstractVector) = MetricTensor{length(b),0}(b)
+MetricTensor(b::AbstractMatrix) = MetricTensor(getindex.(Ref(b),:,1:(size(b)[1])))
+MetricTensor(b::Chain{V,G,<:Chain} where {V,G}) = MetricTensor(value(b))
+MetricTensor(b::Chain) = DiagonalForm(value(b))
+MetricTensor(b::TensorOperator) = MetricTensor(value(b))
+MetricTensor(b...) = MetricTensor(b)
+
+@pure Manifold(::Type{T}) where T<:MetricTensor = T()
+
+@pure metrictensor(b::Submanifold{V}) where V = isbasis(b) ? metrictensor(V) : TensorOperator(map(b,b(value(metrictensor(V)))))
+@pure metrictensor(V,G) = compound(metrictensor(V),G)
+@pure function metrictensor(V::MetricTensor{N,M,S} where N) where {M,S}
+    out = Chain{Submanifold(V)}.(metrictensor_cache[S])
+    TensorOperator(Chain{Submanifold(V)}(isdual(V) ? SUB(out) : out))
+end
+const metrictensor_cache = Values[]
+@pure function metricsig(M,b::Values)
+    a = dyadmode(M)>0 ? SUB(b) : b
+    if a ∈ metrictensor_cache
+        findfirst(x->x==a,metrictensor_cache)
+    else
+        push!(metrictensor_cache,a)
+        length(metrictensor_cache)
+    end
+end
+
+@pure DirectSum.getalgebra(V::MetricTensor) = DirectSum.getalgebra(Submanifold(V))
+
+for t ∈ (Any,Integer)
+    @eval @inline getindex(s::MetricTensor{N,M,S} where {N,M},i::T) where {S,T<:$t} = value(value(metrictensor(s))[i])
+end
+@inline getindex(vs::MetricTensor,i::Vector) = [getindex(vs,j) for j ∈ i]
+@inline getindex(vs::MetricTensor,i::UnitRange{Int}) = [getindex(vs,j) for j ∈ i]
+@inline getindex(vs::MetricTensor{N,M,S} where M,i::Colon) where {N,S} = Vector(value(metrictensor(vs)))
+
+@pure Signature(V::MetricTensor{N,M}) where {N,M} = Signature{N,M,UInt(0)}()
+
+# anything array-like gets summarized e.g. 10-element Array{Int64,1}
+Base.summary(io::IO, a::MetricTensor) = Base.array_summary(io, a, _axes(metrictensor(a)))
+
+show(io::IO,M::MetricTensor) = Base.show(io,Submanifold(M))
+function show(io::IO, ::MIME"text/plain", M::MetricTensor)
+    X = display_matrix(value(metrictensor(M)))
+    if isempty(X) && get(io, :compact, false)::Bool
+        return show(io, X)
+    end
+    show_matrix(io,M,X)
+end
+
+(M::MetricTensor)(b::Int...) = Submanifold{M}(b)
+(M::MetricTensor)(b::T) where T<:AbstractVector{Int} = Submanifold{M}(b)
+(M::MetricTensor)(b::T) where T<:AbstractRange{Int} = Submanifold{M}(b)
+
+import LinearAlgebra: isdiag; export isdiag
+isdiag(::MetricTensor) = false

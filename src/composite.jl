@@ -183,7 +183,8 @@ end
 function Base.exp(t::T) where T<:TensorGraded
     S,B,V = T<:Submanifold,T<:TensorTerm,Manifold(t)
     if B && isnull(t)
-        return One(V)
+        vt = valuetype(t)
+        return Couple{V,basis(t)}(one(vt),zero(vt))
     elseif isR301(V) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
         u = sqrt(abs(abs2(t)[1]))
         u<1e-5 && (return One(V)+t)
@@ -804,6 +805,7 @@ end
 
 DirectSum.Λ(x::Chain{V,1,<:Chain{V,1}},G) where V = compound(x,G)
 compound(x,G::T) where T<:Integer = compound(x,Val(G))
+compound(x::Chain{V,1,<:Chain{V,1}},::Val{0}) where V = Chain{V,0}(Values(Chain{V,0}(1)))
 @generated function compound(x::Chain{V,1,<:Chain{V,1}},::Val{G}) where {V,G}
     Expr(:call,:(Chain{V,G}),Expr(:call,:Values,[Expr(:call,:∧,[:(@inbounds x[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...))
 end
