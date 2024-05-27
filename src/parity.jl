@@ -107,14 +107,19 @@ end=#
     d≠0 && count_ones(A&v)+count_ones(B&v)>diffmode(V)
 end
 
-@pure function parityinterior(V::M,a,b,::Val{lim}=Val(false)) where {W,M<:Manifold{W},lim}
+@pure function parityinterior(V::M,a,b,::Val{lim}=Val(false),::Val{field}=Val(false)) where {W,M<:Manifold{W},lim,field}
     A,B,Q,Z = symmetricmask(V,a,b); N = rank(V)
     diffcheck(V,A,B) && (return lim ? (Values{0,Tuple{UInt,Int}}(),Z) : (1,Zero(UInt),false,Z))
     gout,tout,G,diag = 0,false,count_ones(B),isdiag(V)
     bas = diag ? Values((B,)) : indexbasis(grade(V),G)
     g = if diag
-        gg = V[indices(B,N)]
-        Values((prod(isempty(gg) ? 1 : signbool.(gg)),))
+        if field
+            bi = basisindex(N,B)
+            Values((:(value(value(g))[$bi]),))
+        else
+            gg = V[indices(B,N)]
+            Values((prod(isempty(gg) ? 1 : signbool.(gg)),))
+        end
     else
         value(metrictensor(V,G))[bladeindex(grade(V),B)]
     end
@@ -124,7 +129,7 @@ end
             p,C,t = parityregressive(Signature(W),A,complement(N,bas[i],diffvars(V)),Val{true}())
             CQ,tout = C|Q,tout|t
             if t
-                ggg = (p⊻parityright(0,sum(indices(bas[i],N)),G)) ? -(g[i]) : g[i]
+                ggg = (p⊻parityright(0,sum(indices(bas[i],N)),G)) ? field ? :(-($(g[i]))) : -(g[i]) : g[i]
                 if CQ ∉ bs
                     bs = (bs...,CQ)
                     bg = (bg...,(CQ,ggg))
@@ -132,7 +137,7 @@ end
                     j = findfirst(x->x==CQ,bs)
                     bg = @inbounds (bg[1:j-1]...,(CQ,(bg[j][2]+ggg)),bg[j+1:length(bs)]...)
                 end
-                gout += ggg
+                iszero(gout) ? (gout = ggg) : (gout += ggg)
             end
         end
     end
@@ -149,16 +154,21 @@ end
     parity(V,A,B) ? -1 : 1
 end
 
-@pure function parityinner(V::M,a::UInt,b::UInt) where {W,M<:Manifold{W}}
+@pure function parityinner(V::M,a::UInt,b::UInt,::Val{field}=Val(false)) where {W,M<:Manifold{W},field}
     A,B = symmetricmask(V,a,b)
     C = A&B; G = count_ones(C)
     g = if isdiag(V) || hasconformal(V)
-        gg = V[indices(C,mdims(V))]
-        abs(prod(isempty(gg) ? 1 : signbool.(gg)))
+        if field
+            bi = basisindex(mdims(V),C)
+            :(value(value(g))[$bi])
+        else
+            gg = V[indices(C,mdims(V))]
+            abs(prod(isempty(gg) ? 1 : signbool.(gg)))
+        end
     else
         value(metrictensor(V,G))[bladeindex(mdims(V),C)]
     end
-    parity(Signature(W),A,B) ? -(g) : g
+    parity(Signature(W),A,B) ? fieldneg(g) : g
 end
 
 function parityseq(V,B)
@@ -172,85 +182,89 @@ end
 
 maxempty(x) = isempty(x) ? 0 : maximum(x)
 
-function paritygeometric(V,A::UInt,B::UInt)
+function paritygeometric(V,A::UInt,B::UInt,field=Val(false))
     #if iszero(B)
     #    Values(((A,1),))
     a,b = splitbasis(V,A),splitbasis(V,B)
     ga,gb = maxempty(count_ones.(a)),maxempty(count_ones.(b))
     if  (ga≤1 && gb≤1) ? count_ones(A) ≥ count_ones(B) : ga ≥ gb
-        paritygeometric(V,A,b)
+        paritygeometric(V,A,b,field)
     else
-        paritygeometric(V,a,B)
+        paritygeometric(V,a,B,field)
     end
 end
-function paritygeometric(V,A::UInt,b::Tuple)
+function paritygeometric(V,A::UInt,b::Tuple,field)
     i = length(b)
     vals = if iszero(i)
         Values((((UInt(0),1),(A,1)),))
     else
         p = parityseq(V,b)
-        out = paritygeometricright(V,((UInt(0),p),(A,1)),b[1])
-        isone(i) ? out : paritygeometricright(V,out,b,2)
+        out = paritygeometricright(V,((UInt(0),p),(A,1)),b[1],field)
+        isone(i) ? out : paritygeometricright(V,out,b,2,field)
     end
     combinebasis(V,vals)
 end
-function paritygeometric(V,a::Tuple,B::UInt)
+function paritygeometric(V,a::Tuple,B::UInt,field)
     i = length(a)
     vals = if iszero(i)
         Values((((UInt(0),1),(B,1)),))
     else
         p = parityseq(V,a)
-        out = paritygeometricleft(V,a[i],((UInt(0),p),(B,1)))
-        isone(i) ? out : paritygeometricleft(V,a,out,i-1)
+        out = paritygeometricleft(V,a[i],((UInt(0),p),(B,1)),field)
+        isone(i) ? out : paritygeometricleft(V,a,out,i-1,field)
     end
     combinebasis(V,vals)
 end
-function paritygeometricright(V,a,b::Tuple,i)
-    out = vcat(paritygeometricright.(Ref(V),a,Ref(b[i]))...)
-    i==length(b) ? out : paritygeometricright(V,out,b,i+1)
+function paritygeometricright(V,a,b::Tuple,i,field)
+    out = vcat(paritygeometricright.(Ref(V),a,Ref(b[i]),field)...)
+    i==length(b) ? out : paritygeometricright(V,out,b,i+1,field)
 end
-function paritygeometricright(V,aeai,B::UInt)
+function paritygeometricright(V,aeai,B::UInt,field)
     ae,ai = @inbounds (aeai[1],aeai[2])
     Ae,Aeg = @inbounds (ae[1],ae[2])
     Ai,Aig = @inbounds (ai[1],ai[2])
     G = count_ones(B)
     CCg = if isdiag(V) || hasconformal(V)
-        g,C,t,Z = interior(V,Ai,B)
-        Cg = parityclifford(G)⊻isodd(G*count_ones(Ai)) ? -Aig*g : Aig*g
+        g,C,t,Z = interior(V,Ai,B,Val(false),field)
+        Aigg = fieldprod(Aig,g)
+        Cg = parityclifford(G)⊻isodd(G*count_ones(Ai)) ? fieldneg(Aigg) : Aigg
         t ? ((ae,(C,Cg)),) : ()
     else
-        Cg,Z = parityinterior(V,Ai,B,Val(true))
-        g = parityclifford(G)⊻isodd(G*count_ones(Ai)) ? -Aig*Aeg : Aig*Aeg
+        Cg,Z = parityinterior(V,Ai,B,Val(true),field)
+        AigAeg = fieldprod(Aig,Aeg)
+        g = parityclifford(G)⊻isodd(G*count_ones(Ai)) ? fieldneg(AigAeg) : AigAeg
         ([((Ae,g),cg) for cg ∈ Cg]...,)
     end
     out = if iszero(Ai&B)
-        p = parity(grade(V),Ai⊻Ae,B) ? -Aeg : Aeg
+        p = parity(grade(V),Ai⊻Ae,B) ? fieldneg(Aeg) : Aeg
         (combinegeometric(V,(Ae⊻B,p),ai),CCg...)
     else
         CCg
     end
     isempty(out) ? Values{0,Tuple{Tuple{UInt,Int},Tuple{UInt,Int}}}() : Values(out)
 end
-function paritygeometricleft(V,a::Tuple,b,i)
-    out = vcat(paritygeometricleft.(Ref(V),Ref(a[i]),b)...)
-    isone(i) ? out : paritygeometricleft(V,a,out,i-1)
+function paritygeometricleft(V,a::Tuple,b,i,field)
+    out = vcat(paritygeometricleft.(Ref(V),Ref(a[i]),b,field)...)
+    isone(i) ? out : paritygeometricleft(V,a,out,i-1,field)
 end
-function paritygeometricleft(V,A::UInt,bebi)
+function paritygeometricleft(V,A::UInt,bebi,field)
     be,bi = @inbounds (bebi[1],bebi[2])
     Be,Beg = @inbounds (be[1],be[2])
     Bi,Big = @inbounds (bi[1],bi[2])
     G = count_ones(A)
     CCg = if isdiag(V) || hasconformal(V)
-        g,C,t,Z = interior(V,Bi,A)
-        Cg = parityreverse(G) ? -Big*g : Big*g
+        g,C,t,Z = interior(V,Bi,A,Val(false),field)
+        Bigg = fieldprod(Big,g)
+        Cg = parityreverse(G) ? fieldneg(Bigg) : Bigg
         t ? ((be,(C,Cg)),) : ()
     else
-        Cg,Z = parityinterior(V,Bi,A,Val(true))
-        g = parityreverse(G) ? -Big*Beg : Big*Beg
+        Cg,Z = parityinterior(V,Bi,A,Val(true),field)
+        BigBeg = fieldprod(Big,Beg)
+        g = parityreverse(G) ? fieldneg(BigBeg) : BigBeg
         ([((Be,g),cg) for cg ∈ Cg]...,)
     end
     out = if iszero(A&Bi)
-        p = parity(grade(V),A,Be⊻Bi) ? -Beg : Beg
+        p = parity(grade(V),A,Be⊻Bi) ? fieldneg(Beg) : Beg
         (combinegeometric(V,(A⊻Be,p),bi),CCg...)
     else
         CCg
@@ -309,14 +323,21 @@ function combinegeometric(V,ei)
     e,i = @inbounds ei[1],ei[2]
     E,Eg = @inbounds e[1],e[2]
     I,Ig = @inbounds i[1],i[2]
-    iszero(E&I) ? (E⊻I,Eg*Ig) : nothing
+    iszero(E&I) ? (E⊻I,fieldprod(Eg,Ig)) : nothing
 end
 function combinegeometric(V,e,i)
     E,Eg = @inbounds e[1],e[2]
     I,Ig = @inbounds i[1],i[2]
     #p = parity(grade(V),E,I) ? -Eg*Ig : Eg*Ig
-    return ((E,Eg*Ig),(I,1))
+    return ((E,fieldprod(Eg,Ig)),(I,1))
 end
+
+fieldprod(a::Expr,b::Expr,op=:*) = :($op($a,$b))
+fieldprod(a::Expr,b,op=:*) = isone(b) ? a : isone(abs(b)) ? :(-($a)) : :($op($a,$b))
+fieldprod(a,b::Expr,op=:*) = isone(a) ? b : isone(abs(a)) ? :(-($b)) : :($op($a,$b))
+fieldprod(a,b) = a*b
+fieldneg(a::Expr) = :(-($a))
+fieldneg(a) = -a
 
 ### parity cache
 
@@ -359,6 +380,10 @@ end
 @pure parity(a::Submanifold{V,G,B},b::Submanifold{V,L,C}) where {V,G,B,L,C} = parity(V,UInt(a),UInt(b))
 
 ### parity product caches
+
+function interior(V,a,b,c::Val{lim},d::Val{field}=Val(false)) where {lim,field}
+    lim||field ? parityinterior(V,a,b,c,d) : interior(V,a,b)
+end
 
 for par ∈ (:conformal,:regressive,:interior)
     calc = Symbol(:parity,par)

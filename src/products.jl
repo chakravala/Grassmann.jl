@@ -196,7 +196,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
-                @inline function $(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
+                @inline function $(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S,field=nothing) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         val = :($$MUL($(parityinner(grade(V),A,B)),$v))
@@ -234,12 +234,12 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                     end
                     return false
                 end
-                @inline function $(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
+                @inline function $(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S,vfield::Val{field}=Val(false)) where {T<:$F,S<:$F,M,field}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
                         if isdiag(V)
                             pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                            g = parityinner(V,A,B)
+                            g = parityinner(V,A,B,vfield)
                             val = :($$MUL($g,$(pcc ? :($$SUB($v)) : v)))
                             if istangent(V)
                                 !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
@@ -248,7 +248,7 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                             $spre(m,val,bas|Q,Val(mdims(V)))
                             cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
                         else
-                            for (bas,g) ∈ paritygeometric(V,A,B)
+                            for (bas,g) ∈ paritygeometric(V,A,B,vfield)
                                 val = :($$MUL($g,$v))
                                 if istangent(V)
                                     !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
@@ -267,63 +267,93 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                         $(Symbol(prod,S))(V,m,UInt(A),UInt(B),v)
                     end
                 end
-                @eval begin
-                    @inline function $(Symbol(prod,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
-                        if val ≠ 0
-                            if isdiag(V)
-                                g,C,t,Z = $uct(V,A,B)
-                                v = val
-                                if istangent(V) && !iszero(Z)
-                                    T≠Any && (return true)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v *= getbasis(loworder(V),Z)
-                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
-                                end
-                                t && $s(m,$MUL(g,v),C,Val(mdims(V)))
-                            else
-                                Cg,Z = $(Symbol(:parity,uct))(V,A,B,Val(true))
-                                v = val
-                                if istangent(V) && !iszero(Z)
-                                    T≠Any && (return true)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v *= getbasis(loworder(V),Z)
-                                    count_ones(Q)+order(v)>diffmode(V) && (return false)
-                                end
-                                for (C,g) ∈ Cg
-                                    $s(m,$MUL(g,v),C,Val(mdims(V)))
-                                end
-                            end
-                        end
-                        return false
-                    end
-                    @inline function $(Symbol(prod,spre))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
-                        if val ≠ 0
-                            if isdiag(V)
-                                g,C,t,Z = $uct(V,A,B)
-                                v = val
-                                if istangent(V) && !iszero(Z)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
-                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
-                                end
-                                t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
-                            else
-                                Cg,Z = $(Symbol(:parity,uct))(V,A,B,Val(true))
-                                v = val
-                                if istangent(V) && !iszero(Z)
-                                    _,_,Q,_ = symmetricmask(V,A,B)
-                                    v = Expr(:call,:*,v,getbasis(loworder(V),Z))
-                                    v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
-                                end
-                                for (C,g) ∈ Cg
-                                    $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
-                                end
-                            end
-                        end
-                        return false
-                    end
-                end
             end
+            @eval begin
+                @inline function $(Symbol(:meet,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
+                    if val ≠ 0
+                        g,C,t,Z = regressive(V,A,B)
+                        v = val
+                        if istangent(V) && !iszero(Z)
+                            T≠Any && (return true)
+                            _,_,Q,_ = symmetricmask(V,A,B)
+                            v *= getbasis(loworder(V),Z)
+                            count_ones(Q)+order(v)>diffmode(V) && (return false)
+                        end
+                        t && $s(m,$MUL(g,v),C,Val(mdims(V)))
+                    end
+                    return false
+                end
+                @inline function $(Symbol(:meet,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
+                    if val ≠ 0
+                        g,C,t,Z = regressive(V,A,B)
+                        v = val
+                        if istangent(V) && !iszero(Z)
+                            _,_,Q,_ = symmetricmask(V,A,B)
+                            v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                            v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                        end
+                        t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                    end
+                    return false
+                end
+                @inline function $(Symbol(:skew,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
+                    if val ≠ 0
+                        if isdiag(V)
+                            g,C,t,Z = interior(V,A,B)
+                            v = val
+                            if istangent(V) && !iszero(Z)
+                                T≠Any && (return true)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v *= getbasis(loworder(V),Z)
+                                count_ones(Q)+order(v)>diffmode(V) && (return false)
+                            end
+                            t && $s(m,$MUL(g,v),C,Val(mdims(V)))
+                        else
+                            Cg,Z = parityinterior(V,A,B,Val(true),false)
+                            v = val
+                            if istangent(V) && !iszero(Z)
+                                T≠Any && (return true)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v *= getbasis(loworder(V),Z)
+                                count_ones(Q)+order(v)>diffmode(V) && (return false)
+                            end
+                            for (C,g) ∈ Cg
+                                $s(m,$MUL(g,v),C,Val(mdims(V)))
+                            end
+                        end
+                    end
+                    return false
+                end
+                @inline function $(Symbol(:skew,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
+                    if val ≠ 0
+                        if isdiag(V)
+                            g,C,t,Z = interior(V,A,B,Val(false),field)
+                            v = val
+                            if istangent(V) && !iszero(Z)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            end
+                            t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                        else
+                            Cg,Z = parityinterior(V,A,B,Val(true),field)
+                            v = val
+                            if istangent(V) && !iszero(Z)
+                                _,_,Q,_ = symmetricmask(V,A,B)
+                                v = Expr(:call,:*,v,getbasis(loworder(V),Z))
+                                v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
+                            end
+                            for (C,g) ∈ Cg
+                                $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                            end
+                        end
+                    end
+                    return false
+                end
+
+
+            end
+
         end
     end
 end
@@ -1089,16 +1119,21 @@ end
 
 ### Product Algebra
 
+const product_contraction_metric = product_contraction
 @generated function contraction2(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
-    product_contraction(a,b,false,:product)
+    product_contraction(a,b,false,false,:product)
 end
-for (op,prop) ∈ ((:⟑,:product),(:contraction,:product_contraction))
+@generated function contraction2_metric(a::TensorGraded{V,L},b::Chain{V,G,T},g) where {V,G,L,T}
+    product_contraction(a,b,false,true,:product)
+end
+for (op,prop,field) ∈ ((:⟑,:product,false),(:contraction,:product_contraction,false),(:wedgedot_metric,:product,true),(:contraction_metric,:product_contraction,true))
+    args = field ? (:g,) : ()
     @eval begin
-        @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,L,T}
-            $prop(a,b,true)
+        @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L},$(args...)) where {V,G,L,T}
+            $prop(a,b,true,$field)
         end
-        @generated function $op(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
-            $prop(a,b)
+        @generated function $op(a::TensorGraded{V,L},b::Chain{V,G,T},$(args...)) where {V,G,L,T}
+            $prop(a,b,false,$field)
         end
     end
 end
@@ -1106,30 +1141,32 @@ for op ∈ (:∧,:∨)
     prop = Symbol(:product_,op)
     @eval begin
         @generated function $op(a::Chain{w,G,T},b::Chain{W,L,S}) where {T,w,S,W,G,L}
-            $prop(a,b)
+            $prop(a,b,false)
         end
         @generated function $op(b::Chain{Q,G,T},a::TensorTerm{R,L}) where {Q,G,T,R,L}
             $prop(a,b,true)
         end
         @generated function $op(a::TensorTerm{Q,G},b::Chain{R,L,T}) where {Q,R,T,G,L}
-            $prop(a,b)
+            $prop(a,b,false)
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
-                     (:∨,:meetaddmulti!),(:contraction,:skewaddmulti!))
+for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,false),
+                     (:∨,:meetaddmulti!,false),(:contraction,:skewaddmulti!,false),
+                     (:wedgedot_metric,:geomaddmulti!,true),(:contraction_metric,:skewaddmulti!,true))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:⟑ ? Symbol(:product_,op) : :product
+    prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
+    args = field ? (:g,) : ()
     @eval begin
-        @generated function $op(b::Multivector{V,T},a::TensorGraded{V,G}) where {V,T,G}
-            $prop(a,b,true)
+        @generated function $op(b::Multivector{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            $prop(a,b,true,$field)
         end
-        @generated function $op(a::TensorGraded{V,G},b::Multivector{V,S}) where {V,G,S}
-            $prop(a,b)
+        @generated function $op(a::TensorGraded{V,G},b::Multivector{V,S},$(args...)) where {V,G,S}
+            $prop(a,b,false,$field)
         end
-        @generated function $op(a::Multivector{V,T},b::Multivector{V,S}) where {V,T,S}
+        @generated function $op(a::Multivector{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_multivector(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_multivector(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Multivector{V}($(loop[2].args[2])))
             else return quote
@@ -1138,9 +1175,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
                 return Multivector{V,t}(out)
             end end
         end
-        @generated function $op(a::Spinor{V,T},b::Multivector{V,S}) where {V,T,S}
+        @generated function $op(a::Spinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_s_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_s_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Multivector{V}($(loop[2].args[2])))
             else return quote
@@ -1149,9 +1186,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
                 return Multivector{V,t}(out)
             end end
         end
-        @generated function $op(a::Multivector{V,T},b::Spinor{V,S}) where {V,T,S}
+        @generated function $op(a::Multivector{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_m_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_m_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Multivector{V}($(loop[2].args[2])))
             else return quote
@@ -1161,9 +1198,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
             end end
 
         end
-        @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S}) where {V,T,S}
+        @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_a_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_a_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Multivector{V}($(loop[2].args[2])))
             else return quote
@@ -1172,9 +1209,9 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
                 return Multivector{V,t}(out)
             end end
         end
-        @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+        @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_m_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_m_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Multivector{V}($(loop[2].args[2])))
             else return quote
@@ -1185,32 +1222,35 @@ for (op,product!) ∈ ((:∧,:exteraddmulti!),(:⟑,:geomaddmulti!),
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),
-                     (:∨,:meetaddspin!),(:contraction,:skewaddspin!))
+for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),
+                     (:∨,:meetaddspin!,false),(:contraction,:skewaddspin!,false),
+                     (:wedgedot_metric,:geomaddspin!,true),(:contraction_metric,:skewaddspin!,true))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:⟑ ? Symbol(:product_,op) : :product
+    prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
+    args = field ? (:g,) : ()
     @eval begin
-        @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
-            Grassmann.$prop(a,b,true)
+        @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            Grassmann.$prop(a,b,true,$field)
         end
-        @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S}) where {V,G,S}
-            Grassmann.$prop(a,b)
+        @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S},$(args...)) where {V,G,S}
+            Grassmann.$prop(a,b,false,$field)
         end
-        @generated function $op(b::AntiSpinor{V,T},a::TensorGraded{V,G}) where {V,T,G}
-            Grassmann.$prop(a,b,true)
+        @generated function $op(b::AntiSpinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            Grassmann.$prop(a,b,true,$field)
         end
-        @generated function $op(a::TensorGraded{V,G},b::AntiSpinor{V,S}) where {V,G,S}
-            Grassmann.$prop(a,b)
+        @generated function $op(a::TensorGraded{V,G},b::AntiSpinor{V,S},$(args...)) where {V,G,S}
+            Grassmann.$prop(a,b,false,$field)
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),(:contraction,:skewaddspin!))
+for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),(:contraction,:skewaddspin!,false),(:wedgedot_metric,:geomaddspin!,true),(:contraction_metric,:skewaddspin!,true))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:⟑ ? Symbol(:product_,op) : :product
+    prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
+    args = field ? (:g,) : ()
     @eval begin
-        @generated function $op(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
+        @generated function $op(a::Spinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Spinor{V}($(loop[2].args[2])))
             else return quote
@@ -1219,9 +1259,9 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),(:contraction,
                 return Spinor{V,t}(out)
             end end
         end
-        @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+        @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(Spinor{V}($(loop[2].args[2])))
             else return quote
@@ -1232,13 +1272,14 @@ for (op,product!) ∈ ((:∧,:exteraddspin!),(:⟑,:geomaddspin!),(:contraction,
         end
     end
 end
-for (op,product!) ∈ ((:∧,:exteraddanti!),(:⟑,:geomaddanti!),(:contraction,:skewaddanti!))
+for (op,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,false),(:contraction,:skewaddanti!,false),(:wedgedot_metric,:geomaddanti!,true),(:contraction_metric,:skewaddanti!,true))
     preproduct! = Symbol(product!,:_pre)
-    prop = op≠:⟑ ? Symbol(:product_,op) : :product
+    prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
+    args = field ? (:g,) : ()
     @eval begin
-        @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+        @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(AntiSpinor{V}($(loop[2].args[2])))
             else return quote
@@ -1247,9 +1288,9 @@ for (op,product!) ∈ ((:∧,:exteraddanti!),(:⟑,:geomaddanti!),(:contraction,
                 return AntiSpinor{V,t}(out)
             end end
         end
-        @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
+        @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             MUL,VEC = mulvec(a,b)
-            loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!)
+            loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
                 return :(AntiSpinor{V}($(loop[2].args[2])))
             else return quote
@@ -1309,18 +1350,19 @@ for side ∈ (:left,:right)
     cc,p = Symbol(:complement,side),Symbol(:parity,side)
     h,pg,pn = Symbol(cc,:hodge),Symbol(p,:hodge),Symbol(p,:null)
     pnp = :(Leibniz.$(Symbol(pn,:pre)))
-    for (c,p) ∈ ((cc,p),(h,pg))
+    for (c,p,ff) ∈ ((cc,p,false),(h,pg,false),(h,pg,true))
+        args = ff ? (:g,) : ()
         @eval begin
-            $c(z::Phasor) = $c(Couple(z))
-            function $c(z::Couple{V}) where V
+            $c(z::Phasor,$(args...)) = $c(Couple(z),$(args...))
+            function $c(z::Couple{V},$(args...)) where V
                 G = grade(V)
-                Single{V,G,getbasis(V,UInt(1)<<G-1)}(realvalue(z)) + $c(imaginary(z))
+                Single{V,G,getbasis(V,UInt(1)<<G-1)}(realvalue(z)) + $c(imaginary(z),$(args...))
             end
-            $c(z::PseudoCouple{V}) where V = $c(volume(z)) + $c(imaginary(z))
-            @generated function $c(b::Chain{V,G,T}) where {V,G,T}
+            $c(z::PseudoCouple{V},$(args...)) where V = $c(volume(z),$(args...)) + $c(imaginary(z),$(args...))
+            @generated function $c(b::Chain{V,G,T},$(args...)) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                istangent(V) && (return :($$c(Multivector(b))))
-                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(b)))) ))
+                istangent(V) && (return :($$c(Multivector(b),$(args...))))
+                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(b,$($args...))))) ))
                 SUB,VEC,MUL = subvec(b)
                 if binomial(mdims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:ib,:D),:svec)...)
@@ -1350,9 +1392,9 @@ for side ∈ (:left,:right)
                     return Chain{V,N-G}(out)
                 end end
             end
-            @generated function $c(m::Multivector{V,T}) where {V,T}
+            @generated function $c(m::Multivector{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvec(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:bs,:bn),:svec)...)
@@ -1388,9 +1430,9 @@ for side ∈ (:left,:right)
                     return Multivector{V}(out)
                 end end
             end
-            @generated function $c(m::Spinor{V,T}) where {V,T}
+            @generated function $c(m::Spinor{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:rs,:bn),:svec)...)
@@ -1426,9 +1468,9 @@ for side ∈ (:left,:right)
                     return $(isodd(N) ? :AntiSpinor : :Spinor){V}(out)
                 end end
             end
-            @generated function $c(m::AntiSpinor{V,T}) where {V,T}
+            @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :((!isdiag(V)) && (return :($$cc(metric(m)))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:ps,:bn),:svec)...)
@@ -1502,17 +1544,19 @@ for c ∈ (:even,:odd)
         end
     end
 end
-for side ∈ (:metric,:anti)
+for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
     c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
     tens,tensfull = Symbol(side,:tensor),Symbol(side,:full)
     tenseven,tensodd = Symbol(side,:even),Symbol(side,:odd)
+    args = field ? (:g,) : ()
     @eval begin
-        $c(z::Phasor) = $c(Couple(z))
-        $c(z::Couple{V}) where V = scalar(z) + $c(imaginary(z))
-        $c(z::PseudoCouple{V}) where V = $c(imaginary(z)) + $c(volume(z))
-        @generated function $c(b::Chain{V,G,T}) where {V,G,T}
+        $c(z::Phasor,$(args...)) = $c(Couple(z),$(args...))
+        $c(z::Couple{V},$(args...)) where V = scalar(z) + $c(imaginary(z),$(args...))
+        $c(z::PseudoCouple{V},$(args...)) where V = $c(imaginary(z),$(args...)) + $c(volume(z),$(args...))
+        @generated function $c(b::Chain{V,G,T},$(args...)) where {V,G,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            istangent(V) && (return :($$c(Multivector(b))))
+            istangent(V) && (return :($$c(Multivector(b),$$(args...))))
+            $field && (return :(contraction(g,b)))
             (!isdiag(V)) && (return :(contraction($($tens(V,G)),b)))
             SUB,VEC,MUL = subvec(b)
             if binomial(mdims(V),G)<(1<<cache_limit)
@@ -1549,8 +1593,9 @@ for side ∈ (:metric,:anti)
                 return Chain{V,G}(out)
             end end
         end
-        @generated function $c(m::Multivector{V,T}) where {V,T}
+        @generated function $c(m::Multivector{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            $field && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tensfull(V)),m)))
             SUB,VEC = subvec(m)
             if mdims(V)<cache_limit
@@ -1593,8 +1638,9 @@ for side ∈ (:metric,:anti)
                 return Multivector{V}(out)
             end end
         end
-        @generated function $c(m::Spinor{V,T}) where {V,T}
+        @generated function $c(m::Spinor{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
+            $field && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tenseven(V)),m)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
@@ -1637,9 +1683,10 @@ for side ∈ (:metric,:anti)
                 return Spinor{V}(out)
             end end
         end
-        @generated function $c(m::AntiSpinor{V,T}) where {V,T}
+        @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            (!isdiag(V)) && (return :(contraction($($tensodd(V)),m)))
+            $field && (return :(contraction(g,m)))
+            (!isdiag(V)) && (return :(contraction($($tensodd(V)),m,)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:ps,:bn),:svecs)...)

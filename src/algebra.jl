@@ -35,7 +35,7 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 @pure ⟑(a::Submanifold{V},b::Submanifold{V}) where V = mul(a,b)
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
-@pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
+@pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true),::Val{field}=Val(false)) where {V,field}
     if isdiag(V)
         ba,bb = UInt(a),UInt(b)
         (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
@@ -938,18 +938,20 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return AntiSpinor{V}(out)
         end end end
     end
-    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false) where S<:TensorGraded{V,L} where {V,G,L,T}
+    @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,field=false) where S<:TensorGraded{V,L} where {V,G,L,T}
         MUL,VEC = mulvecs(a,b)
+        vfield = Val(field)
         anti = isodd(L) ≠ isodd(G)
         type = anti ? :AntiSpinor : :Spinor
+        args = field ? (:g,) : ()
         if G == 0
             return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(@inbounds b[1])))) : swap ? :(Single(b)⟑a) : :(a⟑Single(b))
         elseif S<:Chain && L == 0
             return :(Chain{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
         elseif (swap ? L : G) == mdims(V) && !istangent(V)
-            return swap ? (S<:Single ? :(⋆(~b)*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b)) : :(⋆(~b))) : :(@inbounds ⋆(~a)*b[1])
+            return swap ? (S<:Single ? :(⋆(~b,$(args...))*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b,$(args...))) : :(⋆(~b,$(args...)))) : :(@inbounds ⋆(~a,$(args...))*b[1])
         elseif (swap ? G : L) == mdims(V) && !istangent(V)
-            return swap ? :(b[1]*complementlefthodge(~a)) : S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
+            return swap ? :(b[1]*complementlefthodge(~a,$(args...))) : S<:Single ? :(value(a)*complementlefthodge(~b,$(args...))) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b,$(args...))) : :(complementlefthodge(~b,$(args...)))
         elseif binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
             if S<:Chain
                 $(insert_expr((:N,:t,:bng,:ib,:μ),:mvecs)...)
@@ -958,7 +960,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 for i ∈ list(1,binomial(N,L))
                     @inbounds v,ibi = :(@inbounds a[$i]),B[i]
                     for j ∈ 1:bng
-                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(@inbounds b[$j]),MUL))
+                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,ibi,ib[j],derive_pre(V,ibi,ib[j],v,:(@inbounds b[$j]),MUL),vfield)
                     end
                 end
             else
@@ -968,9 +970,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 for i ∈ list(1,binomial(N,G))
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Single
-                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
+                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL),vfield)
                     else
-                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
+                        @inbounds (anti ? geomaddanti!_pre : geomaddspin!_pre)(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false),vfield)
                     end
                 end
             end
@@ -1009,11 +1011,12 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return $type{V}(out)
         end end
     end
-    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,contr=:contraction) where S<:TensorGraded{V,L} where {V,G,T,L}
+    @noinline function product_contraction(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,field=false,contr=:contraction) where S<:TensorGraded{V,L} where {V,G,T,L}
         MUL,VEC = mulvec(a,b,contr)
+        vfield = Val(field); args = field ? (:g,) : ()
         (swap ? G<L : L<G) && (!istangent(V)) && (return Zero(V))
         if (G==0 || G==mdims(V)) && (!istangent(V))
-            return swap ? :(contraction(Single(b),a)) : :(contraction(a,Single(b)))
+            return swap ? :(contraction(Single(b),a,$(args...))) : :(contraction(a,Single(b),$(args...)))
         end
         GL = swap ? G-L : L-G
         if binomial(mdims(V),G)*(S<:Chain ? binomial(mdims(V),L) : 1)<(1<<cache_limit)
@@ -1027,9 +1030,9 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     @inbounds v,iai = :(@inbounds a[$i]),ia[i]
                     for j ∈ list(1,bng)
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL))
+                            @inbounds skewaddmulti!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL),vfield)
                         else
-                            @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL))
+                            @inbounds skewaddblade!_pre(V,out,iai,ib[j],derive_pre(V,iai,ib[j],v,:(@inbounds b[$j]),MUL),vfield)
                         end
                     end
                 end
@@ -1041,15 +1044,15 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     A,B = swap ? (@inbounds ib[i],U) : (U,@inbounds ib[i])
                     if S<:Single
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL),vfield)
                         else
-                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL))
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(a.v),:(@inbounds b[$i]),MUL),vfield)
                         end
                     else
                         if μ
-                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
+                            @inbounds skewaddmulti!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false),vfield)
                         else
-                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false))
+                            @inbounds skewaddblade!_pre(V,out,A,B,derive_pre(V,A,B,:(@inbounds b[$i]),false),vfield)
                         end
                     end
                 end
@@ -1240,9 +1243,10 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
     prop = op≠:* ? Symbol(:product_,op) : :product
     outmulti && @eval $prop(a,b,swap=false) = $prop(typeof(a),typeof(b),swap)
     mgrade,nmgrade = op≠:∧ ? (:maxgrade,:nextmaxgrade) : (:mingrade,:nextmingrade)
-    @eval @noinline function $prop(a::Type{S},b::Type{<:$input{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
+    @eval @noinline function $prop(a::Type{S},b::Type{<:$input{V,T}},swap=false,field=false) where S<:TensorGraded{V,G} where {V,G,T}
         MUL,VEC = mulvec(a,b,$(QuoteNode(op)))
         VECS = isodd(G) ? VEC : string(VEC)*"s"
+        args = field ? (:g,) : (); vfield = Val(field)
         $(if op ∈ (:∧,:∨); quote
             if $(op≠:∧ ? :(<(G+maxgrade(b),mdims(V))) : :(>(G+mingrade(b),mdims(V)))) && (!istangent(V))
                 return Zero(V)
@@ -1255,18 +1259,18 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
             if (swap ? maxgrade(b)<G : G<mingrade(b)) && (!istangent(V))
                 return Zero(V)
             elseif (swap ? maxgrade(b)==G : G+maxpseudograde(b)==mdims(V)) && (!istangent(V))
-                return swap ? :($$op(b(Val(maxgrade(b))),a)) : :($$op(a,b(Val(mingrade(b)))))
+                return swap ? :($$op(b(Val(maxgrade(b))),a,$(args...))) : :($$op(a,b(Val(mingrade(b))),$(args...)))
             elseif (swap ? nextmaxgrade(b)==G : G+nextmaxpseudograde(b)==mdims(V)) && (!istangent(V))
-                return swap ? :($$op(b(Val(maxgrade(b))),a)+$$op(b(Val(nextmaxgrade(b))),a)) : :($$op(a,b(Val(mingrade(b))))+$$op(a,b(Val(nextmingrade(b)))))
+                return swap ? :($$op(b(Val(maxgrade(b))),a,$(args...))+$$op(b(Val(nextmaxgrade(b))),a,$(args...))) : :($$op(a,b(Val(mingrade(b))),$(args...))+$$op(a,b(Val(nextmingrade(b))),$(args...)))
             end
         end; elseif op == :*; quote
             if S<:Chain && G == 0
                 return :($input{V,G}(broadcast($MUL,Ref(@inbounds a[1]),b.v)))
             elseif G == mdims(V) && !istangent(V)
                 return if swap
-                    S<:Single ? :(⋆(~b)*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b)) : :(⋆(~b))
+                    S<:Single ? :(⋆(~b,$(args...))*value(a)) : S<:Chain ? :(@inbounds a[1]*⋆(~b,$(args...))) : :(⋆(~b,$(args...)))
                 else
-                    S<:Single ? :(value(a)*complementlefthodge(~b)) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b)) : :(complementlefthodge(~b))
+                    S<:Single ? :(value(a)*complementlefthodge(~b,$(args...))) : S<:Chain ? :(@inbounds a[1]*complementlefthodge(~b,$(args...))) : :(complementlefthodge(~b,$(args...)))
                 end
             end
         end; else nothing end)
@@ -1282,15 +1286,15 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                         @inbounds for j ∈ 1:bn[G+1]
                             @inbounds A,B = swapper(ib[j],ia[i],swap)
                             X,Y = swapper(:(@inbounds a[$j]),val,swap)
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL),vfield)
                         end
                     else
                         @inbounds A,B = swapper(UInt(basis(a)),ia[i],swap)
                         if S<:Single
                             X,Y = swapper(:(a.v),:(@inbounds b.v[$(bs[g]+i)]),swap)
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,X,Y,MUL),vfield)
                         else
-                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(@inbounds b.v[$(bs[g]+i)]),false))
+                            @inbounds $preproduct!(V,out,A,B,derive_pre(V,A,B,:(@inbounds b.v[$(bs[g]+i)]),false),vfield)
                         end
                     end
                 end
@@ -1346,9 +1350,10 @@ for input ∈ (:Spinor,:AntiSpinor)
     product2! = :(isodd(G) ? geomaddanti! : geomaddspin!)
     preproduct2! = :(isodd(G) ? geomaddanti!_pre : geomaddspin!_pre)
     input≠:Spinor && @eval product_sandwich(a,b,swap=false) = product_sandwich(typeof(a),typeof(b),swap)
-    @eval @noinline function product_sandwich(a::Type{S},b::Type{<:$input{V,T}},swap=false) where S<:TensorGraded{V,G} where {V,G,T}
+    @eval @noinline function product_sandwich(a::Type{S},b::Type{<:$input{V,T}},swap=false,field=false) where S<:TensorGraded{V,G} where {V,G,T}
         MUL,VEC = mulvec(a,b,:*)
         VECS = isodd(G) ? VEC : string(VEC)*"s"
+        args = field ? (:g,) : (); vfield = Val(field)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
             bs = $(inspin ? :spinsum_set : :antisum_set)(N)
@@ -1361,14 +1366,14 @@ for input ∈ (:Spinor,:AntiSpinor)
                     if S<:Chain
                         @inbounds for j ∈ 1:bn[G+1]
                             @inbounds A,B = ia[i],ib[j]
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL),vfield)
                         end
                     else
                         @inbounds A,B = ia[i],UInt(basis(a))
                         if S<:Single
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL),vfield)
                         else
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false),vfield)
                         end
                     end
                 end
@@ -1386,7 +1391,7 @@ for input ∈ (:Spinor,:AntiSpinor)
                             val2 = :(b.v[$(bs[g2]+j)])
                             @inbounds A,B = ia[i],io[j]
                             Y = par ? :(@inbounds -$val2) : :(@inbounds $val2)
-                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL),vfield)
                         end
                     end
                 end
@@ -1440,9 +1445,10 @@ for input ∈ (:Chain,)
     preproduct! = :((iseven(L) ? isodd : iseven)(G) ? geomaddanti!_pre : geomaddspin!_pre)
     product2! = :(isodd(G) ? geomaddanti! : geomaddspin!)
     preproduct2! = :(isodd(G) ? geomaddanti!_pre : geomaddspin!_pre)
-    @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false) where {S<:TensorGraded{V,G},Q<:TensorGraded{V,L}} where {V,G,L}
+    @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false,field=false) where {S<:TensorGraded{V,G},Q<:TensorGraded{V,L}} where {V,G,L}
         MUL,VEC = mulvec(a,b,:*)
         VECS = isodd(G) ? VEC : string(VEC)*"s"
+        args = field ? (:g,) : (); vfield = Val(field)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t,:ib,:bn,:μ))...)
             il = indexbasis(N,L)
@@ -1455,14 +1461,14 @@ for input ∈ (:Chain,)
                     if S<:Chain
                         @inbounds for j ∈ 1:bn[G+1]
                             @inbounds A,B = il[i],ib[j]
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL),vfield)
                         end
                     else
                         @inbounds A,B = il[i],UInt(basis(a))
                         if S<:Single
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL),vfield)
                         else
-                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false),vfield)
                         end
                     end
                 end
@@ -1472,14 +1478,14 @@ for input ∈ (:Chain,)
                 if S<:Chain
                     @inbounds for j ∈ 1:bn[G+1]
                         @inbounds B = ib[j]
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL),vfield)
                     end
                 else
                     B = UInt(basis(a))
                     if S<:Single
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL),vfield)
                     else
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false),vfield)
                     end
                 end
             end
@@ -1493,15 +1499,15 @@ for input ∈ (:Chain,)
                         @inbounds for j ∈ 1:bn[L+1]
                             @inbounds A,B = ia[i],il[j]
                             Y = (swap ? par : false) ? :(@inbounds -b[$j]) : :(@inbounds b[$j])
-                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL),vfield)
                         end
                     else
                         @inbounds A,B = ia[i],UInt(basis(b))
                         if Q<:Single
                             Y = swapper((swap ? par : false) ? :(-value(b)) : :(value(b)),val,true)
-                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL))
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,Y,MUL),vfield)
                         else
-                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,false))
+                            $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,false),vfield)
                         end
                     end
                 end
@@ -1520,13 +1526,14 @@ for input ∈ (:Couple,:PseudoCouple)
     preproduct2! = :(isodd(G) ? geomaddanti!_pre : geomaddspin!_pre)
     calar = input == :Couple ? :scalar : :volume
     pg = input == :Couple ? 0 : :N
-    @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false) where {S<:TensorGraded{V,G},Q<:$input{V,BB}} where {V,G,BB}
+    @eval @noinline function product_sandwich(a::Type{S},b::Type{Q},swap=false,field=false) where {S<:TensorGraded{V,G},Q<:$input{V,BB}} where {V,G,BB}
         MUL,VEC = mulvec(a,b,:*)
         N = mdims(V)
+        args = field ? (:g,) : (); vfield = Val(field)
         $(if input == :Couple
-            :(isodd(grade(BB)) && return :(a⊘multispin(b)))
+            :(isodd(grade(BB)) && return :($(swap ? :>>> : :⊘)(a,multispin(b),$(args...))))
         else
-            :(isodd(grade(BB))≠isodd(N) && return :(a⊘multispin(b)))
+            :(isodd(grade(BB))≠isodd(N) && return :($(swap ? :>>> : :⊘)(a,multispin(b),$(args...))))
         end)
         inspin = iseven(grade(BB))
         VECS = isodd(G) ? VEC : string(VEC)*"s"
@@ -1537,14 +1544,14 @@ for input ∈ (:Couple,:PseudoCouple)
                 if S<:Chain
                     @inbounds for j ∈ 1:bn[G+1]
                         @inbounds B = ib[j]
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(@inbounds a[$j]),MUL),vfield)
                     end
                 else
                     B = UInt(basis(a))
                     if S<:Single
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,:(a.v),MUL),vfield)
                     else
-                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false))
+                        $preproduct!(V,out,A,B,derive_pre(V,A,B,val,false),vfield)
                     end
                 end
             end
@@ -1556,7 +1563,7 @@ for input ∈ (:Couple,:PseudoCouple)
                     @inbounds val = out[bs2[g]+i]
                     !isnull(val) && for (B,val2) ∈ ((UInt(BB),(swap ? parityclifford(grade(BB)) : false) ? :(-value(imaginary(b))) : :(value(imaginary(b)))),(indexbasis(N,$pg)[1],(swap ? parityclifford($pg) : false) ? :(-value($$calar(b))) : :(value($$calar(b)))))
                         @inbounds A = ia[i]
-                        $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,val2,MUL))
+                        $preproduct2!(V,out2,A,B,derive_pre(V,A,B,val,val2,MUL),vfield)
                     end
                 end
             end
@@ -1608,8 +1615,9 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
     left,leftspin,right,rightspin,br = leftrightsym(com)
     VEC = outspin ? :svecs : :svec
     genloop = Symbol(:generate_loop_,com)
-    @eval @noinline function $genloop(V,a,b,t,MUL,product!,preproduct!,d=nothing)
+    @eval @noinline function $genloop(V,a,b,t,MUL,product!,preproduct!,field=false,d=nothing)
         $(insert_expr((:N,br...,:bn),:mvec)...)
+        vfield = Val(field)
         if mdims(V)<cache_limit/2
             out = $VEC(N,Any)(zeros($VEC(N,t)))
             for g ∈ $leftspin
@@ -1620,7 +1628,7 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                         @inbounds R = $right[G]
                         Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]
-                            @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL))
+                            @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL),vfield)
                         end
                     end
                 end

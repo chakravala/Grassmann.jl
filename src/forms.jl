@@ -399,16 +399,48 @@ show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
 Chain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
-export TensorOperator, Endomorphism
+export DiagonalOperator
 
-#=struct TensorOperator{V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} <: TensorNested{V,S}
+struct DiagonalOperator{V,T<:TensorAlgebra{V}} <: TensorNested{V,T}
     v::T
-    TensorOperator{V,W}(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
-    TensorOperator{V}(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
-    TensorOperator(t::T) where {V,W,S<:TensorAlgebra{W},T<:TensorAlgebra{V,S}} = new{V,W,S,T}(t)
+    DiagonalOperator{V}(t::T) where {V,T<:TensorAlgebra{V}} = new{V,T}(t)
+    DiagonalOperator(t::T) where {V,T<:TensorAlgebra{V}} = new{V,T}(t)
 end
 
-Endomorphism{V,S<:TensorAlgebra{V},T<:TensorAlgebra{V,S}} = TensorOperator{V,V,S,T}=#
+value(t::DiagonalOperator) = t.v
+matrix(m::DiagonalOperator) = matrix(TensorOperator(m))
+getindex(t::DiagonalOperator,i::Int,j::Int) = i≠j ? zero(valuetype(value(t))) : value(t)[i]
+getindex(t::DiagonalOperator,i::Int) = value(t)(i)
+
+compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{0}) where V = DiagonalOperator(Chain{V,0}(1))
+@generated function compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{G}) where {V,G}
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),Expr(:call,Values,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...)))
+end
+@generated function outermorphism(m::DiagonalOperator{V,<:Chain{V,1}}) where V
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),Expr(:call,Values,1,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V))[list(2,tdims(V))]]...)))
+end
+
+for op ∈ (:(Base.inv),:(Base.exp))
+    @eval $op(t::DiagonalOperator) = DiagonalOperator(map($op,value(t)))
+end
+
+_axes(t::DiagonalOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
+_axes(t::DiagonalOperator{V,T}) where {V,G,T<:Chain{V,G}} = (Base.OneTo(gdims(T)),Base.OneTo(gdims(T)))
+
+# anything array-like gets summarized e.g. 10-element Array{Int64,1}
+Base.summary(io::IO, a::DiagonalOperator) = Base.array_summary(io, a, _axes(a))
+
+show(io::IO,X::DiagonalOperator) = Base.show(io,TensorOperator(X))
+
+function show(io::IO, ::MIME"text/plain", t::DiagonalOperator)
+    X = display_matrix(value(TensorOperator(t)))
+    if isempty(X) && get(io, :compact, false)::Bool
+        return show(io, X)
+    end
+    show_matrix(io, t, X)
+end
+
+export TensorOperator, Endomorphism
 
 struct TensorOperator{V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} <: TensorNested{V,T}
     v::T
@@ -424,10 +456,16 @@ matrix(m::TensorOperator) = matrix(value(m))
 compound(m::TensorOperator,g) = TensorOperator(compound(value(m),g))
 compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
+getindex(t::TensorOperator,i::Int) = value(t.v)[i]
 
 for op ∈ (:(Base.inv),)
     @eval $op(t::Endomorphism{V,<:Chain}) where V = TensorOperator($op(value(t)))
 end
+
+TensorOperator(t::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = TensorOperator(Chain{V,G}(value(value(t)).*chainbasis(V,G)))
+TensorOperator(t::DiagonalOperator{V,<:Spinor{V,G}}) where {V,G} = TensorOperator(Spinor{V}(value(value(t)).*evenbasis(V)))
+TensorOperator(t::DiagonalOperator{V,<:AntiSpinor{V,G}}) where {V,G} = TensorOperator(AntiSpinor{V}(value(value(t)).*oddbasis(V)))
+TensorOperator(t::DiagonalOperator{V,<:Multivector{V,G}}) where {V,G} = TensorOperator(Multivector{V}(value(value(t)).*Λ(V).b))
 
 _axes(t::TensorOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
 _axes(t::TensorOperator{V,W,T}) where {V,W,G,L,S<:Chain{W,L},T<:Chain{V,G,S}} = (Base.OneTo(gdims(S)),Base.OneTo(gdims(T)))
@@ -600,7 +638,35 @@ minus(a::TensorNested,b::TensorNested) = a+(-b)
 @inline ⟑(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorNested) = contraction(a,b)
 @inline ⟑(a::TensorNested,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
 
-for op ∈ (:*,:⟑,:contraction,:plus,:minus,:+,:-,:/)
+contraction(a::DiagonalOperator{V,<:Chain{V,G}},b::Chain{V,G}) where {V,G} = Chain{V,G}(value(value(a)).*value(b))
+contraction(a::Chain{V,G},b::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = Chain{V,G}(value(a).*value(value(b)))
+contraction(a::DiagonalOperator{V,<:Chain{V,G}},b::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = DiagonalOperator(Chain{V,G}(value(value(a)).*value(value(b))))
+
+contraction(a::DiagonalOperator{V,<:Multivector{V}},b::Chain{V,G}) where {V,G} = Chain{V,G}(value(value(a)(Val(G))).*value(b))
+contraction(a::Chain{V,G},b::DiagonalOperator{V,<:Multivector{V}}) where {V,G} = Chain{V,G}(value(a).*value(value(b)(Val(G))))
+contraction(a::DiagonalOperator{V,<:Multivector{V}},b::Spinor{V}) where V = Spinor{V}(value(even(value(a))).*value(b))
+contraction(a::Spinor{V},b::DiagonalOperator{V,<:Multivector{V}}) where V = Spinor{V}(value(a).*value(even(value(b))))
+contraction(a::DiagonalOperator{V,<:Multivector{V}},b::AntiSpinor{V}) where V = AntiSpinor{V}(value(even(value(a))).*value(b))
+contraction(a::AntiSpinor{V},b::DiagonalOperator{V,<:Multivector{V}}) where V = AntiSpinor{V}(value(a).*value(even(value(b))))
+contraction(a::DiagonalOperator{V,<:Multivector{V}},b::Multivector{V}) where V = Multivector{V}(value(value(a)).*value(b))
+contraction(a::Multivector{V},b::DiagonalOperator{V,<:Multivector{V}}) where V = Multivector{V}(value(a).*value(value(b)))
+contraction(a::DiagonalOperator{V,<:Multivector{V}},b::DiagonalOperator{V,<:Multivector{V}}) where V = DiagonalOperator(Multivector{V}(value(value(a)).*value(value(b))))
+
+for op ∈ (:⟑,:*)
+    @eval begin
+        $op(a::DiagonalOperator,b::TensorAlgebra) = contraction(a,b)
+        $op(a::TensorAlgebra,b::DiagonalOperator) = contraction(a,b)
+        $op(a::DiagonalOperator,b::DiagonalOperator) = contraction(a,b)
+    end
+end
+for op ∈ (:plus,:minus,:+,:-)
+    for operator ∈ (:TensorOperator,:DiagonalOperator)
+        @eval begin
+            $op(a::$operator,b::$operator) = $operator($op(value(a),value(b)))
+        end
+    end
+end
+for op ∈ (:*,:⟑,:contraction,:/)
     @eval begin
         $op(a::TensorAlgebra,b::TensorOperator) = $op(a,value(b))
         $op(a::TensorOperator,b::TensorAlgebra) = $op(value(a),b)
@@ -608,9 +674,11 @@ for op ∈ (:*,:⟑,:contraction,:plus,:minus,:+,:-,:/)
     end
 end
 for F ∈ Fields
-    @eval begin
-        *(a::F,b::TensorOperator) where F<:$F = TensorOperator(a*value(b))
-        *(a::TensorOperator,b::F) where F<:$F = TensorOperator(value(a)*b)
+    for operator ∈ (:TensorOperator,:DiagonalOperator)
+        @eval begin
+            *(a::F,b::$operator) where F<:$F = $operator(a*value(b))
+            *(a::$operator,b::F) where F<:$F = $operator(value(a)*b)
+        end
     end
 end
 
@@ -702,9 +770,11 @@ function metricdyad(V)
     end
 end
 
+applyf(f,mat::TensorOperator) = f.(value(value(mat)))
+
 metricfull(V) = TensorOperator(Multivector{V}(vcat(value.(map.(Multivector,value.(metrictensor.(V,list(0,mdims(V))))))...)))
-metriceven(V) = TensorOperator(Spinor{V}(vcat(value.(map.(Spinor,value.(metrictensor.(V,evens(0,mdims(V))))))...)))
-metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(value.(map.(AntiSpinor,value.(metrictensor.(V,evens(1,mdims(V))))))...)))
+metriceven(V) = TensorOperator(Spinor{V}(vcat(applyf.(Spinor,metrictensor.(V,evens(0,mdims(V))))...)))
+metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(applyf.(AntiSpinor,metrictensor.(V,evens(1,mdims(V))))...)))
 
 struct MetricTensor{n,ℙ,g,Vars,Diff,Name} <: TensorBundle{n,ℙ,g,Vars,Diff,Name}
     @pure MetricTensor{N,M,S,F,D,L}() where {N,M,S,F,D,L} = new{N,M,S,F,D,L}()

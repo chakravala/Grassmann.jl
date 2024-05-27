@@ -45,7 +45,7 @@ function Base.expm1(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.expm1(b::Multivector{V,T}) where {V,T}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:k)
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:k)
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
@@ -72,7 +72,7 @@ end
 end
 
 @eval @generated function Base.expm1(b::Spinor{V,T}) where {V,T}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:k)
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:k)
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
@@ -523,7 +523,7 @@ function Base.cosh(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.cosh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
@@ -552,7 +552,7 @@ end
 end
 
 @eval @generated function Base.cosh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
@@ -607,7 +607,7 @@ function Base.sinh(t::T) where T<:TensorAlgebra
 end
 
 @eval @generated function Base.sinh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,:(k*(k-1)))
+    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
@@ -635,7 +635,7 @@ end
 end
 
 @eval @generated function Base.sinh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,:(k*(k-1)))
+    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))

@@ -452,9 +452,10 @@ for pinor ∈ (:Spinor,:AntiSpinor)
         @computed struct $pinor{V,T} <: AbstractSpinor{V,T}
             v::Values{1<<(mdims(V)-1),T}
             $pinor{V,T}(v) where {V,T} = new{DirectSum.submanifold(V),T}(v)
+            $pinor{V}(v::Values{N,T}) where {N,V,T} = new{DirectSum.submanifold(V),T}(v)
         end
         #$pinor{V,T}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(Values{1<<(mdims(V)-1),T}(v)
-        $pinor{V}(v::AbstractVector{T}) where {V,T} = $pinor{V,T}(v)
+        $pinor{V}(v::S) where {V,S<:AbstractVector{T}} where T = $pinor{V,T}(v)
         $pinor{V,𝕂}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = $pinor{V,𝕂}(val.v,B)
         $pinor{V}(val::Single{V,G,B,𝕂}) where {V,G,B,𝕂} = $pinor{V,𝕂}(val)
         $pinor(val::TensorAlgebra{V}) where V = $pinor{V}(val)
@@ -595,7 +596,7 @@ end
     :(Multivector{V,T}($(Expr(:call,:Values,vcat([isodd(G) ? [:(@inbounds t.v[$(i+bs[G+1])]) for i ∈ list(1,binomial(N,G))] : zeros(T,binomial(N,G)) for G ∈ list(0,N)]...)...))))
 end
 
-@pure function Base.getproperty(a::Spinor{V,T},v::Symbol) where {V,T}
+#=@pure function Base.getproperty(a::Spinor{V,T},v::Symbol) where {V,T}
     return if v == :v
         getfield(a,:v)
     else
@@ -610,7 +611,7 @@ end
         B = getproperty(Λ(V),v)
         isodd(grade(B)) ? a.v[bladeindex(mdims(V),UInt(B))]*B : zero(T)*B
     end
-end
+end=#
 
 function Base.show(io::IO, m::Spinor{V,T}) where {V,T}
     N,compact = mdims(V),get(io,:compact,false)

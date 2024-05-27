@@ -73,7 +73,7 @@ for 𝔽 in [Float64]
     α = rand(𝔽)
     @test α*e == α
     @testset "Field: $(𝔽)" begin
-        for G in [3,V"+++", S"∞+", S"∅+", V"-+++"]#, S"∞∅+"]
+        for G in [3,V"+++", S"∞+", S"∅+", V"-+++", S"∞∅+"]
             @testset "Algebra: $(G)" begin
                 dims = mdims(G)
 
