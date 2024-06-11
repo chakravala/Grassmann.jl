@@ -39,6 +39,7 @@ import DirectSum: antimetric, signbool
 import Leibniz: hasconformal, hasinf2origin, hasorigin2inf
 import AbstractTensors: valuetype, scalar, isscalar, trivector, istrivector, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
+import AbstractTensors: wedgedot_metric, contraction_metric, log_metric
 
 ## cache
 

@@ -379,22 +379,24 @@ const FieldsBig = (Fields...,BigFloat,BigInt,Complex{BigFloat},Complex{BigInt},R
 
 +(a::Zero{V},::Zero{V}) where V = a
 -(a::Zero{V},::Zero{V}) where V = a
-*(a::Zero{V},::Zero{V}) where V = a
+⟑(a::Zero{V},::Zero{V}) where V = a
 ∧(a::Zero{V},::Zero{V}) where V = a
 ∨(a::Zero{V},::Zero{V}) where V = a
 contraction(a::Zero{V},::Zero{V}) where V = a
+contraction_metric(a::Zero{V},::Zero{V},g) where V = a
+wedgedot_metric(a::Zero{V},::Zero{V},g) where V = a
 
-*(a::Infinity{V},::Infinity{V}) where V = a
+⟑(a::Infinity{V},::Infinity{V}) where V = a
 ∧(a::Infinity{V},::Infinity{V}) where V = a
 ∨(a::Infinity{V},::Infinity{V}) where V = a
 contraction(a::Infinity{V},::Infinity{V}) where V = a
+contraction_metric(a::Infinity{V},::Infinity{V},g) where V = a
+wedgedot_metric(a::Infinity{V},::Infinity{V}) where V = a
 
 +(a::T,b::Zero) where T<:TensorAlgebra{V} where V = a
 +(a::Zero,b::T) where T<:TensorAlgebra{V} where V = b
 -(a::T,b::Zero) where T<:TensorAlgebra{V} where V = a
 -(a::Zero,b::T) where T<:TensorAlgebra{V} where V = -b
-*(a::T,b::Zero) where T<:TensorAlgebra{V} where V = b
-*(a::Zero,b::T) where T<:TensorAlgebra{V} where V = a
 #/(a::T,b::Zero) where T<:TensorAlgebra = inv(b)
 /(a::Zero,b::T) where T<:Number = iszero(b) ? Single{V}(0/0) : a
 /(a::Zero,b::T) where T<:TensorAlgebra{V} where V = iszero(b) ? Single{V}(0/0) : Zero(V)
@@ -407,8 +409,6 @@ inv(a::Zero{V}) where V = Infinity(V)
 +(a::Infinity,b::T) where T<:TensorAlgebra = a
 -(a::T,b::Infinity) where T<:TensorAlgebra = b
 -(a::Infinity,b::T) where T<:TensorAlgebra = a
-*(a::T,b::Infinity) where T<:TensorAlgebra = b
-*(a::Infinity,b::T) where T<:TensorAlgebra = a
 #/(a::T,b::Infinity) where T<:TensorAlgebra = inv(b)
 /(a::Infinity,b::T) where T<:Number = isinf(b) ? Single{V}(Inf/Inf) : a
 /(a::Infinity,b::T) where T<:TensorAlgebra{V} where V = isinf(norm(b)) ? Single{V}(Inf/Inf) : Infinity(V)
@@ -417,15 +417,28 @@ inv(a::Zero{V}) where V = Infinity(V)
 /(a::One,b::Infinity) = inv(b)
 inv(a::Infinity{V}) where V = Zero(V)
 
-for T ∈ (:TensorTerm,:Couple,:PseudoCouple,:Chain,:Spinor,:AntiSpinor,:Multivector)
+for type ∈ (:Zero,:Infinity)
+    for tensor ∈ (:TensorTerm,:Couple,:PseudoCouple)
+        for (op,args) ∈ ((:⟑,()),(:wedgedot_metric,(:g,)))
+            @eval begin
+                $op(a::$tensor,b::$type,$(args...)) = b
+                $op(a::$type,b::$tensor,$(args...)) = a
+            end
+        end
+    end
+end
+
+for T ∈ (:TensorTerm,:Couple,:PseudoCouple)
     for type ∈ (:Zero,:Infinity)
         @eval begin
             ∧(a::T,b::$type) where T<:$T = b
             ∧(a::$type,b::T) where T<:$T = a
             ∨(a::T,b::$type) where T<:$T = b
             ∨(a::$type,b::T) where T<:$T = a
-            contraction(a::T,b::$type) where T<:$T = b
-            contraction(a::$type,b::T) where T<:$T = a
+            contraction(a::$T,b::$type) = b
+            contraction(a::$type,b::$T) = a
+            contraction_metric(a::$T,b::$type,g) = b
+            contraction_metric(a::$type,b::$T,g) = a
         end
     end
 end
@@ -434,38 +447,42 @@ end
 +(a::Zero{V},b::T) where {T<:Number,V} = Single{V}(b)
 -(a::T,b::Zero{V}) where {T<:Number,V} = Single{V}(a)
 -(a::Zero{V},b::T) where {T<:Number,V} = Single{V}(-b)
-*(a::T,b::Zero) where T<:Number = b
-*(a::Zero,b::T) where T<:Number = a
+*(a::T,b::Zero) where T<:Real = b
+*(a::Zero,b::T) where T<:Real = a
+*(a::T,b::Zero) where T<:Complex = b
+*(a::Zero,b::T) where T<:Complex = a
 
 +(a::T,b::Infinity) where T<:Number = b
 +(a::Infinity,b::T) where T<:Number = a
 -(a::T,b::Infinity) where T<:Number = b
 -(a::Infinity,b::T) where T<:Number = a
-*(a::T,b::Infinity) where T<:Number = b
-*(a::Infinity,b::T) where T<:Number = a
+*(a::T,b::Infinity) where T<:Real = b
+*(a::Infinity,b::T) where T<:Real = a
+*(a::T,b::Infinity) where T<:Complex = b
+*(a::Infinity,b::T) where T<:Complex = a
 
-@inline Base.:^(a::T,b::Zero) where T<:TensorAlgebra{V} where V = One(V)
-@inline Base.:^(a::Zero,b::Single{V,0}) where V = iszero(b) ? One(V) : isless(b,0) ? Infinity(V) : Zero(V)
-@inline Base.:^(a::T,b::Zero{V}) where {T<:Number,V} = One(V)
-@inline Base.:^(a::Zero{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
-@inline Base.:^(a::Zero{V},::Zero) where V = One(V)
-@inline Base.:^(a::Zero,::Infinity) = a
-@inline Base.:^(a::Zero{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
+@inline Base.:^(a::T,b::Zero,_=nothing) where T<:TensorAlgebra{V} where V = One(V)
+@inline Base.:^(a::Zero,b::Single{V,0},_=nothing) where V = iszero(b) ? One(V) : isless(b,0) ? Infinity(V) : Zero(V)
+@inline Base.:^(a::T,b::Zero{V},_=nothing) where {T<:Number,V} = One(V)
+@inline Base.:^(a::Zero{V},b::T,_=nothing) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
+@inline Base.:^(a::Zero{V},::Zero,_=nothing) where V = One(V)
+@inline Base.:^(a::Zero,::Infinity,_=nothing) = a
+@inline Base.:^(a::Zero{V},b::T,_=nothing) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Infinity(V) : a
 
-@inline Base.:^(a::Single{V,0},b::Infinity) where V = (c=abs(value(a)); isone(c) ? One(V) : isless(c,1) ? Zero(V) : b)
-@inline Base.:^(a::Infinity,b::T) where T<:TensorTerm{V,0} where V = iszero(b) ? One(V) : isless(b,0) ? Zero(V) : Infinity(V)
-@inline Base.:^(a::T,b::Infinity{V}) where {T<:Number,V} = (c=abs(a); isone(c) ? One(V) : isless(c,1) : Zero(V) : b)
-@inline Base.:^(a::Infinity{V},b::T) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
-@inline Base.:^(a::Infinity{V},::Zero) where V = One(V)
-@inline Base.:^(a::Infinity,::Infinity) = a
-@inline Base.:^(a::Infinity{V},b::T) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
+@inline Base.:^(a::Single{V,0},b::Infinity,_=nothing) where V = (c=abs(value(a)); isone(c) ? One(V) : isless(c,1) ? Zero(V) : b)
+@inline Base.:^(a::Infinity,b::T,_=nothing) where T<:TensorTerm{V,0} where V = iszero(b) ? One(V) : isless(b,0) ? Zero(V) : Infinity(V)
+@inline Base.:^(a::T,b::Infinity{V},_=nothing) where {T<:Number,V} = (c=abs(a); isone(c) ? One(V) : isless(c,1) : Zero(V) : b)
+@inline Base.:^(a::Infinity{V},b::T,_=nothing) where {T<:Number,V} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
+@inline Base.:^(a::Infinity{V},::Zero,_=nothing) where V = One(V)
+@inline Base.:^(a::Infinity,::Infinity,_=nothing) = a
+@inline Base.:^(a::Infinity{V},b::T,_=nothing) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
 
 +(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+Couple(b)
 +(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)+b
 -(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a-Couple(b)
 -(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)-b
-*(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a*Couple(b)
-*(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)*b
+⟑(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a⟑Couple(b)
+⟑(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)⟑b
 /(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a/Couple(b)
 /(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)/b
 ∧(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∧Couple(b)
@@ -474,6 +491,10 @@ end
 ∨(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)∨b
 contraction(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = contraction(a,Couple(b))
 contraction(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = contraction(Couple(a),b)
+contraction_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = contraction_metric(a,Couple(b),g)
+contraction_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = contraction_metric(Couple(a),b,g)
+wedgedot_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(a,Couple(b),g)
+wedgedot_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(Couple(a),b,g)
 
 plus(b::Chain{V,G},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Chain{V,G},a::Submanifold{V,L}) where {V,G,L} = plus(a,b)
@@ -496,6 +517,10 @@ plus(b::AntiSpinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
 ⟑(a::Chain{V,G},b::Single{V,0}) where {V,G} = Chain{V,G}(a.v*b.v)
 ⟑(a::Submanifold{V,0},b::Chain{W,G}) where {V,W,G} = b
 ⟑(a::Chain{V,G},b::Submanifold{W,0}) where {V,W,G} = a
+wedgedot_metric(a::Single{V,0},b::Chain{V,G},g) where {V,G} = Chain{V,G}(a.v*b.v)
+wedgedot_metric(a::Chain{V,G},b::Single{V,0},g) where {V,G} = Chain{V,G}(a.v*b.v)
+wedgedot_metric(a::Submanifold{V,0},b::Chain{W,G},g) where {V,W,G} = b
+wedgedot_metric(a::Chain{V,G},b::Submanifold{W,0},g) where {V,W,G} = a
 
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
@@ -531,15 +556,23 @@ for (op,po) ∈ ((:plus,:+),(:minus,:-))
     end
 end
 
-function ⟑(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value(B*B),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b))
-end
-function ⟑(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
-    out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
-    Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(B*B)+value(volume(a)*volume(b)),value(out))
-end
-function ⟑(a::Phasor{V,B},b::Phasor{V,B}) where {V,B}
-    Phasor{V,B}(realvalue(a)*realvalue(b),imagvalue(a)+imagvalue(b))
+for (op,args) ∈ ((:⟑,()),(:wedgedot_metric,(:g,)))
+    @eval begin
+        function $op(a::Couple{V,B},b::Couple{V,B},$(args...)) where {V,B}
+            Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value($op(B,B,$(args...))),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b))
+        end
+        function $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B},$(args...)) where {V,B}
+            out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
+            Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value($op(B,B,$(args...)))+value(volume(a)*volume(b)),value(out))
+        end
+        function $op(a::Phasor{V,B},b::Phasor{V,B},$(args...)) where {V,B}
+            Phasor{V,B}(realvalue(a)*realvalue(b),imagvalue(a)+imagvalue(b))
+        end
+        $op(a::Couple{V},b::Couple{V},$(args...)) where V = (a⟑scalar(b))+$op(a,imaginary(b),$(args...))
+        $op(a::PseudoCouple{V},b::PseudoCouple{V},$(args...)) where V = ($op(volume(a),volume(b),$(args...))+$op(imaginary(a),imaginary(b),$(args...)))+$op(imaginary(a),volume(b),$(args...))+$op(volume(b),imaginary(a),$(args...))
+        $op(a::Couple{V},b::PseudoCouple{V},$(args...)) where V = (scalar(a)⟑b)+$op(imaginary(a),b,$(args...))
+        $op(a::PseudoCouple{V},b::Couple{V},$(args...)) where V = (a⟑scalar(b))+$op(a,imaginary(b),$(args...))
+    end
 end
 
 function ∧(a::Couple{V,B},b::Couple{V,B}) where {V,B}
@@ -558,19 +591,23 @@ function ∨(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
 end
 ∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
 
-function contraction(a::Couple{V,B},b::Couple{V,B}) where {V,B}
-    Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value(abs2_inv(B)),imagvalue(a)*realvalue(b))
+for (op,args) ∈ ((:contraction,()),(:contraction_metric,(:g,)))
+    @eval begin
+        function $op(a::Couple{V,B},b::Couple{V,B},$(args...)) where {V,B}
+            Couple{V,B}(realvalue(a)*realvalue(b)+(imagvalue(a)*imagvalue(b))*value(abs2_inv(B,$(args...))),imagvalue(a)*realvalue(b))
+        end
+        function $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B},$(args...)) where {V,B}
+            out = $op(volume(a),imaginary(b),$(args...))
+            Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(abs2_inv(B,$(args...)))+(imagvalue(a)*imagvalue(b))*value(abs2_inv(V,$(args...))),value(out))
+        end
+        $op(a::Phasor{V,B},b::Phasor{V,B},$(args...)) where {V,B} = Phasor($op(Couple(a),Couple(b),$(args...)))
+        $op(a::Couple{V},b::Couple{V},$(args...)) where V = $op(a,imaginary(b),$(args...))+contraction(a,scalar(b))
+        $op(a::PseudoCouple{V},b::PseudoCouple{V},$(args...)) where V = $op(imaginary(a),b,$(args...))+$op(volume(a),b,$(args...))
+        $op(a::Couple{V},b::PseudoCouple{V},$(args...)) where V = contractn(scalar(a),imaginary(b))+$op(imaginary(a),b,$(args...))
+        $op(a::PseudoCouple{V},b::Couple{V},$(args...)) where V = contraction(a,scalar(b))+$op(a,imaginary(b),$(args...))
+    end
 end
-function contraction(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
-    out = contraction(volume(a),imaginary(b))
-    Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(abs2_inv(B))+(imagvalue(a)*imagvalue(b))*value(abs2_inv(V)),value(out))
-end
-contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Couple(a),Couple(b)))
 
-⟑(a::Couple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
-⟑(a::PseudoCouple{V},b::PseudoCouple{V}) where V = ((volume(a)⟑volume(b))+(imaginary(a)⟑imaginary(b)))+(imaginary(a)⟑volume(b))+(volume(b)⟑imaginary(a))
-⟑(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)⟑b)+(imaginary(a)⟑b)
-⟑(a::PseudoCouple{V},b::Couple{V}) where V = (a⟑scalar(b))+(a⟑imaginary(b))
 ∧(a::Couple{V},b::Couple{V}) where V = (a∧scalar(b))+(a∧imaginary(b))
 ∧(a::PseudoCouple{V},b::PseudoCouple{V}) where V = imaginary(a)∧imaginary(b)
 ∧(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∧b)+(imaginary(a)∧imaginary(b))
@@ -579,10 +616,6 @@ contraction(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(contraction(Coup
 ∨(a::PseudoCouple{V},b::PseudoCouple{V}) where V = (a∨imaginary(b))+(a∨volume(b))
 ∨(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∨volume(b))+(imaginary(a)∨b)
 ∨(a::PseudoCouple{V},b::Couple{V}) where V = (volume(a)∨scalar(b))+(a∨imaginary(b))
-contraction(a::Couple{V},b::Couple{V}) where V = contraction(a,imaginary(b))+contraction(a,volume(b))
-contraction(a::PseudoCouple{V},b::PseudoCouple{V}) where V = contraction(imaginary(a),b)+contraction(volume(a),b)
-contraction(a::Couple{V},b::PseudoCouple{V}) where V = contraction(scalar(a),imaginary(b))+contraction(imaginary(a),b)
-contraction(a::PseudoCouple{V},b::Couple{V}) where V = contraction(a,scalar(b))+contraction(a,imaginary(b))
 
 plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(value(a)+realvalue(b),imagvalue(b))
 plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)+value(b),imagvalue(a))
@@ -657,24 +690,28 @@ function minus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     end
 end
 
+for (op,args) ∈ ((:⟑,()),(:wedgedot_metric,(:g,)))
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
-        ⟑(a::Multivector{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        ⟑(a::$couple{V},b::Multivector{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        ⟑(a::Spinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        ⟑(a::$couple{V},b::Spinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        ⟑(a::AntiSpinor{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        ⟑(a::$couple{V},b::AntiSpinor{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
-        ⟑(a::Chain{V,G},b::$couple{V}) where {V,G} = (G==0 || G==mdims(V)) ? Single(a)⟑b : (a⟑$calar(b)) + (a⟑imaginary(b))
-        ⟑(a::$couple{V},b::Chain{V,G}) where {V,G} = (G==0 || G==mdims(V)) ? a⟑Single(b) : ($calar(a)⟑b) + (imaginary(a)⟑b)
-        ⟑(a::TensorTerm{V},b::$couple{V}) where V = (a⟑$calar(b)) + (a⟑imaginary(b))
-        ⟑(a::$couple{V},b::TensorTerm{V}) where V = ($calar(a)⟑b) + (imaginary(a)⟑b)
+        $op(a::Multivector{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Multivector{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::Spinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Spinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::AntiSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::AntiSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::Chain{V,G},b::$couple{V},$(args...)) where {V,G} = (G==0 || G==mdims(V)) ? $op(Single(a),b,$(args...)) : $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Chain{V,G},$(args...)) where {V,G} = (G==0 || G==mdims(V)) ? $op(a,Single(b),$(args...)) : $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::TensorTerm{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::TensorTerm{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
     end
 end
-⟑(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
-⟑(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
-⟑(a::TensorTerm{V,0},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
-⟑(a::PseudoCouple{V,B},b::TensorTerm{V,0}) where {V,B} = PseudoCouple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
+@eval begin
+    $op(a::TensorTerm{V,0},b::Couple{V,B},$(args...)) where {V,B} = Couple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
+    $op(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
+    $op(a::TensorTerm{V,0},b::PseudoCouple{V,B},$(args...)) where {V,B} = PseudoCouple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
+    $op(a::PseudoCouple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = PseudoCouple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
+end
+end
 
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
@@ -736,40 +773,44 @@ end
 ∨(a::TensorTerm{V},b::PseudoCouple{V}) where V = (a∨imaginary(b)) + (a∨volume(b))
 ∨(a::PseudoCouple{V},b::TensorTerm{V}) where V = (imaginary(a)∨b) + (volume(a)∨b)
 
+for (op,args) ∈ ((:contraction,()),(:contraction_metric,(:g,)))
 for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     @eval begin
-        contraction(a::Multivector{V},b::$couple{V}) where V = contraction(a,$calar(b)) + contraction(a,imaginary(b))
-        contraction(a::$couple{V},b::Multivector{V}) where V = contraction($calar(a),b) + contraction(imaginary(a),b)
-        contraction(a::Spinor{V},b::$couple{V}) where V = contraction(a,$calar(b)) + contraction(a,imaginary(b))
-        contraction(a::$couple{V},b::Spinor{V}) where V = contraction($calar(a),b) + contraction(imaginary(a),b)
-        contraction(a::AntiSpinor{V},b::$couple{V}) where V = contraction(a,$calar(b)) + contraction(a,imaginary(b))
-        contraction(a::$couple{V},b::AntiSpinor{V}) where V = contraction($calar(a),b) + contraction(imaginary(a),b)
-        contraction(a::Chain{V},b::$couple{V}) where V = contraction(a,$calar(b)) + contraction(a,imaginary(b))
-        contraction(a::$couple{V},b::Chain{V}) where V = contraction($calar(a),b) + contraction(imaginary(a),b)
-        contraction(a::$couple{V},b::TensorTerm{V,0}) where V = a⟑b
+        $op(a::Multivector{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Multivector{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::Spinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Spinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::AntiSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::AntiSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::Chain{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::Chain{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::$couple{V},b::TensorTerm{V,0},$(args...)) where V = a⟑b
     end
 end
-contraction(a::TensorTerm{V,0},b::Couple{V}) where V = Single{V}(value(a)*realvalue(b))
-contraction(a::TensorTerm{V,0},b::PseudoCouple{V}) where V = contraction(a,imaginary(b))
-function contraction(a::TensorTerm{V,G},b::Couple{V,B}) where {V,G,B}
-    contraction(a,scalar(b)) + contraction(a,imaginary(b))
-end
-function contraction(a::Couple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    if basis(a) == One(V)
-        contraction(scalar(a),b) + contraction(imaginary(a),b)
-    else
-        contraction(imaginary(a),b)
+@eval begin
+    $op(a::TensorTerm{V,0},b::Couple{V},$(args...)) where V = Single{V}(value(a)*realvalue(b))
+    $op(a::TensorTerm{V,0},b::PseudoCouple{V},$(args...)) where V = contraction(a,imaginary(b))
+    function $op(a::TensorTerm{V,G},b::Couple{V,B},$(args...)) where {V,G,B}
+        contraction(a,scalar(b)) + $op(a,imaginary(b),$(args...))
+    end
+    function $op(a::Couple{V,B},b::TensorTerm{V,G},$(args...)) where {V,G,B}
+        if basis(a) == One(V)
+            contraction(scalar(a),b) + $op(imaginary(a),b,$(args...))
+        else
+            $op(imaginary(a),b,$(args...))
+        end
+    end
+    function $op(a::TensorTerm{V,G},b::PseudoCouple{V,B},$(args...)) where {V,G,B}
+        if basis(a) == Submanifold(V)
+            $op(a,imaginary(b),$(args...)) + $op(a,volume(b),$(args...))
+        else
+            $op(a,imaginary(b),$(args...))
+        end
+    end
+    function $op(a::PseudoCouple{V,B},b::TensorTerm{V,G},$(args...)) where {V,G,B}
+        $op(imaginary(a),b,$(args...)) + $op(volume(a),b,$(args...))
     end
 end
-function contraction(a::TensorTerm{V,G},b::PseudoCouple{V,B}) where {V,G,B}
-    if basis(a) == Submanifold(V)
-        contraction(a,imaginary(b)) + contraction(a,volume(b))
-    else
-        contraction(a,imaginary(b))
-    end
-end
-function contraction(a::PseudoCouple{V,B},b::TensorTerm{V,G}) where {V,G,B}
-    contraction(imaginary(a),b) + contraction(volume(a),b)
 end
 
 # more algebra
@@ -1004,6 +1045,11 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
             v*mul(ba,bb,v)
         end
+        function wedgedot_metric(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B},g) where {V,T<:$Field,S<:$Field}
+            ba,bb = basis(a),basis(b)
+            v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
+            v*mul_metric(ba,bb,g,v)
+        end
         ∧(a::$Field,b::$Field) = $MUL(a,b)
         ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Single{V,G}(a,b)
         ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Single{V,G}(b,a)
@@ -1126,13 +1172,17 @@ end
 @generated function contraction2_metric(a::TensorGraded{V,L},b::Chain{V,G,T},g) where {V,G,L,T}
     product_contraction(a,b,false,true,:product)
 end
-for (op,prop,field) ∈ ((:⟑,:product,false),(:contraction,:product_contraction,false),(:wedgedot_metric,:product,true),(:contraction_metric,:product_contraction,true))
+for (mop,prop,field) ∈ ((:⟑,:product,false),(:contraction,:product_contraction,false),(:wedgedot,:product,true),(:contraction,:product_contraction,true))
+    op = field ? Symbol(mop,:_metric) : mop
     args = field ? (:g,) : ()
+    indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
         @generated function $op(b::Chain{V,G,T},a::TensorTerm{V,L},$(args...)) where {V,G,L,T}
+            $indu
             $prop(a,b,true,$field)
         end
         @generated function $op(a::TensorGraded{V,L},b::Chain{V,G,T},$(args...)) where {V,G,L,T}
+            $indu
             $prop(a,b,false,$field)
         end
     end
@@ -1151,20 +1201,25 @@ for op ∈ (:∧,:∨)
         end
     end
 end
-for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,false),
+for (mop,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,false),
                      (:∨,:meetaddmulti!,false),(:contraction,:skewaddmulti!,false),
-                     (:wedgedot_metric,:geomaddmulti!,true),(:contraction_metric,:skewaddmulti!,true))
+                     (:wedgedot,:geomaddmulti!,true),(:contraction,:skewaddmulti!,true))
+    op = field ? Symbol(mop,:_metric) : mop
     preproduct! = Symbol(product!,:_pre)
     prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
     args = field ? (:g,) : ()
+    indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
         @generated function $op(b::Multivector{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            $indu
             $prop(a,b,true,$field)
         end
         @generated function $op(a::TensorGraded{V,G},b::Multivector{V,S},$(args...)) where {V,G,S}
+            $indu
             $prop(a,b,false,$field)
         end
         @generated function $op(a::Multivector{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_multivector(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1176,6 +1231,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,f
             end end
         end
         @generated function $op(a::Spinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1187,6 +1243,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,f
             end end
         end
         @generated function $op(a::Multivector{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_m_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1199,6 +1256,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,f
 
         end
         @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1210,6 +1268,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,f
             end end
         end
         @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_m_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1222,33 +1281,42 @@ for (op,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,f
         end
     end
 end
-for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),
+for (mop,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),
                      (:∨,:meetaddspin!,false),(:contraction,:skewaddspin!,false),
-                     (:wedgedot_metric,:geomaddspin!,true),(:contraction_metric,:skewaddspin!,true))
+                     (:wedgedot,:geomaddspin!,true),(:contraction,:skewaddspin!,true))
+    op = field ? Symbol(mop,:_metric) : mop
     preproduct! = Symbol(product!,:_pre)
     prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
     args = field ? (:g,) : ()
+    indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
         @generated function $op(b::Spinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            $indu
             Grassmann.$prop(a,b,true,$field)
         end
         @generated function $op(a::TensorGraded{V,G},b::Spinor{V,S},$(args...)) where {V,G,S}
+            $indu
             Grassmann.$prop(a,b,false,$field)
         end
         @generated function $op(b::AntiSpinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+            $indu
             Grassmann.$prop(a,b,true,$field)
         end
         @generated function $op(a::TensorGraded{V,G},b::AntiSpinor{V,S},$(args...)) where {V,G,S}
+            $indu
             Grassmann.$prop(a,b,false,$field)
         end
     end
 end
-for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),(:contraction,:skewaddspin!,false),(:wedgedot_metric,:geomaddspin!,true),(:contraction_metric,:skewaddspin!,true))
+for (mop,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,false),(:contraction,:skewaddspin!,false),(:wedgedot,:geomaddspin!,true),(:contraction,:skewaddspin!,true))
+    op = field ? Symbol(mop,:_metric) : mop
     preproduct! = Symbol(product!,:_pre)
     prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
     args = field ? (:g,) : ()
+    indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
         @generated function $op(a::Spinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1260,6 +1328,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,fal
             end end
         end
         @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1272,12 +1341,15 @@ for (op,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,fal
         end
     end
 end
-for (op,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,false),(:contraction,:skewaddanti!,false),(:wedgedot_metric,:geomaddanti!,true),(:contraction_metric,:skewaddanti!,true))
+for (mop,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,false),(:contraction,:skewaddanti!,false),(:wedgedot,:geomaddanti!,true),(:contraction,:skewaddanti!,true))
+    op = field ? Symbol(mop,:_metric) : mop
     preproduct! = Symbol(product!,:_pre)
     prop = op∉(:⟑,:wedgedot_metric) ? Symbol(:product_,op) : :product
     args = field ? (:g,) : ()
+    indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
         @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1289,6 +1361,7 @@ for (op,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,fal
             end end
         end
         @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
+            $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             if mdims(V)<cache_limit/2
@@ -1362,7 +1435,7 @@ for side ∈ (:left,:right)
             @generated function $c(b::Chain{V,G,T},$(args...)) where {V,G,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                 istangent(V) && (return :($$c(Multivector(b),$(args...))))
-                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(b,$($args...))))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || ($ff && !isinduced(g))) && (return :($$cc(metric(b,$($args...))))) ))
                 SUB,VEC,MUL = subvec(b)
                 if binomial(mdims(V),G)<(1<<cache_limit)
                     $(insert_expr((:N,:ib,:D),:svec)...)
@@ -1394,7 +1467,7 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::Multivector{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || ($ff && !isinduced(g))) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvec(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:bs,:bn),:svec)...)
@@ -1432,7 +1505,7 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::Spinor{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || ($ff && !isinduced(g))) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:rs,:bn),:svec)...)
@@ -1470,7 +1543,7 @@ for side ∈ (:left,:right)
             end
             @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-                $(c≠h ? nothing : :(((!isdiag(V)) || $ff) && (return :($$cc(metric(m,$($args...))))) ))
+                $(c≠h ? nothing : :(((!isdiag(V)) || ($ff && !isinduced(g))) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvecs(m)
                 if mdims(V)<cache_limit
                     $(insert_expr((:N,:ps,:bn),:svec)...)
@@ -1556,7 +1629,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
         @generated function $c(b::Chain{V,G,T},$(args...)) where {V,G,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
             istangent(V) && (return :($$c(Multivector(b),$$(args...))))
-            $field && (return :(contraction(g,b)))
+            ($field && !isinduced(g)) && (return :(contraction(g,b)))
             (!isdiag(V)) && (return :(contraction($($tens(V,G)),b)))
             SUB,VEC,MUL = subvec(b)
             if binomial(mdims(V),G)<(1<<cache_limit)
@@ -1595,7 +1668,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
         end
         @generated function $c(m::Multivector{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            $field && (return :(contraction(g,m)))
+            ($field && !isinduced(g)) && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tensfull(V)),m)))
             SUB,VEC = subvec(m)
             if mdims(V)<cache_limit
@@ -1640,7 +1713,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
         end
         @generated function $c(m::Spinor{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            $field && (return :(contraction(g,m)))
+            ($field && !isinduced(g)) && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tenseven(V)),m)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit
@@ -1685,7 +1758,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
         end
         @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
-            $field && (return :(contraction(g,m)))
+            ($field && !isinduced(g)) && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tensodd(V)),m,)))
             SUB,VEC = subvecs(m)
             if mdims(V)<cache_limit

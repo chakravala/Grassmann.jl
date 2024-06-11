@@ -242,6 +242,7 @@ end
 @pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
+@pure points(t::AbstractArray) = t
 
 value(c::Vector{<:Chain}) = c
 value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(mdims(V),G)}})

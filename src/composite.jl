@@ -18,43 +18,49 @@ export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 
 ## exponential & logarithm function
 
-@inline Base.expm1(t::Submanifold{V,0}) where V = Single{V}(ℯ-1)
-@inline Base.expm1(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
+for (op,field) ∈ ((:⟑,false),(:wedgedot_metric,true));
+    args = field ? (:g,) : ()
+    indu(t=:(exp(t))) = field ? :(isinduced(g) && (return :($$t))) : nothing
+@eval @inline Base.expm1(t::Submanifold{V,0},$(args...)) where V = Single{V}(ℯ-1)
+@eval @inline Base.expm1(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.expm1(value(T<:TensorTerm ? t : scalar(t))))
 
-Base.expm1(t::Chain) = expm1(multispin(t))
-function Base.expm1(t::T) where T<:TensorAlgebra
+@eval Base.expm1(t::Chain,$(args...)) = expm1(multispin(t),$(args...))
+@eval function Base.expm1(t::T,$(args...)) where T<:TensorAlgebra
+    $(indu(:(expm1(t))))
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B⟑B)
+        B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
             return Couple{V,B}(expm1(t.v))
         end
     end
-    S,term,f = t,(t⟑t)/2,norm(t)
+    S,term,f = t,$op(t,t,$(args...))/2,norm(t)
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 3
     @inbounds while norms[2]<norms[1] || norms[2]>1
         S += term
         ns = norm(S)
         @inbounds ns ≈ norms[3] && break
-        term *= t/k
+        $(field ? :(term = $op(term,t/k,g)) : :(term *= t/k))
         @inbounds norms .= (norms[2],norm(term),ns)
         k += 1
     end
     return S
 end
 
-@eval @generated function Base.expm1(b::Multivector{V,T}) where {V,T}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:k)
+for pinor ∈ (:Multivector,:Spinor); VEC = pinor≠:Spinor ? :mvec : :mvecs
+@eval @generated function Base.expm1(b::$pinor{V,T},$(args...)) where {V,T}
+    $(indu(:(expm1(b))))
+    loop = $(pinor≠:Spinor ? :generate_loop_multivector : :generate_loop_spinor)(V,:term,:B,promote_type(T,Float64),:*,$(QuoteNode(pinor≠:Spinor ? :geomaddmulti! : :geomaddspin!)),$(pinor≠:Spinor ? :geomaddmulti!_pre : :geomaddspin!_pre),$field,:k)
     return quote
         B = value(b)
         sb,nb = scalar(b),AbstractTensors.norm(B)
         sb ≈ nb && (return Single{V}(AbstractTensors.expm1(value(sb))))
-        $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        S = zeros(mvec(N,t))
-        term = zeros(mvec(N,t))
+        $(insert_expr(loop[1],$(QuoteNode(VEC)),:T,Float64)...)
+        S = zeros($$VEC(N,t))
+        term = zeros($$VEC(N,t))
         S .= B
-        out .= value(b⟑b)/2
+        out .= value($$op(b,b,$($args...)))/2
         norms = FixedVector{3}(nb,norm(out),norm(term))
         k::Int = 3
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -67,63 +73,87 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 1
         end
-        return Multivector{V}(S)
+        return $$pinor{V}(S)
     end
 end
 
-@eval @generated function Base.expm1(b::Spinor{V,T}) where {V,T}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:k)
-    return quote
-        B = value(b)
-        sb,nb = scalar(b),AbstractTensors.norm(B)
-        sb ≈ nb && (return Single{V}(AbstractTensors.expm1(value(sb))))
-        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
-        S = zeros(mvecs(N,t))
-        term = zeros(mvecs(N,t))
-        S .= B
-        out .= value(b⟑b)/2
-        norms = FixedVector{3}(nb,norm(out),norm(term))
-        k::Int = 3
-        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-            S += out
-            ns = norm(S)
-            @inbounds ns ≈ norms[3] && break
-            term .= out
-            # term *= b/k
-            $(loop[2])
-            @inbounds norms .= (norms[2],norm(out),ns)
-            k += 1
-        end
-        return Spinor{V}(S)
-    end
-end
-
-function Base.exp(t::Multivector{V}) where V
+@eval function Base.exp(t::$pinor{V},$(args...)) where V
+    $(indu(:(exp(t))))
     st = scalar(t)
     mt = t-st
-    sq = mt⟑mt
+    sq = $op(mt,mt,$(args...))
     if isscalar(sq)
         hint = value(scalar(sq))
         isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
-        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt,$(args...)))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+$op(mt,AbstractTensors.:/(AbstractTensors.sin(θ),θ),$(args...)) : AbstractTensors.cosh(θ)+$op(mt,AbstractTensors.:/(AbstractTensors.sinh(θ),θ),$(args...)))
+    else
+        return One(V)+expm1(t)
+    end
+end
+end
+
+@eval function Base.exp(t::Couple{V,B},$(args...)) where {V,B}
+    $(indu(:(exp(t))))
+    st,mt = scalar(t),imaginary(t)
+    if isscalar($op(B,B,$(args...)))
+        hint = value(scalar($op(B,B,$(args...))))
+        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt,$(args...)))))))
+        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+$op(mt,AbstractTensors.:/(AbstractTensors.sin(θ),θ),$(args...)) : AbstractTensors.cosh(θ)+$op(mt,AbstractTensors.:/(AbstractTensors.sinh(θ),θ),$(args...)))
     else
         return One(V)+expm1(t)
     end
 end
 
-function Base.exp(t::Spinor{V}) where V
-    st = scalar(t)
-    mt = t-st
-    sq = mt⟑mt
+@eval function Base.expm1(t::PseudoCouple{V,B},$(args...)) where {V,B}
+    $(indu(:(expm1(t))))
+    if isscalar(B)
+        exp(t,$(args...))-One(V)
+    else
+        expm1(multispin(t),$(args...))
+    end
+end
+@eval function Base.exp(t::PseudoCouple{V,B},$(args...)) where {V,B}
+    $(indu(:(exp(t))))
+    if isscalar(B)
+        out = exp(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)),$(args...))
+        PseudoCouple{V,B}(realvalue(out),imagvalue(out))
+    else
+        exp(multispin(t),$(args...))
+    end
+end
+
+@eval Base.expm1(t::Phasor{V},$(args...)) where V = exp(t,$(args...))-One(V)
+@eval function Base.exp(t::Phasor{V,B},$(args...)) where {V,B}
+    z = exp(angle(t,$(args...)))
+    Phasor{V,B}(exp(radius(t,$(args...))+realvalue(z)),imagvalue(z))
+end
+
+@eval function Base.exp(t::T,$(args...)) where T<:TensorGraded
+    $(indu(:(exp(t))))
+    S,B,V = T<:Submanifold,T<:TensorTerm,Manifold(t)
+    if B && isnull(t)
+        vt = valuetype(t)
+        return Couple{V,basis(t)}(one(vt),zero(vt))
+    elseif !$field && isR301(V) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
+        u = sqrt(abs(abs2(t)[1]))
+        u<1e-5 && (return One(V)+t)
+        v,cu,su = (t∧t)*(-0.5/u),cos(u),sin(u)
+        return (cu-v*su)+((su+v*cu)*t)*(inv(u)-v/(u*u))
+    end # need general inv(u+v) ~ inv(u)-v/u^2
+    i = B ? basis(t) : t
+    sq = $op(i,i,$(args...))
     if isscalar(sq)
         hint = value(scalar(sq))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
-        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
+        isnull(hint) && (return One(V)+t)
+        grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
+        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t,$(args...)))))))
+        hint<0 ? AbstractTensors.cos(θ)+$op(t,S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ),$(args...)) : AbstractTensors.cosh(θ)+$op(t,S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ),$(args...))
     else
-        return One(V)+expm1(t)
+        return One(V)+expm1(t,$(args...))
     end
+end
 end
 
 function Base.exp(t::Multivector{V},::Val{hint}) where {V,hint}
@@ -139,70 +169,12 @@ function Base.exp(t::Multivector{V},::Val{hint}) where {V,hint}
     end
 end
 
-Base.expm1(t::Phasor{V}) where V = exp(t)-One(V)
-function Base.exp(t::Phasor{V,B}) where {V,B}
-    z = exp(angle(t))
-    Phasor{V,B}(exp(radius(t)+realvalue(z)),imagvalue(z))
-end
-
-function Base.exp(t::Couple{V,B}) where {V,B}
-    st,mt = scalar(t),imaginary(t)
-    if isscalar(B⟑B)
-        hint = value(scalar(B⟑B))
-        isnull(hint) && (return AbstractTensors.exp(value(st))*(One(V)+t))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(mt))))))
-        return AbstractTensors.exp(value(st))*(hint<0 ? AbstractTensors.cos(θ)+mt*(AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+mt*(AbstractTensors.:/(AbstractTensors.sinh(θ),θ)))
-    else
-        return One(V)+expm1(t)
-    end
-end
-
-function Base.expm1(t::PseudoCouple{V,B}) where {V,B}
-    if isscalar(B)
-        exp(t)-One(V)
-    else
-        expm1(multispin(t))
-    end
-end
-function Base.exp(t::PseudoCouple{V,B}) where {V,B}
-    if isscalar(B)
-        out = exp(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
-        PseudoCouple{V,B}(realvalue(out),imagvalue(out))
-    else
-        exp(multispin(t))
-    end
-end
-
 @pure isR301(V::DiagonalForm) = DirectSum.diagonalform(V) == Values(1,1,1,0)
 @pure isR301(::Submanifold{V}) where V = isR301(V)
 @pure isR301(V) = false
 
 @inline unabs!(t) = t
 @inline unabs!(t::Expr) = (t.head == :call && t.args[1] == :abs) ? t.args[2] : t
-
-function Base.exp(t::T) where T<:TensorGraded
-    S,B,V = T<:Submanifold,T<:TensorTerm,Manifold(t)
-    if B && isnull(t)
-        vt = valuetype(t)
-        return Couple{V,basis(t)}(one(vt),zero(vt))
-    elseif isR301(V) && grade(t)==2 # && abs(t[0])<1e-9 && !options.over
-        u = sqrt(abs(abs2(t)[1]))
-        u<1e-5 && (return One(V)+t)
-        v,cu,su = (t∧t)*(-0.5/u),cos(u),sin(u)
-        return (cu-v*su)+((su+v*cu)*t)*(inv(u)-v/(u*u))
-    end # need general inv(u+v) ~ inv(u)-v/u^2
-    i = B ? basis(t) : t
-    sq = i⟑i
-    if isscalar(sq)
-        hint = value(scalar(sq))
-        isnull(hint) && (return One(V)+t)
-        grade(t)==0 && (return Single{Manifold(t)}(AbstractTensors.exp(value(S ? t : scalar(t)))))
-        θ = unabs!(AbstractTensors.sqrt(AbstractTensors.abs(value(scalar(abs2(t))))))
-        hint<0 ? AbstractTensors.cos(θ)+t*(S ? AbstractTensors.sin(θ) : AbstractTensors.:/(AbstractTensors.sin(θ),θ)) : AbstractTensors.cosh(θ)+t*(S ? AbstractTensors.sinh(θ) : AbstractTensors.:/(AbstractTensors.sinh(θ),θ))
-    else
-        return One(V)+expm1(t)
-    end
-end
 
 function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     S = T<:Submanifold
@@ -218,10 +190,10 @@ function Base.exp(t::T,::Val{hint}) where T<:TensorGraded{V} where {V,hint}
     end
 end
 
-@inline Base.expm1(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = exp(A)-I
-@inline Base.exp(A::Chain{V,G,<:Chain{V,G},1}) where {V,G} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
+@inline Base.expm1(A::Chain{V,G,<:Chain{V,G}},_=nothing) where {V,G} = exp(A)-I
+@inline Base.exp(A::Chain{V,G,<:Chain{V,G},1},_=nothing) where {V,G} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
 
-@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Real,2},2}) where {V,G}
+@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Real,2},2},_=nothing) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -248,7 +220,7 @@ end
     Chain{V,G}(Chain{V,G}(m11, m21), Chain{V,G}(m12, m22))
 end
 
-@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Complex,2},2}) where {V,G}
+@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Complex,2},2},_=nothing) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -268,7 +240,7 @@ end
 
 # Adapted from implementation in Base; algorithm from
 # Higham, "Functions of Matrices: Theory and Computation", SIAM, 2008
-function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N}) where {W,G,T,N}
+function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N},_=nothing) where {W,G,T,N}
     S = typeof((zero(T)*zero(T) + zero(T)*zero(T))/one(T))
     A = Chain{W,G}(map.(S,value(_A)))
     # omitted: matrix balancing, i.e., LAPACK.gebal!
@@ -321,12 +293,16 @@ function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N}) where {W,G,T,N}
     expA
 end
 
-qlog(b::PseudoCouple,x::Int=10000) = qlog(multispin(b),x)
-qlog(b::AntiSpinor,x::Int=10000) = qlog(Multivector(b),x)
-function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
+for (op,logm,field) ∈ ((:⟑,:(Base.log),false),(:wedgedot_metric,:log_metric,true));
+    args = field ? (:g,) : ()
+    indu(t=:(log(t))) = field ? :(isinduced(g) && (return :($$t))) : nothing
+@eval qlog(b::PseudoCouple,$(args...),x::Int=10000) = qlog(multispin(b),$(args...),x)
+@eval qlog(b::AntiSpinor,$(args...),x::Int=10000) = qlog(Multivector(b),$(args...),x)
+@eval function qlog(w::T,$(args...),x::Int=10000) where T<:TensorAlgebra
+    $(indu(:(qlog(w,x))))
     V = Manifold(w)
-    w2,f = w⟑w,norm(w)
-    prod = w⟑w2
+    w2,f = $op(w,w,$(args...)),norm(w)
+    prod = $op(w,w2,$(args...))
     S,term = w,prod/3
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 5
@@ -342,20 +318,22 @@ function qlog(w::T,x::Int=10000) where T<:TensorAlgebra
     return 2S
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
-qlog_fast(b::PseudoCouple,x::Int=10000) = qlog_fast(multispin(b),x)
-qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
-@eval @generated function qlog_fast(b::Multivector{V,T,E},x::Int=10000) where {V,T,E}
-    loop = generate_loop_multivector(V,:prod,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre)
+@eval qlog_fast(b::PseudoCouple,$(args...),x::Int=10000) = qlog_fast(multispin(b),$(args...),x)
+@eval qlog_fast(b::AntiSpinor,$(args...),x::Int=10000) = qlog_fast(Multivector(b),$(args...),x)
+for pinor ∈ (:Multivector,:Spinor); VEC = pinor≠:Spinor ? :mvec : :mvecs
+@eval @generated function qlog_fast(b::$pinor{V,T,E},$(args...),x::Int=10000) where {V,T,E}
+    $(indu(:(qlog_fast(b,x))))
+    loop = $(pinor≠:Spinor ? :generate_loop_multivector : :generate_loop_spinor)(V,:prod,:B,promote_type(T,Float64),:*,$(QuoteNode(pinor≠:Spinor ? :geomaddmulti! : :geomaddspin!)),$(pinor≠:Spinor ? :geomaddmulti!_pre : :geomaddspin!_pre),$field)
     return quote
-        $(insert_expr(loop[1],:mvec,:T,Float64)...)
+        $(insert_expr(loop[1],$(QuoteNode(VEC)),:T,Float64)...)
         f = norm(b)
-        w2::Multivector{V,T,E} = b⟑b
+        w2::$pinor{V,T,E} = $op(b,b,$(args...))
         B = value(w2)
-        S = zeros(mvec(N,t))
-        prod = zeros(mvec(N,t))
-        term = zeros(mvec(N,t))
+        S = zeros($VEC(N,t))
+        prod = zeros($VEC(N,t))
+        term = zeros($VEC(N,t))
         S .= value(b)
-        out .= value(b⟑w2)
+        out .= value($op(b,w2,$(args...)))
         term .= out/3
         norms = FixedVector{3}(f,norm(term),f)
         k::Int = 5
@@ -371,143 +349,120 @@ qlog_fast(b::AntiSpinor,x::Int=10000) = qlog_fast(Multivector(b),x)
             k += 2
         end
         S *= 2
-        return Multivector{V}(S)
+        return $pinor{V}(S)
     end
 end
-
-@eval @generated function qlog_fast(b::Spinor{V,T,E},x::Int=10000) where {V,T,E}
-    loop = generate_loop_spinor(V,:prod,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre)
-    return quote
-        $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        f = norm(b)
-        w2::Spinor{V,T,E} = b⟑b
-        B = value(w2)
-        S = zeros(mvecs(N,t))
-        prod = zeros(mvecs(N,t))
-        term = zeros(mvecs(N,t))
-        S .= value(b)
-        out .= value(b⟑w2)
-        term .= out/3
-        norms = FixedVector{3}(f,norm(term),f)
-        k::Int = 5
-        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ x
-            S += term
-            ns = norm(S)
-            @inbounds ns ≈ norms[3] && break
-            prod .= out
-            # prod *= w2
-            $(loop[2])
-            term .= out/k
-            @inbounds norms .= (norms[2],norm(term),ns)
-            k += 2
-        end
-        S *= 2
-        return Spinor{V}(S)
-    end
 end
 
-Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
-Base.log(t::TensorTerm) = log(Couple(t))
-Base.log(t::Phasor) = (r=radius(t); log(r)+angle(t))
-Base.log1p(t::Phasor{V}) where V = log(One(V)+t)
-Base.log(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log(Complex(t))) : log(radius(t))+angle(t)
-Base.log1p(t::Couple{V,B}) where {V,B} = value(B*B)==-1 ? Couple{V,B}(log1p(Complex(t))) : log(One(V)+t)
-Base.log(t::Quaternion{V}) where V = iszero(metric(V)) ? log(radius(t))+angle(t,r) : qlog((t-One(V))/(t+One(V)))
-Base.log1p(t::Quaternion{V}) where V = iszero(metric(V)) ? log(One(V)+t) : qlog(t/(t+2))
-@inline Base.log(t::T) where T<:TensorAlgebra{V} where V = qlog((t-One(V))/(t+One(V)))
-@inline Base.log1p(t::T) where T<:TensorAlgebra = qlog(t/(t+2))
+@eval begin
+    $logm(A::Chain{V,G,<:Chain{V,G}},$(args...)) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
+    $logm(t::TensorTerm,$(args...)) = $logm(Couple(t),$(args...))
+    $logm(t::Phasor,$(args...)) = (r=radius(t,$(args...)); log(r)+angle(t,$(args...)))
+    Base.log1p(t::Phasor{V},$(args...)) where V = $logm(One(V)+t,$(args...))
+    $logm(t::Couple{V,B},$(args...)) where {V,B} = value($op(B,B,$(args...)))==-1 ? Couple{V,B}(log(Complex(t))) : $logm(radius(t,$(args...)))+angle(t,$(args...))
+    Base.log1p(t::Couple{V,B},$(args...)) where {V,B} = value($op(B,B,$(args...)))==-1 ? Couple{V,B}(log1p(Complex(t))) : $logm(One(V)+t,$(args...))
+    $logm(t::Quaternion{V},$(args...)) where V = iszero(metric(V)) ? (r=radius(t,$(args...)); $logm(radius(t,$(args...)))+angle(t,$(args...),r)) : qlog(/(t-One(V),t+One(V),$(args...)),$(args...))
+    Base.log1p(t::Quaternion{V},$(args...)) where V = iszero(metric(V)) ? $logm(One(V)+t,$(args...)) : qlog(/(t,t+2,$(args...)),$(args...))
+    @inline $logm(t::T,$(args...)) where T<:TensorAlgebra{V} where V = qlog(/(t-One(V),t+One(V),$(args...)),$(args...))
+    @inline Base.log1p(t::T,$(args...)) where T<:TensorAlgebra = qlog(/(t,t+2,$(args...)),$(args...))
+end
 
-function Base.log(t::PseudoCouple{V,B}) where {V,B}
+@eval function $logm(t::PseudoCouple{V,B},$(args...)) where {V,B}
+    $(indu(:(log(t))))
     if isscalar(B)
-        out = log(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
+        out = $logm(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)),$(args...))
         PseudoCouple{V,B}(realvalue(out),imagvalue(out))
     else
-        log(multispin(t))
+        $logm(multispin(t),$(args...))
     end
 end
-function Base.log1p(t::PseudoCouple{V,B}) where {V,B}
+@eval function Base.log1p(t::PseudoCouple{V,B},$(args...)) where {V,B}
+    $(indu(:(log1p(t))))
     if isscalar(B)
-        out = log1p(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)))
+        out = log1p(Couple{V,Submanifold(V)}(realvalue(t),imagvalue(t)),$(args...))
         PseudoCouple{V,B}(realvalue(out),imagvalue(out))
     else
-        log1p(multispin(t))
+        log1p(multispin(t),$(args...))
     end
 end
 
-Base.exp(t::AntiSpinor) = exp(Multivector(t))
-Base.expm1(t::AntiSpinor) = expm1(Multivector(t))
-Base.log(t::AntiSpinor) = log(Multivector(t))
-Base.log1p(t::AntiSpinor) = log1p(Multivector(t))
-log_fast(t::AntiSpinor) = log_fast(Multivector(t))
-logh_fast(t::AntiSpinor) = logh_fast(Multivector(t))
+@eval begin
+    Base.exp(t::AntiSpinor,$(args...)) = exp(Multivector(t),$(args...))
+    Base.expm1(t::AntiSpinor,$(args...)) = expm1(Multivector(t),$(args...))
+    $logm(t::AntiSpinor,$(args...)) = $logm(Multivector(t),$(args...))
+    Base.log1p(t::AntiSpinor,$(args...)) = log1p(Multivector(t),$(args...))
+    log_fast(t::AntiSpinor,$(args...)) = log_fast(Multivector(t),$(args...))
+    logh_fast(t::AntiSpinor,$(args...)) = logh_fast(Multivector(t),$(args...))
+end
 for op ∈ (:cosh,:sinh)
     @eval begin
-        Base.$op(t::PseudoCouple) = $op(multispin(t))
-        Base.$op(t::AntiSpinor) = $op(Multivector(t))
+        Base.$op(t::PseudoCouple,$(args...)) = $op(multispin(t),$(args...))
+        Base.$op(t::AntiSpinor,$(args...)) = $op(Multivector(t),$(args...))
     end
 end
 
-for op ∈ (:log,:exp,:asin,:acos,:atan,:acot,:sinc,:cosc)
-    @eval @inline Base.$op(t::T) where T<:TensorGraded{V,0} where V = Single{V}($op(value(t)))
+for op ∈ (logm,:(Base.exp),:(Base.asin),:(Base.acos),:(Base.atan),:(Base.acot),:(Base.sinc),:(Base.cosc))
+    @eval @inline $op(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{V}($op(value(t)))
 end
 
-for op ∈ (:log,:log2,:log10,:asech,:acosh,:acos,:sinc)
-    @eval @inline Base.$op(::One{V}) where V = Zero(V)
+for op ∈ (logm,:(Base.log2),:(Base.log10),:(Base.asech),:(Base.acosh),:(Base.acos),:(Basesinc))
+    @eval @inline $op(::One{V},$(args...)) where V = Zero(V)
 end
 for op ∈ (:atanh,:acoth)
-    @eval @inline Base.$op(::One{V}) where V = Infinity(V)
+    @eval @inline Base.$op(::One{V},$(args...)) where V = Infinity(V)
 end
 
-@inline Base.sinh(::Zero{V}) where V = Zero(V)
+@eval @inline Base.sinh(::Zero{V},$(args...)) where V = Zero(V)
 for op ∈ (:exp,:exp2,:exp10,:cosh,:sinc) # exp
-    @eval @inline Base.$op(::Zero{V}) where V = One(V)
+    @eval @inline Base.$op(::Zero{V},$(args...)) where V = One(V)
 end
 for op ∈ (:asin,:atan,:asinh,:atanh,:cosc,:sqrt,:cbrt)
-    @eval @inline Base.$op(t::Zero) = t
+    @eval @inline Base.$op(t::Zero,$(args...)) = t
 end
 
 for op ∈ (:tanh,:coth)
-    @eval @inline Base.$op(::Infinity{V}) where V = One(V)
+    @eval @inline Base.$op(::Infinity{V},$(args...)) where V = One(V)
 end
 for op ∈ (:acoth,:acot,:sinc,:cosc)
-    @eval @inline Base.$op(::Infinity{V}) where V = Zero(V)
+    @eval @inline Base.$op(::Infinity{V},$(args...)) where V = Zero(V)
 end
-for op ∈ (:exp,:exp2,:exp10,:log,:log2,:log10,:cosh,:sinh,:acosh,:asinh,:sqrt,:cbrt)
-    @eval @inline Base.$op(t::Infinity) = t
+for op ∈ (:(Base.exp),:(Base.exp2),:(Base.exp10),logm,:(Base.log2),:(Base.log10),:(Base.cosh),:(Base.sinh),:(Base.acosh),:(Base.asinh),:(Base.sqrt),:(Base.cbrt))
+    @eval @inline $op(t::Infinity,$(args...)) = t
 end
 
 for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
     @eval begin
-        @inline function Base.$qrt(t::T) where T<:TensorAlgebra
-            isscalar(t) ? $qrt(scalar(t)) : exp(log(t)/$n)
+        @inline function Base.$qrt(t::T,$(args...)) where T<:TensorAlgebra
+            isscalar(t) ? $qrt(scalar(t)) : exp(log(t,$(args...))/$n,$(args...))
         end
-        @inline function Base.$qrt(t::Quaternion{V}) where V
-            iszero(metric(V)) ? $qrt(radius(t))*exp(angle(t)/$n) : exp(log(t)/$n)
+        @inline function Base.$qrt(t::Quaternion{V},$(args...)) where V
+            iszero(metric(V)) ? $qrt(radius(t))*exp(angle(t)/$n,$(args...)) : exp(log(t,$(args...))/$n,$(args...))
         end
-        @inline function Base.$qrt(t::Couple{V,B}) where {V,B}
+        @inline function Base.$qrt(t::Couple{V,B},$(args...)) where {V,B}
             value(B*B)==-1 ? Couple{V,B}($qrt(Complex(t))) :
-                $qrt(radius(t))*exp(angle(t)/$n)
+                $qrt(radius(t))*exp(angle(t)/$n,$(args...))
         end
-        @inline Base.$qrt(t::Phasor) = Phasor($qrt(radius(t)),angle(t)/$n)
-        @inline Base.$qrt(t::Submanifold{V,0} where V) = t
-        @inline Base.$qrt(t::T) where T<:TensorGraded{V,0} where V = Single{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
+        @inline Base.$qrt(t::Phasor,$(args...)) = Phasor($qrt(radius(t)),angle(t)/$n)
+        @inline Base.$qrt(t::Submanifold{V,0} where V,$(args...)) = t
+        @inline Base.$qrt(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end
 end
 
 ## trigonometric
 
-@inline Base.cosh(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
+@eval @inline Base.cosh(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.cosh(value(T<:TensorTerm ? t : scalar(t))))
 
-function Base.cosh(t::T) where T<:TensorAlgebra
+@eval function Base.cosh(t::T,$(args...)) where T<:TensorAlgebra
+    $(indu(:(cosh(t))))
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B⟑B)
+        B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
             return Couple{V,B}(cosh(t.v))
         end
     end
-    τ = t⟑t
-    S,term = τ/2,(τ⟑τ)/24
+    τ = $op(t,t,$(args...))
+    S,term = τ/2,$op(τ,τ,$(args...))/24
     f = norm(S)
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 6
@@ -515,25 +470,27 @@ function Base.cosh(t::T) where T<:TensorAlgebra
         S += term
         ns = norm(S)
         @inbounds ns ≈ norms[3] && break
-        term *= τ/(k*(k-1))
+        $(field ? :(term = $op(term,τ/(k*(k-1)),g)) : :(term *= τ/(k*(k-1))))
         @inbounds norms .= (norms[2],norm(term),ns)
         k += 2
     end
     return One(V)+S
 end
 
-@eval @generated function Base.cosh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:(k*(k-1)))
+for pinor ∈ (:Multivector,:Spinor); VEC = pinor≠:Spinor ? :mvec : :mvecs
+@eval @generated function Base.cosh(b::$pinor{V,T,E},$(args...)) where {V,T,E}
+    $(indu(:(cosh(b))))
+    loop = $(pinor≠:Spinor ? :generate_loop_multivector : :generate_loop_spinor)(V,:term,:B,promote_type(T,Float64),:*,$(QuoteNode(pinor≠:Spinor ? :geomaddmulti! : :geomaddspin!)),$(pinor≠:Spinor ? :geomaddmulti!_pre : :geomaddspin!_pre),$field,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
-        $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::Multivector{V,T,E} = b⟑b
+        $(insert_expr(loop[1],$(QuoteNode(VEC)),:T,Float64)...)
+        τ::Multivector{V,T,E} = $op(b,b,$(args...))
         B = value(τ)
-        S = zeros(mvec(N,t))
-        term = zeros(mvec(N,t))
+        S = zeros($VEC(N,t))
+        term = zeros($VEC(N,t))
         S .= value(τ)/2
-        out .= value((τ⟑τ))/24
+        out .= value($op(τ,τ,$(args...)))/24
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 6
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -547,77 +504,51 @@ end
             k += 2
         end
         @inbounds S[1] += One(V)
-        return Multivector{V}(S)
+        return $pinor{V}(S)
     end
 end
-
-@eval @generated function Base.cosh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:(k*(k-1)))
-    return quote
-        sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Single{V}(AbstractTensors.cosh(value(sb))))
-        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
-        τ::Spinor{V,T,E} = b⟑b
-        B = value(τ)
-        S = zeros(mvecs(N,t))
-        term = zeros(mvecs(N,t))
-        S .= value(τ)/2
-        out .= value((τ⟑τ))/24
-        norms = FixedVector{3}(norm(S),norm(out),norm(term))
-        k::Int = 6
-        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-            S += out
-            ns = norm(S)
-            @inbounds ns ≈ norms[3] && break
-            term .= out
-            # term *= τ/(k*(k-1))
-            $(loop[2])
-            @inbounds norms .= (norms[2],norm(out),ns)
-            k += 2
-        end
-        @inbounds S[1] += One(V)
-        return Spinor{V}(S)
-    end
 end
 
+@eval @inline Base.sinh(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
 
-@inline Base.sinh(t::T) where T<:TensorGraded{V,0} where V = Single{Manifold(t)}(AbstractTensors.sinh(value(T<:TensorTerm ? t : scalar(t))))
-
-function Base.sinh(t::T) where T<:TensorAlgebra
+@eval  function Base.sinh(t::T,$(args...)) where T<:TensorAlgebra
+    $(indu(:(sinh(t))))
     V = Manifold(t)
     if T<:Couple
-        B = basis(t); BB = value(B⟑B)
+        B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
             return Couple{V,B}(sinh(t.v))
         end
     end
-    τ,f = t⟑t,norm(t)
-    S,term = t,(t⟑τ)/6
+    τ,f = $op(t,t,$(args...)),norm(t)
+    S,term = t,$op(t,τ,$(args...))/6
     norms = FixedVector{3}(f,norm(term),f)
     k::Int = 5
     @inbounds while norms[2]<norms[1] || norms[2]>1
         S += term
         ns = norm(S)
         @inbounds ns ≈ norms[3] && break
-        term *= τ/(k*(k-1))
+        $(field ? :(term = $op(term,τ/(k*(k-1)),g)) : :(term *= τ/(k*(k-1))))
         @inbounds norms .= (norms[2],norm(term),ns)
         k += 2
     end
     return S
 end
 
-@eval @generated function Base.sinh(b::Multivector{V,T,E}) where {V,T,E}
-    loop = generate_loop_multivector(V,:term,:B,promote_type(T,Float64),:*,:geomaddmulti!,geomaddmulti!_pre,false,:(k*(k-1)))
+for pinor ∈ (:Multivector,:Spinor); VEC = pinor≠:Spinor ? :mvec : :mvecs
+@eval @generated function Base.sinh(b::$pinor{V,T,E},$(args...)) where {V,T,E}
+    $(indu(:(sinh(b))))
+    loop = $(pinor≠:Spinor ? :generate_loop_multivector : :generate_loop_spinor)(V,:term,:B,promote_type(T,Float64),:*,$(QuoteNode(pinor≠:Spinor ? :geomaddmulti! : :geomaddspin!)),$(pinor≠:Spinor ? :geomaddmulti!_pre : :geomaddspin!_pre),$field,:(k*(k-1)))
     return quote
         sb,nb = scalar(b),norm(b)
         sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
-        $(insert_expr(loop[1],:mvec,:T,Float64)...)
-        τ::Multivector{V,T,E} = b⟑b
+        $(insert_expr(loop[1],$(QuoteNode(VEC)),:T,Float64)...)
+        τ::Multivector{V,T,E} = $op(b,b,$(args...))
         B = value(τ)
-        S = zeros(mvec(N,t))
-        term = zeros(mvec(N,t))
+        S = zeros($VEC(N,t))
+        term = zeros($VEC(N,t))
         S .= value(b)
-        out .= value(b⟑τ)/6
+        out .= value($op(b,τ,$(args...)))/6
         norms = FixedVector{3}(norm(S),norm(out),norm(term))
         k::Int = 5
         @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
@@ -630,48 +561,21 @@ end
             @inbounds norms .= (norms[2],norm(out),ns)
             k += 2
         end
-        return Multivector{V}(S)
+        return $pinor{V}(S)
     end
 end
-
-@eval @generated function Base.sinh(b::Spinor{V,T,E}) where {V,T,E}
-    loop = generate_loop_spinor(V,:term,:B,promote_type(T,Float64),:*,:geomaddspin!,geomaddspin!_pre,false,:(k*(k-1)))
-    return quote
-        sb,nb = scalar(b),norm(b)
-        sb ≈ nb && (return Single{V}(AbstractTensors.sinh(value(sb))))
-        $(insert_expr(loop[1],:mvecs,:T,Float64)...)
-        τ::Spinor{V,T,E} = b⟑b
-        B = value(τ)
-        S = zeros(mvecs(N,t))
-        term = zeros(mvecs(N,t))
-        S .= value(b)
-        out .= value(b⟑τ)/6
-        norms = FixedVector{3}(norm(S),norm(out),norm(term))
-        k::Int = 5
-        @inbounds while (norms[2]<norms[1] || norms[2]>1) && k ≤ 10000
-            S += out
-            ns = norm(S)
-            @inbounds ns ≈ norms[3] && break
-            term .= out
-            # term *= τ/(k*(k-1))
-            $(loop[2])
-            @inbounds norms .= (norms[2],norm(out),ns)
-            k += 2
-        end
-        return Spinor{V}(S)
-    end
 end
 
-exph(t) = Base.cosh(t)+Base.sinh(t)
+@eval exph(t,$(args...)) = Base.cosh(t,$(args...))+Base.sinh(t,$(args...))
 
 for (logfast,expf) ∈ ((:log_fast,:exp),(:logh_fast,:exph))
-    @eval function $logfast(t::T) where T<:TensorAlgebra
+    @eval function $logfast(t::T,$(args...)) where T<:TensorAlgebra
         V = Manifold(t)
         term = Zero(V)
         nrm = FixedVector{2}(0.,0.)
         while true
-            en = $expf(term)
-            term -= 2(en-t)/(en+t)
+            en = $expf(term,$(args...))
+            term -= /(2(en-t),en+t,$(args...))
             @inbounds nrm .= (nrm[2],norm(term))
             @inbounds nrm[1] ≈ nrm[2] && break
         end
@@ -709,20 +613,21 @@ end
     return sum(terms[1:end-1])
 end=#
 
-function Base.angle(z::Couple{V,B}) where {V,B}
-    if value(B^2) == -1
+@eval function Base.angle(z::Couple{V,B},$(args...)) where {V,B}
+    if value($op(B,B,$(args...))) == -1
         atan(imagvalue(z),realvalue(z))*B
-    elseif value(B^2) == 1
+    elseif value($op(B,B,$(args...))) == 1
         atanh(imagvalue(z),realvalue(z))*B
     else
         error("Unsupported trigonometric angle")
     end
 end
 
-radius(z::Quaternion) = value(scalar(abs(z)))
-function Base.angle(z::Quaternion,r=radius(z))
+@eval radius(z::Quaternion,$(args...)) = value(scalar(abs(z,$(args...))))
+@eval function Base.angle(z::Quaternion,$(args...),r::Real=radius(z,$(args...)))
     b = bivector(z)
-    (acos(value(scalar(z))/r)/value(abs(b)))*b
+    (acos(value(scalar(z))/r)/value(abs(b,$(args...))))*b
+end
 end
 
 Base.atanh(y::Real, x::Real) = atanh(promote(float(y),float(x))...)

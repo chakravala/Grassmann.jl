@@ -847,3 +847,17 @@ end
 
 import LinearAlgebra: isdiag; export isdiag
 isdiag(::MetricTensor) = false
+
+# InducedMetric
+
+export InducedMetric
+
+struct InducedMetric end
+
+isinduced(x) = false
+isinduced(::InducedMetric) = true
+isinduced(x::Submanifold) = !isbasis(x)
+isinduced(::TensorBundle) = true
+isinduced(x::Type{<:Submanifold}) = !isbasis(x)
+isinduced(::Type{<:TensorBundle}) = true
+isinduced(::Type{InducedMetric}) = true

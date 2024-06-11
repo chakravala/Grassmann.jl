@@ -33,9 +33,11 @@ end end
 Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω⊕η))
 """
 @pure ⟑(a::Submanifold{V},b::Submanifold{V}) where V = mul(a,b)
+@pure wedgedot_metric(a::Submanifold{V},b::Submanifold{V},g) where V = mul_metric(a,b,g)
+⟑(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ⟑(a⟑b,c...)
 *(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = *(a*b,c...)
 
-@pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true),::Val{field}=Val(false)) where {V,field}
+@pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
     if isdiag(V)
         ba,bb = UInt(a),UInt(b)
         (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
@@ -54,6 +56,18 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
     end
 end
 
+mul_term(t) = :(Single{V}(($(t[1]),$(t[2]))))
+
+@pure @generated function mul_metric(a::Submanifold{V},b::Submanifold{V},g,der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
+    isinduced(g) && (return :(mul(a,b,der)))
+    out = paritygeometric(V,UInt(a),UInt(b),Val(true))
+    if isempty(out)
+        Zero(V)
+    else
+        Expr(:call,:+,mul_term.(out)...)
+    end
+end
+
 function ⟑(a::Single{V},b::Submanifold{V}) where V
     v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
     bas = mul(basis(a),b,v)
@@ -62,6 +76,16 @@ end
 function ⟑(a::Submanifold{V},b::Single{V}) where V
     v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
     bas = mul(a,basis(b),v)
+    order(b.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
+end
+function wedgedot_metric(a::Single{V},b::Submanifold{V},g) where V
+    v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
+    bas = mul(basis(a),b,g,v)
+    order(a.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
+end
+function wedgedot_metric(a::Submanifold{V},b::Single{V},g) where V
+    v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
+    bas = mul(a,basis(b),g,v)
     order(b.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 
@@ -196,6 +220,19 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
     end
 end
 
+@pure @generated function contraction_metric(a::Submanifold{V},b::Submanifold{V},g) where V
+    isinduced(g) && (return :(contraction(a,b)))
+    iszero(derive_mul(V,UInt(a),UInt(b),1,true)) && (return Zero(V))
+    Cg,Z = parityinterior(V,UInt(a),UInt(b),Val(true),Val(true))
+    #d = getbasis(V,C)
+    #istangent(V) && !iszero(Z) && (d = Single{V}(getbasis(loworder(V),Z),d))
+    if isempty(Cg)
+        Zero(V)
+    else
+        Expr(:call,:+,mul_term.(Cg)...)
+    end
+end
+
 function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     ba,bb = UInt(basis(a)),UInt(basis(b))
     if isdiag(V) || hasconformal(V)
@@ -217,6 +254,17 @@ function contraction(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where 
             count_ones(Q)+order(v)>diffmode(V) && (return Zero(V))
         end
         return isempty(Cg) ? Zero(V) : (+(Single{V}.(Cg)...))*v
+    end
+end
+
+@generated function contraction_metric(a::X,b::Y,g) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
+    isinduced(g) && (return :(contraction(a,b)))
+    ba,bb = UInt(basis(a)),UInt(basis(b))
+    Cg,Z = parityinterior(V,ba,bb,Val(true),Val(true))
+    if isempty(Cg)
+        Zero(V)
+    else
+        Expr(:call,:*,Expr(:call,:+,mul_term.(Cg)...),:(derive_mul(V,$ba,$bb,value(a),value(b),AbstractTensors.dot)))
     end
 end
 
@@ -278,6 +326,26 @@ export ⊘, sandwich, pseudosandwich, antisandwich
 @generated ⊘(a::TensorGraded{V,G},b::Couple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::PseudoCouple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L}) where {V,G,L} = product_sandwich(a,b)
+@generated function ⊘(a::TensorGraded{V,G},b::Spinor{V},g) where {V,G}
+    isinduced(g) && (return :(a⊘b))
+    product_sandwich(a,b,false,true)
+end
+@generated function ⊘(a::TensorGraded{V,G},b::AntiSpinor{V},g) where {V,G}
+    isinduced(g) && (return :(a⊘b))
+    product_sandwich(a,b,false,true)
+end
+@generated function ⊘(a::TensorGraded{V,G},b::Couple{V},g) where {V,G}
+    isinduced(g) && (return :(a⊘b))
+    product_sandwich(a,b,false,true)
+end
+@generated function ⊘(a::TensorGraded{V,G},b::PseudoCouple{V},g) where {V,G}
+    isinduced(g) && (return :(a⊘b))
+    product_sandwich(a,b,false,true)
+end
+@generated function ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L},g) where {V,G,L}
+    isinduced(g) && (return :(a⊘b))
+    product_sandwich(a,b,false,true)
+end
 
 @doc """
     ⊘(ω::TensorAlgebra,η::TensorAlgebra)
@@ -296,6 +364,26 @@ For normalized even grade η it is ω⊘η = (~η)⊖ω⊖η
 @generated >>>(b::Couple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
 @generated >>>(b::PseudoCouple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
 @generated >>>(b::TensorGraded{V,L},a::TensorGraded{V,G}) where {V,G,L} = product_sandwich(a,b,true)
+@generated function >>>(b::Spinor{V},a::TensorGraded{V,G},g) where {V,G}
+    isinduced(g) && (return :(b>>>a))
+    product_sandwich(a,b,true,true)
+end
+@generated function >>>(b::AntiSpinor{V},a::TensorGraded{V,G},g) where {V,G}
+    isinduced(g) && (return :(b>>>a))
+    product_sandwich(a,b,true,true)
+end
+@generated function >>>(b::Couple{V},a::TensorGraded{V,G},g) where {V,G}
+    isinduced(g) && (return :(b>>>a))
+    product_sandwich(a,b,true,true)
+end
+@generated function >>>(b::PseudoCouple{V},a::TensorGraded{V,G},g) where {V,G}
+    isinduced(g) && (return :(b>>>a))
+    product_sandwich(a,b,true,true)
+end
+@generated function >>>(b::TensorGraded{V,L},a::TensorGraded{V,G},g) where {V,G,L}
+    isinduced(g) && (return :(b>>>a))
+    product_sandwich(a,b,true,true)
+end
 
 @doc """
     >>>(ω::TensorAlgebra,η::TensorAlgebra)
@@ -308,10 +396,12 @@ For normalized even grade η it is ω>>>η = ω⊖η⊖(~ω)
 ## veedot
 
 veedot(a,b) = complementleft(complementright(a)*complementright(b))
+veedot_metric(a,b,g) = complementleft(wedgedot_metric(complementright(a),complementright(b),g))
 
 ## antidot
 
 antidot(a,b) = complementleft(contraction(complementright(a),complementright(b)))
+antidot_metric(a,b) = complementleft(contraction_metric(complementright(a),complementright(b),g))
 
 ## linear algebra
 
@@ -321,36 +411,51 @@ export ⟂, ∥
 
 ## exponentiation
 
-function Base.:^(v::T,i::S) where {T<:TensorTerm,S<:Integer}
+# Inline x^2 and x^3 for Val
+# (The first argument prevents unexpected behavior if a function ^
+# is defined that is not equal to Base.^)
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{0}) = one(x)
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{1}) = x
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{2}) = x*x
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{3}) = x*x*x
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{-1}) = inv(x)
+@inline literal_pow(::typeof(^), x::TensorAlgebra, ::Val{-2}) = (i=inv(x); i*i)
+
+# don't use the inv(x) transformation here since float^p is slightly more accurate
+@inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{p}) where {p} = x^p
+@inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{-1}) = inv(x)
+
+for (op,field) ∈ ((:*,false),(:wedgedot_metric,true)); args = field ? (:g,) : ()
+@eval function Base.:^(v::T,i::S,$(args...)) where {T<:TensorTerm,S<:Integer}
     i == 0 && (return getbasis(Manifold(v),0))
     i == 1 && (return v)
     j,bas = (i-1)%4,basis(v)
     out = if j == 0
         bas
     elseif j == 1
-        bas*bas
+        $op(bas,bas,$(args...))
     elseif j == 2
-        bas*bas*bas
+        $op($op(bas,bas,$(args...)),bas,$(args...))
     elseif j == 3
-        bas*bas*bas*bas
+        $op($op($op(bas,bas,$(args...)),bas,$(args...)),bas,$(args...))
     end
     return typeof(v)<:Submanifold ? out : out*AbstractTensors.:^(value(v),i)
 end
 
-function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
+@eval function Base.:^(v::T,i::S,$(args...)) where {T<:TensorAlgebra,S<:Integer}
     V = Manifold(v)
     isone(i) && (return v)
     if T<:Chain && mdims(V)≤3 && diffvars(v)==0
-        sq,d = contraction2(~v,v),i÷2
-        val = isone(d) ? sq : sq^d
+        sq,d = $(field ? :contraction2_metric : :contraction2)(~v,v),i÷2
+        val = isone(d) ? sq : ^(sq,d,$(args...))
         return iszero(i%2) ? val : val*v
-    elseif T<:Couple && value(basis(v)*basis(v))==-1
+    elseif !$field && T<:Couple && value(basis(v)*basis(v))==-1
         return Couple{V,basis(v)}(v.v^i)
     end
     out = One(V)
     if i < 8 # optimal choice ?
         for k ∈ 1:i
-            out *= v
+            $(field ? :(out = $op(out,v,g)) : :(out *= v))
         end
     else
         ind = indices(UInt(i))
@@ -361,8 +466,8 @@ function Base.:^(v::T,i::S) where {T<:TensorAlgebra,S<:Integer}
         end
         p = v
         for k ∈ 1:K
-            b[k] && (out *= p)
-            k ≠ K && (p *= p)
+            b[k] && $(field ? :(out = $op(out,p,g)) : :(out *= p))
+            k ≠ K && $(field ? :(p = $op(p,p,g)) : :(p *= p))
         end
     end
     return out
@@ -370,89 +475,89 @@ end
 
 ## division
 
-@pure abs2_inv(::Submanifold{V,G,B} where G) where {V,B} = abs2(getbasis(V,grade_basis(V,B)))
+@eval @pure abs2_inv(::Submanifold{V,G,B} where G,$(args...)) where {V,B} = abs2(getbasis(V,grade_basis(V,B)),$(args...))
 
 for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
     @eval begin
-        @pure $d(a,b::T) where T<:TensorAlgebra = a*$nv(b)
-        @pure $d(a::N,b::T) where {N<:Number,T<:TensorAlgebra} = a*$nv(b)
-        @pure $d(a::S,b::UniformScaling) where S<:TensorGraded = a*$nv(Manifold(a)(b))
-        @pure $d(a::S,b::UniformScaling) where S<:TensorMixed = a*$nv(Manifold(a)(b))
-        $nv(a::PseudoCouple) = ~a/abs2(a)
-        function $nv(a::Chain)
-            r,v,q = ~a,abs2(a),diffvars(Manifold(a))≠0
-            q&&!(typeof(v)<:TensorGraded && grade(v)==0) ? $d(r,v) : $d(r,value(scalar(v)))
+        @pure $d(a,b::T,$(args...)) where T<:TensorAlgebra = $op(a,$nv(b,$(args...)),$(args...))
+        @pure $d(a::N,b::T,$(args...)) where {N<:Number,T<:TensorAlgebra} = $op(a,$nv(b,$(args...)),$(args...))
+        @pure $d(a::S,b::UniformScaling,$(args...)) where S<:TensorGraded = $op(a,$nv(Manifold(a)(b),$(args...)),$(args...))
+        @pure $d(a::S,b::UniformScaling,$(args...)) where S<:TensorMixed = $op(a,$nv(Manifold(a)(b),$(args...)),$(args...))
+        $nv(a::PseudoCouple,$(args...)) = /(~a,abs2(a,$(args...)),$(args...))
+        function $nv(a::Chain,$(args...))
+            r,v,q = ~a,abs2(a,$(args...)),diffvars(Manifold(a))≠0
+            q&&!(typeof(v)<:TensorGraded && grade(v)==0) ? $d(r,v,$(args...)) : $d(r,value(scalar(v)))
         end
-        function $nv(m::Multivector{V,T}) where {V,T}
+        function $nv(m::Multivector{V,T},$(args...)) where {V,T}
             rm = ~m
-            d = rm*m
+            d = $op(rm,m,$(args...))
             fd = norm(d)
             sd = scalar(d)
             norm(sd) ≈ fd && (return $d(rm,sd))
             for k ∈ list(1,mdims(V))
-                @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k),$(args...)))
             end
             throw(error("inv($m) is undefined"))
         end
-        function $nv(m::Multivector{V,Any}) where V
+        function $nv(m::Multivector{V,Any},$(args...)) where V
             rm = ~m
-            d = rm*m
+            d = $op(rm,m,$(args...))
             fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
             sd = scalar(d)
             $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
             for k ∈ list(1,mdims(V))
-                @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
+                @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k),$(args...)))
             end
             throw(error("inv($m) is undefined"))
         end
     end
     for pinor ∈ (:Spinor,:AntiSpinor)
         @eval begin
-            function $nv(m::$pinor{V,T}) where {V,T}
+            function $nv(m::$pinor{V,T},$(args...)) where {V,T}
                 rm = ~m
-                d = rm*m
+                d = $op(rm,m,$(args...))
                 fd = norm(d)
                 sd = scalar(d)
                 norm(sd) ≈ fd && (return $d(rm,sd))
                 for k ∈ evens(2,mdims(V))
-                    @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k)))
+                    @inbounds AbstractTensors.norm(d[k]) ≈ fd && (return $d(rm,d(k),$(args...)))
                 end
                 throw(error("inv($m) is undefined"))
             end
-            function $nv(m::$pinor{V,Any}) where V
+            function $nv(m::$pinor{V,Any},$(args...)) where V
                 rm = ~m
-                d = rm*m
+                d = $op(rm,m,$(args...))
                 fd = $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d)]...)
                 sd = scalar(d)
                 $Sym.:∏(value(sd),value(sd)) == fd && (return $d(rm,sd))
                 for k ∈ evens(2,mdims(V))
-                    @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k)))
+                    @inbounds $Sym.:∑([$Sym.:∏(a,a) for a ∈ value(d[k])]...) == fd && (return $d(rm,d(k),$(args...)))
                 end
                 throw(error("inv($m) is undefined"))
             end
         end
     end
     @eval begin
-        @pure $nv(b::Submanifold{V,0} where V) = b
-        @pure function $nv(b::Submanifold{V,G,B}) where {V,G,B}
-            $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b)))*b
+        @pure $nv(b::Submanifold{V,0} where V,$(args...)) = b
+        @pure function $nv(b::Submanifold{V,G,B},$(args...)) where {V,G,B}
+            $d(parityreverse(grade(V,B)) ? -1 : 1,value(abs2_inv(b,$(args...))))*b
         end
-        $nv(b::Single{V,0,B}) where {V,B} = Single{V,0,B}(AbstractTensors.inv(value(b)))
-        function $nv(b::Single{V,G,B,T}) where {V,G,B,T}
-            Single{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B)*value(b))))
+        $nv(b::Single{V,0,B},$(args...)) where {V,B} = Single{V,0,B}(AbstractTensors.inv(value(b)))
+        function $nv(b::Single{V,G,B,T},$(args...)) where {V,G,B,T}
+            Single{V,G,B}($d(parityreverse(grade(V,B)) ? -one(T) : one(T),value(abs2_inv(B,$(args...))*value(b))))
         end
-        function $nv(b::Single{V,G,B,Any}) where {V,G,B}
-            Single{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
+        function $nv(b::Single{V,G,B,Any},$(args...)) where {V,G,B}
+            Single{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B,$(args...)),value(b)))))
         end
     end
 end
 
-/(a::TensorTerm{V,0},b::Couple{V,B,S}) where {V,B,S} = a*inv(b)
-/(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)/value(b),imagvalue(a)/value(b))
+@eval /(a::TensorTerm{V,0},b::Couple{V,B,S},$(args...)) where {V,B,S} = a*inv(b,$(args...))
+@eval /(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(realvalue(a)/value(b),imagvalue(a)/value(b))
 
-function /(a::Couple{V,B,T}, b::Couple{V,B,T}) where {V,B,T<:Real}
+@eval function /(a::Couple{V,B,T}, b::Couple{V,B,T},$(args...)) where {V,B,T<:Real}
     are,aim = reim(a); bre,bim = reim(b)
-    B2 = value(abs2_inv(B))
+    B2 = value(abs2_inv(B,$(args...)))
     (rout,iout) = if abs(bre) <= abs(bim)
         if isinf(bre) && isinf(bim)
             r = sign(bre)/sign(bim)
@@ -473,11 +578,11 @@ function /(a::Couple{V,B,T}, b::Couple{V,B,T}) where {V,B,T<:Real}
     Chain{V,B}(rout,iout)
 end
 
-inv(z::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
-    (w = inv(widen(z)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
+@eval inv(z::Couple{V,B,T},$(args...)) where {V,B,T<:Union{Float16,Float32}} =
+    (w = inv(widen(z),$(args...)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
 
-/(z::Couple{V,B,T}, w::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
-    (w = widen(z)*inv(widen(w)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
+@eval /(z::Couple{V,B,T}, w::Couple{V,B,T},$(args...)) where {V,B,T<:Union{Float16,Float32}} =
+    (w = $op(widen(z),inv(widen(w),$(args...)),$(args...)); Couple{V,B}(convert(T,realvalue(w)),convert(T,imagvalue(w))))
 
 # robust complex division for double precision
 # variables are scaled & unscaled to avoid over/underflow, if necessary
@@ -485,20 +590,66 @@ inv(z::Couple{V,B,T}) where {V,B,T<:Union{Float16,Float32}} =
 #             a + i*b
 #  p + i*q = ---------
 #             c + i*d
-function /(z::Couple{V,B,Float64}, w::Couple{V,B,Float64}) where {V,B}
+@eval function /(z::Couple{V,B,Float64}, w::Couple{V,B,Float64},$(args...)) where {V,B}
     a, b = reim(z); c, d = reim(w)
     absa = abs(a); absb = abs(b);  ab = absa >= absb ? absa : absb # equiv. to max(abs(a),abs(b)) but without NaN-handling (faster)
     absc = abs(c); absd = abs(d);  cd = absc >= absd ? absc : absd
     halfov = 0.5*floatmax(Float64)              # overflow threshold
     twounϵ = floatmin(Float64)*2.0/eps(Float64) # underflow threshold
     # actual division operations
-    e = Val(float(value(abs2_inv(B))))
+    e = Val(float(value(abs2_inv(B,$(args...)))))
     if  ab>=halfov || ab<=twounϵ || cd>=halfov || cd<=twounϵ # over/underflow case
         p,q = scaling_cdiv(a,b,c,d,ab,cd,e) # scales a,b,c,d before division (unscales after)
     else
         p,q = cdiv(a,b,c,d,e)
     end
     return Couple{V,B,Float64}(p,q)
+end
+
+@eval function inv(z::Couple{V,B},$(args...)) where {V,B}
+    c, d = reim(z)
+    (isinf(c) | isinf(d)) && (return Couple{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
+    e = c*c + d*d*value(abs2_inv(B,$(args...)))
+    Couple{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
+end
+@eval inv(z::Couple{V,B,<:Integer},$(args...)) where {V,B} = inv(Couple{V,B}(float(z.v)),$(args...))
+
+@eval function inv(w::Couple{V,B,Float64},$(args...)) where {V,B}
+    c, d = reim(w)
+    (isinf(c) | isinf(d)) && return complex(copysign(0.0, c), flipsign(-0.0, d))
+    absc, absd = abs(c), abs(d)
+    cd = ifelse(absc>absd, absc, absd) # cheap `max`: don't need sign- and nan-checks here
+    ϵ  = eps(Float64)
+    bs = 2/(ϵ*ϵ)
+    # scaling
+    s = 1.0
+    if cd >= floatmax(Float64)/2
+        c *= 0.5; d *= 0.5; s = 0.5 # scale down c, d
+    elseif cd <= 2floatmin(Float64)/ϵ
+        c *= bs;  d *= bs;  s = bs  # scale up c, d
+    end
+    # inversion operations
+    a = Val(float(value(abs2_inv(B,$(args...)))))
+    if absd <= absc
+        p, q = robust_cinv(c, d, a)
+    else
+        q, p = robust_cinv_rev(-d, -c, a)
+    end
+    return Couple{V,B}(ComplexF64(p*s, q*s)) # undo scaling
+end
+end
+
+function robust_cinv(c::Float64, d::Float64, ::Val{a}) where a
+    r = d/c
+    p = inv(muladd(d, r*a, c))
+    q = -r*p
+    return p, q
+end
+function robust_cinv_rev(c::Float64, d::Float64, ::Val{a}) where a
+    r = d/c
+    p = inv(muladd(d, r, c*a))
+    q = -r*p
+    return p, q
 end
 
 # sub-functionality for /(z::ComplexF64, w::ComplexF64)
@@ -546,50 +697,6 @@ function robust_cdiv2_rev(a::Float64, b::Float64, c::Float64, d::Float64, r::Flo
     else
         return (a*e + d*(b/c)) * t
     end
-end
-
-function inv(z::Couple{V,B}) where {V,B}
-    c, d = reim(z)
-    (isinf(c) | isinf(d)) && (return Couple{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
-    e = c*c + d*d*value(abs2_inv(B))
-    Couple{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
-end
-inv(z::Couple{V,B,<:Integer}) where {V,B} = inv(Couple{V,B}(float(z.v)))
-
-function inv(w::Couple{V,B,Float64}) where {V,B}
-    c, d = reim(w)
-    (isinf(c) | isinf(d)) && return complex(copysign(0.0, c), flipsign(-0.0, d))
-    absc, absd = abs(c), abs(d)
-    cd = ifelse(absc>absd, absc, absd) # cheap `max`: don't need sign- and nan-checks here
-    ϵ  = eps(Float64)
-    bs = 2/(ϵ*ϵ)
-    # scaling
-    s = 1.0
-    if cd >= floatmax(Float64)/2
-        c *= 0.5; d *= 0.5; s = 0.5 # scale down c, d
-    elseif cd <= 2floatmin(Float64)/ϵ
-        c *= bs;  d *= bs;  s = bs  # scale up c, d
-    end
-    # inversion operations
-    a = Val(float(value(abs2_inv(B))))
-    if absd <= absc
-        p, q = robust_cinv(c, d, a)
-    else
-        q, p = robust_cinv_rev(-d, -c, a)
-    end
-    return Couple{V,B}(ComplexF64(p*s, q*s)) # undo scaling
-end
-function robust_cinv(c::Float64, d::Float64, ::Val{a}) where a
-    r = d/c
-    p = inv(muladd(d, r*a, c))
-    q = -r*p
-    return p, q
-end
-function robust_cinv_rev(c::Float64, d::Float64, ::Val{a}) where a
-    r = d/c
-    p = inv(muladd(d, r, c*a))
-    q = -r*p
-    return p, q
 end
 
 function generate_inverses(Mod,T)
@@ -944,6 +1051,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         anti = isodd(L) ≠ isodd(G)
         type = anti ? :AntiSpinor : :Spinor
         args = field ? (:g,) : ()
+        (S<:Zero || S<:Infinity) && (return :a)
         if G == 0
             return S<:Chain ? :(Chain{V,L}(broadcast($MUL,a.v,Ref(@inbounds b[1])))) : swap ? :(Single(b)⟑a) : :(a⟑Single(b))
         elseif S<:Chain && L == 0
@@ -1015,6 +1123,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         MUL,VEC = mulvec(a,b,contr)
         vfield = Val(field); args = field ? (:g,) : ()
         (swap ? G<L : L<G) && (!istangent(V)) && (return Zero(V))
+        (S<:Zero || S<:Infinity) && (return :a)
         if (G==0 || G==mdims(V)) && (!istangent(V))
             return swap ? :(contraction(Single(b),a,$(args...))) : :(contraction(a,Single(b),$(args...)))
         end
@@ -1122,6 +1231,7 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
         w,W = swap ? (R,Q) : (Q,R)
         V = w==W ? w : ((w==dual(W)) ? (dyadmode(w)≠0 ? W⊕w : w⊕W) : (return :(interop($$op,a,b))))
         $po(G+L,mdims(V)) && (!istangent(V)) && (return Zero(V))
+        (S<:Zero || S<:Infinity) && (return :a)
         if (L==0 || L==mdims(V)) && (!istangent(V))
             return swap ? :($$op(Single(b),a)) : :($$op(a,Single(b)))
         end
@@ -1247,6 +1357,7 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
         MUL,VEC = mulvec(a,b,$(QuoteNode(op)))
         VECS = isodd(G) ? VEC : string(VEC)*"s"
         args = field ? (:g,) : (); vfield = Val(field)
+        (S<:Zero || S<:Infinity) && (return :a)
         $(if op ∈ (:∧,:∨); quote
             if $(op≠:∧ ? :(<(G+maxgrade(b),mdims(V))) : :(>(G+mingrade(b),mdims(V)))) && (!istangent(V))
                 return Zero(V)
