@@ -1050,6 +1050,7 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
             v*mul_metric(ba,bb,g,v)
         end
+        ∨(a::$Field,b::$Field) = zero($Field)
         ∧(a::$Field,b::$Field) = $MUL(a,b)
         ∧(a::F,b::B) where B<:TensorTerm{V,G} where {F<:$EF,V,G} = Single{V,G}(a,b)
         ∧(a::A,b::F) where A<:TensorTerm{V,G} where {F<:$EF,V,G} = Single{V,G}(b,a)

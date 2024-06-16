@@ -399,6 +399,8 @@ show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
 Chain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
+# DiagonalOperator
+
 export DiagonalOperator
 
 struct DiagonalOperator{V,T<:TensorAlgebra{V}} <: TensorNested{V,T}
@@ -420,7 +422,7 @@ end
     Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),Expr(:call,Values,1,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V))[list(2,tdims(V))]]...)))
 end
 
-for op ∈ (:(Base.inv),:(Base.exp))
+for op ∈ (:(Base.inv),:(Base.exp),:(Base.log))
     @eval $op(t::DiagonalOperator) = DiagonalOperator(map($op,value(t)))
 end
 
@@ -517,6 +519,47 @@ function show_matrix(io::IO, t, X)
     # 2) show actual content
     recur_io = IOContext(io, :SHOWN_SET => X)
     Base.print_array(recur_io,X)
+end
+
+# Outermorphism
+
+export Outermorphism, outermorphism
+
+struct Outermorphism{V,T<:Tuple} <: TensorNested{V,T}
+    v::T
+    Outermorphism{V}(t::T) where {V,T<:Tuple} = new{V,T}(t)
+end
+
+@generated function outermorphism(t::Simplex{V}) where V
+    :(Outermorphism{V}($(Expr(:tuple,[:(compound(t,Val($g))) for g ∈ list(1,mdims(V))]...))))
+end
+
+Outermorphism(t::Simplex) = outermorphism(t)
+Outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
+outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
+value(t::Outermorphism) = t.v
+matrix(m::Outermorphism) = matrix(TensorOperator(m))
+getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One(V)),)) : t.v[i]
+
+TensorOperator(t::Outermorphism{V}) where V = TensorOperator(Multivector{V}(vcat(Multivector(One(V)),value.(map.(Multivector,value.(t.v)))...)))
+
+for op ∈ (:(Base.inv),:(Base.exp),:(Base.log))
+    @eval $op(t::Outermorphism) = Outermorphism($op(@inbounds value(t)[1]))
+end
+
+_axes(t::Outermorphism{V}) where V = (Base.OneTo(tdims(V)),Base.OneTo(tdims(V)))
+
+# anything array-like gets summarized e.g. 10-element Array{Int64,1}
+Base.summary(io::IO, a::Outermorphism) = Base.array_summary(io, a, _axes(a))
+
+show(io::IO,X::Outermorphism) = Base.show(io,TensorOperator(X))
+
+function show(io::IO, ::MIME"text/plain", t::Outermorphism)
+    X = display_matrix(TensorOperator(t))
+    if isempty(X) && get(io, :compact, false)::Bool
+        return show(io, X)
+    end
+    show_matrix(io, t, X)
 end
 
 """
@@ -633,6 +676,7 @@ minus(a::TensorNested,b::TensorNested) = a+(-b)
 
 @inline ⟑(a::Chain,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
 @inline ⟑(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::Chain) = contraction(a,b)
+@inline ⟑(a::Chain{V,G,<:Chain{V,G}},b::Chain{V,G,<:Chain{V,G}}) where {V,G} = contraction(a,b)
 @inline ⟑(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorTerm) = contraction(a,b)
 @inline ⟑(a::TensorGraded,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
 @inline ⟑(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorNested) = contraction(a,b)
@@ -652,17 +696,34 @@ contraction(a::DiagonalOperator{V,<:Multivector{V}},b::Multivector{V}) where V =
 contraction(a::Multivector{V},b::DiagonalOperator{V,<:Multivector{V}}) where V = Multivector{V}(value(a).*value(value(b)))
 contraction(a::DiagonalOperator{V,<:Multivector{V}},b::DiagonalOperator{V,<:Multivector{V}}) where V = DiagonalOperator(Multivector{V}(value(value(a)).*value(value(b))))
 
-for op ∈ (:⟑,:*)
-    @eval begin
-        $op(a::DiagonalOperator,b::TensorAlgebra) = contraction(a,b)
-        $op(a::TensorAlgebra,b::DiagonalOperator) = contraction(a,b)
-        $op(a::DiagonalOperator,b::DiagonalOperator) = contraction(a,b)
+contraction(a::Outermorphism{V},b::TensorGraded{V,G}) where {V,G} = contraction(a[G],b)
+contraction(a::TensorGraded{V,G},b::Outermorphism{V}) where {V,G} = contraction(a,b[G])
+contraction(a::Outermorphism{V},b::Outermorphism{V}) where V = Outermorphism(contraction.(a.v,b.v))
+
+@generated function contraction(a::Outermorphism{V},b::Spinor{V}) where V
+    Expr(:call,:(Spinor{V}),Expr(:call,:Values,:(@inbounds value(b)[1]),[:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ evens(2,mdims(V))]...))
+end
+@generated function contraction(a::Outermorphism{V},b::AntiSpinor{V}) where V
+    Expr(:call,:(AntiSpinor{V}),Expr(:call,:Values,[:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ evens(1,mdims(V))]...))
+end
+@generated function contraction(a::Outermorphism{V},b::Multivector{V}) where V
+    Expr(:call,:(Multivector{V}),Expr(:call,:Values,:(@inbounds value(b)[1]),[:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ list(1,mdims(V))]...))
+end
+
+for op ∈ (:plus,:minus,:+,:-)
+    @eval @generated function $op(a::Outermorphism{V},b::Outermorphism{V}) where V
+        Expr(:call,:(Outermorphism{V}),Expr(:tuple,[:($$op(value(a)[$g],value(b)[$g])) for g ∈ list(1,mdims(V))]...))
+    end
+    for operator ∈ (:TensorOperator,:DiagonalOperator)
+        @eval $op(a::$operator,b::$operator) = $operator($op(value(a),value(b)))
     end
 end
-for op ∈ (:plus,:minus,:+,:-)
-    for operator ∈ (:TensorOperator,:DiagonalOperator)
+for op ∈ (:⟑,:*)
+    for type ∈ (:DiagonalOperator,:Outermorphism)
         @eval begin
-            $op(a::$operator,b::$operator) = $operator($op(value(a),value(b)))
+            $op(a::$type,b::TensorAlgebra) = contraction(a,b)
+            $op(a::TensorAlgebra,b::$type) = contraction(a,b)
+            $op(a::$type,b::$type) = contraction(a,b)
         end
     end
 end
@@ -674,10 +735,16 @@ for op ∈ (:*,:⟑,:contraction,:/)
     end
 end
 for F ∈ Fields
+    @eval begin
+        *(a::F,b::Outermorphism{V}) where {V,F<:$F} = Outermorphism{V}(a.*value(b))
+        *(a::Outermorphism{V},b::F) where {V,F<:$F} = Outermorphism{V}(value(a).*b)
+        /(a::Outermorphism{V},b::F) where {V,F<:$F} = Outermorphism{V}(value(a)./b)
+    end
     for operator ∈ (:TensorOperator,:DiagonalOperator)
         @eval begin
             *(a::F,b::$operator) where F<:$F = $operator(a*value(b))
             *(a::$operator,b::F) where F<:$F = $operator(value(a)*b)
+            /(a::$operator,b::F) where F<:$F = $operator(value(a)/b)
         end
     end
 end
@@ -772,9 +839,11 @@ end
 
 applyf(f,mat::TensorOperator) = f.(value(value(mat)))
 
-metricfull(V) = TensorOperator(Multivector{V}(vcat(value.(map.(Multivector,value.(metrictensor.(V,list(0,mdims(V))))))...)))
-metriceven(V) = TensorOperator(Spinor{V}(vcat(applyf.(Spinor,metrictensor.(V,evens(0,mdims(V))))...)))
-metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(applyf.(AntiSpinor,metrictensor.(V,evens(1,mdims(V))))...)))
+@pure metricfull(V) = Outermorphism(metrictensor(V))
+const metriceven,metricodd = metricfull,metricfull
+#metricfull(V) = TensorOperator(Multivector{V}(vcat(value.(map.(Multivector,value.(metrictensor.(V,list(0,mdims(V))))))...)))
+#metriceven(V) = TensorOperator(Spinor{V}(vcat(applyf.(Spinor,metrictensor.(V,evens(0,mdims(V))))...)))
+#metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(applyf.(AntiSpinor,metrictensor.(V,evens(1,mdims(V))))...)))
 
 struct MetricTensor{n,ℙ,g,Vars,Diff,Name} <: TensorBundle{n,ℙ,g,Vars,Diff,Name}
     @pure MetricTensor{N,M,S,F,D,L}() where {N,M,S,F,D,L} = new{N,M,S,F,D,L}()
@@ -853,6 +922,10 @@ isdiag(::MetricTensor) = false
 export InducedMetric
 
 struct InducedMetric end
+#=struct InducedMetric{V} <: TensorNested{V,Multivector{V}} end
+metrictensor(::InducedMetric{V}) where V = metrictensor(V)
+metricfull(::InducedMetric{V}) where V = metricfull(V)
+Base.show(io::IO,x::InducedMetric) = show(io,metricfull(x))=#
 
 isinduced(x) = false
 isinduced(::InducedMetric) = true
@@ -860,4 +933,4 @@ isinduced(x::Submanifold) = !isbasis(x)
 isinduced(::TensorBundle) = true
 isinduced(x::Type{<:Submanifold}) = !isbasis(x)
 isinduced(::Type{<:TensorBundle}) = true
-isinduced(::Type{InducedMetric}) = true
+isinduced(::Type{<:InducedMetric}) = true

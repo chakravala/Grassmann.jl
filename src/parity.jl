@@ -121,7 +121,13 @@ end
             Values((prod(isempty(gg) ? 1 : signbool.(gg)),))
         end
     else
-        value(metrictensor(V,G))[bladeindex(grade(V),B)]
+        gi = bladeindex(grade(V),B)
+        gv = value(metrictensor(V,G))[gi]
+        if field && !iszero(G)
+            [isnull(gv[i]) ? gv[i] : :(value(value(g)[$G])[$gi][$i]) for i ∈ list(1,gdims(grade(V),G))]
+        else
+            gv
+        end
     end
     bs,bg = (),()
     for i ∈ list(1,diag ? 1 : gdims(grade(V),G))
