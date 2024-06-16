@@ -1223,62 +1223,31 @@ for (mop,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_multivector(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Multivector{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],VEC)...)
-                $(loop[2])
-                return Multivector{V,t}(out)
-            end end
+            product_loop(V,:Multivector,loop,VEC)
         end
         @generated function $op(a::Spinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Multivector{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],VEC)...)
-                $(loop[2])
-                return Multivector{V,t}(out)
-            end end
+            product_loop(V,:Multivector,loop,VEC)
         end
         @generated function $op(a::Multivector{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_m_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Multivector{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],VEC)...)
-                $(loop[2])
-                return Multivector{V,t}(out)
-            end end
-
+            product_loop(V,:Multivector,loop,VEC)
         end
         @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Multivector{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],VEC)...)
-                $(loop[2])
-                return Multivector{V,t}(out)
-            end end
+            product_loop(V,:Multivector,loop,VEC)
         end
         @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_m_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Multivector{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],VEC)...)
-                $(loop[2])
-                return Multivector{V,t}(out)
-            end end
+            product_loop(V,:Multivector,loop,VEC)
         end
     end
 end
@@ -1320,25 +1289,13 @@ for (mop,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,fa
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Spinor{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-                $(loop[2])
-                return Spinor{V,t}(out)
-            end end
+            product_loop(V,:Spinor,loop,Symbol(string(VEC)*"s"))
         end
         @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(Spinor{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-                $(loop[2])
-                return Spinor{V,t}(out)
-            end end
+            product_loop(V,:Spinor,loop,Symbol(string(VEC)*"s"))
         end
     end
 end
@@ -1353,71 +1310,35 @@ for (mop,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,fa
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(AntiSpinor{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-                $(loop[2])
-                return AntiSpinor{V,t}(out)
-            end end
+            product_loop(V,:AntiSpinor,loop,Symbol(string(VEC)*"s"))
         end
         @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            if mdims(V)<cache_limit/2
-                return :(AntiSpinor{V}($(loop[2].args[2])))
-            else return quote
-                $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-                $(loop[2])
-                return AntiSpinor{V,t}(out)
-            end end
+            product_loop(V,:AntiSpinor,loop,Symbol(string(VEC)*"s"))
         end
     end
 end
 @generated function ∨(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
-    if mdims(V)<cache_limit/2
-        return :($(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V}($(loop[2].args[2])))
-    else return quote
-        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-        $(loop[2])
-        return  $(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V,t}(out)
-    end end
+    product_loop(V,isodd(mdims(V)) ? :AntiSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
 end
 @generated function ∨(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
-    if mdims(V)<cache_limit/2
-        return :($(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V}($(loop[2].args[2])))
-    else return quote
-        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-        $(loop[2])
-        return $(isodd(mdims(V)) ? :AntiSpinor : :Spinor){V,t}(out)
-    end end
+    product_loop(V,isodd(mdims(V)) ? :AntiSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
 end
 @generated function ∨(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
-    if mdims(V)<cache_limit/2
-        return :($(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V}($(loop[2].args[2])))
-    else return quote
-        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-        $(loop[2])
-        return $(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V,t}(out)
-    end end
+    product_loop(V,isodd(mdims(V)) ? :Spinor : :AntiSpinor,loop,Symbol(string(VEC)*"s"))
 end
 @generated function ∨(a::AntiSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
-    if mdims(V)<cache_limit/2
-        return :($(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V}($(loop[2].args[2])))
-    else return quote
-        $(insert_expr(loop[1],Symbol(string(VEC)*"s"))...)
-        $(loop[2])
-        return $(isodd(mdims(V)) ? :Spinor : :AntiSpinor){V,t}(out)
-    end end
+    product_loop(V,isodd(mdims(V)) ? :Spinor : :AntiSpinor,loop,Symbol(string(VEC)*"s"))
 end
 
 for side ∈ (:left,:right)

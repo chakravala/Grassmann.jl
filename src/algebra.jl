@@ -1721,6 +1721,16 @@ function leftrightsym(com)
     return (left...,right...,br)
 end
 
+function product_loop(V,type,loop,VEC)
+    if mdims(V)<cache_limit/2
+        return :($type{V}($(loop[2].args[2])))
+    else return quote
+        $(insert_expr(loop[1],VEC)...)
+        $(loop[2])
+        return $type{V,t}(out)
+    end end
+end
+
 for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
     outspin = com ∈ (:spinor,:anti,:s_a,:a_s)
     left,leftspin,right,rightspin,br = leftrightsym(com)
