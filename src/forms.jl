@@ -290,6 +290,8 @@ end
 
 export TensorNested
 abstract type TensorNested{V,T} <: Manifold{V,T} end
+@pure Manifold(::T) where T<:TensorNested{V} where V = V
+@pure Manifold(::Type{T}) where T<:TensorNested{V} where V = V
 
 transpose_row(t::Values{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
 transpose_row(t::FixedVector{N,<:Chain{V}},i,W=V) where {N,V} = Chain{W,1}(getindex.(t,i))
@@ -409,6 +411,8 @@ struct DiagonalOperator{V,T<:TensorAlgebra{V}} <: TensorNested{V,T}
     DiagonalOperator(t::T) where {V,T<:TensorAlgebra{V}} = new{V,T}(t)
 end
 
+(T::DiagonalOperator{V})(x::TensorAlgebra{V}) where V = contraction(T,x)
+
 value(t::DiagonalOperator) = t.v
 matrix(m::DiagonalOperator) = matrix(TensorOperator(m))
 getindex(t::DiagonalOperator,i::Int,j::Int) = i≠j ? zero(valuetype(value(t))) : value(t)[i]
@@ -452,6 +456,7 @@ struct TensorOperator{V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} <: TensorNeste
 end
 
 Endomorphism{V,T<:TensorAlgebra{V,<:TensorAlgebra{V}}} = TensorOperator{V,V,T}
+(T::TensorOperator{V})(x::TensorAlgebra{V}) where V = contraction(T,x)
 
 value(t::TensorOperator) = t.v
 matrix(m::TensorOperator) = matrix(value(m))
@@ -534,6 +539,7 @@ end
     :(Outermorphism{V}($(Expr(:tuple,[:(compound(t,Val($g))) for g ∈ list(1,mdims(V))]...))))
 end
 
+(T::Outermorphism{V})(x::TensorAlgebra{V}) where V = contraction(T,x)
 Outermorphism(t::Simplex) = outermorphism(t)
 Outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
 outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
@@ -597,6 +603,13 @@ outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
 outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
 outer(a::Chain{W},b::Chain{V,1}) where {W,V} = Chain{V,1}(a.*value(b))
 
+contraction_metric(a::TensorNested,b::TensorNested,g) = contraction(a,b)
+contraction_metric(a::TensorNested,b::TensorAlgebra,g) = contraction(a,b)
+contraction_metric(a::TensorAlgebra,b::TensorNested,g) = contraction(a,b)
+wedgedot_metric(a::TensorNested,b::TensorNested,g) = a⟑b
+wedgedot_metric(a::TensorNested,b::TensorAlgebra,g) = a⟑b
+wedgedot_metric(a::TensorAlgebra,b::TensorNested,g) = a⟑b
+
 contraction(a::Proj,b::TensorGraded) = a.v⊗(a.λ*(a.v⋅b))
 contraction(a::Dyadic,b::TensorGraded) = a.x⊗(a.y⋅b)
 contraction(a::TensorGraded,b::Dyadic) = (a⋅b.x)⊗b.y
@@ -624,7 +637,7 @@ contraction(a::Submanifold{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(
 contraction(a::Single{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(column(Ref(a).⋅value(b)))
 contraction(x::Chain{V,G,<:Chain},y::Single{V,G}) where {V,G} = value(y)*x[bladeindex(mdims(V),UInt(basis(y)))]
 contraction(x::Chain{V,G,<:Chain},y::Submanifold{V,G}) where {V,G} = x[bladeindex(mdims(V),UInt(y))]
-contraction(a::Chain{V,L,<:Chain{V,G},N},b::Chain{V,G,<:Chain{V},M}) where {V,G,L,N,M} = Chain{V,G}(contraction.(Ref(a),value(b)))
+#contraction(a::Chain{V,L,<:Chain{V,G},N},b::Chain{V,G,<:Chain{V},M}) where {V,G,L,N,M} = Chain{V,G}(contraction.(Ref(a),value(b)))
 contraction(x::Chain{V,L,<:Chain{V,G},N},y::Chain{V,G,<:Chain{V,L},N}) where {L,N,V,G} = Chain{V,G}(contraction.(Ref(x),value(y)))
 contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
 contraction(x::Chain{W,L,<:Multivector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Multivector{V}(matmul(value(x),value(y)))
@@ -634,16 +647,22 @@ contraction(x::Multivector{W,<:Multivector{V},N},y::Multivector{V,T,N}) where {W
     Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ list(1,N)]...)
 end
 @inline @generated function matmul(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*x[$i][$j]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds x[$i][$j]*y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
 end
 @inline @generated function matmul(x::Values{N,<:Multivector{V}},y::Values{N}) where {N,V}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds value(x[$i])[$j]*y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<mdims(V))]...)
 end
 @inline @generated function matmul(x::Values{N,<:Spinor{V}},y::Values{N}) where {N,V}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds value(x[$i])[$j]*y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
 end
 @inline @generated function matmul(x::Values{N,<:AntiSpinor{V}},y::Values{N}) where {N,V}
-    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds y[$i]*value(x[$i])[$j]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds value(x[$i])[$j]*y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,1<<(mdims(V)-1))]...)
+end
+@inline @generated function matwedge(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds x[$i][$j]∧y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
+end
+@inline @generated function matvee(x::Values{N,<:Chain{V,G}},y::Values{N}) where {N,V,G}
+    Expr(:call,:Values,[Expr(:call,:+,[:(@inbounds x[$i][$j]∨y[$i]) for i ∈ list(1,N)]...) for j ∈ list(1,binomial(mdims(V),G))]...)
 end
 
 contraction(x::Spinor{W,<:Spinor{V},N},y::Spinor{V,T,N}) where {W,N,V,T} = Spinor{V}(matmul(value(x),value(y)))
@@ -682,6 +701,21 @@ minus(a::TensorNested,b::TensorNested) = a+(-b)
 @inline ⟑(a::Chain{V,G,<:Chain{V,G}} where {V,G},b::TensorNested) = contraction(a,b)
 @inline ⟑(a::TensorNested,b::Chain{V,G,<:Chain{V,G}} where {V,G}) = contraction(a,b)
 
+for (op,po) ∈ ((:∧,:.∧),(:∨,:.∨))
+    @eval begin
+        $op(a::DiagonalOperator{V,<:Chain{V,G}},b::Chain{V,G}) where {V,G} = Chain{V,G}($po(value(value(a)),value(b)))
+        $op(a::DiagonalOperator{V,<:Chain{V,G}},b::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = DiagonalOperator(Chain{V,G}($po(value(value(a)),value(value(b)))))
+        #$op(a::Endomorphism{W,<:TensorGraded},b::Endomorphism{V,<:Chain{V,G}}) where {W,V,G} = TensorOperator(Chain{V,G}($po(Ref(value(a)),value(value(b)))))
+        $op(a::Endomorphism{W,<:TensorGraded},b::Endomorphism{V,<:Chain{V,G}}) where {W,V,G} = TensorOperator(Chain{V,G}($po(Ref(a),value(value(b)))))
+        #$op(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,<:Chain{X,F} where {X,F},N}) where {W,L,N,V,G} = Chain{V,G}($po(Ref(x),value(y)))
+    end
+end
+∧(a::Endomorphism{W,<:Chain},b::Chain{V,G}) where {W,V,G} = Chain{V,G}(matwedge(value(value(a)),value(b)))
+∨(a::Endomorphism{W,<:Chain},b::Chain{V,G}) where {W,V,G} = Chain{V,G}(matvee(value(value(a)),value(b)))
+for op ∈ (:complementright,:complementleft,:complementrighthodge,:complementlefthodge,:metric,:cometric)
+    @eval $op(a::Endomorphism{V,<:Chain}) where V = map($op,a)
+end
+
 contraction(a::DiagonalOperator{V,<:Chain{V,G}},b::Chain{V,G}) where {V,G} = Chain{V,G}(value(value(a)).*value(b))
 contraction(a::Chain{V,G},b::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = Chain{V,G}(value(a).*value(value(b)))
 contraction(a::DiagonalOperator{V,<:Chain{V,G}},b::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = DiagonalOperator(Chain{V,G}(value(value(a)).*value(value(b))))
@@ -708,6 +742,14 @@ end
 end
 @generated function contraction(a::Outermorphism{V},b::Multivector{V}) where V
     Expr(:call,:(Multivector{V}),Expr(:call,:Values,:(@inbounds value(b)[1]),[:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ list(1,mdims(V))]...))
+end
+
+scalarcheck(x) = isscalar(x) ? value(scalar(x)) : x
+for (op,args) ∈ ((:contraction,()),(:contraction_metric,(:g,)))
+    @eval @generated function $op(x::Endomorphism{V,<:Chain{V,G,<:Chain{V,G,<:TensorGraded{W,L}}}},y::TensorGraded{W,L},$(args...)) where {W,L,V,G}
+    Expr(:call,:TensorOperator,Expr(:call,:(Chain{V,G}),[Expr(:call,:(Chain{V,G}),
+        [:(@inbounds scalarcheck($$op(x[$i][$j],y,$($args...)))) for i ∈ list(1,gdims(mdims(V),G))]...) for j ∈ list(1,gdims(mdims(V),G))]...))
+    end
 end
 
 for op ∈ (:plus,:minus,:+,:-)
@@ -748,6 +790,12 @@ for F ∈ Fields
         end
     end
 end
+
+Base.map(fn, x::DiagonalOperator) = DiagonalOperator(map(fn,value(x)))
+Base.map(fn, x::TensorOperator{V,W,<:Chain{V,G}}) where {V,W,G} = TensorOperator(Chain{V,G}(map.(fn,value(value(x)))))
+Base.map(fn, x::TensorOperator{V,W,<:Spinor}) where {V,W} = TensorOperator(Spinor{V}(map.(fn,value(value(x)))))
+Base.map(fn, x::TensorOperator{V,W,<:AntiSpinor}) where {V,W} = TensorOperator(AntiSpinor{V}(map.(fn,value(value(x)))))
+Base.map(fn, x::TensorOperator{V,W,<:Multivector}) where {V,W} = TensorOperator(Multivector{V}(map.(fn,value(value(x)))))
 
 # dyadic identity element
 
