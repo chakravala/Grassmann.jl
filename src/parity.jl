@@ -416,7 +416,7 @@ for par ∈ (:conformal,:regressive,:interior)
                 end
                 @inbounds !haskey($extra[N][S][m1],s) && push!($extra[N][S][m1],s=>Dict{UInt,Dict{UInt,$T}}())
                 @inbounds !haskey($extra[N][S][m1][s],a) && push!($extra[N][S][m1][s],a=>Dict{UInt,$T}())
-                @inbounds !haskey($extra[N][S][m1][s][a],b) && push!($extra[N][S][m1][s][a],b=>$calc(V,a,b))
+                @inbounds !haskey($extra[N][S][m1][s][a],b) && push!($extra[N][S][m1][s][a],b=>$calc(M,a,b))
                 @inbounds $extra[N][S][m1][s][a][b]
             elseif n==0
                 $calc(V,a,b)
@@ -436,7 +436,7 @@ for par ∈ (:conformal,:regressive,:interior)
                     @inbounds push!($cache[n][S][m1][s],$T[])
                 end
                 @inbounds for k ∈ length($cache[n][S][m1][s][a1]):b
-                    @inbounds push!($cache[n][S][m1][s][a1],$calc(V,a,k))
+                    @inbounds push!($cache[n][S][m1][s][a1],$calc(M,a,k))
                 end
                 @inbounds $cache[n][S][m1][s][a1][b+1]
             end
