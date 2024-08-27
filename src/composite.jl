@@ -906,7 +906,7 @@ function Base.findlast(P,t::ChainBundle)
 end
 Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
-export volumes, detsimplex, initmesh, refinemesh, refinemesh!, select, submesh
+export volumes, detsimplex, submesh
 
 edgelength(e) = (v=points(e)[value(e)]; value(abs(v[2]-v[1])))
 volumes(m,dets) = value.(abs.(.⋆(dets)))

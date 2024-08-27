@@ -274,7 +274,7 @@ function initmeshdata(P,E,T,N::Val{n}=Val(size(P,1))) where n
     return p,ChainBundle(e),ChainBundle(t)
 end
 
-export pointset, edges, facets, adjacency, column, columns
+export pointset, facets, column, columns
 
 column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=mdims(Manifold(t))) = column.(Ref(value(t)),list(i,j))

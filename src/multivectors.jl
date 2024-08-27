@@ -14,7 +14,7 @@
 
 export TensorTerm, TensorGraded, TensorMixed, Scalar, GradedVector, Bivector, Trivector
 export Submanifold, Single, Multivector, Spinor, SparseChain, MultiGrade, ChainBundle
-export Zero, One, Quaternion, GaussianInteger, PointCloud, ElementMesh, AbstractSpinor
+export Zero, One, Quaternion, GaussianInteger, AbstractSpinor
 export AbstractReal, AbstractComplex, AbstractRational, ScalarFloat, ScalarIrrational
 export AbstractInteger, AbstractBool, AbstractSigned, AbstractUnsigned, AntiSpinor
 
@@ -961,8 +961,8 @@ const Quaternion{V,T} = Spinor{V,T,4}
 const AntiQuaternion{V,T} = AntiSpinor{V,T,4}
 const LipschitzInteger{V,T<:Integer} = Quaternion{V,T}
 const GaussianInteger{V,B,T<:Integer} = Couple{V,B,T}
-const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
-const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
+#const PointCloud{T<:Chain{V,1} where V} = AbstractVector{T}
+#const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
 
 const AbstractReal = Union{Real,Single{V,G,B,<:Real} where {V,G,B},Chain{V,G,<:Real,1} where {V,G}}
 const AbstractComplex{T<:Real} = Union{Complex{T},Phasor{V,B,T} where {V,B},Couple{V,B,T} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
