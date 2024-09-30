@@ -80,12 +80,12 @@ function ⟑(a::Submanifold{V},b::Single{V}) where V
 end
 function wedgedot_metric(a::Single{V},b::Submanifold{V},g) where V
     v = derive_mul(V,UInt(basis(a)),UInt(b),a.v,true)
-    bas = mul(basis(a),b,g,v)
+    bas = mul_metric(basis(a),b,g,v)
     order(a.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 function wedgedot_metric(a::Submanifold{V},b::Single{V},g) where V
     v = derive_mul(V,UInt(a),UInt(basis(b)),b.v,false)
-    bas = mul(a,basis(b),g,v)
+    bas = mul_metric(a,basis(b),g,v)
     order(b.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 

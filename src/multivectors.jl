@@ -834,6 +834,8 @@ for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     end
 end
 
+realvalue(z::Complex) = z.re
+imagvalue(z::Complex) = z.im
 for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         export $couple
