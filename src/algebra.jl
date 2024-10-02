@@ -40,7 +40,7 @@ Geometric algebraic product: ω⊖η = (-1)ᵖdet(ω∩η)⊗(Λ(ω⊖η)∪L(ω
 @pure function mul(a::Submanifold{V},b::Submanifold{V},der=derive_mul(V,UInt(a),UInt(b),1,true)) where V
     if isdiag(V)
         ba,bb = UInt(a),UInt(b)
-        (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
+        istangent(V) && (diffcheck(V,ba,bb) || iszero(der)) && (return Zero(V))
         A,B,Q,Z = symmetricmask(V,ba,bb)
         d = getbasis(V,(A⊻B)|Q)
         out = if typeof(V)<:Signature || count_ones(A&B)==0
