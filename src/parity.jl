@@ -54,9 +54,12 @@ end
 end
 
 @pure parityregressive(V::Signature,a,b,skew=Val(false)) = _parityregressive(V,a,b,skew)
-@pure function parityregressive(::M,A,B) where M<:Manifold{V} where V
-    p,C,t,Z = parityregressive(Signature(V),A,B)
+@pure function parityregressivenum(V,A,B)
+    p,C,t,Z = _parityregressive(V,A,B)
     return p ? -1 : 1, C, t, Z
+end
+@pure function parityregressive(::M,A,B) where M<:Manifold{V} where V
+    parityregressivenum(Signature(V),A,B)
 end
 
 @pure function parityinterior(V::Int,a,b)
@@ -364,7 +367,7 @@ function interior(V,a,b,c::Val{lim},d::Val{field}=Val(false)) where {lim,field}
 end
 
 for par ∈ (:conformal,:regressive,:interior)
-    calc = Symbol(:parity,par)
+    calc = par≠:regressive ? Symbol(:parity,par) : :parityregressivenum
     T = Tuple{Any,UInt,Bool,UInt}
     extra = Symbol(par,:_extra)
     cache = Symbol(par,:_cache)

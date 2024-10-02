@@ -763,10 +763,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
                 $(insert_expr((:N,:ib,:t),:mvec)...)
-                out = svec(N,G,Any)(zeros(svec(N,G,t)))
+                out = svec(N,G,Any)(zeros(svec(N,G,t<:Number ? t : Int)))
                 setblade!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
                 setblade!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
-                return :(Chain{V,L}($(Expr(:call,tvec(N,G,t),out...))))
+                return :(Chain{V,L}($(Expr(:call,tvec(N,G,t<:Number ? t : Any),out...))))
             else return quote
                 $(insert_expr((:N,:t))...)
                 out = zeros($VEC(N,L,t))
@@ -787,10 +787,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,bop,VEC = addvec(a,b,false,op)
         if mdims(V)-1<cache_limit
             $(insert_expr((:N,:t),:mvecs)...)
-            out,ib = svecs(N,Any)(zeros(svecs(N,t))),indexbasis(N)
+            out,ib = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int))),indexbasis(N)
             setspin!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
             setspin!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
-            return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+            return :(Spinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else quote
             $(insert_expr((:N,:t),VEC)...)
             out = zeros(mvecs(N,t))
@@ -805,10 +805,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         if mdims(V)-1<cache_limit
             $(insert_expr((:N,),:svecs)...)
             t = promote_type(valuetype(a),valuetype(b))
-            out,ib = svecs(N,Any)(zeros(svecs(N,t))),indexbasis(N)
+            out,ib = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int))),indexbasis(N)
             setanti!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
             setanti!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
-            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t),out...))))
+            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else quote
             $(insert_expr((:N,:t),VEC)...)
             out = zeros(mvecs(N,t))
@@ -821,10 +821,10 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,bop,VEC = addvec(a,b,false,op)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:t),:mvec)...)
-            out,ib = svec(N,Any)(zeros(svec(N,t))),indexbasis(N)
+            out,ib = svec(N,Any)(zeros(svec(N,t<:Number ? t : Int))),indexbasis(N)
             setmulti!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
             setmulti!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
-            return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
+            return :(Multivector{V}($(Expr(:call,tvec(N,t<:Number ? t : Any),out...))))
         else quote
             $(insert_expr((:N,:t,:out),VEC)...)
             setmulti!(out,value(a,t),UInt(basis(a)),Val{N}())
@@ -836,7 +836,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,right,VEC = addvec(a,b,swap,op)
         if binomial(mdims(V),G)<(1<<cache_limit)
             $(insert_expr((:N,:ib,:t),:mvec)...)
-            out = svec(N,G,Any)(zeros(svec(N,G,t)))
+            out = svec(N,G,Any)(zeros(svec(N,G,t<:Number ? t : Int)))
             X = UInt(basis(a))
             for k ∈ list(1,binomial(N,G))
                 B = @inbounds ib[k]
@@ -844,7 +844,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 val = B==X ? Expr(:call,left,val,:(value(a,$t))) :  val
                 setblade!_pre(out,val,B,Val{N}())
             end
-            return :(Chain{V,G}($(Expr(:call,tvec(N,G,t),out...))))
+            return :(Chain{V,G}($(Expr(:call,tvec(N,G,t<:Number ? t : Any),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VEC(N,G,t),$(bcast(right,:(value(b,$VEC(N,G,t)),))))
@@ -883,7 +883,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif iseven(L) && iseven(G)
             if mdims(V)-1<cache_limit
                 $(insert_expr((:N,:ib,:bn,:t),:mvecs)...)
-                out = svecs(N,Any)(zeros(svecs(N,t)))
+                out = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -893,7 +893,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 end
                 val = :(@inbounds $left(value(a,$t)))
                 setspin!_pre(out,val,X,Val(N))
-                return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+                return :(Spinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:rr,:bng),VECS)...)
                 @inbounds out[rr+1:rr+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
@@ -908,7 +908,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         elseif isodd(L) && isodd(G)
             if mdims(V)-1<cache_limit
                 $(insert_expr((:N,:ib,:bn,:t),:mvecs)...)
-                out = svecs(N,Any)(zeros(svecs(N,t)))
+                out = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -918,7 +918,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 end
                 val = :(@inbounds $left(value(a,$t)))
                 setanti!_pre(out,val,X,Val(N))
-                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t),out...))))
+                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:rrr,:bng),VECS)...)
                 @inbounds out[rrr+1:rrr+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
@@ -933,7 +933,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         else
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:ib,:bn,:t),:mvec)...)
-                out = svec(N,Any)(zeros(svec(N,t)))
+                out = svec(N,Any)(zeros(svec(N,t<:Number ? t : Int)))
                 X = UInt(basis(a))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
@@ -943,7 +943,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 end
                 val = :(@inbounds $left(value(a,$t)))
                 setmulti!_pre(out,val,X,Val(N))
-                return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
+                return :(Multivector{V}($(Expr(:call,tvec(N,t<:Number ? t : Any),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
                 @inbounds out[r+1:r+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
@@ -961,7 +961,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,right,VEC = addvec(a,b,swap,op)
         if mdims(V)<cache_limit
             $(insert_expr((:N,:bs,:bn,:t),:mvec)...)
-            out = svec(N,Any)(zeros(svec(N,t)))
+            out = svec(N,Any)(zeros(svec(N,t<:Number ? t : Int)))
             X = UInt(basis(a))
             for g ∈ list(1,N+1)
                 ib = indexbasis(N,g-1)
@@ -972,7 +972,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     setmulti!_pre(out,val,B,Val(N))
                 end
             end
-            return :(Multivector{V}($(Expr(:call,tvec(N,t),out...))))
+            return :(Multivector{V}($(Expr(:call,tvec(N,t<:Number ? t : Any),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VEC(N,t),$(bcast(right,:(value(b,$VEC(N,t)),))))
@@ -991,7 +991,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         !iseven(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
         if mdims(V)<cache_limit
             $(insert_expr((:N,:rs,:bn,:t),:mvecs)...)
-            out = svecs(N,Any)(zeros(svecs(N,t)))
+            out = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int)))
             X = UInt(basis(a))
             for g ∈ evens(1,N+1)
                 ib = indexbasis(N,g-1)
@@ -1002,7 +1002,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     setspin!_pre(out,val,B,Val(N))
                 end
             end
-            return :(Spinor{V}($(Expr(:call,tvecs(N,t),out...))))
+            return :(Spinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
@@ -1021,7 +1021,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         !isodd(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
         if mdims(V)<cache_limit
             $(insert_expr((:N,:ps,:bn,:t),:mvecs)...)
-            out = svecs(N,Any)(zeros(svecs(N,t)))
+            out = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int)))
             X = UInt(basis(a))
             for g ∈ evens(2,N+1)
                 ib = indexbasis(N,g-1)
@@ -1032,7 +1032,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     setanti!_pre(out,val,B,Val(N))
                 end
             end
-            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t),out...))))
+            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
