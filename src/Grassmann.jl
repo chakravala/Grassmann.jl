@@ -32,21 +32,20 @@ import Base: @pure, ==, isapprox
 import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
 import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual, Zero, One, Zero, One
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims, gdims
-import Leibniz: bit2int, indexbits, indices, diffvars, diffmask
+import Leibniz: bit2int, indexbits, indices, diffvars, diffmask, hasconformal
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
-import DirectSum: antimetric, signbool
+import DirectSum: metrichash, antimetric, signbool
 
-import Leibniz: hasconformal, hasinf2origin, hasorigin2inf
 import AbstractTensors: valuetype, scalar, isscalar, trivector, istrivector, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
 import AbstractTensors: wedgedot_metric, contraction_metric, log_metric
 
 ## cache
 
-import Leibniz: algebra_limit, sparse_limit, cache_limit, fill_limit
+import Leibniz: algebra_limit, sparse_limit, cache_limit, fill_limit, gdimsall, spincumsum
 import Leibniz: binomial, binomial_set, binomsum, binomsum_set, lowerbits, expandbits
 import Leibniz: bladeindex, basisindex, indexbasis, indexbasis_set, loworder, intlog
-import Leibniz: antisum, antisum_set, antiindex, spinindex
+import Leibniz: antisum, antisum_set, anticumsum, antiindex, spinindex, binomcumsum
 import Leibniz: promote_type, mvec, svec, intlog, insert_expr, supermanifold
 
 include("multivectors.jl")
@@ -742,13 +741,6 @@ function __init__()
         end
         initmesh(t::Chull) = (p=ChainBundle(initpoints(t.points')); Chain{p(list(2,mdims(p))),1}.(t.simplices))
     end
-    @require MiniQhull="978d7f02-9e05-4691-894f-ae31a51d76ca" begin
-        MiniQhull.delaunay(p::Vector{<:Chain},n=1:length(p)) = MiniQhull.delaunay(ChainBundle(p),n)
-        function MiniQhull.delaunay(p::ChainBundle,n=1:length(p)); l = list(1,mdims(p))
-            T = MiniQhull.delaunay(Matrix(submesh(length(n)==length(p) ? p : p[n])'))
-            [Chain{p,1,Int}(getindex.(Ref(n),Int.(T[l,k]))) for k ∈ 1:size(T,2)]
-        end
-    end
     @require Triangulate = "f7e6ffb2-c36d-4f8f-a77e-16e897189344" begin
         const triangle_cache = (Array{T,2} where T)[]
         function triangle(p::Array{T,2} where T,B)
@@ -812,60 +804,6 @@ function __init__()
         function TetGen.tetrahedralize(mesh::Vector{<:Chain}, command = "Qp";
                 marker = :markers, holes = TetGen.Point{3, Float64}[])
             initmesh(TetGen.JLTetGenIO(mesh;marker=marker,holes=holes),command)
-        end
-    end
-    @require MATLAB="10e44e05-a98a-55b3-a45b-ba969058deb6" begin
-        const matlab_cache = (Array{T,2} where T)[]
-        function matlab(p::Array{T,2} where T,B)
-            for k ∈ length(matlab_cache):B
-                push!(matlab_cache,Array{Any,2}(undef,0,0))
-            end
-            matlab_cache[B] = p
-        end
-        function matlab(p::ChainBundle{V,G,T,B} where {V,G,T}) where B
-            if length(matlab_cache)<B || isempty(matlab_cache[B])
-                ap = array(p)'
-                matlab(islocal(p) ? vcat(ap,ones(length(p))') : ap[2:end,:],B)
-            else
-                return matlab_cache[B]
-            end
-        end
-        initmesh(g,args...) = initmeshall(g,args...)[1:3]
-        initmeshall(g::Matrix{Int},args...) = initmeshall(Matrix{Float64}(g),args...)
-        function initmeshall(g,args...)
-            P,E,T = MATLAB.mxcall(:initmesh,3,g,args...)
-            p,e,t = initmeshdata(P,E,T,Val(2))
-            return (p,e,t,T,E,P)
-        end
-        function initmeshes(g,args...)
-            p,e,t,T = initmeshall(g,args...)
-            p,e,t,[Int(T[end,k]) for k ∈ 1:size(T,2)]
-        end
-        export initmeshes
-        function refinemesh(g,args...)
-            p,e,t,T,E,P = initmeshall(g,args...)
-            matlab(P,bundle(p)); matlab(E,bundle(e)); matlab(T,bundle(t))
-            return (g,p,e,t)
-        end
-        refinemesh3(g,p::ChainBundle,e,t,s...) = MATLAB.mxcall(:refinemesh,3,g,matlab(p),matlab(e),matlab(t),s...)
-        refinemesh4(g,p::ChainBundle,e,t,s...) = MATLAB.mxcall(:refinemesh,4,g,matlab(p),matlab(e),matlab(t),s...)
-        refinemesh(g,p::ChainBundle,e,t) = refinemesh3(g,p,e,t)
-        refinemesh(g,p::ChainBundle,e,t,s::String) = refinemesh3(g,p,e,t,s)
-        refinemesh(g,p::ChainBundle,e,t,η::Vector{Int}) = refinemesh3(g,p,e,t,float.(η))
-        refinemesh(g,p::ChainBundle,e,t,η::Vector{Int},s::String) = refinemesh3(g,p,e,t,float.(η),s)
-        refinemes(g,p::ChainBundle,e,t,u) = refinemesh4(g,p,e,t,u)
-        refinemesh(g,p::ChainBundle,e,t,u,s::String) = refinemesh4(g,p,e,t,u,s)
-        refinemesh(g,p::ChainBundle,e,t,u,η) = refinemesh4(g,p,e,t,u,float.(η))
-        refinemesh(g,p::ChainBundle,e,t,u,η,s) = refinemesh4(g,p,e,t,u,float.(η),s)
-        refinemesh!(g::Matrix{Int},p::ChainBundle,args...) = refinemesh!(Matrix{Float64}(g),p,args...)
-        function refinemesh!(g,p::ChainBundle{V},e,t,s...) where V
-            P,E,T = refinemesh(g,p,e,t,s...); l = size(P,1)+1
-            matlab(P,bundle(p)); matlab(E,bundle(e)); matlab(T,bundle(t))
-            submesh!(p); array!(t); el,tl = list(1,l-1),list(1,l)
-            bundle_cache[bundle(p)] = [Chain{V,1,Float64}(vcat(1,P[:,k])) for k ∈ 1:size(P,2)]
-            bundle_cache[bundle(e)] = [Chain{↓(p),1,Int}(Int.(E[el,k])) for k ∈ 1:size(E,2)]
-            bundle_cache[bundle(t)] = [Chain{p,1,Int}(Int.(T[tl,k])) for k ∈ 1:size(T,2)]
-            return (p,e,t)
         end
     end
 end

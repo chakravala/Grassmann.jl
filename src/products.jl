@@ -211,25 +211,18 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:geom,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        if isdiag(V)
-                            pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                            g = parityinner(V,A,B)
-                            val = $MUL(g,pcc ? $SUB(v) : v)
+                        basg = if isdiag(V)
+                            Values(((A⊻B,parityinner(V,A,B)),))
+                        else
+                            paritygeometric(V,A,B)
+                        end
+                        for (bas,g) ∈ basg
+                            val = $MUL(g,v)
                             if istangent(V)
                                 !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                                 count_ones(Q)+order(val)>diffmode(V) && (return false)
                             end
                             $s(m,val,bas|Q,Val(mdims(V)))
-                            cc && $s(m,hasinforigin(V,A,B) ? $SUB(val) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
-                        else
-                            for (bas,g) ∈ paritygeometric(V,A,B)
-                                val = $MUL(g,v)
-                                if istangent(V)
-                                    !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
-                                    count_ones(Q)+order(val)>diffmode(V) && (return false)
-                                end
-                                $s(m,val,bas|Q,Val(mdims(V)))
-                            end
                         end
                     end
                     return false
@@ -237,25 +230,18 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 @inline function $(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S,vfield::Val{field}=Val(false)) where {T<:$F,S<:$F,M,field}
                     if v ≠ 0 && !diffcheck(V,a,b)
                         A,B,Q,Z = symmetricmask(V,a,b)
-                        if isdiag(V)
-                            pcc,bas,cc = (hasinf(V) && hasorigin(V)) ? conformal(V,A,B) : (false,A⊻B,false)
-                            g = parityinner(V,A,B,vfield)
-                            val = :($$MUL($g,$(pcc ? :($$SUB($v)) : v)))
+                        basg = if isdiag(V)
+                            Values(((A⊻B,parityinner(V,A,B,vfield)),))
+                        else
+                            paritygeometric(V,A,B,vfield)
+                        end
+                        for (bas,g) ∈ basg
+                            val = :($$MUL($g,$v))
                             if istangent(V)
                                 !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                                 val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                             end
                             $spre(m,val,bas|Q,Val(mdims(V)))
-                            cc && $spre(m,hasinforigin(V,A,B) ? :($$SUB($val)) : val,(conformalmask(V)⊻bas)|Q,Val(mdims(V)))
-                        else
-                            for (bas,g) ∈ paritygeometric(V,A,B,vfield)
-                                val = :($$MUL($g,$v))
-                                if istangent(V)
-                                    !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
-                                    val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
-                                end
-                                $spre(m,val,bas|Q,Val(mdims(V)))
-                            end
                         end
                     end
                     return false
@@ -363,10 +349,10 @@ end
 @inline exteraddblade!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!(V,out,α,β,γ)
 @inline exteraddspin!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!(V,out,α,β,γ)
 @inline exteraddanti!(V,out,α,β,γ) = exterbits(V,α,β) && joinaddanti!(V,out,α,β,γ)
-@inline exteraddmulti!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddmulti!_pre(V,out,α,β,γ)
-@inline exteraddblade!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ)
-@inline exteraddspin!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddspin!_pre(V,out,α,β,γ)
-@inline exteraddanti!_pre(V,out,α,β,γ) = exterbits(V,α,β) && joinaddanti!_pre(V,out,α,β,γ)
+@inline exteraddmulti!_pre(V,out,α,β,γ,f=Val(false)) = exterbits(V,α,β) && joinaddmulti!_pre(V,out,α,β,γ,f)
+@inline exteraddblade!_pre(V,out,α,β,γ,f=Val(false)) = exterbits(V,α,β) && joinaddblade!_pre(V,out,α,β,γ,f)
+@inline exteraddspin!_pre(V,out,α,β,γ,f=Val(false)) = exterbits(V,α,β) && joinaddspin!_pre(V,out,α,β,γ,f)
+@inline exteraddanti!_pre(V,out,α,β,γ,f=Val(false)) = exterbits(V,α,β) && joinaddanti!_pre(V,out,α,β,γ,f)
 
 # algebra
 

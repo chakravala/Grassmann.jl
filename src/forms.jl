@@ -243,7 +243,7 @@ end
     function (a::Chain{V,1})(b::Single{V,1}) where V
         (!isdyadic(V)) && (return contraction(a,b))
         $(insert_expr((:t,))...)
-        x = bits(b)
+        x = UInt(b)
         X = isdyadic(V) ? x<<Int(mdims(V)/2) : x
         Y = X>2^mdims(V) ? x : X
         @inbounds out = a.v[bladeindex(mdims(V),Y)]
@@ -871,7 +871,7 @@ gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
 @pure evendyad(V) = Spinor.(evenbasis(V))
 @pure function evenbasis(V,even=true)
     N = mdims(V)
-    r,b = binomsum_set(N),binomial_set(N)
+    r,b = binomsum_set(N),gdimsall(N)
     vcat([Λ(V).b[list(r[g]+1,r[g]+b[g])] for g ∈ evens(even ? 1 : 2,N+1)]...)
 end
 evenoperator(t::TensorAlgebra{V}) where V = TensorOperator(Spinor{V}(evenbasis(V) .⊘ Ref(t)))

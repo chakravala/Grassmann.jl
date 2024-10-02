@@ -16,7 +16,7 @@ import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractTensors: ∧, ∨, ⟑, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
 import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
 import AbstractTensors: pseudosandwich, antisandwich, antidot
-import Leibniz: diffcheck, diffmode, hasinforigin, hasorigininf, symmetricsplit
+import Leibniz: diffcheck, diffmode, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
 

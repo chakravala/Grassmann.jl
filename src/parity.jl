@@ -34,48 +34,20 @@ export involute, clifford, pseudoreverse, antireverse
     isodd(sum(digits_fast(a,N) .* cumsum(digits_fast(b<<1,N)))+count_ones((a & b) & S))
 end
 
-@pure conformalmask(V) = UInt(2)^(hasinf(V)&&hasorigin(V) ? 2 : 0)-1
-
-@pure function conformalcheck(V,A,B)
-    bt = conformalmask(V)
-    i2o,o2i = hasinf2origin(V,A,B),hasorigin2inf(V,A,B)
-    A&bt, B&bt, i2o, o2i, i2o ⊻ o2i
-end
-
-@pure function parityconformal(V,A,B)
-    C,cc = A ⊻ B, hasinforigin(V,A,B) || hasorigininf(V,A,B)
-    A3,B3,i2o,o2i,xor = conformalcheck(V,A,B)
-    pcc,bas = xor⊻i2o⊻(i2o&o2i), xor ? (A3|B3)⊻C : C
-    return pcc, bas, cc, Zero(UInt)
-end
-
 function paritycomplementinverse(N,G)#,S)
     parityreverse(N-G)⊻parityreverse(G)⊻isodd(binomial(N,2))#⊻isodd(count_ones(S))
 end
 
-function cga(V,A,B)
-    (hasinforigin(V,A,B) || hasorigininf(V,A,B)) && iszero(getbasis(V,A)∨⋆(getbasis(V,B)))
-end
-
 @pure parityregressive(V::Int,a,b,skew=Val(false)) = _parityregressive(V,a,b,skew)
 @pure function _parityregressive(V,a,b,::Val{skew}=Val(false)) where skew
-    N,M,S = mdims(V),options(V),metric(V)
-    D,G = diffvars(V),typeof(V)<:Int ? V : grade(V)
+    N,S,D,G = mdims(V),metric(V),diffvars(V),typeof(V)<:Int ? V : grade(V)
     A,B,Q,Z = symmetricmask(V,a,b)
     α,β = complement(N,A,D),complement(N,B,D)
-    cc = skew && (hasinforigin(V,A,β) || hasorigininf(V,A,β))
-    if ((count_ones(α&β)==0) && !diffcheck(V,α,β)) #|| cc
+    if ((count_ones(α&β)==0) && !diffcheck(V,α,β))
         C,L = α ⊻ β, count_ones(A)+count_ones(B)
-        bas = complement(N,C,D)
-        pcc,bas = if skew
-            A3,β3,i2o,o2i,xor = UInt(0),UInt(0),false,false,false#conformalcheck(V,A,β)
-            cx = cc || xor
-            cx && parity(V,A3,β3)⊻(i2o || o2i)⊻(xor&!i2o), cx ? (A3|β3)⊻bas : bas
-        else
-            false, A+B≠0 ? bas : Zero(UInt)
-        end
+        bas = skew || A+B≠0 ? complement(N,C,D) : Zero(UInt)
         par = parityright(S,A,N)⊻parityright(S,B,N)⊻parityright(S,C,N)
-        return (isodd(L*(L-G))⊻par⊻parity(N,S,α,β)⊻pcc)::Bool, bas|Q, true, Z
+        return (isodd(L*(L-G))⊻par⊻parity(N,S,α,β))::Bool, bas|Q, true, Z
     else
         return false, Zero(UInt), false, Z
     end
@@ -89,7 +61,7 @@ end
 
 @pure function parityinterior(V::Int,a,b)
     A,B,Q,Z = symmetricmask(V,a,b)
-    (diffcheck(V,A,B) || cga(V,A,B)) && (return false,Zero(UInt),false,Z)
+    diffcheck(V,A,B) && (return false,Zero(UInt),false,Z)
     p,C,t = parityregressive(V,A,complement(V,B,diffvars(V)),Val(true))
     t ? (p⊻parityright(0,sum(indices(B,V)),count_ones(B)) ? -1 : 1) : 1, C|Q, t, Z
 end
@@ -131,7 +103,7 @@ end
     end
     bs,bg = (),()
     for i ∈ list(1,diag ? 1 : gdims(grade(V),G))
-        if (!isnull(g[i])) && !(diffcheck2(V,A,bas[i]) || cga(V,A,bas[i]))
+        if (!isnull(g[i])) && !diffcheck2(V,A,bas[i])
             p,C,t = parityregressive(Signature(W),A,complement(N,bas[i],diffvars(V)),Val{true}())
             CQ,tout = C|Q,tout|t
             if t
