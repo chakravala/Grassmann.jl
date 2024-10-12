@@ -13,12 +13,15 @@
 #   https://crucialflow.com
 
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
-import AbstractTensors: ∧, ∨, ⟑, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
+import AbstractTensors: ∧, ∨, ⟑, ⊖, ⊘, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
 import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
 import AbstractTensors: pseudosandwich, antisandwich, antidot
 import Leibniz: diffcheck, diffmode, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
+
+export ∗, ⊛, ⊖, ∧, ∨, ⟑, wedgedot, veedot, ⊗, ⨼, ⨽, ⊙, ⊠, ⟂, ∥
+export ⊘, sandwich, pseudosandwich, antisandwich
 
 if VERSION >= v"1.10.0"; @eval begin
     import AbstractTensors.$(Symbol("⟇"))
@@ -89,9 +92,6 @@ function wedgedot_metric(a::Submanifold{V},b::Single{V},g) where V
     order(b.v)+order(bas)>diffmode(V) ? Zero(V) : v*bas
 end
 
-export ∗, ⊛, ⊖
-import AbstractTensors: ⊖, ⊘, ∗
-
 @doc """
     ∗(ω::TensorAlgebra,η::TensorAlgebra)
 
@@ -138,8 +138,6 @@ function ∧(a::X,b::Y) where {X<:TensorTerm{V},Y<:TensorTerm{V}} where V
     end
     return Single{V}(parity(x,y) ? -v : v,getbasis(V,(A⊻B)|Q))
 end
-
-export ∧, ∨, ⟑, wedgedot, veedot, ⊗
 
 #⊗(a::A,b::B) where {A<:TensorAlgebra,B<:TensorAlgebra} = a∧b
 ⊗(a::A,b::B) where {A<:TensorGraded,B<:TensorGraded} = Dyadic(a,b)
@@ -195,9 +193,6 @@ Regressive product as defined by the DeMorgan's law: ∨(ω...) = ⋆⁻¹(∧(�
 """ Grassmann.:&
 
 ## interior product: a ∨ ⋆(b)
-
-import LinearAlgebra: dot, ⋅
-export ⋅
 
 """
     contraction(ω::TensorAlgebra,η::TensorAlgebra)
@@ -268,8 +263,6 @@ end
     end
 end
 
-export ⨼, ⨽
-
 @doc """
     dot(ω::TensorAlgebra,η::TensorAlgebra)
 
@@ -278,9 +271,6 @@ Interior (right) contraction product: ω⋅η = ω∨⋆η
 
 ## cross product
 
-import LinearAlgebra: cross, ×
-export ×
-
 @doc """
     cross(ω::TensorAlgebra,η::TensorAlgebra)
 
@@ -288,8 +278,6 @@ Cross product: ω×η = ⋆(ω∧η)
 """ LinearAlgebra.cross
 
 # symmetrization and anti-symmetrization
-
-export ⊙, ⊠
 
 """
     ⊙(ω::TensorAlgebra,η::TensorAlgebra)
@@ -315,14 +303,12 @@ end
 
 ## sandwich product
 
-export ⊘, sandwich, pseudosandwich, antisandwich
-
 ⊘(x::TensorTerm{V},y::TensorTerm{V}) where V = reverse(y)*x*involute(y)
 ⊘(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V = reverse(y)*x*involute(y)
 ⊘(x::Couple{V},y::TensorAlgebra{V}) where V = (scalar(x)⊘y)+(imaginary(x)⊘y)
 ⊘(x::PseudoCouple{V},y::TensorAlgebra{V}) where V = (imaginary(x)⊘y)+(volume(x)⊘y)
 @generated ⊘(a::TensorGraded{V,G},b::Spinor{V}) where {V,G} = product_sandwich(a,b)
-@generated ⊘(a::TensorGraded{V,G},b::AntiSpinor{V}) where {V,G} = product_sandwich(a,b)
+@generated ⊘(a::TensorGraded{V,G},b::CoSpinor{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::Couple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::PseudoCouple{V}) where {V,G} = product_sandwich(a,b)
 @generated ⊘(a::TensorGraded{V,G},b::TensorGraded{V,L}) where {V,G,L} = product_sandwich(a,b)
@@ -330,7 +316,7 @@ export ⊘, sandwich, pseudosandwich, antisandwich
     isinduced(g) && (return :(a⊘b))
     product_sandwich(a,b,false,true)
 end
-@generated function ⊘(a::TensorGraded{V,G},b::AntiSpinor{V},g) where {V,G}
+@generated function ⊘(a::TensorGraded{V,G},b::CoSpinor{V},g) where {V,G}
     isinduced(g) && (return :(a⊘b))
     product_sandwich(a,b,false,true)
 end
@@ -360,7 +346,7 @@ For normalized even grade η it is ω⊘η = (~η)⊖ω⊖η
 >>>(y::TensorAlgebra{V},x::Couple{V}) where V = (y>>>scalar(x))+(y>>>imaginary(x))
 >>>(y::TensorAlgebra{V},x::PseudoCouple{V}) where V = (y>>>imaginary(x))+(y>>>volume(x))
 @generated >>>(b::Spinor{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
-@generated >>>(b::AntiSpinor{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
+@generated >>>(b::CoSpinor{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
 @generated >>>(b::Couple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
 @generated >>>(b::PseudoCouple{V},a::TensorGraded{V,G}) where {V,G} = product_sandwich(a,b,true)
 @generated >>>(b::TensorGraded{V,L},a::TensorGraded{V,G}) where {V,G,L} = product_sandwich(a,b,true)
@@ -368,7 +354,7 @@ For normalized even grade η it is ω⊘η = (~η)⊖ω⊖η
     isinduced(g) && (return :(b>>>a))
     product_sandwich(a,b,true,true)
 end
-@generated function >>>(b::AntiSpinor{V},a::TensorGraded{V,G},g) where {V,G}
+@generated function >>>(b::CoSpinor{V},a::TensorGraded{V,G},g) where {V,G}
     isinduced(g) && (return :(b>>>a))
     product_sandwich(a,b,true,true)
 end
@@ -404,8 +390,6 @@ antidot(a,b) = complementleft(contraction(complementright(a),complementright(b))
 antidot_metric(a,b) = complementleft(contraction_metric(complementright(a),complementright(b),g))
 
 ## linear algebra
-
-export ⟂, ∥
 
 ∥(a,b) = iszero(a∧b)
 
@@ -511,7 +495,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
             throw(error("inv($m) is undefined"))
         end
     end
-    for pinor ∈ (:Spinor,:AntiSpinor)
+    for pinor ∈ (:Spinor,:CoSpinor)
         @eval begin
             function $nv(m::$pinor{V,T},$(args...)) where {V,T}
                 rm = ~m
@@ -800,7 +784,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         end end
     end
     @noinline function adderanti(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
-        (iseven(L) || iseven(G)) && (return :(error("$(basis(a)) and $(basis(b)) are not expressible as AntiSpinor")))
+        (iseven(L) || iseven(G)) && (return :(error("$(basis(a)) and $(basis(b)) are not expressible as CoSpinor")))
         left,bop,VEC = addvec(a,b,false,op)
         if mdims(V)-1<cache_limit
             $(insert_expr((:N,),:svecs)...)
@@ -808,13 +792,13 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             out,ib = svecs(N,Any)(zeros(svecs(N,t<:Number ? t : Int))),indexbasis(N)
             setanti!_pre(out,:(value(a,$t)),UInt(basis(a)),Val{N}())
             setanti!_pre(out,:($bop(value(b,$t))),UInt(basis(b)),Val{N}())
-            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
+            return :(CoSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else quote
             $(insert_expr((:N,:t),VEC)...)
             out = zeros(mvecs(N,t))
             setanti!(out,value(a,t),UInt(basis(a)),Val{N}())
             setanti!(out,$bop(value(b,t)),UInt(basis(b)),Val{N}())
-            return AntiSpinor{V}(out)
+            return CoSpinor{V}(out)
         end end
     end
     @noinline function addermulti(a::Type{<:TensorTerm{V,L}},b::Type{<:TensorTerm{V,G}},op) where {V,L,G}
@@ -918,17 +902,17 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                 end
                 val = :(@inbounds $left(value(a,$t)))
                 setanti!_pre(out,val,X,Val(N))
-                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
+                return :(CoSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
             else return if !swap; quote
                 $(insert_expr((:N,:t,:out,:rrr,:bng),VECS)...)
                 @inbounds out[rrr+1:rrr+bng] = $(bcast(right,:(value(b,$VEC(N,G,t)),)))
                 addpseudo(out,value(a,t),UInt(basis(a)),Val(N))
-                return AntiSpinor{V}(out)
+                return CoSpinor{V}(out)
             end; else quote
                 $(insert_expr((:N,:t,:out,:rrr,:bng),VECS)...)
                 @inbounds out[rrr+1:rrr+bng] = value(a,$VEC(N,G,t))
                 addanti!(out,$left(value(b,t)),UInt(basis(b)),Val(N))
-                return AntiSpinor{V}(out)
+                return CoSpinor{V}(out)
             end end end
         else
             if mdims(V)<cache_limit
@@ -1015,7 +999,7 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return Spinor{V}(out)
         end end end
     end
-    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:AntiSpinor{V,T}},op,swap=false) where {V,G,T}
+    @noinline function adder(a::Type{<:TensorTerm{V,G}},b::Type{<:CoSpinor{V,T}},op,swap=false) where {V,G,T}
         left,right,VEC = addvec(a,b,swap,op)
         VECS = Symbol(string(VEC)*"s")
         !isodd(G) && (return swap ? :($op(Multivector(b),a)) : :($op(a,Multivector(b))))
@@ -1032,24 +1016,24 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
                     setanti!_pre(out,val,B,Val(N))
                 end
             end
-            return :(AntiSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
+            return :(CoSpinor{V}($(Expr(:call,tvecs(N,t<:Number ? t : Any),out...))))
         else return if !swap; quote
             $(insert_expr((:N,:t),VEC)...)
             out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
             addanti!(out,value(a,t),UInt(basis(a)),Val(N))
-            return AntiSpinor{V}(out)
+            return CoSpinor{V}(out)
         end; else quote
             $(insert_expr((:N,:t),VEC)...)
             out = value(a,$VECS(N,t))
             addpseudo(out,$left(value(b,t)),UInt(basis(b)),Val(N))
-            return AntiSpinor{V}(out)
+            return CoSpinor{V}(out)
         end end end
     end
     @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,field=false) where S<:TensorGraded{V,L} where {V,G,L,T}
         MUL,VEC = mulvecs(a,b)
         vfield = Val(field)
         anti = isodd(L) ≠ isodd(G)
-        type = anti ? :AntiSpinor : :Spinor
+        type = anti ? :CoSpinor : :Spinor
         args = field ? (:g,) : ()
         (S<:Zero || S<:Infinity) && (return :a)
         if G == 0
@@ -1341,13 +1325,13 @@ for (op,po,GL,grass) ∈ ((:∧,:>,:(G+L),:exter),(:∨,:<,:(G+L-mdims(V)),:meet
     end
 end
 
-for input ∈ (:Multivector,:Spinor,:AntiSpinor)
-    inspin,inanti = input==:Spinor,input==:AntiSpinor
+for input ∈ (:Multivector,:Spinor,:CoSpinor)
+    inspin,inanti = input==:Spinor,input==:CoSpinor
 for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
                      (:∨,:meetadd),(:contraction,:skewadd))
     outspin = product ∈ (:exteradd,:geomadd,:skewadd)
     outmulti = input == :Multivector
-    outype = outmulti ? :Multivector : outspin ? :($(inspin ? :isodd : :iseven)(G) ? AntiSpinor : Spinor) : inspin ?  :(isodd(G)⊻isodd(N) ? AntiSpinor : Spinor) : :(isodd(G)⊻isodd(N) ? Spinor : AntiSpinor)
+    outype = outmulti ? :Multivector : outspin ? :($(inspin ? :isodd : :iseven)(G) ? CoSpinor : Spinor) : inspin ?  :(isodd(G)⊻isodd(N) ? CoSpinor : Spinor) : :(isodd(G)⊻isodd(N) ? Spinor : CoSpinor)
     product! = outmulti ? Symbol(product,:multi!) : outspin ? :($(inspin ? :isodd : :iseven)(G) ? $(Symbol(product,:anti!)) : $(Symbol(product,:spin!))) : :(isodd(G)⊻isodd(N) ? $(Symbol(product,outspin⊻inspin ? :anti! : :spin!)) : $(Symbol(product,outspin⊻inspin ? :spin! : :anti!)))
     preproduct! = outmulti ? Symbol(product,:multi!_pre) : outspin ? :($(inspin ? :isodd : :iseven)(G) ? $(Symbol(product,:anti!_pre)) : $(Symbol(product,:spin!_pre))) : :(isodd(G)⊻isodd(N) ? $(Symbol(product,outspin⊻inspin ? :anti!_pre : :spin!_pre)) : $(Symbol(product,outspin⊻inspin ? :spin!_pre : :anti!_pre)))
     prop = op≠:* ? Symbol(:product_,op) : :product
@@ -1453,9 +1437,9 @@ for (op,product) ∈ ((:∧,:exteradd),(:*,:geomadd),
 end
 end
 
-for input ∈ (:Spinor,:AntiSpinor)
+for input ∈ (:Spinor,:CoSpinor)
     inspin = input==:Spinor
-    outype = :($(inspin ? :isodd : :iseven)(G) ? AntiSpinor : Spinor)
+    outype = :($(inspin ? :isodd : :iseven)(G) ? CoSpinor : Spinor)
     product! = :($(inspin ? :isodd : :iseven)(G) ? geomaddanti! : geomaddspin!)
     preproduct! = :($(inspin ? :isodd : :iseven)(G) ? geomaddanti!_pre : geomaddspin!_pre)
     product2! = :(isodd(G) ? geomaddanti! : geomaddspin!)

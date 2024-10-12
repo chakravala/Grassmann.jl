@@ -24,8 +24,8 @@ export complementleftanti, complementrightanti
 
 ## reverse
 
-import Base: reverse, conj, ~
-export involute, clifford, pseudoreverse, antireverse
+import Base: reverse, conj, ~, signbit, imag, real
+export involute, clifford, pseudoreverse, antireverse, odd, even, angular, radial, ₊, ₋, ǂ
 
 ## product parities
 
@@ -420,9 +420,6 @@ for par ∈ (:conformal,:regressive,:interior)
     end
 end
 
-import Base: signbit, imag, real
-export odd, even, angular, radial, ₊, ₋, ǂ
-
 @pure signbit(V::T) where T<:Manifold = (ib=indexbasis(rank(V)); parity.(Ref(V),ib,ib))
 @pure signbit(V::T,G) where T<:Manifold = (ib=indexbasis(rank(V),G); parity.(Ref(V),ib,ib))
 @pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
@@ -448,9 +445,9 @@ Base.isodd(t::Zero) = true
 Base.iseven(t::TensorGraded{V,G}) where {V,G} = iseven(G) ? true : iszero(t)
 Base.isodd(t::TensorGraded{V,G}) where {V,G} = isodd(G) ? true : iszero(t)
 Base.iseven(t::Spinor) = true
-Base.iseven(t::AntiSpinor) = iszero(t)
+Base.iseven(t::CoSpinor) = iszero(t)
 Base.isodd(t::Spinor) = iszero(t)
-Base.isodd(t::AntiSpinor) = true
+Base.isodd(t::CoSpinor) = true
 Base.iseven(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? true : iszero(imaginary(t))
 Base.isodd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? iszero(scalar(t)) : iszero(t)
 Base.iseven(t::PseudoCouple{V,B}) where {V,B} = iseven(imaginary(t)) && iseven(volume(t))
@@ -458,10 +455,10 @@ Base.isodd(t::PseudoCouple{V,B}) where {V,B} = isodd(imaginary(t)) && isodd(volu
 Base.iseven(t::Multivector) = norm(t) ≈ norm(even(t))
 Base.isodd(t::Multivector) = norm(t) ≈ norm(odd(t))
 
-even(t::AntiSpinor{V}) where V = Zero{V}()
+even(t::CoSpinor{V}) where V = Zero{V}()
 odd(t::Spinor{V}) where V = Zero{V}()
 even(t::Spinor) = t
-odd(t::AntiSpinor) = t
+odd(t::CoSpinor) = t
 even(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? t : scalar(t)
 odd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? imaginary(t) : Zero{V}()
 even(t::PseudoCouple{V,B}) where {V,B} = even(imaginary(t)) + even(volume(t))

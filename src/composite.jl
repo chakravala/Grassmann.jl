@@ -15,6 +15,7 @@
 export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudometric, pseudodot, @pseudo
 export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
+export vandermonde, volumes, detsimplex, submesh
 
 ## exponential & logarithm function
 
@@ -297,7 +298,7 @@ for (op,logm,field) ∈ ((:⟑,:(Base.log),false),(:wedgedot_metric,:log_metric,
     args = field ? (:g,) : ()
     indu(t=:(log(t))) = field ? :(isinduced(g) && (return :($$t))) : nothing
 @eval qlog(b::PseudoCouple,$(args...),x::Int=10000) = qlog(multispin(b),$(args...),x)
-@eval qlog(b::AntiSpinor,$(args...),x::Int=10000) = qlog(Multivector(b),$(args...),x)
+@eval qlog(b::CoSpinor,$(args...),x::Int=10000) = qlog(Multivector(b),$(args...),x)
 @eval function qlog(w::T,$(args...),x::Int=10000) where T<:TensorAlgebra
     $(indu(:(qlog(w,x))))
     V = Manifold(w)
@@ -319,7 +320,7 @@ for (op,logm,field) ∈ ((:⟑,:(Base.log),false),(:wedgedot_metric,:log_metric,
 end # http://www.netlib.org/cephes/qlibdoc.html#qlog
 
 @eval qlog_fast(b::PseudoCouple,$(args...),x::Int=10000) = qlog_fast(multispin(b),$(args...),x)
-@eval qlog_fast(b::AntiSpinor,$(args...),x::Int=10000) = qlog_fast(Multivector(b),$(args...),x)
+@eval qlog_fast(b::CoSpinor,$(args...),x::Int=10000) = qlog_fast(Multivector(b),$(args...),x)
 for pinor ∈ (:Multivector,:Spinor); VEC = pinor≠:Spinor ? :mvec : :mvecs
 @eval @generated function qlog_fast(b::$pinor{V,T,E},$(args...),x::Int=10000) where {V,T,E}
     $(indu(:(qlog_fast(b,x))))
@@ -387,17 +388,17 @@ end
 end
 
 @eval begin
-    Base.exp(t::AntiSpinor,$(args...)) = exp(Multivector(t),$(args...))
-    Base.expm1(t::AntiSpinor,$(args...)) = expm1(Multivector(t),$(args...))
-    $logm(t::AntiSpinor,$(args...)) = $logm(Multivector(t),$(args...))
-    Base.log1p(t::AntiSpinor,$(args...)) = log1p(Multivector(t),$(args...))
-    log_fast(t::AntiSpinor,$(args...)) = log_fast(Multivector(t),$(args...))
-    logh_fast(t::AntiSpinor,$(args...)) = logh_fast(Multivector(t),$(args...))
+    Base.exp(t::CoSpinor,$(args...)) = exp(Multivector(t),$(args...))
+    Base.expm1(t::CoSpinor,$(args...)) = expm1(Multivector(t),$(args...))
+    $logm(t::CoSpinor,$(args...)) = $logm(Multivector(t),$(args...))
+    Base.log1p(t::CoSpinor,$(args...)) = log1p(Multivector(t),$(args...))
+    log_fast(t::CoSpinor,$(args...)) = log_fast(Multivector(t),$(args...))
+    logh_fast(t::CoSpinor,$(args...)) = logh_fast(Multivector(t),$(args...))
 end
 for op ∈ (:cosh,:sinh)
     @eval begin
         Base.$op(t::PseudoCouple,$(args...)) = $op(multispin(t),$(args...))
-        Base.$op(t::AntiSpinor,$(args...)) = $op(Multivector(t),$(args...))
+        Base.$op(t::CoSpinor,$(args...)) = $op(Multivector(t),$(args...))
     end
 end
 
@@ -825,8 +826,6 @@ Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
 grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
 
-export vandermonde
-
 @generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(mdims(V))))⋅y)
 approx(x,y::Values{N}) where N = value(polynom(x,Val(N)))⋅y
 approx(x,y::AbstractVector) = [x^i for i ∈ 0:length(y)-1]⋅y
@@ -905,8 +904,6 @@ function Base.findlast(P,t::ChainBundle)
     return 0
 end
 Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
-
-export volumes, detsimplex, submesh
 
 edgelength(e) = (v=points(e)[value(e)]; value(abs(v[2]-v[1])))
 volumes(m,dets) = value.(abs.(.⋆(dets)))
@@ -1007,7 +1004,7 @@ for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
         Base.$op(a::PseudoCouple{V,B},m) where {V,B} = PseudoCouple{V,B}($op(value(a),m))
         Base.$op(a::Chain{V,G,T},m) where {V,G,T} = Chain{V,G}($op.(value(a),m))
         Base.$op(a::Spinor{V,T},m) where {T,V} = Spinor{V}($op.(value(a),m))
-        Base.$op(a::AntiSpinor{V,T},m) where {T,V} = AntiSpinor{V}($op.(value(a),m))
+        Base.$op(a::CoSpinor{V,T},m) where {T,V} = CoSpinor{V}($op.(value(a),m))
         Base.$op(a::Multivector{V,T},m) where {T,V} = Multivector{V}($op.(value(a),m))
     end
 end
@@ -1017,20 +1014,20 @@ for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
         Base.$op(a::PseudoCouple{V,B};args...) where {V,B} = PseudoCouple{V,B}($op(value(a);args...))
         Base.$op(a::Chain{V,G,T};args...) where {V,G,T} = Chain{V,G}($op.(value(a);args...))
         Base.$op(a::Spinor{V,T};args...) where {V,T} = Spinor{V}($op.(value(a);args...))
-        Base.$op(a::AntiSpinor{V,T};args...) where {V,T} = AntiSpinor{V}($op.(value(a);args...))
+        Base.$op(a::CoSpinor{V,T};args...) where {V,T} = CoSpinor{V}($op.(value(a);args...))
         Base.$op(a::Multivector{V,T};args...) where {V,T} = Multivector{V}($op.(alue(a);args...))
     end
 end
 Base.isfinite(a::Chain) = prod(isfinite.(value(a)))
 Base.isfinite(a::Spinor) = prod(isfinite.(value(a)))
-Base.isfinite(a::AntiSpinor) = prod(isfinite.(value(a)))
+Base.isfinite(a::CoSpinor) = prod(isfinite.(value(a)))
 Base.isfinite(a::Multivector) = prod(isfinite.(value(a)))
 Base.isfinite(a::Couple) = isfinite(value(a))
 Base.isfinite(a::PseudoCouple) = isfinite(value(a))
 Base.rationalize(t::Type,a::Chain{V,G,T};tol::Real=eps(T)) where {V,G,T} = Chain{V,G}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Multivector{V,T};tol::Real=eps(T)) where {V,T} = Multivector{V}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Spinor{V,T};tol::Real=eps(T)) where {V,T} = Spinor{V}(rationalize.(t,value(a),tol))
-Base.rationalize(t::Type,a::AntiSpinor{V,T};tol::Real=eps(T)) where {V,T} = AntiSpinor{V}(rationalize.(t,value(a),tol))
+Base.rationalize(t::Type,a::CoSpinor{V,T};tol::Real=eps(T)) where {V,T} = CoSpinor{V}(rationalize.(t,value(a),tol))
 Base.rationalize(t::Type,a::Couple{V,B};tol::Real=eps(T)) where {V,B} = Couple{V,B}(rationalize(t,value(a),tol))
 Base.rationalize(t::Type,a::PseudoCouple{V,B};tol::Real=eps(T)) where {V,B} = PseudoCouple{V,B}(rationalize(t,value(a),tol))
 Base.rationalize(t::T;kvs...) where T<:TensorAlgebra = rationalize(Int,t;kvs...)
@@ -1067,7 +1064,7 @@ end
 
 Base.map(fn, x::Multivector{V}) where V = Multivector{V}(map(fn, value(x)))
 Base.map(fn, x::Spinor{V}) where V = Spinor{V}(map(fn, value(x)))
-Base.map(fn, x::AntiSpinor{V}) where V = AntiSpinor{V}(map(fn, value(x)))
+Base.map(fn, x::CoSpinor{V}) where V = CoSpinor{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::TensorTerm) = fn(value(x))*basis(x)
 Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
@@ -1085,9 +1082,9 @@ Base.rand(::AbstractRNG,::SamplerType{Multivector{V,T}}) where {V,T} = Multivect
 Base.rand(::AbstractRNG,::SamplerType{Spinor}) = rand(Spinor{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Spinor{V}}) where V = Spinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
 Base.rand(::AbstractRNG,::SamplerType{Spinor{V,T}}) where {V,T} = Spinor{V}(rand(svecs(mdims(V),T)))
-Base.rand(::AbstractRNG,::SamplerType{AntiSpinor}) = rand(AntiSpinor{rand(Manifold)})
-Base.rand(::AbstractRNG,::SamplerType{AntiSpinor{V}}) where V = AntiSpinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
-Base.rand(::AbstractRNG,::SamplerType{AntiSpinor{V,T}}) where {V,T} = AntiSpinor{V}(rand(svecs(mdims(V),T)))
+Base.rand(::AbstractRNG,::SamplerType{CoSpinor}) = rand(CoSpinor{rand(Manifold)})
+Base.rand(::AbstractRNG,::SamplerType{CoSpinor{V}}) where V = CoSpinor{V}(DirectSum.orand(svecs(mdims(V),Float64)))
+Base.rand(::AbstractRNG,::SamplerType{CoSpinor{V,T}}) where {V,T} = CoSpinor{V}(rand(svecs(mdims(V),T)))
 Base.rand(::AbstractRNG,::SamplerType{Couple}) = rand(Couple{rand(Manifold)})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V}}) where V = rand(Couple{V,Submanifold{V}(UInt(rand(1:1<<mdims(V)-1)))})
 Base.rand(::AbstractRNG,::SamplerType{Couple{V,B}}) where {V,B} = Couple{V,B}(rand(Complex{Float64}))

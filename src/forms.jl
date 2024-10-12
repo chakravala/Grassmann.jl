@@ -1,6 +1,10 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
+export TensorNested, Projector, Dyadic, Proj, outer, InducedMetric
+export DiagonalOperator, TensorOperator, Endomorphism, Outermorphism, outermorphism
+export operator, gradedoperator, evenoperator, oddoperator, MetricTensor, metrictensor
+
 ## conversions
 
 @pure choicevec(M,G,T) = T ∈ (Any,BigFloat,BigInt,Complex{BigFloat},Rational{BigInt},Complex{BigInt}) ? svec(M,G,T) : mvec(M,G,T)
@@ -288,7 +292,6 @@ end
 
 # Dyadic
 
-export TensorNested
 abstract type TensorNested{V,T} <: Manifold{V,T} end
 @pure Manifold(::T) where T<:TensorNested{V} where V = V
 @pure Manifold(::Type{T}) where T<:TensorNested{V} where V = V
@@ -301,6 +304,14 @@ transpose_row(t::Chain{V,1,<:Chain},i) where V = transpose_row(value(t),i,V)
 Base.transpose(t::Chain{V,1,<:Chain{V,1}}) where V = _transpose(value(t))
 Base.transpose(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = _transpose(value(t),V)
 Base.inv(t::TensorNested,g) = inv(t)
+@generated function LinearAlgebra.tr(m::Chain{V,G,<:Chain{V,G},N}) where {V,G,N}
+    :(sum(Values($([:(m[$i][$i]) for i ∈ list(1,N)]...))))
+end
+for typ ∈ (:Spinor,:AntiSpinor,:Multivector)
+    @eval @generated function LinearAlgebra.tr(m::$typ{V,<:$typ{V},N}) where {V,N}
+        :(sum(Values($([:(m[$i][$i]) for i ∈ list(1,N)]...))))
+    end
+end
 
 Base.Matrix(t::TensorAlgebra) = matrix(t)
 
@@ -349,8 +360,6 @@ display_matrix(m::TensorAlgebra{V,<:Multivector{W}}) where {V,W} = vcat(transpos
 for (pinor,bas) ∈ ((:Spinor,:evenbasis),(:AntiSpinor,:oddbasis),(:Multivector,:fullbasis))
     @eval display_matrix(m::$pinor{V,<:TensorAlgebra{W}}) where {V,W} = vcat(transpose([Submanifold(V),$bas(V)...]),hcat($bas(W),matrix(m)))
 end
-
-export Projector, Dyadic, Proj
 
 struct Projector{V,T,Λ} <: TensorNested{V,T}
     v::T
@@ -404,8 +413,6 @@ Chain(P::Dyadic{V}) where V = Chain{V}(P)
 
 # DiagonalOperator
 
-export DiagonalOperator
-
 struct DiagonalOperator{V,T<:TensorAlgebra{V}} <: TensorNested{V,T}
     v::T
     DiagonalOperator{V}(t::T) where {V,T<:TensorAlgebra{V}} = new{V,T}(t)
@@ -419,6 +426,7 @@ matrix(m::DiagonalOperator) = matrix(TensorOperator(m))
 getindex(t::DiagonalOperator,i::Int,j::Int) = i≠j ? zero(valuetype(value(t))) : value(value(t))[i]
 getindex(t::DiagonalOperator,i::Int) = value(t)(i)
 
+LinearAlgebra.tr(m::DiagonalOperator) = sum(value(value(m)))
 compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{0}) where V = DiagonalOperator(Chain{V,0}(1))
 @generated function compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{G}) where {V,G}
     Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),Expr(:call,Values,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...)))
@@ -447,8 +455,6 @@ function show(io::IO, ::MIME"text/plain", t::DiagonalOperator)
     show_matrix(io, t, X)
 end
 
-export TensorOperator, Endomorphism
-
 struct TensorOperator{V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} <: TensorNested{V,T}
     v::T
     TensorOperator{V,W}(t::T) where {V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} = new{V,W,T}(t)
@@ -465,6 +471,7 @@ compound(m::TensorOperator,g) = TensorOperator(compound(value(m),g))
 compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 getindex(t::TensorOperator,i::Int) = value(t.v)[i]
+LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
 
 for op ∈ (:(Base.inv),)
     @eval $op(t::Endomorphism{V,<:Chain}) where V = TensorOperator($op(value(t)))
@@ -529,8 +536,6 @@ end
 
 # Outermorphism
 
-export Outermorphism, outermorphism
-
 struct Outermorphism{V,T<:Tuple} <: TensorNested{V,T}
     v::T
     Outermorphism{V}(t::T) where {V,T<:Tuple} = new{V,T}(t)
@@ -547,6 +552,7 @@ outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
 value(t::Outermorphism) = t.v
 matrix(m::Outermorphism) = matrix(TensorOperator(m))
 getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One(V)),)) : t.v[i]
+LinearAlgebra.tr(m::Outermorphism) = 1+sum(tr.(value(m)))
 
 TensorOperator(t::Outermorphism{V}) where V = TensorOperator(Multivector{V}(vcat(Multivector(One(V)),value.(map.(Multivector,value.(t.v)))...)))
 
@@ -597,8 +603,6 @@ cayley(a::AbstractVector,b::AbstractVector) = a*transpose(b)
 cayley(a::AbstractVector,b::AbstractVector,op) = TensorAlgebra{Manifold(Manifold(eltype(a)))}[op(x,y) for x ∈ a, y ∈ b]
 
 # dyadic products
-
-export outer
 
 outer(a::Leibniz.Derivation,b::Chain{V,1}) where V= outer(V(a),b)
 outer(a::Chain{W},b::Leibniz.Derivation{T,1}) where {W,T} = outer(a,W(b))
@@ -828,8 +832,6 @@ Base.:-(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = Ch
 
 # representation
 
-export operator, gradedoperator, evenoperator, oddoperator
-
 ⊘(a::TensorOperator{V,W,<:Chain{V,G}},b::TensorAlgebra{W}) where {V,W,G} = TensorOperator(Chain{V,G}(value(value(a)) .⊘ Ref(b)))
 for t ∈ (:Spinor,:AntiSpinor,:Multivector)
     @eval begin
@@ -896,8 +898,8 @@ end
 
 applyf(f,mat::TensorOperator) = f.(value(value(mat)))
 
-@pure metricfull(V) = Outermorphism(metrictensor(V))
-const metriceven,metricodd = metricfull,metricfull
+@pure metricextensor(V::TensorAlgebra) = Outermorphism(metrictensor(V))
+const metriceven,metricodd = metricextensor,metricextensor
 #metricfull(V) = TensorOperator(Multivector{V}(vcat(value.(map.(Multivector,value.(metrictensor.(V,list(0,mdims(V))))))...)))
 #metriceven(V) = TensorOperator(Spinor{V}(vcat(applyf.(Spinor,metrictensor.(V,evens(0,mdims(V))))...)))
 #metricodd(V) = TensorOperator(AntiSpinor{V}(vcat(applyf.(AntiSpinor,metrictensor.(V,evens(1,mdims(V))))...)))
@@ -906,7 +908,6 @@ struct MetricTensor{n,ℙ,g,Vars,Diff,Name} <: TensorBundle{n,ℙ,g,Vars,Diff,Na
     @pure MetricTensor{N,M,S,F,D,L}() where {N,M,S,F,D,L} = new{N,M,S,F,D,L}()
 end
 
-export MetricTensor, metrictensor
 @pure MetricTensor{N,M,S,F,D}() where {N,M,S,F,D} = MetricTensor{N,M,S,F,D,1}()
 @pure MetricTensor{N,M,S}() where {N,M,S} = MetricTensor{N,M,S,0,0}()
 @pure MetricTensor{N,M}(b::Values{N,<:Tuple}) where {N,M} = MetricTensor{N,M,metricsig(M,Values.(b))}()
@@ -971,18 +972,15 @@ end
 (M::MetricTensor)(b::T) where T<:AbstractVector{Int} = Submanifold{M}(b)
 (M::MetricTensor)(b::T) where T<:AbstractRange{Int} = Submanifold{M}(b)
 
-import LinearAlgebra: isdiag; export isdiag
 isdiag(::MetricTensor) = false
 
 # InducedMetric
 
-export InducedMetric
-
 struct InducedMetric end
 #=struct InducedMetric{V} <: TensorNested{V,Multivector{V}} end
 metrictensor(::InducedMetric{V}) where V = metrictensor(V)
-metricfull(::InducedMetric{V}) where V = metricfull(V)
-Base.show(io::IO,x::InducedMetric) = show(io,metricfull(x))=#
+metricextensor(::InducedMetric{V}) where V = metricextensor(V)
+Base.show(io::IO,x::InducedMetric) = show(io,metricextensor(x))=#
 
 isinduced(x) = false
 isinduced(::InducedMetric) = true

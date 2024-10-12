@@ -490,13 +490,13 @@ plus(b::Multivector{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Multivector{V},a::Single{V,G}) where {V,G} = plus(a,b)
 plus(b::Spinor{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Spinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
-plus(b::AntiSpinor{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
-plus(b::AntiSpinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
+plus(b::CoSpinor{V},a::Submanifold{V,G}) where {V,G} = plus(a,b)
+plus(b::CoSpinor{V},a::Single{V,G}) where {V,G} = plus(a,b)
 -(t::Submanifold) = Single(-value(t),t)
 -(a::Chain{V,G}) where {V,G} = Chain{V,G}(-value(a))
 -(a::Multivector{V}) where V = Multivector{V}(-value(a))
 -(a::Spinor{V}) where V = Spinor{V}(-value(a))
--(a::AntiSpinor{V}) where V = AntiSpinor{V}(-value(a))
+-(a::CoSpinor{V}) where V = CoSpinor{V}(-value(a))
 -(a::Couple{V,B}) where {V,B} = Couple{V,B}(-a.v)
 -(a::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(-a.v)
 ⟑(a::Single{V,0},b::Chain{V,G}) where {V,G} = Chain{V,G}(a.v*b.v)
@@ -537,8 +537,8 @@ for (op,po) ∈ ((:plus,:+),(:minus,:-))
         $op(a::Couple{V},b::PseudoCouple{V}) where V = $op($op(a,imaginary(b)),volume(b))
         $op(a::PseudoCouple{V},b::Couple{V}) where V = $op(imaginary(a),b)+volume(a)
         $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
-        $op(a::Spinor{V},b::AntiSpinor{V}) where V = $op(Multivector(a),Multivector(b))
-        $op(a::AntiSpinor{V},b::Spinor{V}) where V = $op(Multivector(a),Multivector(b))
+        $op(a::Spinor{V},b::CoSpinor{V}) where V = $op(Multivector(a),Multivector(b))
+        $op(a::CoSpinor{V},b::Spinor{V}) where V = $op(Multivector(a),Multivector(b))
     end
 end
 
@@ -683,8 +683,8 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
         $op(a::$couple{V},b::Multivector{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::Spinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
         $op(a::$couple{V},b::Spinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
-        $op(a::AntiSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
-        $op(a::$couple{V},b::AntiSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::CoSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::CoSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::Chain{V,G},b::$couple{V},$(args...)) where {V,G} = (G==0 || G==mdims(V)) ? $op(Single(a),b,$(args...)) : $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
         $op(a::$couple{V},b::Chain{V,G},$(args...)) where {V,G} = (G==0 || G==mdims(V)) ? $op(a,Single(b),$(args...)) : $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::TensorTerm{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
@@ -705,8 +705,8 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
         ∧(a::$couple{V},b::Multivector{V}) where V = ($calar(a)∧b) + (imaginary(a)∧b)
         ∧(a::Spinor{V},b::$couple{V}) where V = (a∧$calar(b)) + (a∧imaginary(b))
         ∧(a::$couple{V},b::Spinor{V}) where V = ($calar(a)∧b) + (imaginary(a)∧b)
-        ∧(a::AntiSpinor{V},b::$couple{V}) where V = (a∧$calar(b)) + (a∧imaginary(b))
-        ∧(a::$couple{V},b::AntiSpinor{V}) where V = ($calar(a)∧b) + (imaginary(a)∧b)
+        ∧(a::CoSpinor{V},b::$couple{V}) where V = (a∧$calar(b)) + (a∧imaginary(b))
+        ∧(a::$couple{V},b::CoSpinor{V}) where V = ($calar(a)∧b) + (imaginary(a)∧b)
         ∧(a::Chain{V},b::$couple{V}) where V = (a∧$calar(b)) + (a∧imaginary(b))
         ∧(a::$couple{V},b::Chain{V}) where V = ($calar(a)∧b) + (imaginary(a)∧b)
         ∧(a::TensorTerm{V,0},b::$couple{V}) where V = a⟑b
@@ -732,8 +732,8 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
         ∨(a::$couple{V},b::Multivector{V}) where V = ($calar(a)∨b) + (imaginary(a)∨b)
         ∨(a::Spinor{V},b::$couple{V}) where V = (a∨$calar(b)) + (a∨imaginary(b))
         ∨(a::$couple{V},b::Spinor{V}) where V = ($calar(a)∨b) + (imaginary(a)∨b)
-        ∨(a::AntiSpinor{V},b::$couple{V}) where V = (a∨$calar(b)) + (a∨imaginary(b))
-        ∨(a::$couple{V},b::AntiSpinor{V}) where V = ($calar(a)∨b) + (imaginary(a)∨b)
+        ∨(a::CoSpinor{V},b::$couple{V}) where V = (a∨$calar(b)) + (a∨imaginary(b))
+        ∨(a::$couple{V},b::CoSpinor{V}) where V = ($calar(a)∨b) + (imaginary(a)∨b)
         ∨(a::Chain{V},b::$couple{V}) where V = (a∨$calar(b)) + (a∨imaginary(b))
         ∨(a::$couple{V},b::Chain{V}) where V = ($calar(a)∨b) + (imaginary(a)∨b)
     end
@@ -766,8 +766,8 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
         $op(a::$couple{V},b::Multivector{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::Spinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
         $op(a::$couple{V},b::Spinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
-        $op(a::AntiSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
-        $op(a::$couple{V},b::AntiSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
+        $op(a::CoSpinor{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
+        $op(a::$couple{V},b::CoSpinor{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::Chain{V},b::$couple{V},$(args...)) where V = $op(a,$calar(b),$(args...)) + $op(a,imaginary(b),$(args...))
         $op(a::$couple{V},b::Chain{V},$(args...)) where V = $op($calar(a),b,$(args...)) + $op(imaginary(a),b,$(args...))
         $op(a::$couple{V},b::TensorTerm{V,0},$(args...)) where V = a⟑b
@@ -813,8 +813,8 @@ for F ∈ Fields
         *(a::Multivector{V},b::F) where {F<:$F,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$F,V} = Spinor{V}(a*b.v)
         *(a::Spinor{V},b::F) where {F<:$F,V} = Spinor{V}(a.v*b)
-        *(a::F,b::AntiSpinor{V}) where {F<:$F,V} = AntiSpinor{V}(a*b.v)
-        *(a::AntiSpinor{V},b::F) where {F<:$F,V} = AntiSpinor{V}(a.v*b)
+        *(a::F,b::CoSpinor{V}) where {F<:$F,V} = CoSpinor{V}(a*b.v)
+        *(a::CoSpinor{V},b::F) where {F<:$F,V} = CoSpinor{V}(a.v*b)
         *(a::F,b::Chain{V,G}) where {F<:$F,V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::F) where {F<:$F,V,G} = Chain{V,G}(a.v*b)
         *(a::F,b::Single{V,G,B,T} where B) where {F<:$F,V,G,T} = Single{V,G}($Sym.:∏(a,b.v),basis(b))
@@ -848,7 +848,7 @@ for (op,po) ∈ ((:+,:plus),(:-,:minus))
         @generated function $po(a::TensorTerm{V,G},b::Spinor{V,T}) where {V,G,T}
             adder(a,b,$(QuoteNode(op)))
         end
-        @generated function $po(a::TensorTerm{V,G},b::AntiSpinor{V,T}) where {V,G,T}
+        @generated function $po(a::TensorTerm{V,G},b::CoSpinor{V,T}) where {V,G,T}
             adder(a,b,$(QuoteNode(op)))
         end
     end
@@ -856,7 +856,7 @@ end
 @generated minus(b::Chain{V,G,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 @generated minus(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,T,L} = adder(a,b,:-,true)
 @generated minus(b::Spinor{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
-@generated minus(b::AntiSpinor{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
+@generated minus(b::CoSpinor{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 @generated minus(b::Multivector{V,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
 
 @eval begin
@@ -953,7 +953,7 @@ end
             Spinor{dual(V)}(out)
         end end
     end
-    @generated function Base.adjoint(m::AntiSpinor{V,T}) where {V,T}
+    @generated function Base.adjoint(m::CoSpinor{V,T}) where {V,T}
         CONJ,VEC = conjvec(m)
         TF = T ∉ FieldsBig ? :Any : :T
         if mdims(V)<cache_limit
@@ -966,9 +966,9 @@ end
                         @inbounds setanti!_pre(out,:($CONJ(@inbounds m.v[$(ps[g]+i)])),dual(V,ib[i],M))
                     end
                 end
-                return :(AntiSpinor{$(dual(V))}($(Expr(:call,tvecs(N,TF),out...))))
+                return :(CoSpinor{$(dual(V))}($(Expr(:call,tvecs(N,TF),out...))))
             else
-                return :(AntiSpinor{$(dual(V))}($CONJ.(value(m))))
+                return :(CoSpinor{$(dual(V))}($CONJ.(value(m))))
             end
         else return quote
             if isdyadic(V)
@@ -983,7 +983,7 @@ end
             else
                 out = $CONJ.(value(m))
             end
-            AntiSpinor{dual(V)}(out)
+            CoSpinor{dual(V)}(out)
         end end
     end
 end
@@ -1009,8 +1009,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         *(a::Multivector{V},b::F) where {F<:$EF,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$EF,V} = Spinor{V}(a*b.v)
         *(a::Spinor{V},b::F) where {F<:$EF,V} = Spinor{V}(a.v*b)
-        *(a::F,b::AntiSpinor{V}) where {F<:$EF,V} = AntiSpinor{V}(a*b.v)
-        *(a::AntiSpinor{V},b::F) where {F<:$EF,V} = AntiSpinor{V}(a.v*b)
+        *(a::F,b::CoSpinor{V}) where {F<:$EF,V} = CoSpinor{V}(a*b.v)
+        *(a::CoSpinor{V},b::F) where {F<:$EF,V} = CoSpinor{V}(a.v*b)
         *(a::F,b::Chain{V,G}) where {F<:$EF,V,G} = Chain{V,G}(a*b.v)
         *(a::Chain{V,G},b::F) where {F<:$EF,V,G} = Chain{V,G}(a.v*b)
         *(a::F,b::Single{V,G,B,T} where B) where {F<:$EF,V,G,T} = Single{V,G}($Sym.:∏(a,b.v),basis(b))
@@ -1087,12 +1087,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                 return Spinor{V}(out)=#
                 return Spinor{V}($(bcast(bop,:(a.v,b.v))))
             end
-            function $po(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T<:$Field,S<:$Field}
+            function $po(a::CoSpinor{V,T},b::CoSpinor{V,S}) where {V,T<:$Field,S<:$Field}
                 #=$(insert_expr((:N,:t),VEC)...)
                 out = value(a,$VECS(N,t))
                 $(add_val(eop,:out,:(value(b,$VECS(N,t))),bop))
-                return AntiSpinor{V}(out)=#
-                return AntiSpinor{V}($(bcast(bop,:(a.v,b.v))))
+                return CoSpinor{V}(out)=#
+                return CoSpinor{V}($(bcast(bop,:(a.v,b.v))))
             end
             function $po(a::Spinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(Multivector{V}(a),b)
@@ -1100,10 +1100,10 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
             function $po(a::Multivector{V,T},b::Spinor{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(a,Multivector{V}(b))
             end
-            function $po(a::AntiSpinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
+            function $po(a::CoSpinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(Multivector{V}(a),b)
             end
-            function $po(a::Multivector{V,T},b::AntiSpinor{V,S}) where {V,T<:$Field,S<:$Field}
+            function $po(a::Multivector{V,T},b::CoSpinor{V,S}) where {V,T<:$Field,S<:$Field}
                 return $po(a,Multivector{V}(b))
             end
             function $po(a::Chain{V,G,T},b::Spinor{V,S}) where {V,G,T<:$Field,S<:$Field}
@@ -1126,22 +1126,22 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
                     return $po(Multivector{V}(a),b)
                 end
             end
-            function $po(a::Chain{V,G,T},b::AntiSpinor{V,S}) where {V,G,T<:$Field,S<:$Field}
+            function $po(a::Chain{V,G,T},b::CoSpinor{V,S}) where {V,G,T<:$Field,S<:$Field}
                 if isodd(G)
                     $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
                     out = convert($VECS(N,t),$(bcast(bop,:(value(b,$VECS(N,t)),))))
                     @inbounds $(add_val(:(+=),:(out[list(rrr+1,rrr+bng)]),:(value(a,$VEC(N,G,t))),ADD))
-                    return AntiSpinor{V}(out)
+                    return CoSpinor{V}(out)
                 else
                     return $po(a,Multivector{V}(b))
                 end
             end
-            function $po(a::AntiSpinor{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
+            function $po(a::CoSpinor{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
                 if isodd(G)
                     $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
                     out = value(a,$VECS(N,t))
                     @inbounds $(add_val(eop,:(out[list(rrr+1,rrr+bng)]),:(value(b,$VEC(N,G,t))),bop))
-                    return AntiSpinor{V}(out)
+                    return CoSpinor{V}(out)
                 else
                     return $po(Multivector{V}(a),b)
                 end
@@ -1223,13 +1223,13 @@ for (mop,product!,field) ∈ ((:∧,:exteraddmulti!,false),(:⟑,:geomaddmulti!,
             loop = generate_loop_m_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             product_loop(V,:Multivector,loop,VEC)
         end
-        @generated function $op(a::AntiSpinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
+        @generated function $op(a::CoSpinor{V,T},b::Multivector{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_m(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             product_loop(V,:Multivector,loop,VEC)
         end
-        @generated function $op(a::Multivector{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+        @generated function $op(a::Multivector{V,T},b::CoSpinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_m_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
@@ -1254,11 +1254,11 @@ for (mop,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,fa
             $indu
             Grassmann.$prop(a,b,false,$field)
         end
-        @generated function $op(b::AntiSpinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
+        @generated function $op(b::CoSpinor{V,T},a::TensorGraded{V,G},$(args...)) where {V,T,G}
             $indu
             Grassmann.$prop(a,b,true,$field)
         end
-        @generated function $op(a::TensorGraded{V,G},b::AntiSpinor{V,S},$(args...)) where {V,G,S}
+        @generated function $op(a::TensorGraded{V,G},b::CoSpinor{V,S},$(args...)) where {V,G,S}
             $indu
             Grassmann.$prop(a,b,false,$field)
         end
@@ -1277,7 +1277,7 @@ for (mop,product!,field) ∈ ((:∧,:exteraddspin!,false),(:⟑,:geomaddspin!,fa
             loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
             product_loop(V,:Spinor,loop,Symbol(string(VEC)*"s"))
         end
-        @generated function $op(a::AntiSpinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+        @generated function $op(a::CoSpinor{V,T},b::CoSpinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
@@ -1292,39 +1292,39 @@ for (mop,product!,field) ∈ ((:∧,:exteraddanti!,false),(:⟑,:geomaddanti!,fa
     args = field ? (:g,) : ()
     indu = field ? :(isinduced(g) && (return :($$mop(a,b)))) : nothing
     @eval begin
-        @generated function $op(a::Spinor{V,T},b::AntiSpinor{V,S},$(args...)) where {V,T,S}
+        @generated function $op(a::Spinor{V,T},b::CoSpinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            product_loop(V,:AntiSpinor,loop,Symbol(string(VEC)*"s"))
+            product_loop(V,:CoSpinor,loop,Symbol(string(VEC)*"s"))
         end
-        @generated function $op(a::AntiSpinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
+        @generated function $op(a::CoSpinor{V,T},b::Spinor{V,S},$(args...)) where {V,T,S}
             $indu
             MUL,VEC = mulvec(a,b)
             loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,$product!,$preproduct!,$field)
-            product_loop(V,:AntiSpinor,loop,Symbol(string(VEC)*"s"))
+            product_loop(V,:CoSpinor,loop,Symbol(string(VEC)*"s"))
         end
     end
 end
 @generated function ∨(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_spinor(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
-    product_loop(V,isodd(mdims(V)) ? :AntiSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
+    product_loop(V,isodd(mdims(V)) ? :CoSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
 end
-@generated function ∨(a::AntiSpinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+@generated function ∨(a::CoSpinor{V,T},b::CoSpinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_anti(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddanti! : meetaddspin!,isodd(mdims(V)) ? meetaddanti!_pre : meetaddspin!_pre)
-    product_loop(V,isodd(mdims(V)) ? :AntiSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
+    product_loop(V,isodd(mdims(V)) ? :CoSpinor : :Spinor,loop,Symbol(string(VEC)*"s"))
 end
-@generated function ∨(a::Spinor{V,T},b::AntiSpinor{V,S}) where {V,T,S}
+@generated function ∨(a::Spinor{V,T},b::CoSpinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_s_a(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
-    product_loop(V,isodd(mdims(V)) ? :Spinor : :AntiSpinor,loop,Symbol(string(VEC)*"s"))
+    product_loop(V,isodd(mdims(V)) ? :Spinor : :CoSpinor,loop,Symbol(string(VEC)*"s"))
 end
-@generated function ∨(a::AntiSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
+@generated function ∨(a::CoSpinor{V,T},b::Spinor{V,S}) where {V,T,S}
     MUL,VEC = mulvec(a,b)
     loop = generate_loop_a_s(V,:(a.v),:(b.v),promote_type(T,S),MUL,isodd(mdims(V)) ? meetaddspin! : meetaddanti!,isodd(mdims(V)) ? meetaddspin!_pre : meetaddanti!_pre)
-    product_loop(V,isodd(mdims(V)) ? :Spinor : :AntiSpinor,loop,Symbol(string(VEC)*"s"))
+    product_loop(V,isodd(mdims(V)) ? :Spinor : :CoSpinor,loop,Symbol(string(VEC)*"s"))
 end
 
 for side ∈ (:left,:right)
@@ -1429,7 +1429,7 @@ for side ∈ (:left,:right)
                             @inbounds (isodd(N) ? setanti!_pre : setspin!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
                     end
-                    return :($(isodd(N) ? :AntiSpinor : :Spinor){V}($(Expr(:call,tvecs(N,T),out...))))
+                    return :($(isodd(N) ? :CoSpinor : :Spinor){V}($(Expr(:call,tvecs(N,T),out...))))
                 else return quote
                     $(insert_expr((:N,:rs,:bn),:svec)...)
                     #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
@@ -1446,10 +1446,10 @@ for side ∈ (:left,:right)
                             end
                         end
                     end
-                    return $(isodd(N) ? :AntiSpinor : :Spinor){V}(out)
+                    return $(isodd(N) ? :CoSpinor : :Spinor){V}(out)
                 end end
             end
-            @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
+            @generated function $c(m::CoSpinor{V,T},$(args...)) where {V,T}
                 isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
                 $(c≠h ? nothing : :(((!isdiag(V)) || ($ff && !isinduced(g))) && (return :($$cc(metric(m,$($args...))))) ))
                 SUB,VEC = subvecs(m)
@@ -1467,7 +1467,7 @@ for side ∈ (:left,:right)
                             @inbounds (isodd(N) ? setspin!_pre : setanti!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
                     end
-                    return :($(isodd(N) ? :Spinor : :AntiSpinor){V}($(Expr(:call,tvecs(N,T),out...))))
+                    return :($(isodd(N) ? :Spinor : :CoSpinor){V}($(Expr(:call,tvecs(N,T),out...))))
                 else return quote
                     $(insert_expr((:N,:ps,:bn),:svec)...)
                     #P = $(c≠h ? 0 : :(hasinf(V)+hasorigin(V)))
@@ -1484,7 +1484,7 @@ for side ∈ (:left,:right)
                             end
                         end
                     end
-                    return $(isodd(N) ? :Spinor : :AntiSpinor){V}(out)
+                    return $(isodd(N) ? :Spinor : :CoSpinor){V}(out)
                 end end
             end
         end
@@ -1506,7 +1506,7 @@ for c ∈ (:even,:odd)
                         @inbounds $(anti ? :setanti!_pre : :setspin!_pre)(out,v,ibi,Val{N}())
                     end
                 end
-                return :($$(anti ? :AntiSpinor : :Spinor){V}($(Expr(:call,tvecs(N,T),out...))))
+                return :($$(anti ? :CoSpinor : :Spinor){V}($(Expr(:call,tvecs(N,T),out...))))
             else return quote
                 $(insert_expr((:N,:bs,:bn),:svecs)...)
                 out = zeros($VEC(N,T))
@@ -1520,14 +1520,14 @@ for c ∈ (:even,:odd)
                         end
                     end
                 end
-                return $(anti ? :AntiSpinor : :Spinor){V}(out)
+                return $(anti ? :CoSpinor : :Spinor){V}(out)
             end end
         end
     end
 end
 for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
     c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
-    tens,tensfull = Symbol(side,:tensor),Symbol(side,:full)
+    tens,tensfull = Symbol(side,:tensor),Symbol(side,:extensor)
     tenseven,tensodd = Symbol(side,:even),Symbol(side,:odd)
     args = field ? (:g,) : ()
     @eval begin
@@ -1664,7 +1664,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 return Spinor{V}(out)
             end end
         end
-        @generated function $c(m::AntiSpinor{V,T},$(args...)) where {V,T}
+        @generated function $c(m::CoSpinor{V,T},$(args...)) where {V,T}
             isdyadic(V) && throw(error("Complement for dyadic tensors is undefined"))
             ($field && !isinduced(g)) && (return :(contraction(g,m)))
             (!isdiag(V)) && (return :(contraction($($tensodd(V)),m,)))
@@ -1686,7 +1686,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                         @inbounds setanti!_pre(out,v,ibi,Val{N}())
                     end
                 end
-                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,T),out...))))
+                return :(CoSpinor{V}($(Expr(:call,tvecs(N,T),out...))))
             else return quote
                 $(insert_expr((:N,:ps,:bn),:svecs)...)
                 out = zeros($VEC(N,T))
@@ -1706,7 +1706,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                         end
                     end
                 end
-                return AntiSpinor{V}(out)
+                return CoSpinor{V}(out)
             end end
         end
     end
@@ -1832,7 +1832,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                 return Spinor{V}(out)
             end end
         end
-        @generated function $reverse(m::AntiSpinor{V,T}) where {V,T}
+        @generated function $reverse(m::CoSpinor{V,T}) where {V,T}
             if mdims(V)<cache_limit
                 $(insert_expr((:N,:ps,:bn,:D),:svecs)...)
                 out = svecs(N,Any)(zeros(svecs(N,T)))
@@ -1849,7 +1849,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                         end
                     end
                 end
-                return :(AntiSpinor{V}($(Expr(:call,tvecs(N,T),out...))))
+                return :(CoSpinor{V}($(Expr(:call,tvecs(N,T),out...))))
             else return quote
                 $(insert_expr((:N,:ps,:bn,:D),:svecs)...)
                 out = zeros($VECS(N,T))
@@ -1866,7 +1866,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
                         end
                     end
                 end
-                return AntiSpinor{V}(out)
+                return CoSpinor{V}(out)
             end end
         end
     end
