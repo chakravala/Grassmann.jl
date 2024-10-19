@@ -1,9 +1,10 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorNested, Projector, Dyadic, Proj, outer, InducedMetric
+export TensorNested, Projector, Dyadic, Proj, outer
 export DiagonalOperator, TensorOperator, Endomorphism, Outermorphism, outermorphism
-export operator, gradedoperator, evenoperator, oddoperator, MetricTensor, metrictensor
+export operator, gradedoperator, evenoperator, oddoperator
+export MetricTensor, metrictensor, metricextensor, InducedMetric
 
 ## conversions
 
@@ -928,6 +929,7 @@ MetricTensor(b...) = MetricTensor(b)
 
 @pure Manifold(::Type{T}) where T<:MetricTensor = T()
 
+construct_cache(:MetricTensor)
 @pure metrictensor(b::Submanifold{V}) where V = isbasis(b) ? metrictensor(V) : TensorOperator(map(b,b(value(metrictensor(V)))))
 @pure metrictensor(V,G) = compound(metrictensor(V),G)
 @pure function metrictensor(V::MetricTensor{N,M,S} where N) where {M,S}
@@ -954,7 +956,7 @@ end
 @inline getindex(vs::MetricTensor,i::UnitRange{Int}) = [getindex(vs,j) for j ∈ i]
 @inline getindex(vs::MetricTensor{N,M,S} where M,i::Colon) where {N,S} = Vector(value(metrictensor(vs)))
 
-@pure Signature(V::MetricTensor{N,M}) where {N,M} = Signature{N,M,UInt(0)}()
+@pure Signature(V::MetricTensor{N,M,S,F,D}) where {N,M,S,F,D} = Signature{N,M,UInt(0),F,D}()
 
 # anything array-like gets summarized e.g. 10-element Array{Int64,1}
 Base.summary(io::IO, a::MetricTensor) = Base.array_summary(io, a, _axes(metrictensor(a)))
@@ -973,6 +975,22 @@ end
 (M::MetricTensor)(b::T) where T<:AbstractRange{Int} = Submanifold{M}(b)
 
 isdiag(::MetricTensor) = false
+
+function DirectSum.TensorBundle(b::Submanifold{V}) where V
+    if isbasis(b)
+        TensorBundle(V)
+    elseif typeof(V) <: Int
+        Signature(mdims(b))
+    elseif typeof(V) <: Signature
+        Signature(b)
+    elseif typeof(V) <: DiagonalForm
+        M = options(V)
+        DiagonalForm{mdims(b),M,DirectSum.diagsig(M,Values(DirectSum.diagonalform(V)[indices(b)]...)),diffvars(V),diffmode(V)}()
+    elseif typeof(V) <: MetricTensor
+        M = options(V)
+        MetricTensor{mdims(b),M,metricsig(M,value.(value(value(metrictensor(b))))),diffvars(V),diffmode(V)}()
+    end
+end
 
 # InducedMetric
 

@@ -15,13 +15,13 @@
 import Base: +, -, *, ^, /, //, inv, <, >, <<, >>, >>>
 import AbstractTensors: ∧, ∨, ⟑, ⊖, ⊘, ⊗, ⊛, ⊙, ⊠, ⨼, ⨽, ⋆, ∗, rem, div, TAG, SUB
 import AbstractTensors: plus, minus, times, contraction, equal, wedgedot, veedot
-import AbstractTensors: pseudosandwich, antisandwich, antidot
+import AbstractTensors: pseudosandwich, antisandwich, cosandwich, antidot, codot
 import Leibniz: diffcheck, diffmode, symmetricsplit
 import Leibniz: loworder, isnull, Field, ExprField
 const Sym,SymField = :AbstractTensors,Any
 
 export ∗, ⊛, ⊖, ∧, ∨, ⟑, wedgedot, veedot, ⊗, ⨼, ⨽, ⊙, ⊠, ⟂, ∥
-export ⊘, sandwich, pseudosandwich, antisandwich
+export ⊘, sandwich, pseudosandwich, antisandwich, cosandwich
 
 if VERSION >= v"1.10.0"; @eval begin
     import AbstractTensors.$(Symbol("⟇"))

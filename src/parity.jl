@@ -58,20 +58,20 @@ end
     p,C,t,Z = _parityregressive(V,A,B)
     return p ? -1 : 1, C, t, Z
 end
-@pure function parityregressive(::M,A,B) where M<:Manifold{V} where V
+@pure function parityregressive(V::M,A,B) where M<:Manifold
     parityregressivenum(Signature(V),A,B)
 end
 
 @pure function parityinterior(V::Int,a,b)
     A,B,Q,Z = symmetricmask(V,a,b)
-    diffcheck(V,A,B) && (return false,Zero(UInt),false,Z)
+    diffcheck(V,A,B) && (return lim ? (Values{0,Tuple{UInt,Int}}(),Z) : (1,Zero(UInt),false,Z))
     p,C,t = parityregressive(V,A,complement(V,B,diffvars(V)),Val(true))
     t ? (p⊻parityright(0,sum(indices(B,V)),count_ones(B)) ? -1 : 1) : 1, C|Q, t, Z
 end
 
 #=@pure function parityinterior(V::Signature{N,M,S},a,b) where {N,M,S}
     A,B,Q,Z = symmetricmask(V,a,b)
-    diffcheck(V,A,B) && (return false,Zero(UInt),false,Z)
+    diffcheck(V,A,B) && (return 1,Zero(UInt),false,Z)
     p,C,t = parityregressive(V,A,complement(N,B,diffvars(V)),Val{true}())
     return t ? p⊻parityrighthodge(S,B,N) : p, C|Q, t, Z
 end=#
@@ -107,7 +107,7 @@ end
     bs,bg = (),()
     for i ∈ list(1,diag ? 1 : gdims(grade(V),G))
         if (!isnull(g[i])) && !diffcheck2(V,A,bas[i])
-            p,C,t = parityregressive(Signature(W),A,complement(N,bas[i],diffvars(V)),Val{true}())
+            p,C,t = parityregressive(Signature(V),A,complement(N,bas[i],diffvars(V)),Val{true}())
             CQ,tout = C|Q,tout|t
             if t
                 ggg = (p⊻parityright(0,sum(indices(bas[i],N)),G)) ? field ? :(-($(g[i]))) : -(g[i]) : g[i]
@@ -149,7 +149,7 @@ end
     else
         value(metrictensor(V,G))[bladeindex(mdims(V),C)]
     end
-    parity(Signature(W),A,B) ? fieldneg(g) : g
+    parity(Signature(V),A,B) ? fieldneg(g) : g
 end
 
 function parityseq(V,B)
@@ -362,63 +362,81 @@ end
 
 ### parity product caches
 
-function interior(V,a,b,c::Val{lim},d::Val{field}=Val(false)) where {lim,field}
-    lim||field ? parityinterior(V,a,b,c,d) : interior(V,a,b)
-end
+@pure interior(V::Submanifold,a,b,c,d) = interior(TensorBundle(V),a,b,c,d)
+@pure interior(V,a,b,c::Val=Val(false)) = interior(V,a,b,c,Val(false))
+@pure interior(V,a,b,c::Val{true},d::Val=Val(false)) = parityinterior(V,a,b,c,d)
+@pure interior(a::Submanifold{V,G,B},b::Submanifold{V,L,C},c::Val=Val(false)) where {V,G,B,L,C} = interior(V,UInt(a),UInt(b),c,Val(false))
+@pure interior(a::Submanifold{V,G,B},b::Submanifold{V,L,C},c::Val,d::Val{false}) where {V,G,B,L,C} = interior(V,UInt(a),UInt(b),c,d)
+interior(a::Submanifold{V,G,B},b::Submanifold{V,L,C},c::Val,d::Val{true}) where {V,G,B,L,C} = interior(V,UInt(a),UInt(b),c,d)
+@pure regressive(a::Submanifold{V,G,B},b::Submanifold{V,L,C}) where {V,G,B,L,C} = regressive(V,UInt(a),UInt(b))
 
-for par ∈ (:conformal,:regressive,:interior)
-    calc = par≠:regressive ? Symbol(:parity,par) : :parityregressivenum
-    T = Tuple{Any,UInt,Bool,UInt}
-    extra = Symbol(par,:_extra)
-    cache = Symbol(par,:_cache)
-    @eval begin
-        const $cache = Dict{UInt,Vector{Dict{UInt,Vector{Vector{$T}}}}}[]
-        const $extra = Dict{UInt,Vector{Dict{UInt,Dict{UInt,Dict{UInt,$T}}}}}[]
-        @pure function $par(V,a,b)::$T
-            M,s = DirectSum.supermanifold(V),metric(V)
-            n,m,S = mdims(M),DirectSum.options(M),metric(M)
-            m1 = m+1
-            if n > sparse_limit
-                N = n-sparse_limit
-                for k ∈ length($extra)+1:N
-                    push!($extra,Dict{UInt,Vector{Dict{UInt,Dict{UInt,Dict{UInt,$T}}}}}())
+function construct_cache(typ::Symbol)
+    for par ∈ (:regressive,:interior)
+        noreg = par≠:regressive
+        for field ∈ (noreg ? (true,false) : (false,))
+            (!noreg) && typ ≠ :Signature && continue
+            calc = noreg ? Symbol(:parity,par) : :parityregressivenum
+            T = Tuple{Any,UInt,Bool,UInt}
+            extra = noreg ? Symbol(par,(field ? (:_field,) : ())...,:_,typ,:_extra) : Symbol(par,:_extra)
+            cache = noreg ? Symbol(par,(field ? (:_field,) : ())...,:_,typ,:_cache) : Symbol(par,:_cache)
+            quot = quote
+                M = $(noreg ? :V : :(Signature(V)))
+                n,m,S = mdims(M),DirectSum.options(M),metric(M)
+                m1 = m+1
+                if n > sparse_limit
+                    N = n-sparse_limit
+                    for k ∈ length($extra)+1:N
+                        push!($extra,Dict{UInt,Vector{Dict{UInt,Dict{UInt,$T}}}}())
+                    end
+                    if !haskey($extra[N],S)
+                        push!($extra[N],S=>Dict{UInt,Dict{UInt,$T}}[])
+                    end
+                    for k ∈ length($extra[N][S])+1:m1
+                        @inbounds push!($extra[N][S],Dict{UInt,Dict{UInt,$T}}())
+                    end
+                    @inbounds !haskey($extra[N][S][m1],a) && push!($extra[N][S][m1],a=>Dict{UInt,$T}())
+                    @inbounds !haskey($extra[N][S][m1][a],b) && push!($extra[N][S][m1][a],b=>$calc(M,a,b,$((noreg ? (:c,:d) : ())...)))
+                    @inbounds $extra[N][S][m1][a][b]
+                elseif n==0
+                    $calc(M,a,b,$((noreg ? (:c,:d) : ())...))
+                else
+                    a1 = a+1
+                    for k ∈ length($cache)+1:n
+                        push!($cache,Dict{UInt,Vector{Vector{$T}}}())
+                    end
+                    if !haskey($cache[n],S)
+                        push!($cache[n],S=>Vector{Vector{$T}}[])
+                    end
+                    @inbounds for k ∈ length($cache[n][S])+1:m1
+                        @inbounds push!($cache[n][S],Vector{Vector{$T}}())
+                    end
+                    @inbounds for k ∈ length($cache[n][S][m1]):a
+                        @inbounds push!($cache[n][S][m1],$T[])
+                    end
+                    @inbounds for k ∈ length($cache[n][S][m1][a1]):b
+                        @inbounds push!($cache[n][S][m1][a1],$calc(M,a,k,$((noreg ? (:c,:d) : ())...)))
+                    end
+                    @inbounds $cache[n][S][m1][a1][b+1]
                 end
-                if !haskey($extra[N],S)
-                    push!($extra[N],S=>Dict{UInt,Dict{UInt,Dict{UInt,$T}}}[])
+            end
+            @eval begin
+                global const $cache = Dict{UInt,Vector{Vector{Vector{$T}}}}[]
+                global const $extra = Dict{UInt,Vector{Dict{UInt,Dict{UInt,$T}}}}[]
+            end
+            if field
+                @eval function Grassmann.$par($(noreg ? :(V::$typ) : :V),a,b,$((noreg ? (:(c::Val{false}),:(d::Val{$field})) : ())...))::$T
+                    $quot
                 end
-                for k ∈ length($extra[N][S])+1:m1
-                    @inbounds push!($extra[N][S],Dict{UInt,Dict{UInt,Dict{UInt,$T}}}())
-                end
-                @inbounds !haskey($extra[N][S][m1],s) && push!($extra[N][S][m1],s=>Dict{UInt,Dict{UInt,$T}}())
-                @inbounds !haskey($extra[N][S][m1][s],a) && push!($extra[N][S][m1][s],a=>Dict{UInt,$T}())
-                @inbounds !haskey($extra[N][S][m1][s][a],b) && push!($extra[N][S][m1][s][a],b=>$calc(M,a,b))
-                @inbounds $extra[N][S][m1][s][a][b]
-            elseif n==0
-                $calc(V,a,b)
             else
-                a1 = a+1
-                for k ∈ length($cache)+1:n
-                    push!($cache,Dict{UInt,Dict{UInt,Vector{Vector{$T}}}}())
+                @eval @pure function Grassmann.$par($(noreg ? :(V::$typ) : :V),a,b,$((noreg ? (:(c::Val{false}),:(d::Val{$field})) : ())...))::$T
+                    $quot
                 end
-                if !haskey($cache[n],S)
-                    push!($cache[n],S=>Dict{UInt,Vector{Vector{$T}}}[])
-                end
-                @inbounds for k ∈ length($cache[n][S])+1:m1
-                    @inbounds push!($cache[n][S],Dict{UInt,Vector{Vector{$T}}}())
-                end
-                @inbounds !haskey($cache[n][S][m1],s) && push!($cache[n][S][m1],s=>Vector{$T}[])
-                @inbounds for k ∈ length($cache[n][S][m1][s]):a
-                    @inbounds push!($cache[n][S][m1][s],$T[])
-                end
-                @inbounds for k ∈ length($cache[n][S][m1][s][a1]):b
-                    @inbounds push!($cache[n][S][m1][s][a1],$calc(M,a,k))
-                end
-                @inbounds $cache[n][S][m1][s][a1][b+1]
             end
         end
-        @pure $par(a::Submanifold{V,G,B},b::Submanifold{V,L,C}) where {V,G,B,L,C} = $par(V,UInt(a),UInt(b))
     end
 end
+construct_cache(:Signature)
+construct_cache(:DiagonalForm)
 
 @pure signbit(V::T) where T<:Manifold = (ib=indexbasis(rank(V)); parity.(Ref(V),ib,ib))
 @pure signbit(V::T,G) where T<:Manifold = (ib=indexbasis(rank(V),G); parity.(Ref(V),ib,ib))
