@@ -473,6 +473,7 @@ compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 getindex(t::TensorOperator,i::Int) = value(t.v)[i]
 LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
+LinearAlgebra.det(t::TensorOperator) = ∧(value(t))
 
 for op ∈ (:(Base.inv),)
     @eval $op(t::Endomorphism{V,<:Chain}) where V = TensorOperator($op(value(t)))
@@ -1007,3 +1008,7 @@ isinduced(::TensorBundle) = true
 isinduced(x::Type{<:Submanifold}) = !isbasis(x)
 isinduced(::Type{<:TensorBundle}) = true
 isinduced(::Type{<:InducedMetric}) = true
+
+@inline Base.log(t::Real,g::InducedMetric) = Base.log(t)
+@inline Base.log(t::Complex,g::InducedMetric) = Base.log(t)
+
