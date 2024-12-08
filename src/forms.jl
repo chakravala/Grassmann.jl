@@ -427,6 +427,9 @@ matrix(m::DiagonalOperator) = matrix(TensorOperator(m))
 getindex(t::DiagonalOperator,i::Int,j::Int) = i≠j ? zero(valuetype(value(t))) : value(value(t))[i]
 getindex(t::DiagonalOperator,i::Int) = value(t)(i)
 
+Base.zero(t::DiagonalOperator) = DiagonalOperator(zero(value(t)))
+Base.zero(t::Type{<:DiagonalOperator{V,T}}) where {V,T} = DiagonalOperator(zero(T))
+
 LinearAlgebra.tr(m::DiagonalOperator) = sum(value(value(m)))
 compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{0}) where V = DiagonalOperator(Chain{V,0}(1))
 @generated function compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{G}) where {V,G}
@@ -475,6 +478,9 @@ getindex(t::TensorOperator,i::Int) = value(t.v)[i]
 LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
 LinearAlgebra.det(t::TensorOperator) = ∧(value(t))
 
+Base.zero(t::TensorOperator) = TensorOperator(zero(value(t)))
+Base.zero(t::Type{<:TensorOperator{V,W,T}}) where {V,W,T} = TensorOperator(zero(T))
+
 for op ∈ (:(Base.inv),)
     @eval $op(t::Endomorphism{V,<:Chain}) where V = TensorOperator($op(value(t)))
 end
@@ -483,6 +489,19 @@ TensorOperator(t::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = TensorOperator
 TensorOperator(t::DiagonalOperator{V,<:Spinor{V,G}}) where {V,G} = TensorOperator(Spinor{V}(value(value(t)).*evenbasis(V)))
 TensorOperator(t::DiagonalOperator{V,<:AntiSpinor{V,G}}) where {V,G} = TensorOperator(AntiSpinor{V}(value(value(t)).*oddbasis(V)))
 TensorOperator(t::DiagonalOperator{V,<:Multivector{V,G}}) where {V,G} = TensorOperator(Multivector{V}(value(value(t)).*Λ(V).b))
+
+@generated function DiagonalOperator(t::Endomorphism{V,<:Chain{V,G}}) where {V,G}
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+end
+@generated function DiagonalOperator(t::Endomorphism{V,<:Spinor{V}}) where V
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Spinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+end
+@generated function DiagonalOperator(t::Endomorphism{V,<:AntiSpinor{V}}) where V
+    Expr(:call,:DiagonalOperator,Expr(:call,:(AntiSpinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+end
+@generated function DiagonalOperator(t::Endomorphism{V,<:Multivector{V}}) where V
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+end
 
 _axes(t::TensorOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
 _axes(t::TensorOperator{V,W,T}) where {V,W,G,L,S<:Chain{W,L},T<:Chain{V,G,S}} = (Base.OneTo(gdims(S)),Base.OneTo(gdims(T)))
@@ -551,10 +570,16 @@ end
 Outermorphism(t::Simplex) = outermorphism(t)
 Outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
 outermorphism(t::Endomorphism{V,<:Simplex}) where V = outermorphism(value(t))
+DiagonalOperator(t::Outermorphism) = outermorphism(DiagonalOperator(TensorOperator(t.v[1])))
 value(t::Outermorphism) = t.v
 matrix(m::Outermorphism) = matrix(TensorOperator(m))
 getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One(V)),)) : t.v[i]
 LinearAlgebra.tr(m::Outermorphism) = 1+sum(tr.(value(m)))
+
+Base.zero(t::Outermorphism) = Outermorphism(zero.(value(t)))
+@generated function Base.zero(t::Type{<:Outermorphism{V,T}}) where {V,T}
+    :(Outermorphism{V}($(zero.(([fieldtype(typ,i) for i ∈ 1:fieldcount(typ)]...,)))))
+end
 
 TensorOperator(t::Outermorphism{V}) where V = TensorOperator(Multivector{V}(vcat(Multivector(One(V)),value.(map.(Multivector,value.(t.v)))...)))
 

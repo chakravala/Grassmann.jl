@@ -580,15 +580,6 @@ function __init__()
         Base.convert(::Type{Meshes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? Meshes.Point(value(vector(t))) : Meshes.Point(zeros(T,mdims(V))...)
         Meshes.Point(t::T) where T<:TensorAlgebra = convert(Meshes.Point,t)
         pointpair(p,V) = Pair(Meshes.Point.(V.(value(p)))...)
-        function initmesh(m::Meshes.SimpleMesh{N}) where N
-            c,f = Meshes.vertices(m),m.topology.connec
-            s = N+1; V = Submanifold(ℝ^s) # s
-            n = length(f[1].indices)
-            p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k.coords...)) for k ∈ c])
-            M = s ≠ n ? p(list(s-n+1,s)) : p
-            t = ChainBundle([Chain{M,1}(Values{n,Int}(k.indices)) for k ∈ f])
-            return (p,ChainBundle(∂(t)),t)
-        end
         @pure ptype(::Meshes.Point{N,T} where N) where T = T
         export pointfield
         pointfield(t,V=Manifold(t),W=V) = p->Meshes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
@@ -618,15 +609,6 @@ function __init__()
         Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? GeometryBasics.Point(value(vector(t))) : GeometryBasics.Point(zeros(T,mdims(V))...)
         GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
         pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
-        function initmesh(m::GeometryBasics.Mesh)
-            c,f = GeometryBasics.coordinates(m),GeometryBasics.faces(m)
-            s = size(eltype(c))[1]+1; V = Submanifold(ℝ^s) # s
-            n = size(eltype(f))[1]
-            p = ChainBundle([Chain{V,1}(Values{s,Float64}(1.0,k...)) for k ∈ c])
-            M = s ≠ n ? p(list(s-n+1,s)) : p
-            t = ChainBundle([Chain{M,1}(Values{n,Int}(k)) for k ∈ f])
-            return (p,ChainBundle(∂(t)),t)
-        end
         @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
         export pointfield
         pointfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
@@ -727,19 +709,6 @@ function __init__()
             println("||ϵ||: ",norm(approx.(x,Ref(value(coef))).-value(y)))
             return coef # polynomial coefficients
         end
-    end
-    @require Delaunay="07eb4e4e-0c6d-46ef-bc4e-83d5e5d860a9" begin
-        Delaunay.delaunay(p::ChainBundle) = Delaunay.delaunay(value(p))
-        Delaunay.delaunay(p::Vector{<:Chain}) = initmesh(Delaunay.delaunay(submesh(p)))
-        initmesh(t::Delaunay.Triangulation) = initmeshdata(t.points',t.convex_hull',t.simplices')
-    end
-    @require QHull="a8468747-bd6f-53ef-9e5c-744dbc5c59e7" begin
-        QHull.chull(p::Vector{<:Chain},n=1:length(p)) = QHull.chull(ChainBundle(p),n)
-        function QHull.chull(p::ChainBundle,n=1:length(p)); l = list(1,mdims(p))
-            T = QHull.chull(submesh(length(n)==length(p) ? p : p[n])); V = p(list(2,mdims(p)))
-            [Chain{V,1}(getindex.(Ref(n),k)) for k ∈ T.simplices]
-        end
-        initmesh(t::Chull) = (p=ChainBundle(initpoints(t.points')); Chain{p(list(2,mdims(p))),1}.(t.simplices))
     end
     @require Triangulate = "f7e6ffb2-c36d-4f8f-a77e-16e897189344" begin
         const triangle_cache = (Array{T,2} where T)[]

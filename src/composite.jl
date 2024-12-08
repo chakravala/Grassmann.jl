@@ -784,7 +784,7 @@ end
     out = if M≠mdims(V)
         :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
     else
-        :(.⋆($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end]))[1])))))
+        :(.!($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end]))[1])))))
     end
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
@@ -976,7 +976,7 @@ function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:Abstrac
 end
 
 const array_cache = (Array{T,2} where T)[]
-array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈1:mdims(Manifold(m))]
+array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈list(1,mdims(Manifold(m)))]
 function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(array_cache):B
         push!(array_cache,Array{Any,2}(undef,0,0))
@@ -989,7 +989,7 @@ function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
 end
 
 const submesh_cache = (Array{T,2} where T)[]
-submesh(m) = [m[i][j] for i∈1:length(m),j∈2:mdims(Manifold(m))]
+submesh(m) = [m[i][j] for i∈1:length(m),j∈list(2,mdims(Manifold(m)))]
 function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
     for k ∈ length(submesh_cache):B
         push!(submesh_cache,Array{Any,2}(undef,0,0))
