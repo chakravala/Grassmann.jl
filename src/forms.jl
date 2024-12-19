@@ -1,10 +1,11 @@
 #   This file is part of Grassmann.jl. It is licensed under the AGPL license
 #   Grassmann Copyright (C) 2019 Michael Reed
 
-export TensorNested, Projector, Dyadic, Proj, outer
+export TensorNested, Projector, Dyadic, Proj, outer, operator
 export DiagonalOperator, TensorOperator, Endomorphism, Outermorphism, outermorphism
-export operator, gradedoperator, evenoperator, oddoperator
+export sylvester, characteristic, eigvecs, eigvals, eigpolys, eigprods, eigmults
 export MetricTensor, metrictensor, metricextensor, InducedMetric
+import LinearAlgebra: eigvals, eigvecs
 
 ## conversions
 
@@ -430,7 +431,10 @@ getindex(t::DiagonalOperator,i::Int) = value(t)(i)
 Base.zero(t::DiagonalOperator) = DiagonalOperator(zero(value(t)))
 Base.zero(t::Type{<:DiagonalOperator{V,T}}) where {V,T} = DiagonalOperator(zero(T))
 
+scalar(m::DiagonalOperator) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::DiagonalOperator) = sum(value(value(m)))
+LinearAlgebra.det(m::DiagonalOperator{V,<:Chain}) where V = Chain{V,mdims(V)}(prod(value(value(m))))
+LinearAlgebra.det(m::DiagonalOperator{V,<:Multivector}) where V = value(m)(Val(mdims(V)))
 compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{0}) where V = DiagonalOperator(Chain{V,0}(1))
 @generated function compound(m::DiagonalOperator{V,<:Chain{V,1}},::Val{G}) where {V,G}
     Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),Expr(:call,Values,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...)))
@@ -475,6 +479,7 @@ compound(m::TensorOperator,g) = TensorOperator(compound(value(m),g))
 compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 getindex(t::TensorOperator,i::Int) = value(t.v)[i]
+scalar(m::Endomorphism) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
 LinearAlgebra.det(t::TensorOperator) = ∧(value(t))
 
@@ -489,6 +494,7 @@ TensorOperator(t::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = TensorOperator
 TensorOperator(t::DiagonalOperator{V,<:Spinor{V,G}}) where {V,G} = TensorOperator(Spinor{V}(value(value(t)).*evenbasis(V)))
 TensorOperator(t::DiagonalOperator{V,<:AntiSpinor{V,G}}) where {V,G} = TensorOperator(AntiSpinor{V}(value(value(t)).*oddbasis(V)))
 TensorOperator(t::DiagonalOperator{V,<:Multivector{V,G}}) where {V,G} = TensorOperator(Multivector{V}(value(value(t)).*Λ(V).b))
+TensorOperator{V,W}(m::Matrix) where {V,W} = TensorOperator(Chain{V}(Chain{W,1}.(getindex.(Ref(m),:,list(1,size(m)[2])))))
 
 @generated function DiagonalOperator(t::Endomorphism{V,<:Chain{V,G}}) where {V,G}
     Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
@@ -500,7 +506,7 @@ end
     Expr(:call,:DiagonalOperator,Expr(:call,:(AntiSpinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
 end
 @generated function DiagonalOperator(t::Endomorphism{V,<:Multivector{V}}) where V
-    Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+    Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,1<<mdims(V))]...))
 end
 
 _axes(t::TensorOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
@@ -574,7 +580,9 @@ DiagonalOperator(t::Outermorphism) = outermorphism(DiagonalOperator(TensorOperat
 value(t::Outermorphism) = t.v
 matrix(m::Outermorphism) = matrix(TensorOperator(m))
 getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One(V)),)) : t.v[i]
-LinearAlgebra.tr(m::Outermorphism) = 1+sum(tr.(value(m)))
+scalar(m::Outermorphism{V}) where V = tr(m)/(1<<mdims(V))
+LinearAlgebra.tr(m::Outermorphism) = 1+sum(map(tr,value(m)))
+LinearAlgebra.det(m::Outermorphism) = (@inbounds value(value(m)[end])[1])
 
 Base.zero(t::Outermorphism) = Outermorphism(zero.(value(t)))
 @generated function Base.zero(t::Type{<:Outermorphism{V,T}}) where {V,T}
@@ -849,6 +857,10 @@ for op ∈ (:(Base.:+),:(Base.:-))
         end
     end
 end
+Base.:+(g::Endomorphism,t::LinearAlgebra.UniformScaling) = t+g
+Base.:+(t::LinearAlgebra.UniformScaling,g::Endomorphism) = TensorOperator(t+value(g))
+Base.:-(g::Endomorphism,t::LinearAlgebra.UniformScaling) = TensorOperator(value(g)-t)
+Base.:-(t::LinearAlgebra.UniformScaling,g::Endomorphism) = TensorOperator(t-value(g))
 Base.:+(g::Chain{V,1,<:Chain{V,1}},t::LinearAlgebra.UniformScaling) where V = t+g
 Base.:+(t::LinearAlgebra.UniformScaling{Bool},g::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(chainbasis(V).+value(g))
 Base.:+(t::LinearAlgebra.UniformScaling,g::Chain{V,1,<:Chain{V,1}}) where V = Chain{V,1}(t.λ*chainbasis(V).+value(g))
@@ -876,35 +888,204 @@ end
 @pure fulldyad(V) = Multivector.(fullbasis(V))
 @pure fullbasis(V) = Λ(V).b
 
-@pure chaindyad(V,G=1) = Chain.(chainbasis(V,G))
-@pure function chainbasis(V,G=1)
+@pure chaindyad(V,G=Val(1)) = Chain.(chainbasis(V,G))
+@pure chainbasis(V,G) = chainbasis(V,Val(G))
+@pure function chainbasis(V,::Val{G}=Val(1)) where G
     N = mdims(V)
     r,b = binomsum(N,G),binomial(N,G)
     bas = Values{b,Submanifold{V,G}}(Λ(V).b[list(r+1,r+b)])
 end
 
-function operator(t::TensorAlgebra{V},::Val{G}=Val(1)) where {V,G}
-    TensorOperator(Chain{V,G}(chainbasis(V,G) .⊘ Ref(t)))
-end
 operator(t::TensorAlgebra,G::Int) = operator(t,Val(G))
-gradedoperator(t::TensorAlgebra{V}) where V = TensorOperator(Multivector{V}(Λ(V).b .⊘ Ref(t)))
+function operator(t::TensorTerm{V},G::Val=Val(1)) where V
+    isdiag(V) ? DiagonalOperator(operator(Chain(t),G)) : operator(Chain(t),G)
+end
+function operator(t::TensorAlgebra{V},g::Val{G}=Val(1)) where {V,G}
+    TensorOperator(Chain{V,G}(chainbasis(V,g) .⊘ Ref(t)))
+end
 
-function operator(fun,V,::Val{G}=Val(1)) where G
+outermorphism(t::TensorAlgebra) = gradedoperator(t)
+function gradedoperator(t::TensorTerm{V}) where V
+    isdiag(V) ? outermorphism(operator(t)) : gradedoperator(Chain(t))
+end
+@generated function gradedoperator(t::TensorAlgebra{V}) where V
+    Expr(:call,:(Outermorphism{V}),Expr(:tuple,[:(value(operator(t,Val($G)))) for G ∈ list(1,mdims(V))]...))
+end
+
+#=function operator(fun,V,::Val{G}=Val(1)) where G
     TensorOperator(Chain{V,G}(fun.(chainbasis(V,G))))
 end
 operator(fun,V,G::Int) = operator(fun,V,Val(G))
-gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
+gradedoperator(fun,V) = outermorphism(operator(fun,V))=#
+#gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
 
 @pure odddyad(V) = AntiSpinor.(oddbasis(V))
 @pure oddbasis(V) = evenbasis(V,false)
 @pure evendyad(V) = Spinor.(evenbasis(V))
-@pure function evenbasis(V,even=true)
+@pure evenbasis(V,even::Bool) = evenbasis(V,Val(even))
+@pure function evenbasis(V,::Val{even}=Val(true)) where even
     N = mdims(V)
     r,b = binomsum_set(N),gdimsall(N)
     vcat([Λ(V).b[list(r[g]+1,r[g]+b[g])] for g ∈ evens(even ? 1 : 2,N+1)]...)
 end
-evenoperator(t::TensorAlgebra{V}) where V = TensorOperator(Spinor{V}(evenbasis(V) .⊘ Ref(t)))
-oddoperator(t::TensorAlgebra{V}) where V = TensorOperator(AntiSpinor{V}(oddbasis(V) .⊘ Ref(t)))
+#evenoperator(t::TensorAlgebra{V}) where V = TensorOperator(Spinor{V}(evenbasis(V) .⊘ Ref(t)))
+#oddoperator(t::TensorAlgebra{V}) where V = TensorOperator(AntiSpinor{V}(oddbasis(V) .⊘ Ref(t)))
+
+function getpairs(n,i)
+    ind = indices(basis(!Λ(Submanifold(n)).b[i+1]))
+    Expr(:call,:Values,[:(@inbounds value(x)[$j]-value(x)[$i]) for j ∈ ind]...)
+end
+nozero(x::T) where T = iszero(x) ? one(T) : x
+getmult(n,i) = :(+(true,iszero.($(getpairs(n,i)))...))
+getdiff(n,i) = :(*(nozero.($(getpairs(n,i)))...))
+sylvester(X::TensorNested) = sylvester(eigvals(X))
+@generated function sylvester(x::Chain{V,1}) where V
+    Expr(:call,:(Chain{V}),getdiff.(mdims(V),list(1,mdims(V)))...)
+end
+eigmults(X::TensorNested) = eigmults(eigvals(X))
+@generated function eigmults(x::Chain{V,1}) where V
+    Expr(:call,:(Chain{V}),getmult.(mdims(V),list(1,mdims(V)))...)
+end
+
+function eigpolys(X::TensorNested{V}) where V
+    if mdims(V)≠2
+        eigpolys(eigvalsreal(X))
+    else
+        Chain{V}(eigpolys(X,Val(1)),eigpolys(X,Val(2)))
+    end
+end
+@generated function eigpolys(x::Chain{V,1}) where V
+    Expr(:call,:(Chain{V}),[:(eigpolys(x,Val($i))) for i ∈ list(1,mdims(V))]...)
+end
+eigpolys(X,G::Int) = eigpolys(X,Val(G))
+eigpolys(::TensorAlgebra{V} where V,::Val{0}) = 1
+function eigpolys(X::TensorNested{V},g::Val{G}) where {V,G}
+    mdims(V)≠G ? sum(value(eigprods(X,g)))/binomial(mdims(V),G) : Real(det(X))
+end
+function eigpolys(x::Chain{V,1},g::Val{G}) where {V,G}
+    mdims(V)≠G ? sum(value(eigprods(x,g)))/binomial(mdims(V),G) : prod(value(x))
+end
+eigpolys(X::Outermorphism,G::Val{1}) = scalar(TensorOperator(@inbounds value(x)[1]))
+eigpolys(X::Endomorphism{V,<:Simplex} where V,::Val{1}) = scalar(X)
+eigpolys(X::DiagonalOperator{V,<:Chain{V,1}} where V,::Val{1}) = scalar(X)
+eigpolys(X::DiagonalOperator{V,<:Chain{V,1}} where V,G::Val) = eigpolys(value(X),G)
+eigpolys(X::DiagonalOperator{V,<:Chain{V,1}} where V) = eigpolys(value(X))
+eigpolys(X::DiagonalOperator{V,<:Multivector} where V,G::Val{1}) = scalar(DiagonalOperator(value(X)(G)))
+eigpolys(X::DiagonalOperator{V,<:Multivector} where V,G::Val) = eigpolys(value(X)(Val(1)),G)
+eigpolys(X::DiagonalOperator{V,<:Multivector} where V) = eigpolys(value(X)(Val(1)))
+
+eigprods(X,G::Int) = eigprods(X,Val(G))
+eigprods(X::TensorNested) = eigprods(eigvalsreal(X))
+eigprods(X::TensorNested{V},g::Val{G}) where {V,G} = mdims(V)≠G ? eigprods(eigvalsreal(X),g) : det(X)
+eigprods(X::TensorAlgebra{V},::Val{0}) where V = Chain{V,0}(1)
+eigprods(x::Chain{V,1} where V,::Val{1}) = x
+@generated function eigprods(x::Chain{V,1},::Val{G}) where {V,G}
+    Expr(:call,:(Chain{V,G}),getprod.(mdims(V),list(1,binomial(mdims(V),G)),G)...)
+end
+@generated function eigprods(x::Chain{V,1,T}) where {V,T}
+    N = mdims(V)
+    Expr(:call,:(Multivector{V}),one(T),vcat([[getprod(N,i,G) for i ∈ list(1,binomial(N,G))] for G ∈ list(1,N)]...)...)
+end
+function getprod(n,i,g)
+    ind = indices(basis(Λ(Submanifold(n)).b[i+binomsum(n,g)]))
+    Expr(:call,:*,[:(@inbounds value(x)[$j]) for j ∈ ind]...)
+end
+
+eigvecs(X::TensorAlgebra) = eigvecs(operator(X))
+eigvecs(X::DiagonalOperator{V,<:Chain} where V) = DiagonalOperator(map(unit,value(X)))
+eigvecs(X::DiagonalOperator{V,<:Multivector} where V) = DiagonalOperator(map(unit,value(X)(Val(1))))
+eigvecs(X::Endomorphism{V,<:Simplex}) where V = TensorOperator{V,V}(eigvecs(Matrix(X)))
+eigvecs(X::Outermorphism) = (@inbounds eigvecs(TensorOperator(value(X)[1])))
+eigvals(X::TensorAlgebra) = eigvals(operator(X))
+eigvals(X::Scalar{V}) where V = Chain{V}(value(abs2(X))*ones(Values{mdims(V)}))
+function eigvals(X::T) where {V,G,T<:TensorGraded{V,G}}
+    S = supermanifold(V)
+    if (S==2 || S===S"2" || S===3 || S===S"3") && iseven(G)
+        eigvals(T<:Chain ? Spinor(X) : Couple(X))
+    else
+        eigvals(operator(X))
+    end
+end
+function eigvals(X::Union{<:Couple{V},<:Spinor{V}}) where V
+    S = supermanifold(V)
+    if S===2 || S===S"2"
+        X2 = X*X
+        re,sq = Real(scalar(X2)),sqrt(Real(abs2(imaginary(X2))))
+        Chain{V}(Complex(re,-sq),Complex(re,sq))
+    elseif S===3 || S===S"3"
+        X2 = X*X
+        re,sq = Real(scalar(X2)),sqrt(Real(abs2(imaginary(X2))))
+        Chain{V}(Complex(re,-sq),Complex(re,sq),Real(abs2(X)))
+    else
+        eigvals(operator(X))
+    end
+end
+function eigvals(X::TensorNested{V}) where V
+    N = mdims(V)
+    if N == 1
+        X[1]
+    elseif N < 5
+        Chain{V}(monicroots(characteristic(X)))
+    else
+        Chain{V}(Values{N}(eigvals(eigen(Matrix(X)))))
+    end
+end
+function eigvalsreal(X::TensorNested{V}) where V
+    N = mdims(V)
+    if N == 1
+        X[1]
+    elseif N < 5
+        Chain{V}(monicrootsreal(characteristic(X)))
+    else
+        Chain{V}(Values{N}(eigvals(eigen(Matrix(X)))))
+    end
+end
+function eigvalscomplex(X::TensorNested{V}) where V
+    N = mdims(V)
+    if N == 1
+        Complex(X[1])
+    elseif N < 5
+        Chain{V}(monicrootscomplex(characteristic(X)))
+    else
+        Chain{V}(Complex.(Values{N}(eigvals(eigen(Matrix(X))))))
+    end
+end
+
+characteristic(X::DiagonalOperator) = characteristic_exact(X)
+function characteristic(X::Outermorphism{V}) where V
+    mdims(V) < 5 ? (@inbounds characteristic(TensorOperator(value(X)[1]))) : characteristic_exact(X)
+end
+function characteristic(X::Endomorphism{V,<:Simplex}) where V
+    N = mdims(V)
+    if N == 1
+        -X[1]
+    elseif N == 2
+        Chain{V}(Real(det(X)),-tr(X))
+    elseif N == 3
+        a0,a2 = -Real(det(X)),tr(X)
+        Chain{V}(a0,(a2*a2-tr(X⋅X))/2,-a2)
+    elseif N == 4
+        a3,a0,X2 = tr(X),Real(det(X)),X⋅X
+        a32,trX2 = a3*a3,tr(X2)
+        a2,a1 = (a32 - trX2)/2,(a3*(a32 - 3trX2) + 2tr(X2⋅X))/-6
+        Chain{V}(a0,a1,a2,-a3)
+    else
+        characteristic_exact(X)
+    end
+end
+
+characteristic_exact(X::Endomorphism{V,<:Simplex} where V) = characteristic_exact(outermorphism(X))
+characteristic_exact(X::DiagonalOperator{V,<:Chain{V,1}} where V) = characteristic_exact(outermorphism(X))
+@generated function characteristic_exact(X::DiagonalOperator{V,<:Multivector}) where V
+    N = mdims(V)
+    Expr(:block,:(out = sum.(getindex.(value(X),$(Val.(list(1,N)))))),
+        Expr(:call,:(Chain{V}),[isodd(N-k) ? :(@inbounds out[$(N-k+1)]) : :(@inbounds -out[$(N-k+1)]) for k ∈ list(1,N)]...))
+end
+@generated function characteristic_exact(X::Outermorphism{V}) where V
+    N = mdims(V)
+    Expr(:block,:(out = Values(map(tr,value(X)))),
+        Expr(:call,:(Chain{V}),[isodd(N-k) ? :(@inbounds out[$(N-k+1)]) : :(@inbounds -out[$(N-k+1)]) for k ∈ list(1,N)]...))
+end
 
 # metric tensor
 
