@@ -1153,6 +1153,9 @@ end
 ### Product Algebra
 
 const product_contraction_metric = product_contraction
+#=@generated function contraction2(b::Chain{V,G,T},a::TensorTerm{V,L}) where {V,G,L,T}
+    product_contraction(a,b,true,false,:product)
+end=#
 @generated function contraction2(a::TensorGraded{V,L},b::Chain{V,G,T}) where {V,G,L,T}
     product_contraction(a,b,false,false,:product)
 end
@@ -1333,6 +1336,7 @@ for side ∈ (:left,:right)
     pnp = :(Leibniz.$(Symbol(pn,:pre)))
     for (c,p,ff) ∈ ((cc,p,false),(h,pg,false),(h,pg,true))
         args = ff ? (:g,) : ()
+        adj = c≠cc ? :conj : :identity
         @eval begin
             $c(z::Phasor,$(args...)) = $c(Couple(z),$(args...))
             function $c(z::Couple{V},$(args...)) where V
@@ -1352,7 +1356,7 @@ for side ∈ (:left,:right)
                     D = diffvars(V)
                     for k ∈ list(1,binomial(N,G))
                         B = @inbounds ib[k]
-                        val = :(conj(@inbounds b.v[$k]))
+                        val = :($$adj(@inbounds b.v[$k]))
                         v = Expr(:call,MUL,$p(V,B),val)#$(c≠h ? :($pnp(V,B,val)) : :val))
                         setblade!_pre(out,v,complement(N,B,D),Val{N}())
                     end
@@ -1366,7 +1370,7 @@ for side ∈ (:left,:right)
                         @inbounds val = b.v[k]
                         if val≠0
                             @inbounds ibk = ib[k]
-                            v = conj($MUL($$p(V,ibk),val))#$(c≠h ? :($$pn(V,ibk,val)) : :val)))
+                            v = $$adj($MUL($$p(V,ibk),val))#$(c≠h ? :($$pn(V,ibk,val)) : :val)))
                             setblade!(out,v,complement(N,ibk,D),Val{N}())
                         end
                     end
@@ -1386,7 +1390,7 @@ for side ∈ (:left,:right)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
-                            val = :(conj(@inbounds m.v[$(bs[g]+i)]))
+                            val = :($$adj(@inbounds m.v[$(bs[g]+i)]))
                             v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
                             @inbounds setmulti!_pre(out,v,complement(N,ibi,D),Val{N}())
                         end
@@ -1403,7 +1407,7 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[bs[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                v = $$adj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
                                 setmulti!(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
@@ -1424,7 +1428,7 @@ for side ∈ (:left,:right)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
-                            val = :(conj(@inbounds m.v[$(rs[g]+i)]))
+                            val = :($$adj(@inbounds m.v[$(rs[g]+i)]))
                             v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
                             @inbounds (isodd(N) ? setanti!_pre : setspin!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
@@ -1441,7 +1445,7 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[rs[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                v = $$adj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
                                 $(isodd(N) ? setanti! : setspin!)(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
@@ -1462,7 +1466,7 @@ for side ∈ (:left,:right)
                         ib = indexbasis(N,g-1)
                         @inbounds for i ∈ 1:bn[g]
                             ibi = @inbounds ib[i]
-                            val = :(conj(@inbounds m.v[$(ps[g]+i)]))
+                            val = :($$adj(@inbounds m.v[$(ps[g]+i)]))
                             v = Expr(:call,:*,$p(V,ibi),val)#$(c≠h ? :($pnp(V,ibi,val)) : :val))
                             @inbounds (isodd(N) ? setspin!_pre : setanti!_pre)(out,v,complement(N,ibi,D),Val{N}())
                         end
@@ -1479,7 +1483,7 @@ for side ∈ (:left,:right)
                             @inbounds val = m.v[ps[g]+i]
                             if val≠0
                                 ibi = @inbounds ib[i]
-                                v = conj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
+                                v = $$adj($$p(V,ibi)*val)#$(c≠h ? :($$pn(V,ibi,val)) : :val))
                                 $(isodd(N) ? setspin! : setanti!)(out,v,complement(N,ibi,D),Val{N}())
                             end
                         end
@@ -1525,6 +1529,113 @@ for c ∈ (:even,:odd)
         end
     end
 end
+for c ∈ (:real,:imag)
+    par = c≠:real ? :(parityreverse(g-1)) : :(!parityreverse(g-1))
+    @eval begin
+        @generated function $c(m::Multivector{V,T}) where {V,T}
+            SUB,VEC = subvecs(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:bs,:bn),:svec)...)
+                out = svec(N,Any)(zeros(svec(N,T)))
+                for g ∈ list(1,N+1)
+                    if $par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            ibi = @inbounds ib[i]
+                            v = :(@inbounds m.v[$(bs[g]+i)])
+                            @inbounds setmulti!_pre(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return :(Multivector{V}($(Expr(:call,tvec(N,T),out...))))
+            else return quote
+                $(insert_expr((:N,:bs,:bn),:svec)...)
+                out = zeros($VEC(N,T))
+                for g ∈ list(1,N+1)
+                    if $$par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds v = m.v[bs[g]+i]
+                            if v≠0
+                                ibi = @inbounds ib[i]
+                                setmulti!(out,v,ibi,Val{N}())
+                            end
+                        end
+                    end
+                end
+                return Multivector{V}(out)
+            end end
+        end
+        @generated function $c(m::Spinor{V,T}) where {V,T}
+            SUB,VEC = subvecs(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:rs,:bn),:svecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,T)))
+                for g ∈ evens(1,N+1)
+                    if $par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            ibi = @inbounds ib[i]
+                            v = :(@inbounds m.v[$(rs[g]+i)])
+                            @inbounds setspin!_pre(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return :(Spinor{V}($(Expr(:call,tvecs(N,T),out...))))
+            else return quote
+                $(insert_expr((:N,:rs,:bn),:svecs)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 1:2:N+1
+                    if $$par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds v = m.v[rs[g]+i]
+                            if v≠0
+                                ibi = @inbounds ib[i]
+                                setspin!(out,v,ibi,Val{N}())
+                            end
+                        end
+                    end
+                end
+                return Spinor{V}(out)
+            end end
+        end
+        @generated function $c(m::CoSpinor{V,T}) where {V,T}
+            SUB,VEC = subvecs(m)
+            if mdims(V)<cache_limit
+                $(insert_expr((:N,:ps,:bn),:svecs)...)
+                out = svecs(N,Any)(zeros(svecs(N,T)))
+                for g ∈ evens(2,N+1)
+                    if $par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            ibi = @inbounds ib[i]
+                            v = :(@inbounds m.v[$(ps[g]+i)])
+                            @inbounds setanti!_pre(out,v,ibi,Val{N}())
+                        end
+                    end
+                end
+                return :(CoSpinor{V}($(Expr(:call,tvecs(N,T),out...))))
+            else return quote
+                $(insert_expr((:N,:ps,:bn),:svecs)...)
+                out = zeros($VEC(N,T))
+                for g ∈ 2:2:N+1
+                    if $$par
+                        ib = indexbasis(N,g-1)
+                        @inbounds for i ∈ 1:bn[g]
+                            @inbounds v = m.v[ps[g]+i]
+                            if v≠0
+                                ibi = @inbounds ib[i]
+                                setanti!(out,v,ibi,Val{N}())
+                            end
+                        end
+                    end
+                end
+                return CoSpinor{V}(out)
+            end end
+        end
+    end
+end
 for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
     c,p = (side≠:anti ? side : Symbol(side,:metric)),Symbol(:parity,side)
     tens,tensfull = Symbol(side,:tensor),Symbol(side,:extensor)
@@ -1545,7 +1656,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 out = svec(N,G,Any)(zeros(svec(N,G,T)))
                 for k ∈ list(1,binomial(N,G))
                     B = @inbounds ib[k]
-                    val = :(@inbounds b.v[$k])
+                    val = :(conj(@inbounds b.v[$k]))
                     par = $p(V,B)
                     v = if typeof(par)==Bool
                         par ? :($SUB($val)) : val
@@ -1559,7 +1670,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 $(insert_expr((:N,:ib),:svec)...)
                 out = zeros($VEC(N,G,T))
                 for k ∈ 1:binomial(N,G)
-                    @inbounds val = b.v[k]
+                    @inbounds val = conj(b.v[k])
                     if val≠0
                         @inbounds ibk = ib[k]
                         par = $$p(V,ibk)
@@ -1586,7 +1697,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
-                        val = :(@inbounds m.v[$(bs[g]+i)])
+                        val = :(@inbounds conj(m.v[$(bs[g]+i)]))
                         par = $p(V,ibi)
                         v = if typeof(par)==Bool
                             par ? :($SUB($val)) : val
@@ -1603,7 +1714,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 for g ∈ 1:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = m.v[bs[g]+i]
+                        @inbounds val = conj(m.v[bs[g]+i])
                         if val≠0
                             ibi = @inbounds ib[i]
                             par = $$p(V,ibi)
@@ -1631,7 +1742,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
-                        val = :(@inbounds m.v[$(rs[g]+i)])
+                        val = :(@inbounds conj(m.v[$(rs[g]+i)]))
                         par = $p(V,ibi)
                         v = if typeof(par)==Bool
                             par ? :($SUB($val)) : val
@@ -1648,7 +1759,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 for g ∈ 1:2:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = m.v[rs[g]+i]
+                        @inbounds val = conj(m.v[rs[g]+i])
                         if val≠0
                             ibi = @inbounds ib[i]
                             par = $$p(V,ibi)
@@ -1676,7 +1787,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
                         ibi = @inbounds ib[i]
-                        val = :(@inbounds m.v[$(ps[g]+i)])
+                        val = :(@inbounds conj(m.v[$(ps[g]+i)]))
                         par = $p(V,ibi)
                         v = if typeof(par)==Bool
                             par ? :($SUB($val)) : val
@@ -1693,7 +1804,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
                 for g ∈ 2:2:N+1
                     ib = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = m.v[ps[g]+i]
+                        @inbounds val = conj(m.v[ps[g]+i])
                         if val≠0
                             ibi = @inbounds ib[i]
                             par = $$p(V,ibi)

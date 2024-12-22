@@ -197,7 +197,7 @@ end
 @inline Base.expm1(A::Chain{V,G,<:Chain{V,G}},_=nothing) where {V,G} = exp(A)-I
 @inline Base.exp(A::Chain{V,G,<:Chain{V,G},1},_=nothing) where {V,G} = Chain{V,G}(Values(Chain{V,G}(exp(A[1][1]))))
 
-@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Real,2},2},_=nothing) where {V,G}
+@inline function Base.exp(A::Chain{V,G,<:Chain{V,G,<:Real,2},2},_=nothing) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -224,7 +224,7 @@ end
     Chain{V,G}(Chain{V,G}(m11, m21), Chain{V,G}(m12, m22))
 end
 
-@inline function Base.exp(A::Chain{V,G,Chain{V,G,<:Complex,2},2},_=nothing) where {V,G}
+@inline function Base.exp(A::Chain{V,G,<:Chain{V,G,<:Complex,2},2},_=nothing) where {V,G}
     T = typeof(exp(zero(valuetype(A))))
     @inbounds a = A[1][1]
     @inbounds c = A[1][2]
@@ -244,7 +244,7 @@ end
 
 # Adapted from implementation in Base; algorithm from
 # Higham, "Functions of Matrices: Theory and Computation", SIAM, 2008
-function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N},_=nothing) where {W,G,T,N}
+function Base.exp(_A::Chain{W,G,<:Chain{W,G,T,N},N},_=nothing) where {W,G,T,N}
     S = typeof((zero(T)*zero(T) + zero(T)*zero(T))/one(T))
     A = Chain{W,G}(map.(S,value(_A)))
     # omitted: matrix balancing, i.e., LAPACK.gebal!
@@ -289,7 +289,7 @@ function Base.exp(_A::Chain{W,G,Chain{W,G,T,N},N},_=nothing) where {W,G,T,N}
             S(64764752532480000)*I
         expA = (V - U) \ (V + U)
         if s > 0            # squaring to reverse dividing by power of 2
-            for t=1:si
+            for t=Base.OneTo(si)
                 expA = expA*expA
             end
         end
@@ -821,8 +821,9 @@ function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
     mdims(M) < mdims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
 end
 
-Base.:\(t::LinearAlgebra.UniformScaling,v::Chain{V,G,<:Chain}) where {V,G} = inv(v)#value(Chain{V,G}(t))\v
-Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = t*inv(v)#Chain{V,1}(t.\value(v))
+Base.:\(v::Chain{V,G,<:Chain},t::LinearAlgebra.UniformScaling) where {V,G} = inv(v)#value(Chain{V,G}(t))\v
+Base.:\(t::LinearAlgebra.UniformScaling,v::Chain{V,G,<:Chain}) where {V,G} = v
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = inv(t)*v#Chain{V,1}(t.\value(v))
 Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 #Base.inv(t::Chain{V,1,<:Chain{V,G}}) where {V,G} = value(Chain{V,G}(I))\t
@@ -1098,3 +1099,146 @@ Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V}}) where V = rand(PseudoCou
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B}}) where {V,B} = PseudoCouple{V,B}(rand(Complex{Float64}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T}}) where {V,B,T} = PseudoCouple{V,B}(rand(Complex{T}))
 Base.rand(::AbstractRNG,::SamplerType{PseudoCouple{V,B,T} where B}) where {V,T} = rand(PseudoCouple{V,Submanifold{V}(UInt(rand(0:(1<<mdims(V)-1)-1))),T})
+
+zero!(x::T) where T = x≈0 ? zero(T) : x
+zero!(x::Complex) = Complex(zero!(real(x)),zero!(imag(x)))
+subzero(a,b) = (ab = a/b; ab ≈ 1 ? zero(ab) : a-b)
+subsqrt(a,b) = (ab = a/b; ab ≈ 1 ? zero(ab) : sqrt(a-b))
+subsqrtcomplex(a,b) = (ab = a/b; ab ≈ 1 ? zero(ab) : (amb = a-b; sqrt(amb < 0 ? Complex(amb) : amb)))
+
+export roots, rootsreal, rootscomplex, monicroots, monicrootsreal, monicrootscomplex
+
+roots(a) = roots(value(a)...)
+roots(a0::Real) = zero(a0)
+roots(a0::Complex) = zero(a0)
+roots(a0,a1) = monicroots(a0/a1)
+roots(a0,a1,a2) = monicroots(a0/a2,a1/a2)
+roots(a::Vararg{T,N}) where {N,T<:Real} = monicroots((@inbounds a[list(1,N-1)]./a[N])...)
+
+rootsreal(a) = rootsreal(value(a)...)
+rootsreal(a0::Real) = zero(a0)
+rootsreal(a::Vararg{T,N}) where {N,T<:Real} = monicrootsreal((@inbounds a[list(1,N-1)]./a[N])...)
+
+rootscomplex(a) = rootscomplex(value(a)...)
+rootscomplex(a0::Real) = zero(Complex{typeof(a0)})
+rootscomplex(a0::Complex) = zero(Complex{typeof(a0)})
+rootscomplex(a0,a1) = monicrootscomplex(a0/a1)
+rootscomplex(a0,a1,a2) = monicrootscomplex(a0/a2,a1/a2)
+rootscomplex(a::Vararg{T,N}) where {N,T<:Real} = monicrootscomplex((@inbounds a[list(1,N-1)]./a[N])...)
+
+monicroots(a) = monicroots(value(a)...)
+monicroots(a...) = value(eigvals(companion(Values(a...))))
+monicroots(a0::Real) = -a0 # z+a0
+monicroots(a0::Complex) = -a0 # z+a0
+function monicroots(a0,a1) # z^2+a1*z+a0
+    sq = a1*a1-4a0
+    quadratic(a0,a1,sqrt(sq < 0 ? Complex(sq) : sq))
+end
+function quadratic(a0,a1,rt)
+    if a1 < 0
+        Values(2a0/(-a1+rt),(-a1+rt)/2)
+    else
+        Values((-a1-rt)/2,2a0/(-a1-rt))
+    end
+end
+function monicroots(a0::Real,a1::Real,a2::Real,::Val{C}=Val(false)) where C
+    a22,a23 = a2*a2,a2/3 # z^3+a2*z^2+a1*z+a0
+    q,r = subzero((a1/3),a22/9),(a1*a2/6)-(a0/2)-(a22*a2/27)
+    r2,q3 = r*r,q*q*q
+    if r2+q3 > 0
+        A = cbrt(abs(r)+sqrt(r2+q3))
+        qA = q/A
+        t = r < 0 ? qA-A : A-qA
+        x,y,z = zero!(-((t/2)+a23)),zero!((sqrt(3)/2)*(A+qA)),t-a23
+        if z < x
+            Values(z,Complex(x,-y),Complex(x,y))
+        else
+            Values(Complex(x,-y),Complex(x,y),z)
+        end
+    else # Real (Viete)
+        sq = sqrt(-q)
+        ϕ1,sq2 = if q<0
+            c = r/(q>-1 ? sqrt(-q3) : sq*sq*sq)
+            acos(abs(c)≈1 ? float(sign(c)) : c)/3,2sq
+        else
+            sq/3,2sq
+        end
+        ϕ2,ϕ3 = ϕ1-(2π/3),ϕ1+(2π/3)
+        out = Values(sq2*cos(ϕ3)-a23,sq2*cos(ϕ2)-a23,sq2*cos(ϕ1)-a23)
+        C ? Complex.(out) : out
+    end
+end
+cubicmax(a) = cubicmax(value(a)...)
+function cubicmax(a0::Real,a1::Real,a2::Real) # z^3+a2*z^2+a1*z+a0
+    a22,a23 = a2*a2,a2/3
+    q,r = subzero((a1/3),a22/9),(a1*a2/6)-(a0/2)-(a22*a2/27)
+    r2,q3 = r*r,q*q*q
+    if r2+q3 > 0
+        A = cbrt(abs(r)+sqrt(r2+q3))
+        (r < 0 ? (q/A)-A : A-(q/A))-a23
+    else # Real (Viete)
+        sq = sqrt(-q)
+        θ = if q<0
+            c = r/(q>-1 ? sqrt(-q3) : sq*sq*sq)
+            acos(abs(c)≈1 ? float(sign(c)) : c)
+        else
+            sq
+        end
+        2sq*cos(θ/3)-a23
+    end
+end
+function quartic(a0::Real,a1::Real,a2::Real,a3::Real) # z^4+a3*z^3+a2*z^2+a1*z+a0
+    a04 = 4a0
+    u = cubicmax(a04*a2-a1*a1-a0*a3*a3,a1*a3-a04,-a2)
+    a32,u2 = a3/2,u/2
+    z1 = zero!(a32*a32+u-a2)
+    psq,qsq = z1≤0 ? zero(typeof(z1)) : sqrt(z1),subsqrt(u2*u2,a0)
+    p1,p2,qsqpm = a32-psq,a32+psq,(a1-(a3*u)/2 > 0 ? qsq : -qsq)
+    q1,q2,p12,p22 = u2+qsqpm,u2-qsqpm,(p1/-2),(p2/-2)
+end
+function monicroots(a0::Real,a1::Real,a2::Real,a3::Real) # z^4+a3*z^3+a2*z^2+a1*z+a0
+    q1,q2,p12,p22 = quartic(a0,a1,a2,a3)
+    sq1,sq2 = p12*p12-q1,p22*p22-q2
+    rt1,rt2 = sqrt(sq1 < 0 ? Complex(sq1) : sq1),sqrt(sq2 < 0 ? Complex(sq2) : sq2)
+    if isreal(rt1) && isreal(rt2)
+        Values{4,typeof(q1)}(p22-rt2,p22+rt2,p12-rt1,p12+rt1)
+    else
+        Values{4,Complex{typeof(q1)}}(p22-rt2,p22+rt2,p12-rt1,p12+rt1)
+    end
+end
+
+monicrootsreal(a) = monicrootsreal(value(a)...)
+monicrootsreal(a...) = value(eigvalsreal(companion(Values(a...))))
+monicrootsreal(a0::Real) = -a0 # z+z0
+monicrootsreal(a0::Real,a1::Real) = quadratic(a0,a1,sqrt(a1*a1-4a0)) # z^2+a1*z+a0
+function monicrootsreal(a0::Real,a1::Real,a2::Real) # z^3+a2*z^2+a1*z+a0
+    a22,a23 = a2*a2,a2/3
+    q,r = subzero((a1/3),a22/9),(a1*a2/6)-(a0/2)-(a22*a2/27)
+    sq = sqrt(-q)
+    ϕ1,sq2 = if q<0
+        c = r/(q>-1 ? sqrt(-q*q*q) : sq*sq*sq)
+        acos(abs(c)≈1 ? float(sign(c)) : c)/3,2sq
+    else
+        sq/3,2sq
+    end
+    ϕ2,ϕ3 = ϕ1-(2π/3),ϕ1+(2π/3)
+    Values(sq2*cos(ϕ3)-a23,sq2*cos(ϕ2)-a23,sq2*cos(ϕ1)-a23)
+end
+function monicrootsreal(a0::Real,a1::Real,a2::Real,a3::Real) # z^4+a3*z^3+a2*z^2+a1*z+a0
+    q1,q2,p12,p22 = quartic(a0,a1,a2,a3)
+    rt1,rt2 = sqrt(zero!(p12*p12-q1)),sqrt(zero!(p22*p22-q2))
+    Values(p22-rt2,p22+rt2,p12-rt1,p12+rt1)
+end
+
+monicrootscomplex(a) = monicrootscomplex(value(a)...)
+monicrootscomplex(a...) = value(eigvalscomplex(companion(Values(a...))))
+monicrootscomplex(a0::Real) = Complex(-a0) # z+a0
+monicrootscomplex(a0::Complex) = -a0 # z+a0
+monicrootscomplex(a0,a1) = quadratic(a0,a1,sqrt(Complex(a1*a1-4a0))) # z^2+a1*z+a0
+monicrootscomplex(a0::Real,a1::Real,a2::Real) = monicroots(a0,a1,a2,Val(true))
+function monicrootscomplex(a0::Real,a1::Real,a2::Real,a3::Real)# z^4+a3*z^3+a2*z^2+a1*z+a0
+    q1,q2,p12,p22 = quartic(a0,a1,a2,a3)
+    rt1,rt2 = sqrt(Complex(subzero(p12*p12,q1))),sqrt(Complex(subzero(p22*p22,q2)))
+    Values(p22-rt2,p22+rt2,p12-rt1,p12+rt1)
+end
+

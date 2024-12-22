@@ -145,7 +145,7 @@ function (W::Submanifold{Q,M,S})(m::Multivector{V,T}) where {Q,M,V,S,T}
     end
 end
 
-# need separate storage for m and F for caching
+#= need separate storage for m and F for caching
 
 const dualform_cache = Vector{Tuple{Int,Bool}}[]
 const dualformC_cache = Vector{Tuple{Int,Bool}}[]
@@ -292,7 +292,10 @@ end
         end
         return Single{V}(out::t,Submanifold{V}())
     end
-end
+end=#
+
+(t::TensorGraded)(y::TensorGraded...) = contraction(t,∧(y...))
+(t::TensorMixed)(y::TensorGraded...) = contraction(t,∧(y...))
 
 # Dyadic
 
@@ -1344,7 +1347,7 @@ bracket(X,Y) = X(Y) - Y(X)
 bracket(X,Y,Z) = X(bracket(Y,Z)) + Y(bracket(Z,X)) + Z(bracket(X,Y))
 bracket(W,X,Y,Z) = W(bracket(X,Y,Z)) + X(bracket(W,Z,Y)) + Y(bracket(W,X,Z)) + Z(bracket(W,Y,X))
 bracket(V,W,X,Y,Z) = V(bracket(W,X,Y,Z)) + W(bracket(V,X,Z,Y)) + X(bracket(V,W,Y,Z)) + Y(bracket(V,W,Z,X)) + Z(bracket(V,W,X,Y))
-@generated function bracket(X::Vararg{T,N} where T) where N
+@generated function bracket(X::Vararg{T,N}) where {N,T}
     Expr(:call,:+,[:($(isodd(i) ? :+ : :-)(X[$i](bracket($(vcat([j≠i ? [:(X[$j])] : [] for j ∈ list(1,N)]...)...))))) for i ∈ list(1,N)]...)
 end
 

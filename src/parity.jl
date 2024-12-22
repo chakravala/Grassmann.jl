@@ -440,7 +440,7 @@ construct_cache(:DiagonalForm)
 
 @pure signbit(V::T) where T<:Manifold = (ib=indexbasis(rank(V)); parity.(Ref(V),ib,ib))
 @pure signbit(V::T,G) where T<:Manifold = (ib=indexbasis(rank(V),G); parity.(Ref(V),ib,ib))
-@pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
+#=@pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
 @pure radial(V::T) where T<:Manifold = Values(findall(.!signbit(V))...)
 @pure angular(V::T,G) where T<:Manifold = findall(signbit(V,G))
 @pure radial(V::T,G) where T<:Manifold = findall(.!signbit(V,G))
@@ -456,7 +456,7 @@ for (op,other) ∈ ((:angular,:radial),(:radial,:angular))
             Chain{V,G}(out)
         end
     end
-end
+end=#
 
 Base.iseven(t::Zero) = true
 Base.isodd(t::Zero) = true
@@ -481,8 +481,35 @@ even(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? t : scalar(t)
 odd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? imaginary(t) : Zero{V}()
 even(t::PseudoCouple{V,B}) where {V,B} = even(imaginary(t)) + even(volume(t))
 odd(t::PseudoCouple{V,B}) where {V,B} = odd(imaginary(t)) + odd(volume(t))
+even(t::Multivector{V,T,4} where {V,T}) = scalar(t) + volume(t)
+odd(t::Multivector{V,T,4} where {V,T}) = vector(t)
 
-function imag(t::Multivector{V,T}) where {V,T}
+real(t::TensorTerm{V,G}) where {V,G} = parityreverse(G) ? Zero{V}() : t
+imag(t::TensorTerm{V,G}) where {V,G} = !parityreverse(G) ? Zero{V}() : t
+real(t::Couple) = scalar(t) + real(imaginary(t))
+imag(t::Couple) = imag(imaginary(t))
+real(t::PseudoCouple) = real(volume(t)) + real(imaginary(t))
+imag(t::PseudoCouple) = imag(volume(t)) + imag(imaginary(t))
+real(t::Multivector{V,T,2} where {V,T}) = t
+imag(t::Multivector{V,T,2}) where {V,T} = Zero{V}()
+imag(t::Multivector{V,T,4} where {V,T}) = volume(t)
+real(t::Spinor{V,T,2} where {V,T}) = scalar(t)
+real(t::Quaternion) = scalar(t)
+real(t::Spinor{V,T,8} where {V,T}) = scalar(t) + volume(t)
+imag(t::Spinor{V,T,2} where {V,T}) = volume(t)
+imag(t::Quaternion) = imaginary(t)
+imag(t::Spinor{V,T,8} where {V,T}) = bivector(t)
+imag(t::Spinor{V,T,16} where {V,T}) = bivector(t)
+real(t::CoSpinor{V,T,2} where {V,T}) = t
+real(t::CoSpinor{V,T,4} where {V,T}) = vector(t)
+real(t::CoSpinor{V,T,8} where {V,T}) = vector(t)
+imag(t::CoSpinor{V,T,2}) where {V,T} = Zero{V}()
+imag(t::CoSpinor{V,T,4} where {V,T}) = volume(t)
+imag(t::CoSpinor{V,T,8} where {V,T}) = trivector(t)
+imag(t::CoSpinor{V,T,16} where {V,T}) = trivector(t)
+imag(t::CoSpinor{V,T,32} where {V,T}) = trivector(t)
+
+#=function imag(t::Multivector{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvec(N,T)))
     bs = binomsum_set(N)
@@ -504,27 +531,49 @@ function real(t::Multivector{V,T}) where {V,T}
         end
     end
     Multivector{V}(out)
-end
-function imag(t::Spinor{V,T}) where {V,T}
+end=#
+#=function imag(t::Spinor{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvecs(N,T)))
-    bs = spinsum_set(N)
+    bs = spincumsum(N)
     @inbounds out[1]≠0 && (out[1] = zero(T))
-    for g ∈ evens(2,N+1)
+    for g ∈ evens(3,N+1)
         @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
     Spinor{V}(out)
-end
-function real(t::Spinor{V,T}) where {V,T}
+end=#
+#=function real(t::Spinor{V,T}) where {V,T}
     N = mdims(V)
     out = copy(value(t,mvecs(N,T)))
-    bs = spinsum_set(N)
+    bs = spincumsum(N)
     for g ∈ evens(3,N+1)
         @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
             @inbounds out[k]≠0 && (out[k] = zero(T))
         end
     end
     Spinor{V}(out)
-end
+end=#
+#=function imag(t::CoSpinor{V,T}) where {V,T}
+    N = mdims(V)
+    out = copy(value(t,mvecs(N,T)))
+    bs = anticumsum(N)
+    for g ∈ evens(2,N+1)
+        @inbounds !parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    CoSpinor{V}(out)
+end=#
+#=function real(t::CoSpinor{V,T}) where {V,T}
+    N = mdims(V)
+    out = copy(value(t,mvecs(N,T)))
+    bs = anticumsum(N)
+    for g ∈ evens(2,N+1)
+        @inbounds parityreverse(g-1) && for k ∈ bs[g]+1:bs[g+1]
+            @inbounds out[k]≠0 && (out[k] = zero(T))
+        end
+    end
+    CoSpinor{V}(out)
+end=#
