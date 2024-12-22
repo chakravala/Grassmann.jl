@@ -113,6 +113,7 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 ∧(::Values{0,<:Chain{V}}) where V = One(V) # ∧() = 1
 ∧(::FixedVector{0,<:Chain{V}}) where V = One(V)
 ∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
+∧(t::Chain{V,1,<:Single} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 
 wedges(x,i=length(x)-1) = i ≠ 0 ? Expr(:call,:∧,wedges(x,i-1),x[1+i]) : x[1+i]

@@ -82,8 +82,8 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 #Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 @inline (::Type{T})(x...) where {T<:Chain} = T(x)
 
-#Simplex{V,W,T<:GradedVector{W},N} = Chain{V,1,T,N}
-Simplex{V,T<:GradedVector,N} = Chain{V,1,T,N}
+#const Simplex{V,W,T<:GradedVector{W},N} = Chain{V,1,T,N}
+const Simplex{V,T<:GradedVector,N} = Chain{V,1,T,N}
 
 getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
@@ -154,6 +154,9 @@ getindex(m::Chain{V,G},i::Submanifold{V,G}) where {V,G} = m[bladeindex(mdims(V),
 getindex(m::Chain{V,G,T},i::Submanifold{V}) where {V,G,T} = zero(T)
 
 function (m::Chain{V,G,T})(i::Integer) where {V,G,T}
+    Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[i])
+end
+function (m::Chain{V,G,T})(::Val{i}) where {V,G,T,i}
     Single{V,G,DirectSum.getbasis(V,indexbasis(mdims(V),G)[i]),T}(m[i])
 end
 
@@ -307,6 +310,9 @@ Multivector{V}(val::NTuple{N,Any}) where {V,N} = Multivector{V}(Values{N}(val))
 Multivector(val::NTuple{N,T}) where {N,T} = Multivector{log2sub(N)}(Values{N,T}(val))
 Multivector(val::NTuple{N,Any}) where N = Multivector{log2sub(N)}(Values{N}(val))
 @inline (::Type{T})(x...) where {T<:Multivector} = T(x)
+
+const Multiplex{V,T<:Multivector,N} = Multivector{V,T,N}
+export Multiplex
 
 function grade_src_chain(N,G,r=binomsum(N,G),is=isempty,T=Int)
     :(Chain{V,$G,T}($(grade_src(N,G,r,is,T))))
