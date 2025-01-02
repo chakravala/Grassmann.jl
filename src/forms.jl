@@ -566,7 +566,7 @@ Endomorphism(t::Dyadic) = Endomorphism(Chain(t))
 @generated Endomorphism(t::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = :(Endomorphism(Chain{V,G}(value(value(t)).*$(Chain.(chainbasis(V,G))))))
 @generated Endomorphism(t::DiagonalOperator{V,<:Spinor{V,G}}) where {V,G} = :(Endomorphism(Spinor{V}(value(value(t)).*$(Spinor.(evenbasis(V))))))
 @generated Endomorphism(t::DiagonalOperator{V,<:AntiSpinor{V,G}}) where {V,G} = :(Endomorphism(AntiSpinor{V}(value(value(t)).*$(CoSpinor.(oddbasis(V))))))
-@generated Endomorphism(t::DiagonalOutermorphism{V}) where V = :(Endomorphism(Multivector{V}(value(value(t)).*$(Multivector(Λ(V).b)))))
+@generated Endomorphism(t::DiagonalOutermorphism{V}) where V = :(Endomorphism(Multivector{V}(value(value(t)).*$(Multivector.(Λ(V).b)))))
 Endomorphism(m::AbstractMatrix) = Endomorphism{Submanifold(@inbounds size(m)[1])}(m)
 
 TensorOperator(t::Projector) = TensorOperator(Chain(t))
@@ -574,7 +574,7 @@ TensorOperator(t::Dyadic) = TensorOperator(Chain(t))
 @generated TensorOperator(t::DiagonalOperator{V,<:Chain{V,G}}) where {V,G} = :(TensorOperator(Chain{V,G}(value(value(t)).*$(Chain.(chainbasis(V,G))))))
 @generated TensorOperator(t::DiagonalOperator{V,<:Spinor{V,G}}) where {V,G} = :(TensorOperator(Spinor{V}(value(value(t)).*$(Spinor.(evenbasis(V))))))
 @generated TensorOperator(t::DiagonalOperator{V,<:AntiSpinor{V,G}}) where {V,G} = :(TensorOperator(AntiSpinor{V}(value(value(t)).*$(CoSpinor.(oddbasis(V))))))
-@generated TensorOperator(t::DiagonalOutermorphism{V}) where V = :(TensorOperator(Multivector{V}(value(value(t)).*$(Multivector(Λ(V).b)))))
+@generated TensorOperator(t::DiagonalOutermorphism{V}) where V = :(TensorOperator(Multivector{V}(value(value(t)).*$(Multivector.(Λ(V).b)))))
 TensorOperator(m::AbstractMatrix) = TensorOperator{Submanifold.(size(m))...}(m)
 TensorOperator{V,W}(m::AbstractMatrix) where {V,W} = TensorOperator(Chain{V}(Chain{W,1}.(getindex.(Ref(m),:,list(1,mdims(V))))))
 
@@ -847,7 +847,7 @@ Base.:(:)(a::Chain{W,1,<:Dyadic{V}},b::Chain{V,1}) where {W,V} = sum(value(a).�
 #Base.:(:)(a::Chain{W,1,<:Proj{V}},b::Chain{V,1}) where {W,V} = sum(broadcast(⋅,value(a),Ref(b)))
 
 contraction(a::Chain{W},b::Chain{V,G,<:Chain}) where {W,G,V} = Chain{V,G}(Ref(value(a)).⋅value.(value(b)))
-contraction(a::Chain{W,L,<:Chain,N},b::Chain{V,G,<:Chain{W,L},M}) where {W,L,G,V,N,M} = Chain{V,G}(value.(Ref(a).⋅value(b)))
+contraction(a::Chain{W,L,<:Chain{U,H},N},b::Chain{V,G,<:Chain{W,L},M}) where {U,H,W,L,G,V,N,M} = Chain{V,G}(Chain{U,H}.(value.(Ref(a).⋅value(b))))
 contraction(a::Multivector{W,<:Multivector},b::Multivector{V,<:Multivector{W}}) where {W,V} = Multivector{V}(column(Ref(a).⋅value(b)))
 
 contraction(a::TensorTerm{W},b::Chain{V,G,<:Chain}) where {W,G,V} = contraction(Chain(a),b)
