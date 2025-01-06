@@ -487,8 +487,10 @@ Base.zero(t::Type{<:DiagonalOperator{V,T}}) where {V,T} = DiagonalOperator(zero(
 
 scalar(m::DiagonalOperator) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::DiagonalOperator) = sum(value(value(m)))
-LinearAlgebra.det(m::DiagonalMorphism{V}) where V = Chain{V,mdims(V)}(prod(value(value(m))))
-LinearAlgebra.det(m::DiagonalOutermorphism{V}) where V = value(m)(Val(mdims(V)))
+LinearAlgebra.det(m::DiagonalMorphism) = !∧(m)
+LinearAlgebra.det(m::DiagonalOutermorphism) = !∧(m)
+∧(m::DiagonalMorphism{V}) where V = Chain{V,mdims(V)}(prod(value(value(m))))
+∧(m::DiagonalOutermorphism{V}) where V = value(m)(Val(mdims(V)))
 compound(m::DiagonalMorphism{V},::Val{0}) where V = DiagonalOperator(Chain{V,0}(1))
 @generated function compound(m::DiagonalMorphism{V},::Val{G}) where {V,G}
     Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),Expr(:call,Values,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...)))
@@ -551,7 +553,8 @@ getindex(t::TensorOperator,i::Int) = value(t.v)[i]
 Base.transpose(t::TensorOperator) = TensorOperator(transpose(value(t)))
 scalar(m::Endomorphism) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
-LinearAlgebra.det(t::TensorOperator) = ∧(value(t))
+LinearAlgebra.det(t::TensorOperator) = !∧(value(t))
+∧(t::TensorOperator) = ∧(value(t))
 
 Base.zero(t::TensorOperator) = TensorOperator(zero(value(t)))
 Base.zero(t::Type{<:TensorOperator{V,W,T}}) where {V,W,T} = TensorOperator(zero(T))
@@ -676,7 +679,8 @@ getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One
 Base.transpose(m::Outermorphism) = Outermorphism(map(transpose,value(m)))
 scalar(m::Outermorphism{V}) where V = tr(m)/(1<<mdims(V))
 LinearAlgebra.tr(m::Outermorphism) = 1+sum(map(tr,value(m)))
-LinearAlgebra.det(m::Outermorphism) = (@inbounds value(value(m)[end])[1])
+LinearAlgebra.det(m::Outermorphism) = !∧(m)
+∧(m::Outermorphism) = (@inbounds value(value(m)[end])[1])
 
 Base.zero(t::Outermorphism) = Outermorphism(zero.(value(t)))
 @generated function Base.zero(t::Type{<:Outermorphism{V,T}}) where {V,T}
@@ -1156,7 +1160,7 @@ eigpolys(X::DiagonalOutermorphism) = eigpolys(value(X)(Val(1)))
 
 eigprods(X,G::Int) = eigprods(X,Val(G))
 eigprods(X::TensorNested) = eigprods(eigvalsreal(X))
-eigprods(X::TensorNested{V},g::Val{G}) where {V,G} = mdims(V)≠G ? eigprods(eigvalsreal(X),g) : det(X)
+eigprods(X::TensorNested{V},g::Val{G}) where {V,G} = mdims(V)≠G ? eigprods(eigvalsreal(X),g) : ∧(X)
 eigprods(X::TensorAlgebra{V},::Val{0}) where V = Chain{V,0}(1)
 eigprods(x::Chain{V,1} where V,::Val{1}) = x
 @generated function eigprods(x::Chain{V,1},::Val{G}) where {V,G}

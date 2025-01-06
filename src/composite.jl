@@ -909,10 +909,10 @@ function Base.findlast(P,t::ChainBundle)
 end
 Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
 
-edgelength(e) = (v=points(e)[value(e)]; value(abs(v[2]-v[1])))
-volumes(m,dets) = value.(abs.(.⋆(dets)))
-volumes(m) = mdims(Manifold(m))≠2 ? volumes(m,detsimplex(m)) : edgelength.(value(m))
-detsimplex(m::Vector{<:Chain{V}}) where V = ∧(m)/factorial(mdims(V)-1)
+edgelength(e) = (v=points(e)[value(e)]; Real(abs(v[2]-v[1])))
+volumes(m,dets) = Real.(abs.(dets))
+volumes(m) = mdims(Manifold(m))≠2 ? Real.(abs.(detsimplex(m))) : edgelength.(value(m))
+detsimplex(m::Vector{<:Chain{V}}) where V = det(m)/factorial(mdims(V)-1)
 detsimplex(m::ChainBundle) = detsimplex(value(m))
 mean(m::T) where T<:AbstractVector{<:Chain} = sum(m)/length(m)
 mean(m::T) where T<:Values = sum(m)/length(m)
@@ -923,9 +923,9 @@ barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
-LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = ∧(t)
-LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = ∧(m)
-LinearAlgebra.det(m::ChainBundle) = ∧(m)
+LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = !∧(t)
+LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = .!∧(m)
+LinearAlgebra.det(m::ChainBundle) = .!∧(m)
 ∧(m::ChainBundle) = ∧(value(m))
 function ∧(m::Vector{<:Chain{V}}) where V
     p = points(m); pm = p[m]
