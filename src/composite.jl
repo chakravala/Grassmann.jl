@@ -721,37 +721,14 @@ end
 
 @generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
     W = M≠mdims(V) ? Submanifold(M) : V; N = M-1
-    if M == 1 && (V === ℝ1 || V == 1)
-        return :(@inbounds Chain{V,1}(Values(v[1]/t[1][1])))
-    elseif M == 2 && (V === ℝ2 || V == 2)
-        return quote
-            @inbounds (a,A),(b,B),(c,C) = value(t[1]),value(t[2]),value(v)
-            x1 = (c-C*(b/B))/(a-A*(b/B))
-            return Chain{V,1}(x1,(C-A*x1)/B)
-        end
-    elseif M == 3 && (V === ℝ3 || V == 3)
-        return quote
-            dv = @inbounds v/∧(t)[1]; c1,c2,c3 = value(t)
-            return @inbounds Chain{V,1}(
-                (c2[2]*c3[3] - c3[2]*c2[3])*dv[1] +
-                    (c3[1]*c2[3] - c2[1]*c3[3])*dv[2] +
-                    (c2[1]*c3[2] - c3[1]*c2[2])*dv[3],
-                (c3[2]*c1[3] - c1[2]*c3[3])*dv[1] +
-                    (c1[1]*c3[3] - c3[1]*c1[3])*dv[2] +
-                    (c3[1]*c1[2] - c1[1]*c3[2])*dv[3],
-                (c1[2]*c2[3] - c2[2]*c1[3])*dv[1] +
-                    (c2[1]*c1[3] - c1[1]*c2[3])*dv[2] +
-                    (c1[1]*c2[2] - c2[1]*c1[2])*dv[3])
-        end
-    end
     N<1 && (return :(inv(t)⋅v))
     M > mdims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
     x,y,xy = Grassmann.Cramer(N) # paste this into the REPL for faster eval
     mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ list(1,N-1)]
     out = Expr(:call,:Values,:(v∧$(y[end])),mid...,:($(x[end])∧v))
-    detx = :(detx = @inbounds (t[1]∧$(y[end])))
+    detx = :(detx = @inbounds (t[1]∧$(y[end]))[1])
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,detx,
-        :(Chain{$W,1}(column($(Expr(:call,:.⋅,out,:(Ref(detx))))./abs2(detx)))))
+        :(Chain{$W,1}(Real.($out)./detx)))
 end
 
 @generated function Base.in(v::Chain{V,1},t::Values{N,<:Chain{V,1}}) where {V,N}
