@@ -527,10 +527,17 @@ struct TensorOperator{V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} <: TensorNeste
     TensorOperator{V,W}(t::T) where {V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} = new{V,W,T}(t)
     TensorOperator{V}(t::T) where {V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} = new{V,W,T}(t)
     TensorOperator(t::T) where {V,W,T<:TensorAlgebra{V,<:TensorAlgebra{W}}} = new{V,W,T}(t)
+    TensorOperator(t::T) where {V,W,G,T<:Chain{V,G,<:TensorAlgebra{W},1}} = new{V,W,T}(t)
 end
 
 const Endomorphism{V,T<:TensorAlgebra{V,<:TensorAlgebra{V}}} = TensorOperator{V,V,T}
 Endomorphism(t::TensorAlgebra{V,<:TensorAlgebra{V}}) where V = TensorOperator{V,V}(t)
+for op ∈ (:TensorOperator,:Endomorphism)
+    @eval $op(t::Vararg{Chain{V,G,T,N},N}) where {V,G,T,N} = $op(Chain{V,G}(t...))
+    for typ ∈ (:Spinor,:CoSpinor,:Multivector)
+        @eval $op(t::Vararg{$typ{V,T,N},N}) where {V,T,N} = $op($typ{V}(t...))
+    end
+end
 
 (T::TensorOperator{V})(x::TensorAlgebra{V}) where V = contraction(T,x)
 function (T::TensorOperator{V,W})(x::TensorAlgebra{V},y::TensorAlgebra{W}) where {V,W}
@@ -550,6 +557,7 @@ compound(m::TensorOperator,g) = TensorOperator(compound(value(m),g))
 compound(m::TensorOperator,g::Integer) = TensorOperator(compound(value(m),g))
 getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 getindex(t::TensorOperator,i::Int) = value(t.v)[i]
+Base.lastindex(t::TensorOperator) = lastindex(value(t))
 Base.transpose(t::TensorOperator) = TensorOperator(transpose(value(t)))
 scalar(m::Endomorphism) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::Endomorphism) = tr(value(m))
@@ -582,17 +590,18 @@ TensorOperator(m::AbstractMatrix) = TensorOperator{Submanifold.(size(m))...}(m)
 TensorOperator{V,W}(m::AbstractMatrix) where {V,W} = TensorOperator(Chain{V}(Chain{W,1}.(getindex.(Ref(m),:,list(1,mdims(V))))))
 
 SpectralOperator(t::Endomorphism) = eigen(t)
-@generated function DiagonalOperator(t::Endomorphism{V,<:Chain{V,G}}) where {V,G}
-    Expr(:call,:DiagonalOperator,Expr(:call,:(Chain{V,G}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+DiagonalOperator(t::Endomorphism) = DiagonalOperator(LinearAlgebra.diag(t))
+@generated function LinearAlgebra.diag(t::Endomorphism{V,<:Chain{V,G}}) where {V,G}
+    Expr(:call,:(Chain{V,G}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...)
 end
-@generated function DiagonalOperator(t::Endomorphism{V,<:Spinor{V}}) where V
-    Expr(:call,:DiagonalOperator,Expr(:call,:(Spinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+@generated function LinearAlgebra.diag(t::Endomorphism{V,<:Spinor{V}}) where V
+    Expr(:call,:(Spinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...)
 end
-@generated function DiagonalOperator(t::Endomorphism{V,<:AntiSpinor{V}}) where V
-    Expr(:call,:DiagonalOperator,Expr(:call,:(AntiSpinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...))
+@generated function LinearAlgebra.diag(t::Endomorphism{V,<:AntiSpinor{V}}) where V
+    Expr(:call,:(AntiSpinor{V}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...)
 end
-@generated function DiagonalOperator(t::Endomorphism{V,<:Multivector{V}}) where V
-    Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,1<<mdims(V))]...))
+@generated function LinearAlgebra.diag(t::Endomorphism{V,<:Multivector{V}}) where V
+    Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,1<<mdims(V))]...)
 end
 
 _axes(t::TensorOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
@@ -1493,4 +1502,24 @@ isinduced(::Type{<:InducedMetric}) = true
 
 @inline Base.log(t::Real,g::InducedMetric) = Base.log(t)
 @inline Base.log(t::Complex,g::InducedMetric) = Base.log(t)
+
+# other
+
+affineframe(x::TensorOperator,y=x[1]) = affineframe(value(value(x)),y)
+mean(m::TensorOperator) = mean(value(value(m)))
+barycenter(m::TensorOperator) = barycenter(value(value(m)))
+curl(m::TensorAlgebra) = Manifold(m)(∇)×m
+Base.findall(P,t::AbstractVector{<:TensorOperator}) = findall(P .∈ t)
+function Base.findfirst(P,t::AbstractVector{<:TensorOperator})
+    for i ∈ 1:length(t)
+        @inbounds P ∈ value(t[i]) && (return i)
+    end
+    return 0
+end
+function Base.findlast(P,t::AbstractVector{<:TensorOperator})
+    for i ∈ length(t):-1:1
+        @inbounds P ∈ value(t[i]) && (return i)
+    end
+    return 0
+end
 

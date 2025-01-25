@@ -562,14 +562,6 @@ function __init__()
         Chain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
         Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
         Chain{V,G,<:Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        #Base.log(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain{V,G}(log(StaticArrays.SMatrix(A)))
-        LinearAlgebra.eigvals(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Values{binomial(mdims(V),G)}(LinearAlgebra.eigvals(StaticArrays.SMatrix(A))))
-        LinearAlgebra.eigvecs(A::Chain{V,G,<:Chain{V,G}}) where {V,G} = Chain(Chain.(Values{binomial(mdims(A),G)}.(getindex.(Ref(LinearAlgebra.eigvecs(StaticArrays.SMatrix(A))),:,list(1,binomial(mdims(A),G))))))
-        function LinearAlgebra.eigen(A::Chain{V,G,<:Chain{V,G}}) where {V,G}
-            E,N = eigen(StaticArrays.SMatrix(A)),binomial(mdims(V),G)
-            e = Chain(Chain.(Values{N}.(getindex.(Ref(E.vectors),:,list(1,N)))))
-            Proj(e,Chain(Values{N}(E.values)))
-        end
     end
     @require Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa" begin
         Meshes.Point(t::Values) = Meshes.Point(Tuple(t.v))

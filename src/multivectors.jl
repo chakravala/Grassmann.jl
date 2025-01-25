@@ -227,13 +227,15 @@ end
 
 @pure Manifold(::ChainBundle{V}) where V = V
 @pure Manifold(::Type{<:ChainBundle{V}}) where V = V
-@pure Manifold(::Vector{<:Chain{V}}) where V = V
+@pure Manifold(::AbstractVector{<:Chain{V}}) where V = V
+@pure Manifold(::Type{<:AbstractVector{<:Chain{V}}}) where V = V
 @pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
 @pure grade(::ChainBundle{V}) where V = grade(V)
 @pure antigrade(::ChainBundle{V}) where V = antigrade(V)
 @pure AbstractTensors.mdims(::ChainBundle{V}) where V = mdims(V)
 @pure AbstractTensors.mdims(::Type{T}) where T<:ChainBundle{V} where V = mdims(V)
-@pure AbstractTensors.mdims(::Vector{<:Chain{V}}) where V = mdims(V)
+@pure AbstractTensors.mdims(::AbstractVector{<:Chain{V}}) where V = mdims(V)
+@pure AbstractTensors.mdims(::Type{<:AbstractVector{<:Chain{V}}}) where V = mdims(V)
 @pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
 @pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V

@@ -16,9 +16,7 @@ export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudometric, pseudodot,
 export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 export coabs, coabs2, cosqrt, cocbrt, coinv, coscalar, coexp, colog, cometric, codot, @co
-export cocos, cosin, cotan, cocosh, cosinh, cotanh
-
-export vandermonde, volumes, detsimplex, submesh
+export cocos, cosin, cotan, cocosh, cosinh, cotanh, vandermonde, volumes, submesh
 
 ## exponential & logarithm function
 
@@ -740,8 +738,8 @@ end
     else
         x,y,xy = Grassmann.Cramer(N-1,1)
         mid = [:(signscalar(($(x[i])∧(v-x1)∧$(y[end-i]))/d)) for i ∈ list(1,N-2)]
-        out = Values(:(signscalar((v∧∧(vectors(t,v)))/d)),mid...,:(signscalar(($(x[end])∧(v-x1))/d)))
-        return Expr(:block,:(T=vectors(t)),:((x1,y1)=@inbounds (t[1],T[end])),xy...,
+        out = Values(:(signscalar((v∧∧(affineframe(t,v)))/d)),mid...,:(signscalar(($(x[end])∧(v-x1))/d)))
+        return Expr(:block,:(T=value(affineframe(t))),:((x1,y1)=@inbounds (t[1],T[end])),xy...,
             :($(x[end])=$(x[end-1])∧T[end-1];d=$(x[end])∧T[end]),ands(out))
     end
 end
@@ -836,19 +834,17 @@ function vandermondeinterp(x,y,V,grid) # grid=384
     return coef,xp,yp # coefficients, interpolation
 end
 
-@generated function vectors(t,c=columns(t))
-    v = Expr(:tuple,[:(M.(p[c[$i]]-A)) for i ∈ list(2,mdims(t))]...)
-    quote
-        p = points(t)
-        M,A = ↓(Manifold(p)),p[c[1]]
-        Chain{M,1}.($(Expr(:.,:Values,v)))
-    end
-end
 @pure list(a::Int,b::Int) = Values{max(0,b-a+1),Int}(a:b...)
 @pure evens(a::Int,b::Int) = Values{((b-a)÷2)+1,Int}(a:2:b...)
-vectors(x::Values{N,<:Chain{V}},y=x[1]) where {N,V} = ↓(V).(x[list(2,N)].-y)
-vectors(x::Chain{V,1},y=x[1]) where V = vectors(value(x),y)
-#point(x,y=x[1]) = y∧∧(vectors(x))
+affineframe(x::Values{1,<:Chain{V,G,T,N}},y=nothing) where {V,G,T,N} = Values{0,Chain{↓(V),G,T,N-1}}()
+@generated function affineframe(x::Values{N,<:Chain{V}},y=x[1]) where {N,V}
+    M = :(V($(list(2,N)...)))
+    :(TensorOperator(Chain{$M,1}(↓(V).(x[$(list(2,N))].-y))))
+end
+affineframe(x::Chain{V,1},y=x[1]) where V = affineframe(value(x),y)
+export affineframe
+const vectors  = affineframe
+#point(x,y=x[1]) = y∧∧(affineframe(x))
 
 signscalar(x::Submanifold{V,0} where V) = true
 signscalar(x::Single{V,0} where V) = !signbit(value(x))
@@ -858,56 +854,37 @@ signscalar(x::Chain{V,0} where V) = !signbit(@inbounds x[1])
 signscalar(x::Multivector) = isscalar(x) && !signbit(value(scalar(x)))
 ands(x,i=length(x)-1) = i ≠ 0 ? Expr(:&&,x[end-i],ands(x,i-1)) : x[end-i]
 
-function Base.findfirst(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
+function Base.findfirst(P,t::AbstractVector{<:Chain{V,1,<:Chain}} where V)
     for i ∈ 1:length(t)
         @inbounds P ∈ t[i] && (return i)
     end
     return 0
 end
-function Base.findfirst(P,t::ChainBundle)
-    p = points(t)
-    for i ∈ 1:length(t)
-        P ∈ p[t[i]] && (return i)
-    end
-    return 0
-end
-function Base.findlast(P,t::Vector{<:Chain{V,1,<:Chain}} where V)
+function Base.findlast(P,t::AbstractVector{<:Chain{V,1,<:Chain}} where V)
     for i ∈ length(t):-1:1
         @inbounds P ∈ t[i] && (return i)
     end
     return 0
 end
-function Base.findlast(P,t::ChainBundle)
-    p = points(t)
-    for i ∈ length(t):-1:1
-        P ∈ p[t[i]] && (return i)
-    end
-    return 0
-end
-Base.findall(P,t) = findall(P .∈ getindex.(points(t),value(t)))
+Base.findall(P,t::AbstractVector{<:Chain{V,1,<:Chain}} where V) = findall(P .∈ t)
 
 edgelength(e) = (v=points(e)[value(e)]; Real(abs(v[2]-v[1])))
 volumes(m,dets) = Real.(abs.(dets))
 volumes(m) = mdims(Manifold(m))≠2 ? Real.(abs.(detsimplex(m))) : edgelength.(value(m))
 detsimplex(m::Vector{<:Chain{V}}) where V = det(m)/factorial(mdims(V)-1)
-detsimplex(m::ChainBundle) = detsimplex(value(m))
-mean(m::T) where T<:AbstractVector{<:Chain} = sum(m)/length(m)
-mean(m::T) where T<:Values = sum(m)/length(m)
+mean(m::AbstractVector) = sum(m)/length(m)
+mean(m::Values{N}) where N = sum(m)/N
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
-barycenter(m::Values{N,<:Chain}) where N = (s=sum(m);@inbounds s/s[1])
-barycenter(m::Vector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
+barycenter(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
-curl(m::T) where T<:TensorAlgebra = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = !∧(t)
 LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = .!∧(m)
-LinearAlgebra.det(m::ChainBundle) = .!∧(m)
-∧(m::ChainBundle) = ∧(value(m))
-function ∧(m::Vector{<:Chain{V}}) where V
+function ∧(m::DenseVector{<:Chain{V}}) where V
     p = points(m); pm = p[m]
     if mdims(p)>mdims(V)
-        .∧(vectors.(pm))
+        .∧(affineframe.(pm))
     else
         Chain{↓(Manifold(V)),mdims(V)-1}.(value.(.∧(pm)))
     end
@@ -953,31 +930,13 @@ function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:Abstrac
     end
 end
 
-const array_cache = (Array{T,2} where T)[]
 array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈list(1,mdims(Manifold(m)))]
-function array(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
-    for k ∈ length(array_cache):B
-        push!(array_cache,Array{Any,2}(undef,0,0))
-    end
-    isempty(array_cache[B]) && (array_cache[B] = array(value(m)))
-    return array_cache[B]
-end
-function array!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
-    length(array_cache) ≥ B && (array_cache[B] = Array{Any,2}(undef,0,0))
-end
+array(m::ChainBundle) = array(value(m))
+array!(m::ChainBundle) = nothing
 
-const submesh_cache = (Array{T,2} where T)[]
 submesh(m) = [m[i][j] for i∈1:length(m),j∈list(2,mdims(Manifold(m)))]
-function submesh(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
-    for k ∈ length(submesh_cache):B
-        push!(submesh_cache,Array{Any,2}(undef,0,0))
-    end
-    isempty(submesh_cache[B]) && (submesh_cache[B] = submesh(value(m)))
-    return submesh_cache[B]
-end
-function submesh!(m::ChainBundle{V,G,T,B} where {V,G,T}) where B
-    length(submesh_cache) ≥ B && (submesh_cache[B] = Array{Any,2}(undef,0,0))
-end
+submesh(m::ChainBundle) = submesh(value(m))
+submesh!(m::ChainBundle) = nothing
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin
