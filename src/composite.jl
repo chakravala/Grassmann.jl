@@ -879,6 +879,7 @@ barycenter(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
+curl(m::TensorAlgebra) = Manifold(m)(∇)×m
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = !∧(t)
 LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = .!∧(m)
 function ∧(m::DenseVector{<:Chain{V}}) where V
@@ -893,10 +894,10 @@ for op ∈ (:mean,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
         export $op, $ops
-        $ops(m::Vector{<:Chain{p}}) where p = $ops(m,p)
-        @pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
-        @pure $ops(m,::Submanifold{p}) where p = $ops(m,p)
-        @pure $ops(m,p) = $op.(getindex.(Ref(p),value.(value(m))))
+        #$ops(m::Vector{<:Chain{p}}) where p = $ops(m,p)
+        #@pure $ops(m::ChainBundle{p}) where p = $ops(m,p)
+        #@pure $ops(m,::Submanifold{p}) where p = $ops(m,p)
+        @pure $ops(m,p) = $op.(getindex.(Ref(p),m))
     end
 end
 
@@ -908,35 +909,11 @@ function area(m::Vector{<:Chain})
     return value(abs(⋆(S))/2)
 end
 
-initedges(p::ChainBundle) = Chain{p,1}.(1:length(p)-1,2:length(p))
-initedges(r::R) where R<:AbstractVector = initedges(ChainBundle(initpoints(r)))
-function initmesh(r::R) where R<:AbstractVector
-    t = initedges(r); p = points(t)
-    p,ChainBundle(Chain{↓(p),1}.([1,length(p)])),t
-end
-
-select(η,ϵ=sqrt(norm(η)^2/length(η))) = sort!(findall(x->x>ϵ,η))
-refinemesh(g::R,args...) where R<:AbstractRange = (g,initmesh(g,args...)...)
-function refinemesh!(::R,p::ChainBundle{W},e,t,η,_=nothing) where {W,R<:AbstractRange}
-    p = points(t)
-    x,T,V = value(p),value(t),Manifold(p)
-    for i ∈ η
-        push!(x,Chain{V,1}(Values(1,(x[i+1][2]+x[i][2])/2)))
-    end
-    sort!(x,by=x->x[2]); submesh!(p)
-    e[end] = Chain{p(2),1}(Values(length(x)))
-    for i ∈ length(t)+2:length(x)
-        push!(T,Chain{p,1}(Values{2,Int}(i-1,i)))
-    end
-end
-
 array(m::Vector{<:Chain}) = [m[i][j] for i∈1:length(m),j∈list(1,mdims(Manifold(m)))]
-array(m::ChainBundle) = array(value(m))
-array!(m::ChainBundle) = nothing
+function array! end
 
 submesh(m) = [m[i][j] for i∈1:length(m),j∈list(2,mdims(Manifold(m)))]
-submesh(m::ChainBundle) = submesh(value(m))
-submesh!(m::ChainBundle) = nothing
+function submesh! end
 
 for op ∈ (:div,:rem,:mod,:mod1,:fld,:fld1,:cld,:ldexp)
     @eval begin

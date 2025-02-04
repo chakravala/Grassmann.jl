@@ -203,67 +203,17 @@ struct ChainBundle{V,G,T,Points} <: Manifold{V,T}
     @pure ChainBundle{V,G,T,P}() where {V,G,T,P} = new{DirectSum.submanifold(V),G,T,P}()
 end
 
-const bundle_cache = (Vector{Chain{V,G,T,X}} where {V,G,T,X})[]
-function ChainBundle(c::Vector{Chain{V,G,T,X}} where X) where {V,G,T}
-    push!(bundle_cache,c)
-    ChainBundle{V,G,T,length(bundle_cache)}()
-end
-function clearbundlecache!()
-    for P ∈ 1:length(bundle_cache)
-        deletebundle!(P)
-    end
-end
-@pure bundle(::ChainBundle{V,G,T,P} where {V,G,T}) where P = P
-@pure deletebundle!(V) = deletebundle!(bundle(V))
-@pure function deletebundle!(P::Int)
-    bundle_cache[P] = [Chain{ℝ^0,0,Int}(Values(0))]
-end
-@pure isbundle(::ChainBundle) = true
-@pure isbundle(t) = false
-@pure ispoints(t::Submanifold{V}) where V = isbundle(V) && rank(V) == 1 && !isbundle(Manifold(V))
-@pure ispoints(t) = isbundle(t) && rank(t) == 1 && !isbundle(Manifold(t))
-@pure islocal(t) = isbundle(t) && rank(t)==1 && valuetype(t)==Int && ispoints(Manifold(t))
-@pure iscell(t) = isbundle(t) && islocal(Manifold(t))
-
-@pure Manifold(::ChainBundle{V}) where V = V
-@pure Manifold(::Type{<:ChainBundle{V}}) where V = V
 @pure Manifold(::AbstractVector{<:Chain{V}}) where V = V
 @pure Manifold(::Type{<:AbstractVector{<:Chain{V}}}) where V = V
-@pure LinearAlgebra.rank(M::ChainBundle{V,G} where V) where G = G
-@pure grade(::ChainBundle{V}) where V = grade(V)
-@pure antigrade(::ChainBundle{V}) where V = antigrade(V)
-@pure AbstractTensors.mdims(::ChainBundle{V}) where V = mdims(V)
-@pure AbstractTensors.mdims(::Type{T}) where T<:ChainBundle{V} where V = mdims(V)
 @pure AbstractTensors.mdims(::AbstractVector{<:Chain{V}}) where V = mdims(V)
 @pure AbstractTensors.mdims(::Type{<:AbstractVector{<:Chain{V}}}) where V = mdims(V)
-@pure Base.parent(::ChainBundle{V}) where V = isbundle(V) ? parent(V) : V
 @pure Base.parent(::Vector{<:Chain{V}}) where V = isbundle(V) ? parent(V) : V
-@pure DirectSum.supermanifold(m::ChainBundle{V}) where V = V
 @pure DirectSum.supermanifold(m::Vector{<:Chain{V}}) where V = V
-@pure DirectSum.submanifold(m::ChainBundle) = m
-@pure points(t::ChainBundle{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Vector{<:Chain{p}}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::Chain{p}) where p = isbundle(p) ? p : DirectSum.supermanifold(p)
 @pure points(t::AbstractArray) = t
 
 value(c::Vector{<:Chain}) = c
-value(::ChainBundle{V,G,T,P}) where {V,G,T,P} = bundle_cache[P]::(Vector{Chain{V,G,T,binomial(mdims(V),G)}})
-
-getindex(m::ChainBundle,i::I) where I<:Integer = getindex(value(m),i)
-getindex(m::ChainBundle,i) = getindex(value(m),i)
-getindex(m::ChainBundle,i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
-getindex(m::AbstractVector,i::Chain{V,1}) where V = Chain{Manifold(V),1}(m[value(i)])
-getindex(m::ChainBundle{V},i::ChainBundle) where V = m[value(i)]
-getindex(m::ChainBundle{V},i::T) where {V,T<:AbstractVector{<:Chain}} = getindex.(Ref(m),i)
-setindex!(m::ChainBundle,k,i) = setindex!(value(m),k,i)
-Base.firstindex(m::ChainBundle) = 1
-Base.lastindex(m::ChainBundle) = length(value(m))
-Base.length(m::ChainBundle) = length(value(m))
-Base.resize!(m::ChainBundle,n::Int) = resize!(value(m),n)
-
-Base.display(m::ChainBundle) = (print(showbundle(m));display(value(m)))
-Base.show(io::IO,m::ChainBundle) = print(io,showbundle(m),length(m))
-@pure showbundle(m::ChainBundle{V,G}) where {V,G} = "$(iscell(m) ? 'C' : islocal(m) ? 'I' : 'Λ')$(DirectSum.sups[G])$V×"
 
 ## Multivector{V,T}
 

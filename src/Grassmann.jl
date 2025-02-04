@@ -162,7 +162,7 @@ end
         end
     end
 end
-↑(ω::ChainBundle) = ω
+#↑(ω::ChainBundle) = ω
 function ↑(ω,b)
     ω2 = (~ω)⋅ω # ω^2
     iω2 = inv(ω2+1)
@@ -190,7 +190,7 @@ end
         end
     end
 end
-↓(ω::ChainBundle) = ω(list(2,mdims(ω)))
+#↓(ω::ChainBundle) = ω(list(2,mdims(ω)))
 ↓(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
 ↓(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
@@ -255,25 +255,7 @@ end
 
 # mesh
 
-initpoints(P::T) where T<:AbstractVector = Chain{ℝ2,1}.(1.0,P)
-initpoints(P::T) where T<:AbstractRange = Chain{ℝ2,1}.(1.0,P)
-@generated function initpoints(P,::Val{n}=Val(size(P,1))) where n
-    Expr(:.,:(Chain{$(Submanifold(n+1)),1}),
-         Expr(:tuple,1.0,[:(P[$k,:]) for k ∈ 1:n]...))
-end
-
-function initpointsdata(P,E,N::Val{n}=Val(size(P,1))) where n
-    p = ChainBundle(initpoints(P,N)); l = list(1,n)
-    p,[Chain{↓(p),1}(Int.(E[l,k])) for k ∈ 1:size(E,2)]
-end
-
-function initmeshdata(P,E,T,N::Val{n}=Val(size(P,1))) where n
-    p,e = initpointsdata(P,E,N); l = list(1,n+1)
-    t = [Chain{p,1}(Int.(T[l,k])) for k ∈ 1:size(T,2)]
-    return p,ChainBundle(e),ChainBundle(t)
-end
-
-export pointset, facets, column, columns
+export column, columns
 
 column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=mdims(Manifold(t))) = column.(Ref(value(t)),list(i,j))
@@ -290,96 +272,6 @@ function pointset(e)
     end
     return out
 end
-
-antiadjacency(t::ChainBundle,cols=columns(t)) = (A = sparse(t,cols); A-transpose(A))
-adjacency(t,cols=columns(t)) = (A = sparse(t,cols); A+transpose(A))
-function SparseArrays.sparse(t,cols=columns(t))
-    np,N = length(points(t)),mdims(Manifold(t))
-    A = spzeros(Int,np,np)
-    for c ∈ combo(N,2)
-        A += @inbounds sparse(cols[c[1]],cols[c[2]],1,np,np)
-    end
-    return A
-end
-
-edges(t,cols::Values) = edges(t,adjacency(t,cols))
-function edges(t,adj=adjacency(t))
-    mdims(t) == 2 && (return t)
-    N = mdims(Manifold(t)); M = points(t)(list(N-1,N)...)
-    f = findall(x->!iszero(x),LinearAlgebra.triu(adj))
-    [Chain{M,1}(Values{2,Int}(@inbounds f[n].I)) for n ∈ 1:length(f)]
-end
-
-function facetsinterior(t::Vector{<:Chain{V}}) where V
-    N = mdims(Manifold(t))-1
-    W = V(list(2,N+1))
-    N == 0 && (return [Chain{W,1}(list(2,1))],Int[])
-    out = Chain{W,1,Int,N}[]
-    bnd = Int[]
-    for i ∈ t
-        for w ∈ Chain{W,1}.(Leibniz.combinations(sort(value(i)),N))
-            j = findfirst(isequal(w),out)
-            isnothing(j) ? push!(out,w) : push!(bnd,j)
-        end
-    end
-    return out,bnd
-end
-facets(t) = faces(t,Val(mdims(Manifold(t))-1))
-facets(t,h) = faces(t,h,Val(mdims(Manifold(t))-1))
-faces(t,v::Val) = faces(value(t),v)
-faces(t,h,v,g=identity) = faces(value(t),h,v,g)
-faces(t::Tuple,v,g=identity) = faces(t[1],t[2],v,g)
-function faces(t::Vector{<:Chain{V}},::Val{N}) where {V,N}
-    N == mdims(V) && (return t)
-    N == 2 && (return edges(t))
-    W = V(list(2,N+1))
-    N == 1 && (return Chain{W,1}.(pointset(t)))
-    N == 0 && (return Chain{W,1}(list(2,1)))
-    out = Chain{W,1,Int,N}[]
-    for i ∈ value(t)
-        for w ∈ Chain{W,1}.(DirectSum.combinations(sort(value(i)),N))
-            w ∉ out && push!(out,w)
-        end
-    end
-    return out
-end
-function faces(t::Vector{<:Chain{V}},h,::Val{N},g=identity) where {V,N}
-    W = V(list(1,N))
-    N == 0 && (return [Chain{W,1}(list(1,N))],Int[sum(h)])
-    out = Chain{W,1,Int,N}[]
-    bnd = Int[]
-    vec = zeros(Variables{mdims(V),Int})
-    val = N+1==mdims(V) ? ∂(Manifold(points(t))(list(1,N+1))(I)) : ones(Values{binomial(mdims(V),N)})
-    for i ∈ 1:length(t)
-        vec[:] = @inbounds value(t[i])
-        par = DirectSum.indexparity!(vec)
-        w = Chain{W,1}.(DirectSum.combinations(par[2],N))
-        for k ∈ 1:binomial(mdims(V),N)
-            j = findfirst(isequal(w[k]),out)
-            v = h[i]*(par[1] ? -val[k] : val[k])
-            if isnothing(j)
-                push!(out,w[k])
-                push!(bnd,g(v))
-            else
-                bnd[j] += g(v)
-            end
-        end
-    end
-    return out,bnd
-end
-
-∂(t::ChainBundle) = ∂(value(t))
-∂(t::Values{N,<:Tuple}) where N = ∂.(t)
-∂(t::Values{N,<:Vector}) where N = ∂.(t)
-∂(t::Tuple{Vector{<:Chain},Vector{Int}}) = ∂(t[1],t[2])
-∂(t::Vector{<:Chain},u::Vector{Int}) = (f=facets(t,u); f[1][findall(x->!iszero(x),f[2])])
-∂(t::Vector{<:Chain}) = mdims(t)≠3 ? (f=facetsinterior(t); f[1][setdiff(1:length(f[1]),f[2])]) : edges(t,adjacency(t).%2)
-#∂(t::Vector{<:Chain}) = (f=facets(t,ones(Int,length(t))); f[1][findall(x->!iszero(x),f[2])])
-
-skeleton(t::ChainBundle,v) = skeleton(value(t),v)
-@inline (::Leibniz.Derivation)(x::Vector{<:Chain},v=Val{true}()) = skeleton(x,v)
-@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),Ref(ones(Int,length(t))),$(Val.(list(1,mdims(V)))),abs))
-#@generated skeleton(t::Vector{<:Chain{V}},v) where V = :(faces.(Ref(t),$(Val.(list(1,mdims(V))))))
 
 export scalarfield, vectorfield, chainfield, rectanglefield # rectangle
 
@@ -621,78 +513,17 @@ function __init__()
     end
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
         Makie.convert_arguments(P::Makie.PointBased, a::Vector{<:Chain}) = Makie.convert_arguments(P, Makie.Point.(a))
-        Makie.convert_arguments(P::Makie.PointBased, a::ChainBundle) = Makie.convert_arguments(P, value(a))
         Makie.convert_single_argument(a::Chain) = convert_arguments(P,Point(a))
-        Makie.arrows(p::ChainBundle{V},v;args...) where V = Makie.arrows(value(p),v;args...)
-        Makie.arrows!(p::ChainBundle{V},v;args...) where V = Makie.arrows!(value(p),v;args...)
         Makie.arrows(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
         Makie.arrows!(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        Makie.scatter(p::ChainBundle,x;args...) = Makie.scatter(submesh(p)[:,1],x;args...)
-        Makie.scatter!(p::ChainBundle,x;args...) = Makie.scatter!(submesh(p)[:,1],x;args...)
-        Makie.scatter(p::Vector{<:Chain},x;args...) = Makie.scatter(submesh(p)[:,1],x;args...)
-        Makie.scatter!(p::Vector{<:Chain},x;args...) = Makie.scatter!(submesh(p)[:,1],x;args...)
-        Makie.scatter(p::ChainBundle;args...) = Makie.scatter(submesh(p);args...)
-        Makie.scatter!(p::ChainBundle;args...) = Makie.scatter!(submesh(p);args...)
-        Makie.scatter(p::Vector{<:Chain};args...) = Makie.scatter(submesh(p);args...)
-        Makie.scatter!(p::Vector{<:Chain};args...) = Makie.scatter!(submesh(p);args...)
-        Makie.lines(p::ChainBundle;args...) = Makie.lines(value(p);args...)
-        Makie.lines!(p::ChainBundle;args...) = Makie.lines!(value(p);args...)
         Makie.lines(p::Vector{<:TensorAlgebra};args...) = Makie.lines(GeometryBasics.Point.(p);args...)
         Makie.lines!(p::Vector{<:TensorAlgebra};args...) = Makie.lines!(GeometryBasics.Point.(p);args...)
         Makie.lines(p::Vector{<:TensorTerm};args...) = Makie.lines(value.(p);args...)
         Makie.lines!(p::Vector{<:TensorTerm};args...) = Makie.lines!(value.(p);args...)
         Makie.lines(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines(getindex.(p,1);args...)
         Makie.lines!(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines!(getindex.(p,1);args...)
-        Makie.linesegments(e::ChainBundle;args...) = Makie.linesegments(value(e);args...)
-        Makie.linesegments!(e::ChainBundle;args...) = Makie.linesegments!(value(e);args...)
-        Makie.linesegments(e::Vector{<:Chain};args...) = (p=points(e); Makie.linesegments(pointpair.(p[e],↓(Manifold(p)));args...))
-        Makie.linesegments!(e::Vector{<:Chain};args...) = (p=points(e); Makie.linesegments!(pointpair.(p[e],↓(Manifold(p)));args...))
-        Makie.wireframe(t::ChainBundle;args...) = Makie.linesegments(edges(t);args...)
-        Makie.wireframe!(t::ChainBundle;args...) = Makie.linesegments!(edges(t);args...)
-        Makie.wireframe(t::Vector{<:Chain};args...) = Makie.linesegments(edges(t);args...)
-        Makie.wireframe!(t::Vector{<:Chain};args...) = Makie.linesegments!(edges(t);args...)
-        Makie.mesh(t::ChainBundle;args...) = Makie.mesh(points(t),t;args...)
-        Makie.mesh!(t::ChainBundle;args...) = Makie.mesh!(points(t),t;args...)
-        Makie.mesh(t::Vector{<:Chain};args...) = Makie.mesh(points(t),t;args...)
-        Makie.mesh!(t::Vector{<:Chain};args...) = Makie.mesh!(points(t),t;args...)
-        function Makie.mesh(p::ChainBundle,t;args...)
-            if mdims(p) == 2
-                sm = submesh(p)[:,1]
-                Makie.lines(sm,args[:color])
-                Makie.plot!(sm,args[:color])
-            else
-                Makie.mesh(submesh(p),array(t);args...)
-            end
-        end
-        function Makie.mesh!(p::ChainBundle,t;args...)
-            if mdims(p) == 2
-                sm = submesh(p)[:,1]
-                Makie.lines!(sm,args[:color])
-                Makie.plot!(sm,args[:color])
-            else
-                Makie.mesh!(submesh(p),array(t);args...)
-            end
-        end
     end
     @require UnicodePlots="b8865327-cd53-5732-bb35-84acbb429228" begin
-        UnicodePlots.scatterplot(p::ChainBundle,x;args...) = UnicodePlots.scatterplot(submesh(p)[:,1],x;args...)
-        UnicodePlots.scatterplot!(P,p::ChainBundle,x;args...) = UnicodePlots.scatterplot!(P,submesh(p)[:,1],x;args...)
-        UnicodePlots.scatterplot(p::Vector{<:Chain},x;args...) = UnicodePlots.scatterplot(submesh(p)[:,1],x;args...)
-        UnicodePlots.scatterplot!(P,p::Vector{<:Chain},x;args...) = UnicodePlots.scatterplot!(P,submesh(p)[:,1],x;args...)
-        UnicodePlots.scatterplot(p::ChainBundle;args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.scatterplot(s[:,1],s[:,2];args...)) : UnicodePlots.scatterplot(means(p);args...)
-        UnicodePlots.scatterplot!(P,p::ChainBundle;args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.scatterplot!(P,s[:,1],s[:,2];args...)) : UnicodePlots.scatterplot!(P,means(p);args...)
-        UnicodePlots.scatterplot(p::Vector{<:Chain};args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.scatterplot(s[:,1],s[:,2];args...)) : UnicodePlots.scatterplot(means(p);args...)
-        UnicodePlots.scatterplot!(P,p::Vector{<:Chain};args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.scatterplot!(P,s[:,1],s[:,2];args...)) : UnicodePlots.scatterplot!(P,means(p);args...)
-        UnicodePlots.densityplot(p::ChainBundle;args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.densityplot(s[:,1],s[:,2];args...)) : UnicodePlots.densityplot(means(p);args...)
-        UnicodePlots.densityplot!(P,p::ChainBundle;args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.densityplot!(P,s[:,1],s[:,2];args...)) : UnicodePlots.densityplot!(P,means(p);args...)
-        UnicodePlots.densityplot(p::Vector{<:Chain};args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.densityplot(s[:,1],s[:,2];args...)) : UnicodePlots.densityplot(means(p);args...)
-        UnicodePlots.densityplot!(P,p::Vector{<:Chain};args...) = !ispoints(Manifold(p)) ? (s=submesh(p); UnicodePlots.densityplot!(P,s[:,1],s[:,2];args...)) : UnicodePlots.densityplot!(P,means(p);args...)
-        UnicodePlots.lineplot(p::ChainBundle;args...) = UnicodePlots.lineplot(value(p);args...)
-        UnicodePlots.lineplot!(P,p::ChainBundle;args...) = UnicodePlots.lineplot!(P,value(p);args...)
-        UnicodePlots.lineplot(p::Vector{<:TensorAlgebra};args...) = (s=submesh(p); UnicodePlots.lineplot(s[:,1],s[:,2];args...))
-        UnicodePlots.lineplot!(P,p::Vector{<:TensorAlgebra};args...) = (s=submesh(p); UnicodePlots.lineplot!(P,s[:,1],s[:,2];args...))
-        UnicodePlots.spy(p::ChainBundle) = UnicodePlots.spy(antiadjacency(p))
-        UnicodePlots.spy(p::Vector{<:Chain}) = UnicodePlots.spy(antiadjacency(p))
         vandermonde(x::Chain,y,V,grid) = vandermonde(value(x),y,V,grid)
         function vandermonde(x,y,V,grid) # grid=384
             coef,xp,yp = vandermondeinterp(x,y,V,grid)
@@ -700,71 +531,6 @@ function __init__()
             display(UnicodePlots.lineplot!(p,xp,yp)) # plot polynomial
             println("||ϵ||: ",norm(approx.(x,Ref(value(coef))).-value(y)))
             return coef # polynomial coefficients
-        end
-    end
-    @require Triangulate = "f7e6ffb2-c36d-4f8f-a77e-16e897189344" begin
-        const triangle_cache = (Array{T,2} where T)[]
-        function triangle(p::Array{T,2} where T,B)
-            for k ∈ length(triangle_cache):B
-                push!(triangle_cache,Array{Any,2}(undef,0,0))
-            end
-            triangle_cache[B] = p
-        end
-        function triangle(p::ChainBundle{V,G,T,B} where {V,G,T}) where B
-            if length(triangle_cache)<B || isempty(triangle_cache[B])
-                ap = array(p)'
-                triangle(islocal(p) ? Cint.(ap) : ap[2:end,:],B)
-            else
-                return triangle_cache[B]
-            end
-        end
-        function triangle(p::Vector{<:Chain{V,1,T} where V}) where T
-            ap = array(p)'
-            T<:Int ? Cint.(ap) : ap[2:end,:]
-        end
-        function Triangulate.TriangulateIO(e::Vector{<:Chain},h=nothing)
-            triin=Triangulate.TriangulateIO()
-            triin.pointlist=triangle(points(e))
-            triin.segmentlist=triangle(e)
-            !isnothing(h) && (triin.holelist=triangle(h))
-            return triin
-        end
-        function Triangulate.triangulate(i,e::Vector{<:Chain};holes=nothing)
-            initmesh(Triangulate.triangulate(i,Triangulate.TriangulateIO(e,holes))[1])
-        end
-        initmesh(t::Triangulate.TriangulateIO) = initmeshdata(t.pointlist,t.segmentlist,t.trianglelist,Val(2))
-        #aran(area=0.001,angle=20) = "pa$(Printf.@sprintf("%.15f",area))q$(Printf.@sprintf("%.15f",angle))Q"
-    end
-    @require TetGen="c5d3f3f7-f850-59f6-8a2e-ffc6dc1317ea" begin
-        function TetGen.JLTetGenIO(mesh::ChainBundle;
-                marker = :markers, holes = TetGen.Point{3,Float64}[])
-            TetGen.JLTetGenIO(value(mesh); marker=marker, holes=holes)
-        end
-        function TetGen.JLTetGenIO(mesh::Vector{<:Chain};
-                marker = :markers, holes = TetGen.Point{3, Float64}[])
-            f = TetGen.TriangleFace{Cint}.(value.(mesh))
-            kw_args = Any[:facets => TetGen.metafree(f),:holes => holes]
-            if hasproperty(f, marker)
-                push!(kw_args, :facetmarkers => getproperty(f, marker))
-            end
-            pm = points(mesh); V = Manifold(pm)
-            TetGen.JLTetGenIO(TetGen.Point.(↓(V).(value(pm))); kw_args...)
-        end
-        function initmesh(tio::TetGen.JLTetGenIO, command = "Qp")
-            r = TetGen.tetrahedralize(tio, command); V = Submanifold(ℝ^4)
-            p = ChainBundle([Chain{V,1}(Values{4,Float64}(1.0,k...)) for k ∈ r.points])
-            t = Chain{p,1}.(Values{4,Int}.(r.tetrahedra))
-            e = Chain{p(2,3,4),1}.(Values{3,Int}.(r.trifaces))
-            # Chain{p(2,3),1}.(Values{2,Int}.(r.edges)
-            return p,ChainBundle(e),ChainBundle(t)
-        end
-        function TetGen.tetrahedralize(mesh::ChainBundle, command = "Qp";
-                marker = :markers, holes = TetGen.Point{3,Float64}[])
-            TetGen.tetrahedralize(value(mesh), command; marker=marker, holes=holes)
-        end
-        function TetGen.tetrahedralize(mesh::Vector{<:Chain}, command = "Qp";
-                marker = :markers, holes = TetGen.Point{3, Float64}[])
-            initmesh(TetGen.JLTetGenIO(mesh;marker=marker,holes=holes),command)
         end
     end
 end
