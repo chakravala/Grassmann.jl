@@ -17,12 +17,6 @@ import LinearAlgebra: eigvals, eigvecs, eigen
 #@pure supblade(N,S,B) = bladeindex(N,expandbits(N,S,B))
 #@pure supmulti(N,S,B) = basisindex(N,expandbits(N,S,B))
 
-(W::Submanifold)(V::ChainBundle) = W.(value(V))
-(M::ChainBundle)(b::Int...) = Submanifold{M}(b)
-(M::ChainBundle)(b::Tuple) = Submanifold{M}(b)
-(M::ChainBundle)(b::UnitRange) = Submanifold{M}(b)
-(M::ChainBundle)(b::T) where T<:AbstractVector = Submanifold{M}(b)
-
 (W::Signature)(b::Chain{V,G,T}) where {V,G,T} = Submanifold(W)(b)
 @generated function (w::Submanifold{Q,M})(b::Chain{V,G,T}) where {Q,M,V,G,T}
     W = Manifold(w)
@@ -1105,11 +1099,11 @@ end
     Expr(:call,:(Outermorphism{V}),Expr(:tuple,[:(value(operator(t,Val($G)))) for G ∈ list(1,mdims(V))]...))
 end
 
-#=function operator(fun,V,::Val{G}=Val(1)) where G
+function operator(fun,V,::Val{G}=Val(1)) where G
     TensorOperator(Chain{V,G}(fun.(chainbasis(V,G))))
 end
 operator(fun,V,G::Int) = operator(fun,V,Val(G))
-gradedoperator(fun,V) = outermorphism(operator(fun,V))=#
+#gradedoperator(fun,V) = outermorphism(operator(fun,V))
 #gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
 
 @pure odddyad(V) = AntiSpinor.(oddbasis(V))
@@ -1183,6 +1177,44 @@ function getprod(n,i,g)
     ind = indices(basis(Λ(Submanifold(n)).b[i+binomsum(n,g)]))
     Expr(:call,:*,[:(@inbounds value(x)[$j]) for j ∈ ind]...)
 end
+
+#=function getmult(n,i)
+    Expr(:block,:(gp = $(getpairs(n,i))),
+        :((*(nozero.(gp)...),+(true,iszero.(gp)...))))
+end
+@generated function checkmult(v,i,out::Variables{N}) where N
+    Expr(:block,
+        [:($j<i && iszero(norm(@inbounds v∧out[$j])) && (return false)) for j ∈ list(1,N)]...,
+        :(return true))
+end
+function getperm(n,i)
+    V = Submanifold(n)
+    ind = indices(basis(!Λ(V).b[i+1]))
+    Expr(:call,:!,Expr(:call,:∧,[:(m>$(n-j) ? $(Λ(V).b[ind[j]+1]) : X⋅$(Λ(V).b[ind[j]+1])) for j ∈ list(1,n-1)]...))
+end
+@generated function tryperm(X::Endomorphism{V},i,x,m,out) where V
+    Expr(:block,[quote
+        v = $(getperm(mdims(V),j))*x
+        n = norm(v)
+        !iszero(n) && (m>1 ? checkmult(v,i,out) : true) && (@inbounds out[i] = v/n; return nothing)
+    end for j ∈ list(1,mdims(V))]...,nothing)
+end
+@generated function tryperm(X::Endomorphism{V},x,m,b) where V
+    Expr(:block,[quote
+        if (@inbounds b[$i])
+            v = $(getperm(mdims(V),i))*x
+            n = norm(v)
+            !iszero(n) && ((@inbounds b[$i]=false); return v/n)
+        end
+    end for i ∈ list(1,mdims(V))]...,nothing)
+end
+@generated function eigvecs2(X::Endomorphism{V},x::Chain{V}=eigvals(X)) where V
+    Expr(:block,:(out = zeros(Variables{$(mdims(V)),typeof(x)})),
+        [:(tryperm(X-(@inbounds conj(value(x)[$i])*I),$i,$(getmult(mdims(V),i))...,out)) for i ∈ list(1,mdims(V))]...,
+        :(TensorOperator(Chain{V}(out))))
+end
+eigvecs(X::TensorAlgebra,x::Chain) = eigvecs(operator(X),x)
+eigvecs(X::TensorAlgebra{V}) where V = mdims(V)>3 ? eigvecs(operator(X)) : eigvecs(operator(X),eigvals(X))=#
 
 for fun ∈ (:eigvecs,:eigvecsreal,:eigvecscomplex,:eigvals,:eigvalsreal,:eigvalscomplex,:eigen,:eigenreal,:eigencomplex)
     @eval begin
@@ -1508,7 +1540,7 @@ isinduced(::Type{<:InducedMetric}) = true
 affineframe(x::TensorOperator,y=x[1]) = affineframe(value(value(x)),y)
 mean(m::TensorOperator) = mean(value(value(m)))
 barycenter(m::TensorOperator) = barycenter(value(value(m)))
-curl(m::TensorAlgebra) = Manifold(m)(∇)×m
+curl(m::TensorOperator) = curl(value(m))
 Base.findall(P,t::AbstractVector{<:TensorOperator}) = findall(P .∈ t)
 function Base.findfirst(P,t::AbstractVector{<:TensorOperator})
     for i ∈ 1:length(t)
