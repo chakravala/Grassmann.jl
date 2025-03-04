@@ -397,9 +397,14 @@ function Base.log(P::Proj{V}) where V
     out = log(Endomorphism(P))[1]
     Proj{V}(out/sqrt(out[1]))
 end
+LinearAlgebra.det(P::Proj{V}) where V = Chain{V,0}(mdims(V)≠1 ? 0 : (@inbounds P.λ[1]))
+∧(P::Proj) = !det(P)
 Base.exp(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(exp,P.λ))
 Base.log(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(log,P.λ))
 Base.inv(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(inv,P.λ))
+invdet(P::SpectralOperator{V}) where V = (inv(P),det(P))
+LinearAlgebra.det(P::SpectralOperator{V}) where V = Chain{V,0}(prod(P.λ))
+∧(P::SpectralOperator) = !det(P)
 
 getindex(P::Proj,i::Int,j::Int) = P.v[i]*P.v[j]
 getindex(P::Proj{V,<:Chain{W,1,<:Chain}},i::Int) where {V,W} = Proj{V}(P.v[i],P.λ[i])
@@ -493,6 +498,12 @@ end
     Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),Expr(:call,Values,1,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V))[list(2,tdims(V))]]...)))
 end
 
+function adjugate(t::DiagonalMorphism{V}) where V
+    DiagonalOperator(Chain{V}(reverse(value(value(compound(t,Val(mdims(V)-1)))))))
+end
+adjugate(t::DiagonalOutermorphism) = outermorphism(adjugate(DiagonalOperator(value(t)(Val(1)))))
+invdet(t::DiagonalMorphism) = (inv(t),det(t))
+invdet(t::DiagonalOutermorphism) = (inv(t),det(t))
 for op ∈ (:(Base.inv),:(Base.exp),:(Base.expm1),:(Base.log))
     @eval begin
         $op(t::DiagonalMorphism) = DiagonalOperator(map($op,value(t)))
@@ -561,9 +572,13 @@ LinearAlgebra.det(t::TensorOperator) = !∧(value(t))
 Base.zero(t::TensorOperator) = TensorOperator(zero(value(t)))
 Base.zero(t::Type{<:TensorOperator{V,W,T}}) where {V,W,T} = TensorOperator(zero(T))
 
+function invdet(t::Endomorphism{V,<:Chain} where V)
+    i,d = invdet(value(t))
+    TensorOperator(i),d
+end
 Base.log(t::Endomorphism{V,<:Chain}) where V = Endomorphism{V}(log(Matrix(t)))
-for op ∈ (:(Base.inv),:(Base.exp),:(Base.expm1))
-    @eval $op(t::Endomorphism{V,<:Chain}) where V = TensorOperator($op(value(t)))
+for op ∈ (:(Base.inv),:adjugate,:(Base.exp),:(Base.expm1))
+    @eval $op(t::Endomorphism{V,<:Chain} where V) = TensorOperator($op(value(t)))
 end
 
 Endomorphism(t::Projector) = Endomorphism(Chain(t))
@@ -696,7 +711,11 @@ compound(m::Outermorphism,g::Integer) = TensorOperator(value(m)[g])
 Endomorphism(t::Outermorphism) = TensorOperator(t)
 TensorOperator(t::Outermorphism{V}) where V = TensorOperator(Multivector{V}(vcat(Multivector(One(V)),value.(map.(Multivector,value.(t.v)))...)))
 
-for op ∈ (:(Base.inv),:(Base.exp),:(Base.expm1),:(Base.log))
+function invdet(t::Outermorphism)
+    i,d = invdet(@inbounds value(t)[1])
+    Outermorphism(i),d
+end
+for op ∈ (:adjugate,:(Base.inv),:(Base.exp),:(Base.expm1),:(Base.log))
     @eval $op(t::Outermorphism) = Outermorphism($op(@inbounds value(t)[1]))
 end
 

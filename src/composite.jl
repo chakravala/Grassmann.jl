@@ -16,7 +16,7 @@ export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudometric, pseudodot,
 export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 export coabs, coabs2, cosqrt, cocbrt, coinv, coscalar, coexp, colog, cometric, codot, @co
-export cocos, cosin, cotan, cocosh, cosinh, cotanh, vandermonde, volumes, submesh
+export cocos, cosin, cotan, cocosh, cosinh, cotanh, vandermonde, invdet, adjugate, volumes
 
 ## exponential & logarithm function
 
@@ -744,23 +744,59 @@ end
     end
 end
 
+function _inv(M,N); M1 = M - 1
+    x,y,xy = Grassmann.Cramer(M1)
+    val = if iseven(M1)
+        Expr(:call,:Values,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ list(1,M1-1)]...,x[end])
+    elseif M ≠ N # N = mdims(V)
+        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,M1-1)]...,:(-$(x[end])))
+    else
+        Expr(:call,:Values,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,M1-1)]...,x[end])
+    end
+    return xy,val,:(@inbounds t[1]∧$(y[end]))
+end
+
 @generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
-    W = M≠mdims(V) ? Submanifold(M) : V; N = M-1
-    N<1 && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
+    W = M≠mdims(V) ? Submanifold(M) : V
+    isone(M) && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
-    x,y,xy = Grassmann.Cramer(N)
-    val = if iseven(N)
-        Expr(:call,:Values,y[end],[:($(y[end-i])∧$(x[i])) for i ∈ list(1,N-1)]...,x[end])
-    elseif M≠mdims(V)
-        Expr(:call,:Values,y[end],[:($(iseven(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,:(-$(x[end])))
-    else
-        Expr(:call,:Values,:(-$(y[end])),[:($(isodd(i) ? :+ : :-)($(y[end-i])∧$(x[i]))) for i ∈ list(1,N-1)]...,x[end])
-    end
+    xy,val,dt = _inv(M,mdims(V))
     out = if M≠mdims(V)
-        :(vector.($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end])))))))
+        :(vector.($(Expr(:call,:./,val,dt))))
     else
-        :(.!($(Expr(:call,:./,val,:(@inbounds (t[1]∧$(y[end]))[1])))))
+        :(.!($(Expr(:call,:./,val,:(@inbounds $dt[1])))))
     end
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
+end
+
+@generated function invdet(t::Values{M,<:Chain{V,1}}) where {M,V}
+    W = M≠mdims(V) ? Submanifold(M) : V
+    isone(M) && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
+    M > mdims(V) && error("pseudo-determinant")
+    xy,val,dt = _inv(M,mdims(V))
+    out = if M≠mdims(V)
+        :(vector.($(Expr(:call,:./,val,:dt))))
+    else
+        :(.!($(Expr(:call,:./,val,:(@inbounds dt[1])))))
+    end
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(dt = $dt),:((_transpose($out,$W),!(dt))))
+end
+
+#=@generated function adjugatedet(t::Values{M,<:Chain{V,1}}) where {M,V}
+    W = M≠mdims(V) ? Submanifold(M) : V
+    isone(M) && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
+    M > mdims(V) && error("pseudo-determinant")
+    xy,val,dt = _inv(M,mdims(V))
+    out,dt = M≠mdims(V) ? :(vector.($val)) : :(.!($val))
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:((_transpose($out,$W),:(!($dt)))))
+end=#
+
+@generated function adjugate(t::Values{M,<:Chain{V,1}}) where {M,V}
+    W = M≠mdims(V) ? Submanifold(M) : V
+    isone(M) && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
+    M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅adjugate(Chain{$W,1}(t)⋅tt)))
+    xy,val = _inv(M,mdims(V))
+    out = M≠mdims(V) ? :(vector.($val)) : :(.!($val))
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
 
@@ -803,6 +839,8 @@ Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 #Base.inv(t::Chain{V,1,<:Chain{V,G}}) where {V,G} = value(Chain{V,G}(I))\t
 Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
+invdet(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = invdet(value(t))
+adjugate(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = adjugate(value(t))
 grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
 
 @generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(mdims(V))))⋅y)
