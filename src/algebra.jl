@@ -1745,7 +1745,7 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                 for g ∈ $$leftspin
                     X = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
-                        @inbounds val = $(nothing≠d ? :(@inbounds $a[$left[g]+i]/$d) : :(@inbounds $a[$$left[g]+i]))
+                        @inbounds val = $(nothing≠d ? :(@inbounds $a[$$left[g]+i]/$d) : :(@inbounds $a[$$left[g]+i]))
                         val≠0 && for G ∈ $$rightspin
                             @inbounds R = $$right[G]
                             Y = indexbasis(N,G-1)
