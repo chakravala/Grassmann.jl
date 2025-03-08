@@ -1729,12 +1729,14 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
             for g ∈ $leftspin
                 X = indexbasis(N,g-1)
                 @inbounds for i ∈ 1:bn[g]
+                    Xi = @inbounds X[i]
                     @inbounds val = nothing≠d ? :(@inbounds $a[$($left[g]+i)]/$d) : :(@inbounds $a[$($left[g]+i)])
                     for G ∈ $rightspin
                         @inbounds R = $right[G]
                         Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]
-                            @inbounds preproduct!(V,out,X[i],Y[j],derive_pre(V,X[i],Y[j],val,:(@inbounds $b[$(R+j)]),MUL),vfield)
+                            Yj = @inbounds Y[j]
+                            @inbounds preproduct!(V,out,Xi,Yj,derive_pre(V,Xi,Yj,val,:(@inbounds $b[$(R+j)]),MUL),vfield)
                         end
                     end
                 end
@@ -1742,18 +1744,21 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
             (:N,:t,:out), :(out = $(Expr(:call,$(outspin ? :tvecs : :tvec)(N,t),out...)))
         else
             (:N,:t,:out,$br...,:bn,:μ), quote
+                $(nothing≠d ? :(out = zeros($$(outspin ? :mvecs : :mvec)(N,t))) : nothing)
                 for g ∈ $$leftspin
                     X = indexbasis(N,g-1)
                     @inbounds for i ∈ 1:bn[g]
+                        Xi = @inbounds X[i]
                         @inbounds val = $(nothing≠d ? :(@inbounds $a[$$left[g]+i]/$d) : :(@inbounds $a[$$left[g]+i]))
                         val≠0 && for G ∈ $$rightspin
                             @inbounds R = $$right[G]
                             Y = indexbasis(N,G-1)
                             @inbounds for j ∈ 1:bn[G]
-                                dm = derive_mul(V,X[i],Y[j],val,$b[R+j],$MUL)
-                                if @inbounds $product!(V,out,X[i],Y[j],dm)&μ
+                                Yj = @inbounds Y[j]
+                                dm = derive_mul(V,Xi,Yj,val,$b[R+j],$MUL)
+                                if @inbounds $product!(V,out,Xi,Yj,dm)&μ
                                     $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $product!(V,out,X[i],Y[j],dm)
+                                    @inbounds $product!(V,out,Xi,Yj,dm)
                                 end
                             end
                         end
