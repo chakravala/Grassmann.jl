@@ -560,7 +560,7 @@ end
         den = bre + (r*bim)*B2
         ((are + (aim*r)*B2)/den, (aim - are*r)/den)
     end
-    Chain{V,B}(rout,iout)
+    Couple{V,B}(rout,iout)
 end
 
 @eval inv(z::Couple{V,B,T},$(args...)) where {V,B,T<:Union{Float16,Float32}} =
@@ -593,11 +593,11 @@ end
 
 @eval function inv(z::Couple{V,B},$(args...)) where {V,B}
     c, d = reim(z)
-    (isinf(c) | isinf(d)) && (return Couple{V,B}(complex(copysign(zero(c), c), flipsign(-zero(d), d))))
+    (isinf(c) | isinf(d)) && (return Couple{V,B}(copysign(zero(c), c), flipsign(-zero(d), d)))
     e = c*c + d*d*value(abs2_inv(B,$(args...)))
-    Couple{V,B}(complex(c/e, parityreverse(grade(B)) ? -d/e : d/e))
+    Couple{V,B}(c/e, parityreverse(grade(B)) ? -d/e : d/e)
 end
-@eval inv(z::Couple{V,B,<:Integer},$(args...)) where {V,B} = inv(Couple{V,B}(float(z.v)),$(args...))
+@eval inv(z::Couple{V,B,<:Integer},$(args...)) where {V,B} = inv(Couple{V,B}(float.(z.v)),$(args...))
 
 @eval function inv(w::Couple{V,B,Float64},$(args...)) where {V,B}
     c, d = reim(w)
@@ -620,7 +620,7 @@ end
     else
         q, p = robust_cinv_rev(-d, -c, a)
     end
-    return Couple{V,B}(ComplexF64(p*s, q*s)) # undo scaling
+    return Couple{V,B,Float64}(p*s, q*s) # undo scaling
 end
 end
 
@@ -1736,7 +1736,7 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                         Y = indexbasis(N,G-1)
                         @inbounds for j ∈ 1:bn[G]
                             Yj = @inbounds Y[j]
-                            @inbounds preproduct!(V,out,Xi,Yj,derive_pre(V,Xi,Yj,val,:(@inbounds $b[$(R+j)]),MUL),vfield)
+                            preproduct!(V,out,Xi,Yj,derive_pre(V,Xi,Yj,val,:(@inbounds $b[$(R+j)]),MUL),vfield)
                         end
                     end
                 end
@@ -1755,10 +1755,10 @@ for com ∈ (:spinor,:s_m,:m_s,:anti,:a_m,:m_a,:multivector,:s_a,:a_s)
                             Y = indexbasis(N,G-1)
                             @inbounds for j ∈ 1:bn[G]
                                 Yj = @inbounds Y[j]
-                                dm = derive_mul(V,Xi,Yj,val,$b[R+j],$MUL)
-                                if @inbounds $product!(V,out,Xi,Yj,dm)&μ
+                                dm = @inbounds derive_mul(V,Xi,Yj,val,$b[R+j],$MUL)
+                                if $product!(V,out,Xi,Yj,dm)&μ
                                     $(insert_expr((:out,);mv=:out)...)
-                                    @inbounds $product!(V,out,Xi,Yj,dm)
+                                    $product!(V,out,Xi,Yj,dm)
                                 end
                             end
                         end

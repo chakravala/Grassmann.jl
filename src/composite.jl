@@ -1022,8 +1022,8 @@ Base.map(fn, x::Spinor{V}) where V = Spinor{V}(map(fn, value(x)))
 Base.map(fn, x::CoSpinor{V}) where V = CoSpinor{V}(map(fn, value(x)))
 Base.map(fn, x::Chain{V,G}) where {V,G} = Chain{V,G}(map(fn,value(x)))
 Base.map(fn, x::TensorTerm) = fn(value(x))*basis(x)
-Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
-Base.map(fn, x::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(Complex(fn(x.v.re),fn(x.v.im)))
+Base.map(fn, x::Couple{V,B}) where {V,B} = Couple{V,B}(fn(realvalue(x)),fn(imagvalue(x)))
+Base.map(fn, x::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}(fn(realvalue(x)),fn(imagvalue(x)))
 
 import Random: SamplerType, AbstractRNG
 Base.rand(::AbstractRNG,::SamplerType{Chain}) = rand(Chain{rand(Manifold)})

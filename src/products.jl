@@ -640,7 +640,7 @@ function plus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
         PseudoCouple{V,B}(realvalue(a)+value(b),imagvalue(a))
     elseif Submanifold(V) == basis(b)
-        PseudoCouple{V,B}(Complex(realvalue(a),imagvalue(a)+value(b)))
+        PseudoCouple{V,B}(realvalue(a),imagvalue(a)+value(b))
     else
         multispin(a)+b
     end
@@ -1835,13 +1835,13 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
     g = reverse≠:antireverse ? :grade : :antigrade
     @eval begin
         function $reverse(z::Couple{V,B}) where {V,B}
-            Couple{V,B}(Complex(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z)))
+            Couple{V,B}(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z))
         end
         function $reverse(z::PseudoCouple{V,B}) where {V,B}
-            PseudoCouple{V,B}(Complex($p($g(B)) ? -realvalue(z) : reavalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z)))
+            PseudoCouple{V,B}($p($g(B)) ? -realvalue(z) : reavalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z))
         end
         function $reverse(z::Phasor{V,B}) where {V,B}
-            Phasor{V,B}(Complex(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z)))
+            Phasor{V,B}(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z))
         end
         @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
             SUB,VEC = subvec(b)
