@@ -638,17 +638,18 @@ end
 Pair of values with `V::Manifold`, basis `B::Submanifold`, scalar field of `T::Type`.
 """
 struct Couple{V,B,T} <: AbstractSpinor{V,T}
-    #v::Complex{T}
     v::Values{2,T}
     Couple{V,B,T}(v) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
-Couple{V,B,T}(a::T,b::T) where {V,B,T} = Couple{V,B,T}(Values{2,T}(a,b))
-Couple{V,B}(a::T,b::T) where {V,B,T} = Couple{V,B,T}(Values{2,T}(a,b))
-Couple{V,B}(v::Values{2,T}) where {V,B,T} = Couple{V,B,T}(v)
 Couple{V,B}(v::Complex{T}) where {V,B,T} = Couple{V,B,T}(Values{2,T}(real(v),imag(v)))
+Couple{V,B}(val::S) where {V,B,S<:AbstractVector{𝕂}} where 𝕂 = Couple{V,B,𝕂}(val)
+Couple{V,B}(val::NTuple{2,T}) where {V,B,T} = Couple{V,B}(Values{2,T}(val))
+Couple{V,B}(val::NTuple{2,Any}) where {V,B} = Couple{V,B}(Values{2}(val))
+Couple(v::Couple{V,B,𝕂}) where {V,B,𝕂} = v
+@inline (::Type{T})(x...) where {T<:Couple} = T(x)
 
-Couple(a,b) = (V=Submanifold(2); Couple{V,Submanifold(V)}(a,b))
+Couple(ab) = (V=Submanifold(2); Couple{V,Submanifold(V)}(ab))
 Base.abs2(z::Couple{V,B}) where {V,B} = abs2(realvalue(z)) + abs2(imagvalue(z))*abs2_inv(B)
 grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? imagvalue(z) : G==0 ? realvalue(z) : Zero(V)
 
@@ -658,15 +659,16 @@ grade(z::Couple{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? imagvalue(z) : G==0
 Pair of values with `V::Manifold`, basis `B::Submanifold`, pseudoscalar of `T::Type`.
 """
 struct PseudoCouple{V,B,T} <: AbstractSpinor{V,T}
-    #v::Complex{T}
     v::Values{2,T}
     PseudoCouple{V,B,T}(v) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
-PseudoCouple{V,B,T}(a::T,b::T) where {V,B,T} = PseudoCouple{V,B,T}(Values{2,T}(a,b))
-PseudoCouple{V,B}(a::T,b::T) where {V,B,T} = PseudoCouple{V,B,T}(Values{2,T}(a,b))
-PseudoCouple{V,B}(v::Values{2,T}) where {V,B,T} = PseudoCouple{V,B,T}(v)
 PseudoCouple{V,B}(v::Complex{T}) where {V,B,T} = PseudoCouple{V,B,T}(Values{2,T}(real(v),imag(v)))
+PseudoCouple{V,B}(val::S) where {V,B,S<:AbstractVector{𝕂}} where 𝕂 = PseudoCouple{V,B,𝕂}(val)
+PseudoCouple{V,B}(val::NTuple{2,T}) where {V,B,T} = PseudoCouple{V,B}(Values{2,T}(val))
+PseudoCouple{V,B}(val::NTuple{2,Any}) where {V,B} = PseudoCouple{V,B}(Values{2}(val))
+PseudoCouple(v::PseudoCouple{V,B,𝕂}) where {V,B,𝕂} = v
+@inline (::Type{T})(x...) where {T<:PseudoCouple} = T(x)
 
 function Base.abs2(z::PseudoCouple{V,B}) where {V,B}
     out = abs2(realvalue(z))*abs2_inv(B) + abs2(imagvalue(z))*abs2_inv(V)
@@ -806,9 +808,8 @@ imagvalue(z::Complex) = z.im
 for couple ∈ (:Couple,:PseudoCouple)
     @eval begin
         export $couple
-        $couple{V,B}(a,b) where {V,B} = $couple{V,B}(promote(a,b)...)
-        @inline realvalue(z::$couple) = z.v.v.:1#z.v.re
-        @inline imagvalue(z::$couple) = z.v.v.:2#z.v.im
+        @inline realvalue(z::$couple) = z.v.v.:1
+        @inline imagvalue(z::$couple) = z.v.v.:2
         DirectSum.basis(::$couple{V,B}) where {V,B} = B
         Base.reim(z::$couple) = (realvalue(z),imagvalue(z))
         Base.widen(z::$couple{V,B}) where {V,B} = $couple{V,B}(widen(realvalue(z),widen(imagvalue(z))))
@@ -833,17 +834,19 @@ end
 Magnitude/phase angle with `V::Manifold`, basis `B::Submanifold`, scalar field `T::Type`.
 """
 struct Phasor{V,B,T} <: AbstractSpinor{V,T}
-    #v::Complex{T}
     v::Values{2,T}
     Phasor{V,B,T}(v) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
 end
 
-Phasor{V,B}(r::T,iθ::T) where {V,B,T} = Phasor{V,B,T}(Values{2,T}(r,iθ))
-Phasor{V,B}(v::Values{2,T}) where {V,B,T} = Phasor{V,B,T}(v)
 Phasor{V,B}(v::Complex{T}) where {V,B,T} = Phasor{V,B,T}(Values{2,T}(real(v),imag(v)))
+Phasor{V,B}(val::S) where {V,B,S<:AbstractVector{𝕂}} where 𝕂 = Phasor{V,B,𝕂}(val)
+Phasor{V,B}(val::NTuple{2,T}) where {V,B,T} = Phasor{V,B}(Values{2,T}(val))
+Phasor{V,B}(val::NTuple{2,Any}) where {V,B} = Phasor{V,B}(Values{2}(val))
+Phasor(v::Phasor{V,B,𝕂}) where {V,B,𝕂} = v
+@inline (::Type{T})(x...) where {T<:Phasor} = T(x)
 
-@inline realvalue(z::Phasor) = z.v.v.:1#z.v.re
-@inline imagvalue(z::Phasor) = z.v.v.:2#z.v.im
+@inline realvalue(z::Phasor) = z.v.v.:1
+@inline imagvalue(z::Phasor) = z.v.v.:2
 
 Phasor{V,B}(a,b) where {V,B} = Phasor{V,B}(promote(a,b)...)
 Phasor(a,b) = (V=Submanifold(2); Phasor{V,Submanifold(V)}(a,b))
@@ -1004,9 +1007,9 @@ Base.isapprox(a::S,b::T) where {S<:CoSpinor,T<:CoSpinor} = Manifold(a)==Manifold
 @inline scalar(z::Couple{V}) where V = Single{V}(realvalue(z))
 @inline scalar(z::PseudoCouple{V,B}) where {V,B} = grade(B)==0 ? Single{V}(realvalue(z)) : Zero(V)
 @inline scalar(z::Phasor) = scalar(Couple(z))
-@inline scalar(t::Chain{V,0,T}) where {V,T} = @inbounds Single{V}(t.v[1])
-@inline scalar(t::Multivector{V}) where V = @inbounds Single{V}(t.v[1])
-@inline scalar(t::Spinor{V}) where V = @inbounds Single{V}(t.v[1])
+@inline scalar(t::Chain{V,0,T}) where {V,T} = Single{V}(t.v.v.:1)
+@inline scalar(t::Multivector{V}) where V = Single{V}(t.v.v.:1)
+@inline scalar(t::Spinor{V}) where V = Single{V}(t.v.v.:1)
 @inline scalar(t::CoSpinor{V}) where V = Zero(V)
 @inline vector(z::Couple{V,B}) where {V,B} = grade(B)==1 ? imaginary(z) : Zero(V)
 @inline vector(z::PseudoCouple{V,B}) where {V,B} = grade(B)==1 ? imaginary(z) : grade(V)==1 ? volume(z) : Zero(V)
@@ -1024,7 +1027,7 @@ Base.isapprox(a::S,b::T) where {S<:CoSpinor,T<:CoSpinor} = Manifold(a)==Manifold
 @inline trivector(t::Spinor{V}) where V = Zero(V)
 @inline trivector(t::CoSpinor) = t(Val(3))
 #@inline bivector(t::Quaternion{V}) where V = @inbounds Chain{V,2}(t.v[2],t.v[3],t.v[4])
-@inline volume(t::Chain{V,G,T,1}) where {V,G,T} = @inbounds Single{V,G,basis(V)}(t.v[1])
+@inline volume(t::Chain{V,G,T,1}) where {V,G,T} = Single{V,G,basis(V)}(t.v.v.:1)
 @inline volume(z::Couple{V,B}) where {V,B} = grade(B)==grade(V) ? Single{V,grade(B),B}(imagvalue(z)) : Zero(V)
 @inline volume(z::PseudoCouple{V}) where V = Single{V,mdims(V),Submanifold(V)}(imagvalue(z))
 @inline volume(t::Multivector{V}) where V = @inbounds Single{V,mdims(V),Submanifold(V)}(t.v[end])

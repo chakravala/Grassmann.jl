@@ -733,17 +733,13 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
         left,bop,VEC = addvec(a,b,false,op)
         if basis(a) == basis(b)
             :(Single{V,L}($bop(value(a),value(b)),basis(a)))
-        elseif !istangent(V) && !hasconformal(V) && L == 0 &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && L == 0
             :(Couple{V,basis(b)}(value(a),$bop(value(b))))
-        elseif !istangent(V) && !hasconformal(V) && G == 0 &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && G == 0
             :(Couple{V,basis(a)}($bop(value(b)),value(a)))
-        elseif !istangent(V) && !hasconformal(V) && L == grade(V) &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && L == grade(V)
             :(PseudoCouple{V,basis(b)}($bop(value(b)),value(a)))
-        elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && G == grade(V)
             :(PseudoCouple{V,basis(a)}(value(a),$bop(value(b))))
         elseif L == G
             if binomial(mdims(V),G)<(1<<cache_limit)
@@ -844,22 +840,19 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
     end
     @noinline function adder(a::Type{<:TensorTerm{V,L}},b::Type{<:Chain{V,G,T}},op,swap=false) where {V,G,T,L}
         left,right,VEC = addvec(a,b,swap,op)
-        if !istangent(V) && !hasconformal(V) && L == 0 && G == mdims(V) &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        if !istangent(V) && !hasconformal(V) && L == 0 && G == mdims(V)
             if swap
                 :(Couple{V,basis(V)}($right(value(a)),b.v[1]))
             else
                 :(Couple{V,basis(V)}(value(a),$right(b.v[1])))
             end
-        elseif !istangent(V) && !hasconformal(V) && G == 0 &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && G == 0
             if swap
                 :(Couple{V,basis(a)}(b.v[1],$right(value(a))))
             else
                 :(Couple{V,basis(a)}($right(b.v[1]),value(a)))
             end
-        elseif !istangent(V) && !hasconformal(V) && G == grade(V) &&
-                valuetype(a)<:Real && valuetype(b)<:Real
+        elseif !istangent(V) && !hasconformal(V) && G == grade(V)
             if swap
                 :(PseudoCouple{V,basis(a)}($right(value(a)),b.v[1]))
             else

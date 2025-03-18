@@ -611,74 +611,74 @@ end
 ∨(a::Couple{V},b::PseudoCouple{V}) where V = (scalar(a)∨volume(b))+(imaginary(a)∨b)
 ∨(a::PseudoCouple{V},b::Couple{V}) where V = (volume(a)∨scalar(b))+(a∨imaginary(b))
 
-plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(value(a)+realvalue(b),imagvalue(b))
-plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)+value(b),imagvalue(a))
+plus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = Couple{V,B}(AbstractTensors.:∑(value(a),realvalue(b)),imagvalue(b))
+plus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(AbstractTensors.:∑(realvalue(a),value(b)),imagvalue(a))
 function plus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
-        Couple{V,B}(realvalue(b),value(a)+imagvalue(b))
+        Couple{V,B}(realvalue(b),AbstractTensors.:∑(value(a),imagvalue(b)))
     else
         a+multispin(b)
     end
 end
 function plus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        Couple{V,B}(realvalue(a),imagvalue(a)+value(b))
+        Couple{V,B}(realvalue(a),AbstractTensors.:∑(imagvalue(a),value(b)))
     else
         multispin(a)+b
     end
 end
 function plus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
-        PseudoCouple{V,B}(value(a)+realvalue(b),imagvalue(b))
+        PseudoCouple{V,B}(AbstractTensors.:∑(value(a),realvalue(b)),imagvalue(b))
     elseif basis(a) == Subamnifold(V)
-        PseudoCouple{V,B}(realvalue(b),value(a)+imagvalue(b))
+        PseudoCouple{V,B}(realvalue(b),AbstractTensors.:∑(value(a),imagvalue(b)))
     else
         a+multispin(b)
     end
 end
 function plus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        PseudoCouple{V,B}(realvalue(a)+value(b),imagvalue(a))
+        PseudoCouple{V,B}(AbstractTensors.:∑(realvalue(a),value(b)),imagvalue(a))
     elseif Submanifold(V) == basis(b)
-        PseudoCouple{V,B}(realvalue(a),imagvalue(a)+value(b))
+        PseudoCouple{V,B}(realvalue(a),AbstractTensors.:∑(imagvalue(a),value(b)))
     else
         multispin(a)+b
     end
 end
 
-minus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = (re = value(a)-realvalue(b); Couple{V,B}(re,-oftype(re,imagvalue(b))))
-minus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(realvalue(a)-value(b),imagvalue(a))
+minus(a::TensorTerm{V,0},b::Couple{V,B}) where {V,B} = (re = AbstractTensors.:-(value(a),realvalue(b)); Couple{V,B}(re,AbstractTensors.:-(imagvalue(b))))
+minus(a::Couple{V,B},b::TensorTerm{V,0}) where {V,B} = Couple{V,B}(AbstractTensors.:-(realvalue(a),value(b)),imagvalue(a))
 function minus(a::TensorTerm{V},b::Couple{V,B}) where {V,B}
     if basis(a) == B
-        re = value(a)-imagvalue(b)
-        Couple{V,B}(-oftype(re,realvalue(b)),re)
+        re = AbstractTensors.:-(value(a),imagvalue(b))
+        Couple{V,B}(AbstractTensors.:-(realvalue(b)),re)
     else
         a-multispin(b)
     end
 end
 function minus(a::Couple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        Couple{V,B}(realvalue(a),imagvalue(a)-value(b))
+        Couple{V,B}(realvalue(a),AbstractTensors.:-(imagvalue(a),value(b)))
     else
         multispin(a)-b
     end
 end
 function minus(a::TensorTerm{V},b::PseudoCouple{V,B}) where {V,B}
     if basis(a) == B
-        re = value(a)-realvalue(b)
-        PseudoCouple{V,B}(re,-oftype(re,imagvalue(b)))
+        re = AbstractTensors.:-(value(a),realvalue(b))
+        PseudoCouple{V,B}(re,AbstractTensors.:-(imagvalue(b)))
     elseif basis(a) == Submanifold(V)
-        re = value(a)-imagvalue(b)
-        PseudoCouple{V,B}(-oftype(re,realvalue(b)),re)
+        re = AbstractTensors.:-(value(a),imagvalue(b))
+        PseudoCouple{V,B}(AbstractTensors.:-(realvalue(b)),re)
     else
         a-multispin(b)
     end
 end
 function minus(a::PseudoCouple{V,B},b::TensorTerm{V}) where {V,B}
     if B == basis(b)
-        PseudoCouple{V,B}(realvalue(a)-value(b),imagvalue(a))
+        PseudoCouple{V,B}(AbstractTensors.:-(realvalue(a),value(b)),imagvalue(a))
     elseif Submanifold(V) == basis(b)
-        PseudoCouple{V,B}(realvalue(a),imagvalue(a)-value(b))
+        PseudoCouple{V,B}(realvalue(a),AbstractTensors.:-(imagvalue(a),value(b)))
     else
         multispin(a)-b
     end
@@ -700,10 +700,10 @@ for (couple,calar) ∈ ((:Couple,:scalar),(:PseudoCouple,:volume))
     end
 end
 @eval begin
-    $op(a::TensorTerm{V,0},b::Couple{V,B},$(args...)) where {V,B} = Couple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
-    $op(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
-    $op(a::TensorTerm{V,0},b::PseudoCouple{V,B},$(args...)) where {V,B} = PseudoCouple{V,B}(value(a)*realvalue(b),value(a)*imagvalue(b))
-    $op(a::PseudoCouple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = PseudoCouple{V,B}(realvalue(a)*value(b),imagvalue(a)*value(b))
+    $op(a::TensorTerm{V,0},b::Couple{V,B},$(args...)) where {V,B} = Couple{V,B}(AbstractTensors.:∏(value(a),realvalue(b)),AbstractTensors.:∏(value(a),imagvalue(b)))
+    $op(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(AbstractTensors.:∏(realvalue(a),value(b)),AbstractTensors.:∏(imagvalue(a),value(b)))
+    $op(a::TensorTerm{V,0},b::PseudoCouple{V,B},$(args...)) where {V,B} = PseudoCouple{V,B}(AbstractTensors.:∏(value(a),realvalue(b)),AbstractTensors.:∏(value(a),imagvalue(b)))
+    $op(a::PseudoCouple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = PseudoCouple{V,B}(AbstractTensors.:∏(realvalue(a),value(b)),AbstractTensors.:∏(imagvalue(a),value(b)))
 end
 end
 
@@ -1009,10 +1009,12 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     Field ∉ Fields && @eval begin
         *(a::F,b::Submanifold{V}) where {F<:$EF,V} = Single{V}(a,b)
         *(a::Submanifold{V},b::F) where {F<:$EF,V} = Single{V}(b,a)
-        *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
-        *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
-        *(a::F,b::PseudoCouple{V,B}) where {F<:$EF,V,B} = a*multispin(b)
-        *(a::PseudoCouple{V,B},b::F) where {F<:$EF,V,B} = multispin(a)*b
+        *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = Couple{V,B}($Sym.:∏(a,realvalue(b)),$Sym.:∏(a,imagvalue(b)))
+        *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = Couple{V,B}($Sym.:∏(realvalue(a),b),$Sym.:∏(imagvalue(a),b))
+        *(a::F,b::PseudoCouple{V,B}) where {F<:$EF,V,B} = PseudoCouple{V,B}($Sym.:∏(a,realvalue(b)),$Sym.:∏(a,imagvalue(b)))
+        *(a::PseudoCouple{V,B},b::F) where {F<:$EF,V,B} = PseudoCouple{V,B}($Sym.:∏(realvalue(a),b),$Sym.:∏(imagvalue(a),b))
+        *(a::F,b::Phasor{V,B}) where {F<:$EF,V,B} = Phasor{V,B}($Sym.:∏(a,realvalue(b)),imagvalue(b))
+        *(a::Phasor{V,B},b::F) where {F<:$EF,V,B} = Phasor{V,B}($Sym.:∏(realvalue(a),b),imagvalue(a))
         *(a::F,b::Multivector{V}) where {F<:$EF,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$EF,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$EF,V} = Spinor{V}(a*b.v)
