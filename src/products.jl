@@ -859,6 +859,61 @@ for (op,po) ∈ ((:+,:plus),(:-,:minus))
         @generated function $po(a::TensorTerm{V,G},b::CoSpinor{V,T}) where {V,G,T}
             adder(a,b,$(QuoteNode(op)))
         end
+        function $po(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T,L,S}
+            #adder(a,b,$(QuoteNode(op)))
+            (G == 0 || G == mdims(V)) && (return $po(Single(a),b))
+            (L == 0 || L == mdims(V)) && (return $po(a,Single(b)))
+            ((isodd(G) && isodd(L))||(iseven(G) && iseven(L))) && (return $po(multispin(a),multispin(b)))
+            return $po(Multivector{V}(a),Multivector{V}(b))
+        end
+        @generated function $po(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $po(a::Multivector{V,T},b::Multivector{V,S}) where {V,T,S}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $po(a::Spinor{V,T},b::Spinor{V,S}) where {V,T,S}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        @generated function $po(a::CoSpinor{V,T},b::CoSpinor{V,S}) where {V,T,S}
+            adder(a,b,$(QuoteNode(op)))
+        end
+        function $po(a::Spinor{V,T},b::Multivector{V,S}) where {V,T,S}
+            return $po(Multivector{V}(a),b)
+        end
+        function $po(a::Multivector{V,T},b::Spinor{V,S}) where {V,T,S}
+            return $po(a,Multivector{V}(b))
+        end
+        function $po(a::CoSpinor{V,T},b::Multivector{V,S}) where {V,T,S}
+            return $po(Multivector{V}(a),b)
+        end
+        function $po(a::Multivector{V,T},b::CoSpinor{V,S}) where {V,T,S}
+            return $po(a,Multivector{V}(b))
+        end
+        function $po(a::Chain{V,G,T},b::Multivector{V,S}) where {V,G,T,S}
+            #adder(a,b,$(QuoteNode(op)))
+            return $po(Multivector{V}(a),b)
+        end
+        function $po(a::Multivector{V,T},b::Chain{V,G,S}) where {V,T,G,S}
+            #adder(a,b,$(QuoteNode(op)))
+            return $po(a,Multivector{V}(b))
+        end
+        function $po(a::Chain{V,G,T},b::Spinor{V,S}) where {V,G,T,S}
+            #adder(a,b,$(QuoteNode(op)))
+            iseven(G) ? $po(multispin(a),b) : $po(a,Multivector{V}(b))
+        end
+        function $po(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
+            #adder(a,b,$(QuoteNode(op)))
+            iseven(G) ? $po(a,multispin(b)) : $po(Multivector{V}(a),b)
+        end
+        function $po(a::Chain{V,G,T},b::CoSpinor{V,S}) where {V,G,T,S}
+            #adder(a,b,$(QuoteNode(op)))
+            isodd(G) ? $po(multispin(a),b) : $po(a,Multivector{V}(b))
+        end
+        function $po(a::CoSpinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
+            #adder(a,b,$(QuoteNode(op)))
+            isodd(G) ? $po(a,multispin(b)) : $po(Multivector{V}(a),b)
+        end
     end
 end
 @generated minus(b::Chain{V,G,T},a::TensorTerm{V,G}) where {V,G,T} = adder(a,b,:-,true)
@@ -1054,109 +1109,6 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
         ∧(a::$Field,b::Multivector{V,T}) where {V,T<:$Field} = Multivector{V,T}(a.*b.v)
         ∧(a::Multivector{V,T},b::$Field) where {V,T<:$Field} = Multivector{V,T}(a.v.*b)=#
-    end
-    for (op,po,eop,bop) ∈ ((:+,:plus,:(+=),ADD),(:-,:minus,:(-=),SUB))
-        @eval begin
-            function $po(a::Chain{V,G,T},b::Chain{V,L,S}) where {V,G,T<:$Field,L,S<:$Field}
-                (G == 0 || G == mdims(V)) && (return $po(Single(a),b))
-                (L == 0 || L == mdims(V)) && (return $po(a,Single(b)))
-                ((isodd(G) && isodd(L))||(iseven(G) && iseven(L))) && (return $po(multispin(a),multispin(b)))
-                $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
-                @inbounds out[list(r+1,r+bng)] = value(a,$VEC(N,G,t))
-                rb = binomsum(N,L)
-                Rb = binomial(N,L)
-                @inbounds out[list(rb+1,rb+Rb)] = $(bcast(bop,:(value(b,$VEC(N,L,t)),)))
-                return Multivector{V}(out)
-            end
-            function $po(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T<:$Field,S<:$Field}
-                return Chain{V,G}($(bcast(bop,:(a.v,b.v))))
-            end
-            function $po(a::Multivector{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
-                #=$(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VEC(N,t))
-                $(add_val(eop,:out,:(value(b,$VEC(N,t))),bop))
-                return Multivector{V}(out)=#
-                return Multivector{V}($(bcast(bop,:(a.v,b.v))))
-            end
-            function $po(a::Chain{V,G,T},b::Multivector{V,S}) where {V,G,T<:$Field,S<:$Field}
-                $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                out = convert($VEC(N,t),$(bcast(bop,:(value(b,$VEC(N,t)),))))
-                @inbounds $(add_val(:(+=),:(out[list(r+1,r+bng)]),:(value(a,$VEC(N,G,t))),ADD))
-                return Multivector{V}(out)
-            end
-            function $po(a::Multivector{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
-                $(insert_expr((:N,:t,:r,:bng),VEC)...)
-                out = value(a,$VEC(N,t))
-                @inbounds $(add_val(eop,:(out[list(r+1,r+bng)]),:(value(b,$VEC(N,G,t))),bop))
-                return Multivector{V}(out)
-            end
-            function $po(a::Spinor{V,T},b::Spinor{V,S}) where {V,T<:$Field,S<:$Field}
-                #=$(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VECS(N,t))
-                $(add_val(eop,:out,:(value(b,$VECS(N,t))),bop))
-                return Spinor{V}(out)=#
-                return Spinor{V}($(bcast(bop,:(a.v,b.v))))
-            end
-            function $po(a::CoSpinor{V,T},b::CoSpinor{V,S}) where {V,T<:$Field,S<:$Field}
-                #=$(insert_expr((:N,:t),VEC)...)
-                out = value(a,$VECS(N,t))
-                $(add_val(eop,:out,:(value(b,$VECS(N,t))),bop))
-                return CoSpinor{V}(out)=#
-                return CoSpinor{V}($(bcast(bop,:(a.v,b.v))))
-            end
-            function $po(a::Spinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
-                return $po(Multivector{V}(a),b)
-            end
-            function $po(a::Multivector{V,T},b::Spinor{V,S}) where {V,T<:$Field,S<:$Field}
-                return $po(a,Multivector{V}(b))
-            end
-            function $po(a::CoSpinor{V,T},b::Multivector{V,S}) where {V,T<:$Field,S<:$Field}
-                return $po(Multivector{V}(a),b)
-            end
-            function $po(a::Multivector{V,T},b::CoSpinor{V,S}) where {V,T<:$Field,S<:$Field}
-                return $po(a,Multivector{V}(b))
-            end
-            function $po(a::Chain{V,G,T},b::Spinor{V,S}) where {V,G,T<:$Field,S<:$Field}
-                if iseven(G)
-                    $(insert_expr((:N,:t,:rr,:bng),VEC)...)
-                    out = convert($VECS(N,t),$(bcast(bop,:(value(b,$VECS(N,t)),))))
-                    @inbounds $(add_val(:(+=),:(out[list(rr+1,rr+bng)]),:(value(a,$VEC(N,G,t))),ADD))
-                    return Spinor{V}(out)
-                else
-                    return $po(a,Multivector{V}(b))
-                end
-            end
-            function $po(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
-                if iseven(G)
-                    $(insert_expr((:N,:t,:rr,:bng),VEC)...)
-                    out = value(a,$VECS(N,t))
-                    @inbounds $(add_val(eop,:(out[list(rr+1,rr+bng)]),:(value(b,$VEC(N,G,t))),bop))
-                    return Spinor{V}(out)
-                else
-                    return $po(Multivector{V}(a),b)
-                end
-            end
-            function $po(a::Chain{V,G,T},b::CoSpinor{V,S}) where {V,G,T<:$Field,S<:$Field}
-                if isodd(G)
-                    $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
-                    out = convert($VECS(N,t),$(bcast(bop,:(value(b,$VECS(N,t)),))))
-                    @inbounds $(add_val(:(+=),:(out[list(rrr+1,rrr+bng)]),:(value(a,$VEC(N,G,t))),ADD))
-                    return CoSpinor{V}(out)
-                else
-                    return $po(a,Multivector{V}(b))
-                end
-            end
-            function $po(a::CoSpinor{V,T},b::Chain{V,G,S}) where {V,T<:$Field,G,S<:$Field}
-                if isodd(G)
-                    $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
-                    out = value(a,$VECS(N,t))
-                    @inbounds $(add_val(eop,:(out[list(rrr+1,rrr+bng)]),:(value(b,$VEC(N,G,t))),bop))
-                    return CoSpinor{V}(out)
-                else
-                    return $po(Multivector{V}(a),b)
-                end
-            end
-        end
     end
 end
 

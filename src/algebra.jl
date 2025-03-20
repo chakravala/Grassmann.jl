@@ -1023,6 +1023,117 @@ adder(a,b,op=:+) = adder(typeof(a),typeof(b),op)
             return CoSpinor{V}(out)
         end end end
     end
+    #=@noinline function adder(a::Type{<:Chain{V,G,T}},b::Type{<:Chain{V,L,S}},op) where {V,G,T,L,S}
+        (G == 0 || G == mdims(V)) && (return :($op(Single(a),b)))
+        (L == 0 || L == mdims(V)) && (return :($op(a,Single(b))))
+        ((isodd(G) && isodd(L))||(iseven(G) && iseven(L))) && (return :($op(multispin(a),multispin(b))))
+        return :($op(Multivector{V}(a),Multivector{V}(b)))
+        #=left,right,VEC = addvec(a,b,false,op)
+        quote # improve this
+            $(insert_expr((:N,:t,:out,:r,:bng),VEC)...)
+            @inbounds out[list(r+1,r+bng)] = value(a,$VEC(N,G,t))
+            rb = binomsum(N,L)
+            Rb = binomial(N,L)
+            @inbounds out[list(rb+1,rb+Rb)] = $(bcast(right,:(value(b,$VEC(N,L,t)),)))
+            return Multivector{V}(out)
+        end=#
+    end=#
+    @noinline function adder(a::Type{<:Chain{V,G,T}},b::Type{<:Chain{V,G,S}},op) where {V,G,T,S}
+        left,right,VEC = addvec(a,b,false,op)
+        :(return Chain{V,G}($(bcast(right,:(a.v,b.v)))))
+    end
+    @noinline function adder(a::Type{<:Multivector{V,T}},b::Type{<:Multivector{V,S}},op) where {V,T,S}
+        left,right,VEC = addvec(a,b,false,op)
+        :(return Multivector{V}($(bcast(right,:(a.v,b.v)))))
+    end
+    @noinline function adder(a::Type{<:Spinor{V,T}},b::Type{<:Spinor{V,S}},op) where {V,T,S}
+        left,right,VEC = addvec(a,b,false,op)
+        :(return Spinor{V}($(bcast(right,:(a.v,b.v)))))
+    end
+    @noinline function adder(a::Type{<:CoSpinor{V,T}},b::Type{<:CoSpinor{V,S}},op) where {V,T,S}
+        left,right,VEC = addvec(a,b,false,op)
+        :(return CoSpinor{V}($(bcast(right,:(a.v,b.v)))))
+    end
+    #=@noinline function adder(a::Type{<:Chain{V,G,T}},b::Type{<:Multivector{V,S}},op,swap=false) where {V,G,T,S}
+        return :($op(Multivector{V}(a),b))
+        #=left,right,VEC = addvec(a,b,false,op)
+        quote
+            $(insert_expr((:N,:t,:r,:bng),VEC)...)
+            out = convert($VEC(N,t),$(bcast(right,:(value(b,$VEC(N,t)),))))
+            @inbounds $(add_val(:(+=),:(out[list(r+1,r+bng)]),:(value(a,$VEC(N,G,t))),left))
+            return Multivector{V}(out)
+        end=#
+    end
+    @noinline function adder(a::Type{<:Multivector{V,T}},b::Type{<:Chain{V,G,S}},op) where {V,G,T,S}
+        return :($op(a,Multivector{V}(b)))
+        #=left,right,VEC = addvec(a,b,false,op)
+        quote
+            $(insert_expr((:N,:t,:r,:bng),VEC)...)
+            out = value(a,$VEC(N,t))
+            @inbounds $(add_val(op≠:+ ? :(-=) : :(+=),:(out[list(r+1,r+bng)]),:(value(b,$VEC(N,G,t))),right))
+            return Multivector{V}(out)
+        end=#
+    end
+    @noinline function adder(a::Type{<:Chain{V,G,T}},b::Type{<:Spinor{V,S}},op,swap=false) where {V,G,T,S}
+        if iseven(G)
+            return :($op(multispin(a),b))
+            #=left,right,VEC = addvec(a,b,false,op)
+            VECS = Symbol(string(VEC)*"s")
+            quote
+                $(insert_expr((:N,:t,:rr,:bng),VEC)...)
+                out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
+                @inbounds $(add_val(:(+=),:(out[list(rr+1,rr+bng)]),:(value(a,$VEC(N,G,t))),left))
+                return Spinor{V}(out)
+            end=#
+        else
+            :(return $op(a,Multivector{V}(b)))
+        end
+    end
+    @noinline function adder(a::Type{<:Spinor{V,T}},b::Type{<:Chain{V,G,S}},op) where {V,G,T,S}
+        if iseven(G)
+            return :($op(a,multispin(b)))
+            #=left,right,VEC = addvec(a,b,false,op)
+            VECS = Symbol(string(VEC)*"s")
+            quote
+                $(insert_expr((:N,:t,:rr,:bng),VEC)...)
+                out = value(a,$VECS(N,t))
+                @inbounds $(add_val(op≠:+ ? :(-=) : :(+=),:(out[list(rr+1,rr+bng)]),:(value(b,$VEC(N,G,t))),right))
+                return Spinor{V}(out)
+            end=#
+        else
+            :(return $op(Multivector{V}(a),b))
+        end
+    end
+    @noinline function adder(a::Type{<:Chain{V,G,T}},b::Type{<:CoSpinor{V,S}},op,swap=false) where {V,G,T,S}
+        if isodd(G)
+            return :($op(multispin(a),b))
+            #=left,right,VEC = addvec(a,b,false,op)
+            VECS = Symbol(string(VEC)*"s")
+            quote
+                $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
+                out = convert($VECS(N,t),$(bcast(right,:(value(b,$VECS(N,t)),))))
+                @inbounds $(add_val(:(+=),:(out[list(rrr+1,rrr+bng)]),:(value(a,$VEC(N,G,t))),left))
+                return CoSpinor{V}(out)
+            end=#
+        else
+            :(return $op(a,Multivector{V}(b)))
+        end
+    end
+    @noinline function adder(a::Type{<:CoSpinor{V,T}},b::Type{<:Chain{V,G,S}},op) where {V,G,T,S}
+        if isodd(G)
+            return :($op(a,multispin(b)))
+            #=left,right,VEC = addvec(a,b,false,op)
+            VECS = Symbol(string(VEC)*"s")
+            quote
+                $(insert_expr((:N,:t,:rrr,:bng),VEC)...)
+                out = value(a,$VECS(N,t))
+                @inbounds $(add_val(op≠:+ ? :(-=) : :(+=),:(out[list(rrr+1,rrr+bng)]),:(value(b,$VEC(N,G,t))),right))
+                return CoSpinor{V}(out)
+            end=#
+        else
+            :(return $op(Multivector{V}(a),b))
+        end
+    end=#
     @noinline function product(a::Type{S},b::Type{<:Chain{V,G,T}},swap=false,field=false) where S<:TensorGraded{V,L} where {V,G,L,T}
         MUL,VEC = mulvecs(a,b)
         vfield = Val(field)

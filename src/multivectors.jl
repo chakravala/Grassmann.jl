@@ -123,10 +123,11 @@ isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ 
 @generated function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
     b = bladeindex(N,UInt(basis(v)))
+    bin,T = binomial(N,G),𝕂<:Number ? 𝕂 : Any
     if N<cache_limit
-        :(Chain{V,G,𝕂}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:binomial(N,G)]...))))
+        :(Chain{V,G,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
     else
-        :(Chain{V,G}(setblade!(zeros(mvec($N,G,𝕂)),val,UInt(v),$(Val(N)))))
+        :(Chain{V,G,$T}(setblade!(zeros($(mvec(N,G,T))),val,$(UInt(v)),$(Val(N)))))
     end
 end
 Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(val,v)
@@ -228,7 +229,7 @@ end
 Chain type with pseudoscalar `V::Manifold` and scalar field `T::Type`.
 """
 Multivector{V}(v::S) where {V,S<:AbstractVector{T}} where T = Multivector{V,T}(v)
-for var ∈ ((:V,:T),(:T,),())
+for var ∈ ((:V,:T),(:V,),())
     @eval @generated function Multivector{$(var...)}(t::Chain{V,G,T}) where {V,G,T}
         N = mdims(V)
         chain_src(N,G,T,list(0,N))
@@ -237,12 +238,14 @@ end
 
 function chain_src(N,G,T,grades,type=:Multivector)
     if N<cache_limit
-        :($type{V,$T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(T,binomial(N,g)) for g ∈ grades]...)...))))
+        :($type{V,$T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(Values{binomial(N,g),T}) for g ∈ grades]...)...))))
     else
+        b = binomial(N,G)
+        r = type == :Multivector ? binomsum(N,G) ? type == :Spinor : spinsum(N,G) : antisum(N,G)
         quote
-            out = zeros(mvec($N,T))
-            @inbounds out[list($(r+1),$(r+b))] = v.v
-            return Multivector{V,T}(out)
+            out = zeros($(type≠:Multivector ? :mvecs : :mvec)($N,T))
+            @inbounds out[list($(r+1),$(r+b))] = t.v
+            return $type{V,T}(out)
         end
     end
 end
@@ -368,13 +371,14 @@ Base.one(t::Type{Multivector{V,T,X}}) where {V,T,X} = zero(t)+one(V)
 
 Single(v,b::Multivector) = v*b
 
-@generated function Multivector(val::T,v::Submanifold{V,G}) where {V,T,G}
+@generated function Multivector(val::𝕂,v::Submanifold{V,G}) where {V,𝕂,G}
     N = mdims(V)
     b = basisindex(N,UInt(basis(v)))
+    bin,T = 1<<N,𝕂<:Number ? 𝕂 : Any
     if N<cache_limit
-        :(Multivector{V}(Values($([i==b ? :val : zero(T) for i ∈ 1:1<<N]...))))
+        :(Multivector{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
     else
-        :(Multivector{V}(setmulti!(zeros(mvec(N,T)),val,UInt(v),Val{N}())))
+        :(Multivector{V,$T}(setmulti!(zeros($(mvec(N,T))),val,$(UInt(basis(v))),$(Val{N}()))))
     end
 end
 Multivector(v::Submanifold{V,G}) where {V,G} = Multivector(one(Int),v)
@@ -452,10 +456,11 @@ Spinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = Spinor{V,T}(one(T),v)
     isodd(G) && error("$v is not expressible as a Spinor")
     N = mdims(V)
     b = spinindex(N,UInt(basis(v)))
+    bin,T = 1<<(N-1),𝕂<:Number ? 𝕂 : Any
     if N<cache_limit
-        :(Spinor{V}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:1<<(N-1)]...))))
+        :(Spinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
     else
-        :(Spinor{V,𝕂}(setspin!(zeros(mvecs($N,𝕂)),val,UInt(v),$(Val(N)))))
+        :(Spinor{V,$T}(setspin!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end
 end
 
@@ -470,14 +475,15 @@ CoSpinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = CoSpinor{V,T}(one(T),v)
     iseven(G) && error("$v is not expressible as an CoSpinor")
     N = mdims(V)
     b = antiindex(N,UInt(basis(v)))
+    bin,T = 1<<(N-1),𝕂<:Number ? 𝕂 : Any
     if N<cache_limit
-        :(CoSpinor{V}(Values($([i==b ? :val : zero(𝕂) for i ∈ 1:1<<(N-1)]...))))
+        :(CoSpinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
     else
-        :(CoSpinor{V,𝕂}(setanti!(zeros(mvecs($N,𝕂)),val,UInt(v),$(Val(N)))))
+        :(CoSpinor{V,$T}(setanti!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end
 end
 
-for var ∈ ((:V,:T),(:T,),())
+for var ∈ ((:V,:T),(:V,),())
     @eval @generated function Spinor{$(var...)}(t::Chain{V,G,T}) where {V,G,T}
         isodd(G) && error("$t is not expressible as a Spinor")
         N = mdims(V)
@@ -989,7 +995,7 @@ quatvalue(q::Quaternion{V,T}) where {V,T} = Values{4,T}(q.v[1],q.v[2],-q.v[3],q.
 quatvalue(q::AntiQuaternion{V,T}) where {V,T} = Values{4,T}(q.v[4],q.v[3],q.v[2],q.v[1])
 const quatvalues = quatvalue
 
-# fixup convert(T,m.v) appearances in codegen
+# fixup convert.(T,m.v) appearances in adders, unsplit
 @inline value(m::Chain,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Multivector,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
 @inline value(m::Spinor,T=valuetype(m)) = T∉(valuetype(m),Any) ? convert(T,m.v) : m.v
