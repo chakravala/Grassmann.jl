@@ -238,7 +238,7 @@ end
 
 function chain_src(N,G,T,grades,type=:Multivector)
     if N<cache_limit
-        :($type{V,$T}($(Expr(:call,:Values,vcat([G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(Values{binomial(N,g),T}) for g ∈ grades]...)...))))
+        :($type{V,$T}($(Expr(:call,:Values,vcat(TupleVector[G==g ? [:(@inbounds t.v[$i]) for i ∈ list(1,binomial(N,g))] : zeros(Values{binomial(N,g),T}) for g ∈ grades]...)...))))
     else
         b = binomial(N,G)
         r = type == :Multivector ? binomsum(N,G) ? type == :Spinor : spinsum(N,G) : antisum(N,G)
