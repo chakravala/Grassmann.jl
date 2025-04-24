@@ -25,7 +25,7 @@ import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, 
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, Submanifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
-export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent, metric, antimetric
+export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent, metric, antimetric, cometric
 export hodge, wedge, vee, complement, dot, antidot, istangent, Values
 
 import Base: @pure, ==, isapprox
@@ -34,7 +34,7 @@ import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual, Zero, On
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims, gdims
 import Leibniz: bit2int, indexbits, indices, diffvars, diffmask, hasconformal
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
-import DirectSum: metrichash, antimetric, signbool
+import DirectSum: metrichash, antimetric, cometric, signbool
 
 import AbstractTensors: valuetype, scalar, isscalar, trivector, istrivector, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
