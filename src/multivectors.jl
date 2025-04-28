@@ -304,6 +304,8 @@ end
     0 <= G <= N || throw(BoundsError(t, G))
     return grade_src(N,G)
 end
+grade(m::Multivector,g::Int) = m(g)
+grade(m::Multivector,g::Val) = m(g)
 getindex(m::Multivector,i::Int,j::Int) = m[i][j]
 getindex(m::Multivector,i::UnitRange{Int}) = m.v[i]
 getindex(m::Multivector,i::T) where T<:AbstractVector = m.v[i]
