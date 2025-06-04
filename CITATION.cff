@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Reed"
+  given-names: "Michael"
+  orcid: "https://orcid.org/0000-0002-8006-7816"
+title: "Grassmann.jl"
+version: 0.8.33
+doi: 10.5281/zenodo.101519786
+date-released: 2025-03-20
+url: "https://github.com/chakravala/Grassmann.jl"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Reed"
+    given-names: "Michael"
+    orcid: "https://orcid.org/0000-0002-8006-7816"
+  doi: "10.5281/zenodo.101519786"
+  journal: "JuliaCon"
+  month: 1
+  start: 1 # First page number
+  end: 6 # Last page number
+  title: "Differential geometric algebra with Leibniz and Grassmann"
+  issue: 1
+  volume: 1
+  year: 2019
