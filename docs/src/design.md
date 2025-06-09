@@ -1,36 +1,16 @@
-# `TensorAlgebra` design, `Manifold` code generation
+# `TensorAlgebra{V}` design and code generation
 
-Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with geometric algebra at high dimensions, along with the accompanying support packages. 
-The design is based on the `TensorAlgebra` abstract type interoperability from [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl) with a `TensorBundle` parameter from [DirectSum.jl](https://github.com/chakravala/DirectSum.jl).
-Abstract tangent vector space type operations happen at compile-time, resulting in a differential conformal geometric algebra of hyper-dual multivector forms.
 
-The nature of the geometric algebra code generation enables one to easily extend the abstract product operations to any specific number field type (including differential operators with [Leibniz.jl](https://github.com/chakravala/Leibniz.jl) or symbolic coefficients with [Reduce.jl](https://github.com/chakravala/Reduce.jl)), by making use of Julia's type system. Mixed tensor products with their coefficients are constructed from these operations to work with bivector elements of Lie groups.
+Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with a universal language for finite element methods based on a discrete manifold bundle. 
+Tools built on these foundations enable computations based on multi-linear algebra and spin groups using the geometric algebra known as Grassmann algebra or Clifford algebra.
+This foundation is built on a [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) parametric type system for tangent bundles and vector spaces generating the algorithms for local tangent algebras in a global context.
+With this unifying mathematical foundation, it is possible to improve efficiency of multi-disciplinary research using geometric tensor calculus by relying on universal mathematical principles.
 
-* **DirectSum.jl**: Abstract tangent bundle vector space types (unions, intersections, sums, etc.)
-* **AbstractTensors.jl**: Tensor algebra abstract type interoperability with vector bundle parameter
-* **Grassmann.jl**: ⟨Leibniz-Grassmann-Clifford-Hestenes⟩ differential geometric algebra of multivector forms
-* **Leibniz.jl**: Derivation operator algebras for tensor fields
-* **Reduce.jl**: Symbolic parser generator for Julia expressions using REDUCE algebra term rewriter
+* **AbstractTensors.jl**: Tensor algebra abstract type interoperability setup
+* **DirectSum.jl**: Tangent bundle, vector space and `Submanifold` definition
+* **Grassmann.jl**: ⟨Grassmann-Clifford-Hodge⟩ multilinear differential geometric algebra
 
-Mathematics of `Grassmann` can be used to study unitary groups used in quantum computing by building efficient computational representations of their algebras.
-Applicability of the Grassmann computational package not only maps to quantum computing, but has the potential of impacting countless other engineering and scientific computing applications.
-It can be used to work with automatic differentiation and differential geometry, algebraic forms and invariant theory, electric circuits and wave scattering, spacetime geometry and relativity, computer graphics and photogrammetry, and much more.
-
-Thus, computations involving fully general rotational algebras and Lie bivector groups are possible with a full trigonometric suite.
-Conformal geometric algebra is possible with the Minkowski plane ``v_{\infty\emptyset}``, based on the null-basis.
-In general, multivalued quantum logic is enabled by the ``\wedge,\vee,\star`` Grassmann lattice.
-Mixed-symmetry algebra with *Leibniz.jl* and *Grassmann.jl*, having the geometric algebraic product chain rule, yields automatic differentiation and Hodge-DeRahm co/homology  as unveiled by Grassmann.
-Most importantly, the Dirac-Clifford product yields generalized Hodge-Laplacian and the Betti numbers with Euler characteristic ``\chi``.
-
-Due to the abstract generality of the product algebra code generation, it is possible to extend the `Grassmann` library to include additional high performance products with few extra definitions.
-Operations on ultra-sparse representations for very high dimensional algebras will be gaining further performance enhancements in future updates, along with hybrid optimizations for low-dimensional algebra code generation.
-Thanks to the design of the product algebra code generation, any additional optimizations to the type stability will automatically enhance all the different products simultaneously.
-Likewise, any new product formulas will be able to quickly gain from the setup of all of the existing optimizations.
-
-The *Grassmann.jl* package and its accompanying support packages provide an extensible platform for high performance computing with geometric algebra at high dimensions.
-This enables the usage of many different types of `TensorAlgebra` along with various `TensorBundle` parameters and interoperability for a wide range of scientific and research applications.
-
-## DirectSum yields `TensorBundle` parametric type polymorphism
+## Direct sum parametric type polymorphism
 
 [![DOI](https://zenodo.org/badge/169765288.svg)](https://zenodo.org/badge/latestdoi/169765288)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/DirectSum.jl)](https://github.com/chakravala/DirectSum.jl/releases)
@@ -42,43 +22,59 @@ The *DirectSum.jl* package is a work in progress providing the necessary tools t
 Due to the parametric type system for the generating `TensorBundle`, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time.
 Although intended for use with the *Grassmann.jl* package, `DirectSum` can be used independently.
 
-Let ``M = T^\mu V`` be a `TensorBundle{n}<:Manifold{n}` of rank ``n``,
-```math
-T^\mu V = (n,\mathbb P,g,\nu,\mu), \qquad \mathbb P \subseteq\langle v_\infty,v_\emptyset\rangle, \qquad g :V\times V\rightarrow\mathbb K
-```
-The type `TensorBundle{n,ℙ,g,ν,μ}` uses *byte-encoded* data available at pre-compilation, where
-``\mathbb P`` specifies the basis for up and down projection,
-``g`` is a bilinear form that specifies the metric of the space,
-and ``\mu`` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of Leibniz-Taylor monomials). Lastly, ``\nu`` is the number of tangent variables.
-The dual space functor ``'``
-is an involution which toggles a dual vector space with inverted signature with property ``V' = \text{Hom}(V,\mathbb K)`` and having `Submanifold` generators
+Let ``M = T^\mu V`` be a ``\mathbb{K}``-module of rank ``n``, then an instance for
+``T^\mu V`` can be the tuple ``(n,\mathbb{P},g,\nu,\mu)`` with ``\mathbb{P}\subseteq \langle v_\infty,v_\emptyset\rangle`` specifying the presence of the projective basis and ``g:V\times V\rightarrow\mathbb{K}`` is a metric tensor specification.
+The type `TensorBundle{n,```\mathbb{P}```,g,```\nu```,```\mu```}` encodes this information as *byte-encoded* data available at pre-compilation,
+where ``\mu`` is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of the Leibniz-Taylor monomials).
+Lastly, ``\nu`` is the number of tangent variables.
 ```math
 \langle v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu\rangle=M\leftrightarrow M' = \langle w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu\rangle
 ```
-where ``v_i,w_i`` are a basis for the vectors and covectors, while ``\partial_j,\epsilon_j`` are a basis for differential operators and tensor fields.
+where ``v_i`` and ``w_i`` are bases for the vectors and covectors, while ``\partial_i`` and ``\epsilon_j`` are bases for differential operators and scalar functions.
+The purpose of the `TensorBundle` type is to specify the ``\mathbb{K}``-module basis at compile time.
+When assigned in a workspace, `V = Submanifold(::TensorBundle)` is used.
 
-The metric signature of the `Submanifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` constructor by using ``+`` and ``-`` to specify whether the `Submanifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
-For example, `S"+++"` constructs a positive definite 3-dimensional `TensorBundle`.
+The metric signature of the `Submanifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` by using ``+`` or ``-`` to specify whether the `Submanifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
+For example, `S"+++"` constructs a positive definite 3-dimensional `TensorBundle`, so constructors such as `S"..."` and `D"..."` are convenient.
 ```@setup ds
 using DirectSum
 ```
 ```@repl ds
 ℝ^3 == V"+++" == Manifold(3)
 ```
-It is also possible to specify an arbitrary `DiagonalForm` having numerical values for the basis with degeneracy `D"1,1,1,0"`, although the `Signature` format has a more compact representation.
-Further development will result in more metric types.
+It is also possible to change the diagonal scaling, such as with `D"1,1,1,0"`, although the `Signature` format has a more compact representation if limited to ``+1`` and ``-1``.
+It is also possible to change the diagonal scaling, such as with `D"0.3,2.4,1"`.
+Fully general `MetricTensor` as a type with non-diagonal components requires a matrix, e.g. `MetricTensor([1 2; 2 3])`.
 
-Declaring an additional plane at infinity is done by specifying it in the string constructor with ``\infty`` at the first index (i.e. Riemann sphere `S"∞+++"`). The hyperbolic geometry can be declared by ``\emptyset`` subsequently (i.e. Minkowski spacetime `S"∅+++"`).
-Additionally, the *null-basis* based on the projective split for confromal geometric algebra would be specified with `∞∅` initially (i.e. 5D CGA `S"∞∅+++"`). These two declared basis elements are interpreted in the type system.
+Declaring an additional point at infinity is done by specifying it in the string constructor with ``\infty`` at the first index (i.e. Riemann sphere `S"∞+++"`).
+The hyperbolic geometry can be declared by ``\emptyset`` subsequently (i.e. hyperbolic projection `S"∞+++"`).
+Additionally, the *null-basis* based on the projective split for conformal geometric algebra would be specified with `S"∞∅+++"`.
+These two declared basis elements are interpreted in the type system.
+The `tangent(V,μ,ν)`  map can be used to specify ``\mu`` and ``\nu``.
 
-The index number ``n`` of the `TensorBundle` corresponds to the total number of generator elements. However, even though `V"∞∅+++"` is of type `TensorBundle{5,3}` with ``5`` generator elements, it can be internally recognized in the direct sum algebra as being an embedding of a 3-index `TensorBundle{3,0}` with additional encoding of the null-basis (origin and point at infinity) in the parameter ``\mathbb P`` of the `TensorBundle{n,ℙ}` type.
-
-The `tangent` map takes ``V`` to its tangent space and can be applied repeatedly for higher orders, such that `tangent(V,μ,ν)` can be used to specify ``\mu`` and ``\nu``.
+To assign `V = Submanifold(::TensorBundle)` along with associated basis
+elements of the `DirectSum.Basis` to the local Julia session workspace, it is typical to use `Submanifold` elements created by the `@basis` macro,
 ```@repl ds
-V = tangent(ℝ^3)
-tangent(V')
-V⊕V'
+using Grassmann; @basis S"-++" # macro or basis"-++"
 ```
+the macro `@basis V` delcares a local basis in Julia.
+As a result of this macro, all `Submanifold{V,G}` elements generated with `M::TensorBundle` become available in the local workspace with the specified naming arguments.
+The first argument provides signature specifications, the second argument is the variable name for ``V`` the ``\mathbb{K}``-module, and the third and fourth argument are prefixes of the `Submanifold` vector names (and covector names).
+Default is ``V`` assigned `Submanifold{M}` and ``v`` is prefix for the `Submanifold{V}`.
+
+It is entirely possible to assign multiple different bases having different signatures without any problems.
+The `@basis` macro arguments are used to assign the vector space name to ``V`` and the basis elements to ``v_i``, but other assigned names can be chosen so that their local names don't interfere:
+If it is undesirable to assign these variables to a local workspace, the versatile constructs of `DirectSum.Basis{V}` can be used to contain or access them, which is exported to the user as the method `DirectSum.Basis(V)`.
+```@repl ds
+DirectSum.Basis(V)
+```
+`V(::Int...)` provides a convenient way to define a `Submanifold` by using integer indices to reference specific direct sums within the ambient space ``V``.
+```@repl ds
+(ℝ^5)(3,5)
+dump(ans)
+```
+Here, calling a `Manifold` with a set of indices produces a `Submanifold` representation.
+
 The direct sum operator ``\oplus`` can be used to join spaces (alternatively ``+``), and the dual space functor ``'`` is an involution which toggles a dual vector space with inverted signature.
 ```@repl ds
 V = ℝ'⊕ℝ^3
@@ -98,35 +94,11 @@ Due to the design of the `TensorBundle` dispatch, these operations enable code o
 ℝ ∩ ℝ' == Manifold(0)
 ℝ ∪ ℝ' == ℝ⊕ℝ'
 ```
-**Remark**. Although some of the operations like ``\cup`` and ``\oplus`` are similar and sometimes result in the same values, the `union` and `⊕` are entirely different operations in general.
-```math
-\bigcup T^{\mu_i}V_i = \left(|\mathbb P|+\max\{n_i-|\mathbb P_i|\}_i,\, \bigcup \mathbb P_i,\, \cup g_i,\, \max\{\mu_i\}_i\right)
-```
-```math
-\bigoplus T^{\mu_i}V_i = \left(|\mathbb P|+\sum (n_i-|\mathbb P_i|),\, \bigcup \mathbb P_i,\, \oplus_i g_i,\,\max\{\mu_i\}_i\right)
-```
-Calling manifolds with sets of indices constructs the subspace representations.
-Given `M(s::Int...)` one can encode `Submanifold{length(s),M,s}` with induced orthogonal space ``Z``, such that computing unions of submanifolds is done by inspecting the parameter ``s\in V\subseteq W`` and ``s\notin Z``.
-```@repl ds
-(ℝ^5)(3,5)
-dump(ans)
-```
-Here, calling a `Manifold` with a set of indices produces a `Submanifold` representation.
-```math
-T^eV \subset T^\mu W \iff \exists Z\in\text{Vect}_{\mathbb K}(T^e(V\oplus Z) = T^{e\leq \mu}W,\,V\perp Z).
-```
 Operations on `Manifold` types is automatically handled at compile time.
-
-To help provide a commonly shared and readable indexing to the user, some extended dual index print methods with full alphanumeric characters (62+2) are provided:
-```@repl ds
-DirectSum.printindices(stdout,DirectSum.indices(UInt(2^62-1)),false,"v")
-DirectSum.printindices(stdout,DirectSum.indices(UInt(2^62-1)),false,"w")
-```
-An application of this is in the `Grasmann` package, where dual indexing is used.
 
 More information about `DirectSum` is available  at [https://github.com/chakravala/DirectSum.jl](https://github.com/chakravala/DirectSum.jl)
 
-## Approaching ∞ dimensions with `SparseBasis` and `ExtendedBasis`
+## Higher dimensions with `SparseBasis` and `ExtendedBasis`
 
 In order to work with a `TensorAlgebra{V}`, it is necessary for some computations to be cached. This is usually done automatically when accessed.
 ```julia
@@ -178,13 +150,11 @@ The sparse representations are a work in progress to be improved with time.
 [![Build Status](https://travis-ci.org/chakravala/AbstractTensors.jl.svg?branch=master)](https://travis-ci.org/chakravala/AbstractTensors.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/yey8huk505h4b81u?svg=true)](https://ci.appveyor.com/project/chakravala/abstracttensors-jl)
 
-The `AbstractTensors` package is intended for universal interoperability of the abstract `TensorAlgebra` type system.
-All `TensorAlgebra{V}` subtypes have type parameter ``V``, used to store a `TensorBundle` value obtained from *DirectSum.jl*.
-By itself, this package does not impose any specifications or structure on the `TensorAlgebra{V}` subtypes and elements, aside from requiring ``V`` to be a `TensorBundle`.
-This means that different packages can create tensor types having a common underlying `TensorBundle` structure.
-For example, this is mainly used in *Grassmann.jl* to define various `SubAlgebra`, `TensorTerm` and `TensorMixed` types, each with subtypes. Externalizing the abstract type helps extend the dispatch to other packages.
-
-The key to making the whole interoperability work is that each `TensorAlgebra` subtype shares a `TensorBundle` parameter (with all `isbitstype` parameters), which contains all the info needed at compile time to make decisions about conversions. So other packages need only use the vector space information to decide on how to convert based on the implementation of a type. If external methods are needed, they can be loaded by `Requires` when making a separate package with `TensorAlgebra` interoperability.
+The `AbstractTensors` package is intended for universal interoperation of the abstract `TensorAlgebra` type system.
+All `TensorAlgebra{V}` subtypes have type parameter ``V``, used to store a `Submanifold{M}` value, which is parametrized by ``M`` the `TensorBundle` choice.
+This means that different tensor types can have a commonly shared underlying ``\mathbb{K}``-module parametric type expressed by defining `V::Submanifold{M}`.
+Each `TensorAlgebra` subtype must be accompanied by a corresponding `TensorBundle` parameter, which is fully static at compile time.
+Due to the parametric type system for the ``\mathbb{K}``-module types, the compiler can fully pre-allocate and often cache.
 
 Since `TensorBundle` choices are fundamental to `TensorAlgebra` operations, the universal interoperability between `TensorAlgebra{V}` elements with different associated `TensorBundle` choices is naturally realized by applying the `union` morphism to operations,
 e.g. ``\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \rightarrow \Lambda^{\sum_kp_k}\bigcup_k V_k``.
@@ -201,47 +171,9 @@ end # this option is automatic with interop(a,b)
 
 # alternatively for evaluation of forms, VW(a)(VW(b))
 ```
-Suppose we are dealing with a new subtype in another project, such as
-```@example at
-using AbstractTensors, DirectSum
-struct SpecialTensor{V} <: TensorAlgebra{V} end
-a = SpecialTensor{ℝ}()
-b = SpecialTensor{ℝ'}()
-nothing # hide
-```
-To define additional specialized interoperability for further methods, it is necessary to define dispatch that catches well-defined operations for equal `TensorBundle` choices and a fallback method for interoperability, along with a `TensorBundle` morphism:
-```@example at
-(W::Signature)(s::SpecialTensor{V}) where V = SpecialTensor{W}() # conversions
-op(a::SpecialTensor{V},b::SpecialTensor{V}) where V = a # do some kind of operation
-op(a::TensorAlgebra{V},b::TensorAlgebra{W}) where {V,W} = interop(op,a,b) # compat
-nothing # hide
-```
-which should satisfy (using the ``\cup`` operation as defined in `DirectSum`)
-```@repl at
-op(a,b) |> Manifold == Manifold(a) ∪ Manifold(b)
-```
-Thus, interoperability is simply a matter of defining one additional fallback method for the operation and also a new form `TensorBundle` compatibility morphism.
 
-Additionally, a universal unit volume element can be specified in terms of `LinearAlgebra.UniformScaling`, which is independent of ``V`` and has its interpretation only instantiated by the context of the `TensorAlgebra{V}` element being operated on.
-The universal interoperability of `LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the `TensorBundle` form of any other `TensorAlgebra` element is handled globally.
-This enables the usage of ``I`` from `LinearAlgebra` as a universal pseudoscalar element.
-```julia
-(W::Signature)(s::UniformScaling) = ones(ndims(W)) # interpret a unit pseudoscalar
-op(a::TensorAlgebra{V},b::UniformScaling) where V = op(a,V(b)) # right pseudoscalar
-op(a::UniformScaling,b::TensorAlgebra{V}) where V = op(V(a),b) # left pseudoscalar
-```
-Utility methods such as `scalar, involute, norm, norm2, unit, even, odd` are also defined.
+Additionally, a universal unit volume element can be specified in terms of `LinearAlgebra.UniformScaling`, which is independent of ``V`` and has its interpretation only instantiated by context of `TensorAlgebra{V}` elements being operated on.
+Interoperability of `LinearAlgebra.UniformScaling` as a pseudoscalar element which takes on the `TensorBundle` form of any other `TensorAlgebra` element is handled globally.
+This enables the usage of `I` from `LinearAlgebra` as a universal pseudoscalar element defined at every point ``x`` of a `Manifold`, which is mathematically denoted by ``I = I(x)`` and specified by the ``g(x)`` bilinear tensor field of ``TM``.
 
-To support a generalized interface for `TensorAlgebra` element evaluation, a similar compatibility interface is constructible.
-```@example at
-(a::SpecialTensor{V})(b::SpecialTensor{V}) where V = a # conversion of some form
-(a::SpecialTensor{W})(b::SpecialTensor{V}) where {V,W} = interform(a,b) # compat
-nothing # hide
-```
-which should satisfy (using the ``\cup`` operation as defined in `DirectSum`)
-```@repl at
-b(a) |> Manifold == Manifold(a) ∪ Manifold(b)
-```
-The purpose of the `interop` and `interform` methods is to help unify the interoperability of `TensorAlgebra` elements.
-
-More information about `DirectSum` is available  at [https://github.com/chakravala/AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl)
+More information about `AbstractTensors` is available  at [https://github.com/chakravala/AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl)

@@ -7,7 +7,8 @@ makedocs(
     # options
     modules = [AbstractTensors,DirectSum,Leibniz,Grassmann],#Adapode],
     doctest = false,
-    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
+    format = Documenter.HTML(prettyurls = true), #get(ENV, "CI", nothing) == "true"),
+    remotes = nothing,
     sitename = "Grassmann.jl",
     authors = "Michael Reed",
     pages = Any[

@@ -6,8 +6,7 @@
 2. `` (a+b)x = ax + bd`` distribution of field addition,
 3. `` (ab)x = a(bx)`` associative compatibility.
 
-In the software package `Grassmann`, an underlying generating vector space is also synonymous with the term `<:TensorBundle` (an abstract type).
-
+In the software package `Grassmann`, a generating vector space ``\mathbb{K}``-module is specified as a value of `<:TensorBundle` (an abstract type).
 
 **Definition** (Linear dependence).
 	Let ``V`` be a vector space over field $\mathbb K$, then the set ``\{v_i\}_i`` is linearly dependent if and only if ``\sum_{i=1}^n k_iv_i = 0`` for some ``0\ne k\in\mathbb K^n``.
@@ -22,9 +21,9 @@ Initially, it is enough to understand that ``\wedge:\Lambda^n V\times\Lambda^m V
 However, this idea comes from extending Grassmann's product ``v_i\wedge v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i`` to yield a tool for characterizing linear dependence.
 
 **Definition** (Dimension ``n``-Submanifold in ``\Lambda^n V``).
-	Hence, writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`Submanifold`.
+	Note that writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`Submanifold`.
 
-With the product ``\Lambda^0\Lambda^n V\times(v_1\wedge v_2\wedge\cdots\wedge v_n)\cong \mathbb K`` it is also clear that a 1-dimensional basis subspace is induced by any ``n``-`Submanifold`.
+Furthermore, ``\mathbb{K}\times\{v_1\wedge v_2\wedge\cdots\wedge v_n\}\cong\mathbb{K}`` shows the ``1``-dimensional basis subspace is induced by any ``n``-`Submanifold`.
 
 *Example*. Therefore, ``\mathbb K = \Lambda^0\mathbb K \cong \Lambda^1\mathbb K`` is a vector space or a 0-Submanifold.
 
@@ -43,13 +42,13 @@ V_1\oplus V_2\oplus\cdots\oplus V_n = V \iff
 DirectSum of a full  non-zero product implies an ``n``-Submanifold.
 
 **Ddefinition**
-	Grade-``m`` projection is defined as ``\{\Lambda V\,\}_m = \Lambda^m V`` such that
+	Grade-``m`` projection is defined as ``\langle\Lambda V\,\rangle_m = \Lambda^m V`` such that
 ```math
 \Lambda V = \bigoplus_{m=0}^n \langle\Lambda V\,\rangle_m = \Lambda^0V\oplus\Lambda^1V\oplus\cdots\oplus\Lambda^nV, \qquad \langle\Lambda V\,\rangle_m = \bigoplus_{m=1}^{n\choose m}\mathbb K.
 ```
-Note that ``\dim \{\Lambda V\,\}_m = {n\choose m}`` and hence ``\dim\Lambda V = \sum_{m=0}^n {n\choose m} = 2^n``.
+Note that ``\dim \langle\Lambda V\,\rangle_m = {n\choose m}`` and hence ``\dim\Lambda V = \sum_{m=0}^n {n\choose m} = 2^n``.
 
-*Example* (Combinatorics of ``\mathcal P(V)`` and hypergraphs ``\subseteq P(V)\backslash\{\emptyset\}``).
+*Example* (Combinatorics of power set ``\mathcal P(V)``).
 Let ``v_1,v_2,v_3 \in\mathbb R^3``, then the power set of elements is:
 ```math
 \mathcal P(\mathbb R^3) = \{\emptyset,\{v_1\},\{v_2\},\{v_3\},\{v_1,v_2\},\{v_1,v_3\},\{v_2,v_3\},\{v_1,v_2,v_3\}\}
@@ -106,7 +105,98 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `Multivector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including ``\cup,\cap,\oplus`` and the index operation ``\ominus``, which is symmetric difference operation.
 
-By virtue of Julia's multiple dispatch on the field type ``\mathbb K``, methods can specialize on the dimension ``n`` and grade ``G`` with a `TensorBundle{n}` via the `TensorAlgebra{V}` subtypes, such as `Submanifold{V,G}`, `Single{V,G,B,𝕂}`, `Couple{V,B,𝕂}`, `Chain{V,G,𝕂}`, `Spinor{V,𝕂}`, and `Multivector{V,𝕂}` types.
+Grassmann's exterior product is an anti-symmetric tensor product
+```math
+v_i \wedge v_j = - v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i,
+```
+which generalizes the multilinear determinant transposition property
+```math
+v_{\omega_1}\wedge\cdots\wedge v_{\omega_m}\wedge v_{\eta_1}\wedge\cdots\wedge v_{\eta_n} = (-1)^{mn} v_{\eta_1} \wedge \cdots \wedge v_{\eta_n} \wedge v_{\omega_1} \wedge \cdots \wedge v_{\omega_m}.
+```
+Hence for graded elements it is possible to deduce that
+```math
+\omega \in \Lambda^mV,\quad\eta\in\Lambda^nV : \qquad \omega\wedge\eta = (-1)^{mn}\eta\wedge\omega.
+```
+
+**Remark**. Observe the anti-symmetry property implies that ``\omega\otimes\omega = 0``, while the symmetric property neither implies nor denies such a property.
+
+*Example*. Case of 3rd order tangent bundle operators composition:
+```math
+T^3(\Lambda^0V) = \partial_\emptyset \oplus \partial_1\oplus\partial_2\oplus\partial_3 \oplus (\partial_1\circ\partial_2) \oplus (\partial_1\circ\partial_3) \oplus (\partial_2\circ\partial_3) \oplus (\partial_1\circ\partial_2\circ\partial_3)
+```
+
+In order to shorten the notation, the operation symbol is left out:
+```math
+\{v_1,v_2,v_3,v_{12},v_{13},v_{23},v_{123}\}, \{\partial_1,\partial_2,\partial_3,\partial_{12},\partial_{13},\partial_{23},\partial_{123}\}
+```
+The canonical choice of orientation is with indices in sorted order, so that for example anti-symmetry is applied to rewrite ``v_{21} = -v_{12}`` or the property ``\partial_2\circ\partial_1 = \partial_1\circ\partial_2`` is applied for differential operators.
+In general, permutations of the indices get rendered as orientations of ``(-1)^k`` of a basis ``\mathbb{K}``-module.
+
+**Definition** (Permutations).
+Consider ``\displaystyle\sigma_j(\omega) = \sum_{k=0}^n(-1)^{\binom{k}{2^{j-1}}}\langle\omega\rangle_k``,
+```math
+\sigma_1(\omega) \equiv \overline\omega, \qquad \sigma_2(\omega) \equiv \widetilde\omega, \qquad \sigma_{12} = \sigma_2(\sigma_1(\omega)) \equiv \widetilde{\overline{\omega}}
+```
+
+*Theorem* (``\mathfrak{S}_j = \langle\sigma_1,\sigma_2,\dots,\sigma_j\rangle`` is a group).
+    ``\mathfrak{S}_2 = \{1,\sigma_1,\sigma_2,\sigma_{12}\}``
+	is a set of automorphisms: grade involution ``\overline\omega = \sigma_1(\omega) = \sum_{k=0}^n (-1)^{\binom{k}{1}}\langle\omega\rangle_k ``,
+	reverse ``\widetilde\omega = \sigma_2(\omega) = \sum_{k=0}^n (-1)^{\binom{k}{2}}\langle\omega\rangle_k = \sum_{k=0}^n (-1)^{(k-1)k/2}\langle\omega\rangle_k`` is an anti-automorphism with ``\sigma_2(v_i\wedge v_j) = \sigma_2(v_j)\wedge\sigma_2(v_i)``, and Clifford conjugate ``\widetilde{\overline\omega}`` is the composition of grade involution and reverse anti-automorphism.
+
+**Definition** (Real ``\widetilde{\mathfrak{R}}\omega = (\omega + \widetilde\omega)/2`` and imaginary ``\widetilde{\mathfrak{I}}\omega = (\omega - \widetilde\omega)/2``).
+Real and imaginary define ``\mathbb{Z}_2``-grading projections so that ``\Lambda V = \widetilde{\mathfrak{R}}\Lambda V \oplus \widetilde{\mathfrak{I}}\Lambda V``;
+	where ``\widetilde{\mathfrak{R}}\Lambda V`` is the `real` part and ``\widetilde{\mathfrak{I}}\Lambda V`` is the `imag` (imaginary) part.
+
+**Definition** (Even ``\overline{\mathfrak{R}}\omega = (\omega + \overline\omega)/2`` and odd ``\overline{\mathfrak{I}}\omega = (\omega - \overline\omega)/2``).
+Even and odd define ``\mathbb{Z}_2``-grading projections so that ``\Lambda V = \overline{\mathfrak{R}}\Lambda V \oplus \overline{\mathfrak{I}}\Lambda V``;
+	where ``\overline{\mathfrak{R}}\Lambda V`` is the `even` part and ``\overline{\mathfrak{I}}\Lambda V`` is the `odd` part.
+
+In general, this can be extended to ``\mathbb{Z}_2``-grading projections ``\sigma_j`` and its real
+``\sigma_j(\mathfrak{R})\omega = (\omega + \sigma_j(\omega))/2`` and imaginary ``\sigma_j(\mathfrak{I})\omega = (\omega-\sigma_j(\omega))/2`` parts.
+
+*Grassmann.jl* is a foundation which has been built up from a minimal ``\mathbb{K}``-module algebra kernel on which an entirely custom algbera specification is designed and built from scratch on the base Julia language.
+
+**Definition**.
+`TensorAlgebra{V,```\mathbb{K}```}` where `V::Submanifold{M}` for a generating ``\mathbb{K}``-module specified by a `M::TensorBundle` choice
+* `TensorBundle` specifies generators of `DirectSum.Basis` algebra
+    * `Int` value induces a Euclidean metric of counted dimension
+    * `Signature` uses `S"..."` with + and - specifying the metric
+    * `DiagonalForm` uses `D"..."` for defining any diagonal metric
+    * `MetricTensor` can accept non-diagonal metric tensor array
+* `TensorGraded{V,G,```\mathbb{K}```}` has `grade` ``G`` and element of ``\Lambda^GV`` subspace
+    * `Chain{V,G,```\mathbb{K}```}` has a complete basis for ``\Lambda^GV`` with ``\mathbb{K}``-module
+    * `Simplex{V}` alias column-module `Chain{V,1,Chain{V,1,```\mathbb{K}```}}`
+* `TensorTerm{V,G,```\mathbb{K}```} <: TensorGraded{V,G,```\mathbb{K}```}` single coefficient
+    * `Zero{V}` is a zero value which preserves ``V`` in its algebra type
+    * `Submanifold{V,G,B}` ``\langle v_{i_1}\wedge\cdots\wedge v_{i_G}\rangle_G`` with sorted indices ``B``
+    * `Single{V,G,B,```\mathbb{K}```}` where `B::Submanifold{V}` is paired to ``\mathbb{K}``
+* `AbstractSpinor{V,```\mathbb{K}```}` subtypes are special sub-algebras of ``\Lambda V``
+    * `Couple{V,B,```\mathbb{K}```}` is the sum of ``\mathbb{K}`` scalar with `Single{V,G,B,```\mathbb{K}```}`
+    * `PseudoCouple{V,B,```\mathbb{K}```}` is pseudoscalar + `Single{V,G,B,```\mathbb{K}```}`
+    * `Spinor{V,```\mathbb{K}```}` has complete basis for the `even` ``\mathbb{Z}_2``-graded terms
+    * `CoSpinor{V,```\mathbb{K}```}` has complete basis for `odd` ``\mathbb{Z}_2``-graded terms
+* `Multivector{V,```\mathbb{K}```}` has complete basis for all ``\Lambda V`` with ``\mathbb{K}``-module
+
+
+**Definition**. `TensorNested{V,T}` subtypes are linear transformations
+* `TensorOperator{V,W,T}` linear map ``V\rightarrow W`` with `T::DataType`
+    * `Endomorphism{V,T}` linear map ``V\rightarrow V`` with `T::DataType`
+* `DiagonalOperator{V,T}` diagonal map ``V\rightarrow V`` with `T::DataType`
+    * `DiagonalMorphism{V,<:Chain{V,1}}` diagonal map ``V\rightarrow V``
+    * `DiagonalOutermorphism{V,<:Multivector{V}}` ``:\Lambda V\rightarrow \Lambda V``
+* `Outermorphism{V,T}` extends ``F\in`` `Endomorphism{V}` to full ``\Lambda V``
+```math
+F(v_1)\wedge\cdots\wedge F(v_n) = F(v_1\wedge\cdots\wedge v_n)
+```
+* `Projector{V,T}` linear map ``F:V\rightarrow V`` with ``F(F) = F`` defined
+```math
+\verb`Proj(x::TensorGraded)` = \frac{x}{|x|}\otimes\frac{x}{|x|}
+```
+* `Dyadic{V,X,Y}` linear map ``V\rightarrow V`` with `Dyadic(x,y)` ``= x\otimes y``
+
+*Grassmann.jl* was first to define a comprehensive `TensorAlgebra{V}` type system from scratch around the idea of the `V::Submanifold{M}` value to express algebra subtypes for a specified ``\mathbb{K}``-module structure.
+
+
 
 The elements of the `Basis` can be generated in many ways using the `Submanifold` elements created by the `@basis` macro,
 ```@repl ga
