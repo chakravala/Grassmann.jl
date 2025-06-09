@@ -20,8 +20,7 @@ makedocs(
         "Tutorials" => Any[
             "tutorials/install.md",
             "tutorials/quick-start.md",
-            "tutorials/algebra-of-space.md",
-            "tutorials/dyadic-tensors.md"
+            "tutorials/algebra-of-space.md"
             ],
         "References" => "references.md"
         ]

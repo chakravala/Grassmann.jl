@@ -7,6 +7,9 @@
 [![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 * Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf) (2019)
+* Michael Reed, [Foundatons of differential geometric algebra](https://vixra.org/abs/2304.0228) (2021)
+* Michael Reed, [Multilinear Lie bracket recursion formula](https://vixra.org/abs/2412.0034) (2024)
+* Michael Reed, [Differential geometric algebra: compute using Grassmann.jl and Cartan.jl](https://vixra.org/abs/2505.0100) (2025)
 * Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp) (1957)
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
@@ -17,3 +20,30 @@
 * Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)
 * Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv (2011)
 * Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)
+
+```
+       _           _                         _
+      | |         | |                       | |
+   ___| |__   __ _| | ___ __ __ ___   ____ _| | __ _
+  / __| '_ \ / _` | |/ / '__/ _` \ \ / / _` | |/ _` |
+ | (__| | | | (_| |   <| | | (_| |\ V / (_| | | (_| |
+  \___|_| |_|\__,_|_|\_\_|  \__,_| \_/ \__,_|_|\__,_|
+
+   https://github.com/chakravala
+   https://crucialflow.com
+
+   ____  ____    ____   _____  _____ ___ ___   ____  ____   ____
+  /    T|    \  /    T / ___/ / ___/|   T   T /    T|    \ |    \
+ Y   __j|  D  )Y  o  |(   \_ (   \_ | _   _ |Y  o  ||  _  Y|  _  Y
+ |  T  ||    / |     | \__  T \__  T|  \_/  ||     ||  |  ||  |  |
+ |  l_ ||    \ |  _  | /  \ | /  \ ||   |   ||  _  ||  |  ||  |  |
+ |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
+ l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
+
+ _________                __                  __________
+ \_   ___ \_____ ________/  |______    ____   \\       /
+ /    \  \/\__  \\_  __ \   __\__  \  /    \   \\     /
+ \     \____/ __ \|  | \/|  |  / __ \|   |  \   \\   /
+  \______  (____  /__|   |__| (____  /___|  /    \\ /
+         \/     \/                 \/     \/      \/
+```
