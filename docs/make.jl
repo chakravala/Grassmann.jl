@@ -15,6 +15,7 @@ makedocs(
         "Home" => "index.md",
         "Design" => "design.md",
         "Algebra" => "algebra.md",
+        "Videos" => "videos.md",
         "Library" => "library.md",
         "AGPL-3.0" => "agpl.md",
         "Tutorials" => Any[

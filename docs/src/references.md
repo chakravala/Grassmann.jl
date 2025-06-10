@@ -1,15 +1,16 @@
 # References
 
-[![YouTube](https://img.shields.io/badge/JuliaCon%202019-YouTube-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
-[![DropBox](https://img.shields.io/badge/download_PDF-DropBox-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
-[![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://grassmann.crucialflow.com/stable)
+[![JuliaCon 2019](https://img.shields.io/badge/JuliaCon-2019-red)](https://www.youtube.com/watch?v=eQjDN0JQ6-s)
+[![Grassmann.jl YouTube](https://img.shields.io/badge/Grassmann.jl-YouTube-red)](https://youtu.be/worMICG1MaI)
+[![PDF 2019](https://img.shields.io/badge/PDF-2019-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
+[![PDF 2021](https://img.shields.io/badge/PDF-2021-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=differential-geometric-algebra-2021.pdf)
+[![PDF 2025](https://img.shields.io/badge/PDF-2025-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-cartan-2025.pdf)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://grassmann.crucialflow.com/dev)
-[![Gitter](https://badges.gitter.im/Grassmann-jl/community.svg)](https://gitter.im/Grassmann-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 * Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf) (2019)
 * Michael Reed, [Foundatons of differential geometric algebra](https://vixra.org/abs/2304.0228) (2021)
 * Michael Reed, [Multilinear Lie bracket recursion formula](https://vixra.org/abs/2412.0034) (2024)
-* Michael Reed, [Differential geometric algebra: compute using Grassmann.jl and Cartan.jl](https://vixra.org/abs/2505.0100) (2025)
+* Michael Reed, [Differential geometric algebra: compute using Grassmann.jl and Cartan.jl](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-cartan-2025.pdf) (2025)
 * Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp) (1957)
 * John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
 * C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
@@ -31,7 +32,6 @@
 
    https://github.com/chakravala
    https://crucialflow.com
-
    ____  ____    ____   _____  _____ ___ ___   ____  ____   ____
   /    T|    \  /    T / ___/ / ___/|   T   T /    T|    \ |    \
  Y   __j|  D  )Y  o  |(   \_ (   \_ | _   _ |Y  o  ||  _  Y|  _  Y
@@ -39,11 +39,4 @@
  |  l_ ||    \ |  _  | /  \ | /  \ ||   |   ||  _  ||  |  ||  |  |
  |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
  l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
-
- _________                __                  __________
- \_   ___ \_____ ________/  |______    ____   \\       /
- /    \  \/\__  \\_  __ \   __\__  \  /    \   \\     /
- \     \____/ __ \|  | \/|  |  / __ \|   |  \   \\   /
-  \______  (____  /__|   |__| (____  /___|  /    \\ /
-         \/     \/                 \/     \/      \/
 ```

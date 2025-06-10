@@ -1,6 +1,5 @@
 # `TensorAlgebra{V}` design and code generation
 
-
 Mathematical foundations and definitions specific to the [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) implementation provide an extensible platform for computing with a universal language for finite element methods based on a discrete manifold bundle. 
 Tools built on these foundations enable computations based on multi-linear algebra and spin groups using the geometric algebra known as Grassmann algebra or Clifford algebra.
 This foundation is built on a [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) parametric type system for tangent bundles and vector spaces generating the algorithms for local tangent algebras in a global context.
@@ -15,7 +14,6 @@ With this unifying mathematical foundation, it is possible to improve efficiency
 [![DOI](https://zenodo.org/badge/169765288.svg)](https://zenodo.org/badge/latestdoi/169765288)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/DirectSum.jl)](https://github.com/chakravala/DirectSum.jl/releases)
 [![GitHub commits since latest release](https://img.shields.io/github/commits-since/chakravala/DirectSum.jl/latest?label=new%20commits)](https://github.com/chakravala/DirectSum.jl/commits)
-[![Build Status](https://travis-ci.org/chakravala/DirectSum.jl.svg?branch=master)](https://travis-ci.org/chakravala/DirectSum.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/ipaggdeq2f1509pl?svg=true)](https://ci.appveyor.com/project/chakravala/directsum-jl)
 
 The *DirectSum.jl* package is a work in progress providing the necessary tools to work with an arbitrary `Manifold` specified by an encoding.
@@ -147,7 +145,6 @@ The sparse representations are a work in progress to be improved with time.
 [![DOI](https://zenodo.org/badge/169811826.svg)](https://zenodo.org/badge/latestdoi/169811826)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/chakravala/AbstractTensors.jl)](https://github.com/chakravala/AbstractTensors.jl/releases)
 [![GitHub commits since latest release](https://img.shields.io/github/commits-since/chakravala/AbstractTensors.jl/latest?label=new%20commits)](https://github.com/chakravala/AbstractTensors.jl/commits)
-[![Build Status](https://travis-ci.org/chakravala/AbstractTensors.jl.svg?branch=master)](https://travis-ci.org/chakravala/AbstractTensors.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/yey8huk505h4b81u?svg=true)](https://ci.appveyor.com/project/chakravala/abstracttensors-jl)
 
 The `AbstractTensors` package is intended for universal interoperation of the abstract `TensorAlgebra` type system.

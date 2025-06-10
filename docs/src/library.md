@@ -1,7 +1,7 @@
 # Grassmann.jl Library
 
 ```@index
-Pages = ["library.md"]
+Pages = ["design.md","algebra.md","videos.md","library.md","references.md"]
 ```
 
 ```@autodocs
