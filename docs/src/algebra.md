@@ -235,9 +235,9 @@ F(v_1)\wedge\cdots\wedge F(v_n) = F(v_1\wedge\cdots\wedge v_n)
 
 Binary operations commonly used in `Grassmann` algebra syntax
 * `+` and `-` carry over from the ``\mathbb{K}``-module structure associated to ``\mathbb{K}``
-* `wedge` is exterior product $\wedge$ and \verb`vee` is regressive product ``\vee``
+* `wedge` is exterior product ``\wedge`` and `vee` is regressive product ``\vee``
 * `>` is the right contraction and `<` is the left contraction for ``\Lambda V``
-* `*` is the geometric product and `/` uses \verb`inv` algorithm for division
+* `*` is the geometric product and `/` uses `inv` algorithm for division
 * ``\oslash`` is the `sandwich` and `>>>` is its alternate operator orientation
 
 Custom methods related to tensor operators and roots of polynomials

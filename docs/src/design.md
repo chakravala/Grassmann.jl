@@ -45,7 +45,7 @@ It is also possible to change the diagonal scaling, such as with `D"0.3,2.4,1"`.
 Fully general `MetricTensor` as a type with non-diagonal components requires a matrix, e.g. `MetricTensor([1 2; 2 3])`.
 
 Declaring an additional point at infinity is done by specifying it in the string constructor with ``\infty`` at the first index (i.e. Riemann sphere `S"∞+++"`).
-The hyperbolic geometry can be declared by ``\emptyset`` subsequently (i.e. hyperbolic projection `S"∞+++"`).
+The hyperbolic geometry can be declared by ``\emptyset`` subsequently (i.e. hyperbolic projection `S"∅+++"`).
 Additionally, the *null-basis* based on the projective split for conformal geometric algebra would be specified with `S"∞∅+++"`.
 These two declared basis elements are interpreted in the type system.
 The `tangent(V,μ,ν)`  map can be used to specify ``\mu`` and ``\nu``.
