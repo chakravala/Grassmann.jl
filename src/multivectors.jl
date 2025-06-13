@@ -934,7 +934,7 @@ import Base: isinf, isapprox
 import AbstractTensors: antiabs, antiabs2, geomabs, unit, unitize, unitnorm
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
-export gdims, betti, χ, unit, ∠, radius
+export gdims, tdims, betti, χ, unit, ∠, radius, istensor, isgraded, isterm
 export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
 export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2

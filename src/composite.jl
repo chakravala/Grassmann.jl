@@ -16,7 +16,8 @@ export exph, log_fast, logh_fast, pseudoexp, pseudolog, pseudometric, pseudodot,
 export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 export coabs, coabs2, cosqrt, cocbrt, coinv, coscalar, coexp, colog, cometric, codot, @co
-export cocos, cosin, cotan, cocosh, cosinh, cotanh, vandermonde, invdet, adjugate, volumes
+export cocos, cosin, cotan, cocosh, cosinh, cotanh
+export vandermonde, invdet, adjugate, volumes, compound, companion
 
 ## exponential & logarithm function
 

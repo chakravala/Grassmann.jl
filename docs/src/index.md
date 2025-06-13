@@ -16,7 +16,7 @@ Code generation enables concise usage of the algebra syntax.
 [DirectSum.jl](https://github.com/chakravala/DirectSum.jl) multivector parametric type polymorphism is based on tangent vector spaces and conformal projective geometry.
 Additionally, the universal interoperability between different sub-algebras is enabled by [AbstractTensors.jl](https://github.com/chakravala/AbstractTensors.jl), on which the type system is built.
 The design is based on `TensorAlgebra{V}` abstract type interoperability from *AbstractTensors.jl* with a ``\mathbb{K}``-module type parameter ``V`` from *DirectSum.jl*.
-Abstract vector space type operations happen at compile-time, resulting in a differential geometric algebra of multivector forms.
+Abstract vector space type operations happen at compile-time, resulting in a differential geometric algebra of multivectors.
 
 ```@contents
 Pages = ["design.md","algebra.md","videos.md","library.md","references.md"]

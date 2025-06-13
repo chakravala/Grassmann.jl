@@ -473,10 +473,22 @@ Base.isodd(t::PseudoCouple{V,B}) where {V,B} = isodd(imaginary(t)) && isodd(volu
 Base.iseven(t::Multivector) = norm(t) ≈ norm(even(t))
 Base.isodd(t::Multivector) = norm(t) ≈ norm(odd(t))
 
+"""
+    even(t)
+
+Selects the `even` part `(t+involute(t))/2` and is defined by even grade.
+"""
+even(t::Spinor) = t
+
+"""
+    odd(t)
+
+Selects the `odd` part `(t-involute(t))/2` and is defined by odd grade.
+"""
+odd(t::CoSpinor) = t
+
 even(t::CoSpinor{V}) where V = Zero{V}()
 odd(t::Spinor{V}) where V = Zero{V}()
-even(t::Spinor) = t
-odd(t::CoSpinor) = t
 even(t::Couple{V,B}) where {V,B} = iseven(grade(B)) ? t : scalar(t)
 odd(t::Couple{V,B}) where {V,B} = isodd(grade(B)) ? imaginary(t) : Zero{V}()
 even(t::PseudoCouple{V,B}) where {V,B} = even(imaginary(t)) + even(volume(t))
