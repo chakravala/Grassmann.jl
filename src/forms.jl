@@ -733,10 +733,13 @@ compound(m::Outermorphism,g::Integer) = TensorOperator(value(m)[g])
 
 Endomorphism(t::Outermorphism) = TensorOperator(t)
 function TensorOperator(t::Outermorphism{V}) where V
-    out = Vector(vcat(value.(map.(Multivector,value.(t.v)))...))
-    prepend!(out,[one(eltype(out))])
-    length(out)<tdims(V) && append!(out,[zero(eltype(out)) for i ∈ 1:tdims(V)-length(out)])
-    TensorOperator(Multivector{V}(out))
+    out = vcat(value.(map.(Multivector,value.(t.v)))...)
+    val = if length(out)<tdims(V)-1
+        vcat(one(eltype(out)),out,[zero(eltype(out)) for i ∈ list(1,(tdims(V)-1)-length(out))])
+    else
+        vcat(one(eltype(out)),out)
+    end
+    TensorOperator(Multivector{V}(val))
 end
 
 function invdet(t::Outermorphism)
@@ -1022,20 +1025,20 @@ contraction(a::Outermorphism{V},b::PseudoCouple{V}) where V = contraction(a,imag
 @generated function contraction(a::Outermorphism{V},b::Spinor{V,T}) where {V,T}
     N,M = mdims(V),mdims(_codomain(a))
     out = Vector([:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ evens(2,min(N,M))])
-    append!(out,[[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 2:2:M-N]...)
-    Expr(:call,:(Spinor{_codomain(a)}),Expr(:call,:Values,:(@inbounds value(b)[1]),out...))
+    zer = vcat([[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 2:2:M-N]...)
+    Expr(:call,:(Spinor{_codomain(a)}),Expr(:call,:Values,:(@inbounds value(b)[1]),out...,zer...))
 end
 @generated function contraction(a::Outermorphism{V},b::AntiSpinor{V,T}) where {V,T}
     N,M = mdims(V),mdims(_codomain(a))
     out = Vector([:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ evens(1,min(N,M))])
-    append!(out,[[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 1:2:M-N]...)
-    Expr(:call,:(AntiSpinor{_codomain(a)}),Expr(:call,:Values,out...))
+    zer = vcat([[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 1:2:M-N]...)
+    Expr(:call,:(AntiSpinor{_codomain(a)}),Expr(:call,:Values,out...,zer...))
 end
 @generated function contraction(a::Outermorphism{V},b::Multivector{V,T}) where {V,T}
     N,M = mdims(V),mdims(_codomain(a))
     out = Vector([:(value(contraction((@inbounds a.v[$g]),b(Val($g))))...) for g ∈ list(1,min(N,M))])
-    append!(out,[[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 1:M-N]...)
-    Expr(:call,:(Multivector{_codomain(a)}),Expr(:call,:Values,:(@inbounds value(b)[1]),out...))
+    zer = vcat([[:(zero(T)) for i ∈ 1:binomial(M,g+min(N,M))] for g ∈ 1:M-N]...)
+    Expr(:call,:(Multivector{_codomain(a)}),Expr(:call,:Values,:(@inbounds value(b)[1]),out...,zer...))
 end
 
 scalarcheck(x) = isscalar(x) ? value(scalar(x)) : x

@@ -33,3 +33,6 @@ deploydocs(
     deps = nothing,
     make = nothing
 )
+
+# make multiline HTML
+# find build -name "*.html" -exec tidy -m -i -q {} \;
