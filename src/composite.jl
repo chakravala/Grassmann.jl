@@ -711,14 +711,15 @@ function Cramer(N::Int,j=0)
     return x,y,xy
 end
 
-DirectSum.Λ(x::Chain{V,1,<:Chain{V,1}},G) where V = compound(x,G)
+DirectSum.Λ(x::Chain{V,1,<:Chain{W,1}},G) where {V,W} = compound(x,G)
 compound(x,G::T) where T<:Integer = compound(x,Val(G))
-compound(x::Chain{V,1,<:Chain{V,1}},::Val{0}) where V = Chain{V,0}(Values(Chain{V,0}(1)))
-@generated function compound(x::Chain{V,1,<:Chain{V,1}},::Val{G}) where {V,G}
+compound(x::Chain{V,1,<:Chain{W,1}},::Val{0}) where {V,W} = Chain{V,0}(Values(Chain{V,0}(1)))
+@generated function compound(x::Chain{V,1,<:Chain{W,1}},::Val{G}) where {V,W,G}
+    G > mdims(V) && throw("G = $G > $(mdims(V))")
     Expr(:call,:(Chain{V,G}),Expr(:call,:Values,[Expr(:call,:∧,[:(@inbounds x[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V),G)]...))
 end
 
-@generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1}) where {M,V}
+@generated function Base.:\(t::Values{M,<:Chain{V,1}},v::Chain{V,1},g=nothing) where {M,V}
     W = M≠mdims(V) ? Submanifold(M) : V; N = M-1
     N<1 && (return :(inv(t)⋅v))
     M > mdims(V) && (return :(tt=_transpose(t,$W); tt⋅(inv(Chain{$W,1}(t)⋅tt)⋅v)))
@@ -757,7 +758,7 @@ function _inv(M,N); M1 = M - 1
     return xy,val,:(@inbounds t[1]∧$(y[end]))
 end
 
-@generated function Base.inv(t::Values{M,<:Chain{V,1}}) where {M,V}
+@generated function Base.inv(t::Values{M,<:Chain{V,1}},g=nothing) where {M,V}
     W = M≠mdims(V) ? Submanifold(M) : V
     isone(M) && (return :(_transpose(Values(inv(@inbounds t[1])),$W)))
     M > mdims(V) && (return :(tt = _transpose(t,$W); tt⋅inv(Chain{$W,1}(t)⋅tt)))
@@ -820,7 +821,7 @@ end
     return Expr(:block,:(t=_transpose(T,$W)),:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,↓(V))))
 end
 
-@generated function Base.:\(t::Values{N,<:Chain{M,1}},v::Chain{V,1}) where {N,M,V}
+@generated function Base.:\(t::Values{N,<:Chain{M,1}},v::Chain{V,1},g=nothing) where {N,M,V}
     W = M≠mdims(V) ? Submanifold(N) : V
     if mdims(M) > mdims(V)
         :(ct=Chain{$W,1}(t); ct⋅(inv(_transpose(t,$W)⋅ct)⋅v))
@@ -833,13 +834,13 @@ function inv_approx(t::Chain{M,1,<:Chain{V,1}}) where {M,V}
     mdims(M) < mdims(V) ? (inv(tt⋅t))⋅tt : tt⋅inv(t⋅tt)
 end
 
-Base.:\(v::Chain{V,G,<:Chain},t::LinearAlgebra.UniformScaling) where {V,G} = inv(v)#value(Chain{V,G}(t))\v
-Base.:\(t::LinearAlgebra.UniformScaling,v::Chain{V,G,<:Chain}) where {V,G} = v
-Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain}) where {M,W,V} = inv(t)*v#Chain{V,1}(t.\value(v))
-Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1}) where {M,W,V} = value(t)\v
+Base.:\(v::Chain{V,G,<:Chain},t::LinearAlgebra.UniformScaling,g=nothing) where {V,G} = inv(v)#value(Chain{V,G}(t))\v
+Base.:\(t::LinearAlgebra.UniformScaling,v::Chain{V,G,<:Chain},g=nothing) where {V,G} = v
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1,<:Chain},g=nothing) where {M,W,V} = inv(t)*v#Chain{V,1}(t.\value(v))
+Base.:\(t::Chain{M,1,<:Chain{W,1}},v::Chain{V,1},g=nothing) where {M,W,V} = value(t)\v
 Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 #Base.inv(t::Chain{V,1,<:Chain{V,G}}) where {V,G} = value(Chain{V,G}(I))\t
-Base.inv(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = inv(value(t))
+Base.inv(t::Chain{V,1,<:Chain{W,1}},g=nothing) where {W,V} = inv(value(t))
 invdet(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = invdet(value(t))
 adjugate(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = adjugate(value(t))
 grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))

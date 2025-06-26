@@ -112,7 +112,13 @@ Exterior product as defined by the anti-symmetric quotient Λ≡⊗/~
 @generated ∧(t::T) where T<:FixedVector{N} where N = wedges([:(@inbounds t[$i]) for i ∈ list(1,N)])
 ∧(::Values{0,<:Chain{V}}) where V = One(V) # ∧() = 1
 ∧(::FixedVector{0,<:Chain{V}}) where V = One(V)
-∧(t::Chain{V,1,<:Chain} where V) = ∧(value(t))
+function ∧(t::Chain{V,1,<:Chain{W}}) where {V,W}
+    if mdims(V)>mdims(W)
+        map(Real,compound(t,Val(min(mdims(V),mdims(W)))))
+    else
+        ∧(value(t))
+    end
+end
 ∧(t::Chain{V,1,<:Single} where V) = ∧(value(t))
 ∧(a::X,b::Y,c::Z...) where {X<:TensorAlgebra,Y<:TensorAlgebra,Z<:TensorAlgebra} = ∧(a∧b,c...)
 

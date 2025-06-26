@@ -79,6 +79,7 @@ Chain(val::S) where S<:TupleVector{N,𝕂} where {N,𝕂} = Chain{Submanifold(N)
 Chain(val::NTuple{N,T}) where {N,T} = Chain(Values{N,T}(val))
 Chain(val::NTuple{N,Any}) where N = Chain(Values{N}(val))
 Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
+Chain(v::Zero{V}) where V = zero(Chain{V,0})
 #Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 @inline (::Type{T})(x...) where {T<:Chain} = T(x)
 
@@ -89,7 +90,7 @@ getindex(m::Chain,i::Int) = m.v[i]
 getindex(m::Chain,i::UnitRange{Int}) = m.v[i]
 getindex(m::Chain,i::T) where T<:AbstractVector = m.v[i]
 getindex(m::Chain{V,G,<:Chain} where {V,G},i::Int,j::Int) = m[j][i]
-setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
+#setindex!(m::Chain{V,G,T} where {V,G},k::T,i::Int) where T = (m.v[i] = k)
 Base.firstindex(m::Chain) = 1
 @pure Base.lastindex(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)
 @pure Base.length(m::Chain{V,G}) where {V,G} = binomial(mdims(V),G)
@@ -306,10 +307,10 @@ end
 end
 grade(m::Multivector,g::Int) = m(g)
 grade(m::Multivector,g::Val) = m(g)
-getindex(m::Multivector,i::Int,j::Int) = m[i][j]
+#getindex(m::Multivector,i::Int,j::Int) = value(value(m)[i])[j]
 getindex(m::Multivector,i::UnitRange{Int}) = m.v[i]
 getindex(m::Multivector,i::T) where T<:AbstractVector = m.v[i]
-setindex!(m::Multivector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
+#setindex!(m::Multivector{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
 Base.firstindex(m::Multivector) = 0
 Base.lastindex(m::Multivector{V,T} where T) where V = mdims(V)
 @pure Base.length(m::Multivector{V}) where V = 1<<mdims(V)
@@ -368,8 +369,8 @@ end
 
 Base.zero(::Multivector{V,T,X}) where {V,T,X} = Multivector{V,T}(zeros(Values{X,T}))
 Base.one(t::Multivector{V}) where V = zero(t)+one(V)
-Base.zero(::Type{Multivector{V,T,X}}) where {V,T,X} = Multivector{V,T}(zeros(Values{X,T}))
-Base.one(t::Type{Multivector{V,T,X}}) where {V,T,X} = zero(t)+one(V)
+Base.zero(::Type{<:Multivector{V,T}}) where {V,T} = Multivector{V,T}(zeros(Values{tdims(V),T}))
+Base.one(t::Type{<:Multivector{V,T}}) where {V,T} = zero(t)+one(V)
 
 Single(v,b::Multivector) = v*b
 
@@ -426,7 +427,7 @@ for pinor ∈ (:Spinor,:CoSpinor)
         $pinor(val::NTuple{N,T}) where {N,T} = $pinor{log2sub2(N)}(Values{N,T}(val))
         $pinor(val::NTuple{N,Any}) where N = $pinor{log2sub2(N)}(Values{N}(val))
         @inline (::Type{T})(x...) where {T<:$pinor} = T(x)
-        getindex(m::$pinor,i::Int,j::Int) = m[i][j]
+        #getindex(m::$pinor,i::Int,j::Int) = value(value(m[i])[j])
         #getindex(m::$pinor,i::UnitRange{Int}) = m.v[i]
         #getindex(m::$pinor,i::T) where T<:AbstractVector = m.v[i]
         #setindex!(m::$pinor{V,T} where V,k::T,i::Int,j::Int) where T = (m[i][j] = k)
@@ -437,7 +438,7 @@ for pinor ∈ (:Spinor,:CoSpinor)
         (m::$pinor{V,T})(g::Int,i::Int) where {T,V} = m(Val(g),i)
         Multivector(t::$pinor{V}) where V = Multivector{V}(t)
         Base.zero(::$pinor{V,T}) where {V,T} = $pinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
-        Base.zero(::Type{$pinor{V,T}}) where {V,T} = $pinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
+        Base.zero(::Type{<:$pinor{V,T}}) where {V,T} = $pinor{V,T}(zeros(Values{1<<(mdims(V)-1)}))
         equal(a::$pinor{V,T},b::$pinor{V,S}) where {V,T,S} = prod(a.v .== b.v)
         equal(a::$pinor{V,T},b::Multivector{V,S}) where {V,T,S} = equal(Multivector(a),b)
         equal(a::Multivector{V,T},b::$pinor{V,S}) where {V,T,S} = equal(a,Multivector(b))
@@ -607,7 +608,7 @@ function Base.show(io::IO, m::CoSpinor{V,T}) where {V,T}
 end
 
 Base.one(::Spinor{V,T}) where {V,T} = Spinor{V,T}(one(T),Submanifold{V}())
-Base.one(::Type{Spinor{V,T}}) where {V,T} = Spinor{V,T}(one(T),Submanifold{V}())
+Base.one(::Type{<:Spinor{V,T}}) where {V,T} = Spinor{V,T}(one(T),Submanifold{V}())
 
 function equal(a::Spinor{V,T},b::Chain{V,G,S}) where {V,T,G,S}
     isodd(G) && (return iszero(b) && iszero(a))
@@ -758,7 +759,7 @@ function Base.show(io::IO,z::PseudoCouple{V,B}) where {V,B}
 end
 
 Base.one(t::Couple{V,B,T}) where {V,B,T} = Couple{V,B}(one(T),zero(T))
-Base.one(t::Type{Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(one(T),zero(T))
+Base.one(t::Type{<:Couple{V,B,T}}) where {V,B,T} = Couple{V,B}(one(T),zero(T))
 
 equal(a::Couple{V},b::Couple{V}) where V = realvalue(a)==realvalue(b) && imagvalue(a)==imagvalue(b)==0
 isapprox(a::Couple{V},b::Couple{V}) where V = realvalue(a)≈realvalue(b) && imagvalue(a)≈imagvalue(b)≈0
@@ -829,7 +830,7 @@ for couple ∈ (:Couple,:PseudoCouple)
         Multivector(z::$couple{V,B,T}) where {V,B,T} = Multivector{V,T}(z)
         Spinor{V}(val::$couple{V,B,𝕂}) where {V,B,𝕂} = Spinor{V,𝕂}(val)
         Base.zero(::$couple{V,B,T}) where {V,B,T} = $couple{V,B}(zero(T),zero(T))
-        Base.zero(::Type{$couple{V,B,T}}) where {V,B,T} = $couple{V,B}(zero(T),zero(T))
+        Base.zero(::Type{<:$couple{V,B,T}}) where {V,B,T} = $couple{V,B}(zero(T),zero(T))
         @pure Base.length(m::$couple) = 2
     end
 end
@@ -907,8 +908,8 @@ end
 
 Base.zero(::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(zero(T),zero(T))
 Base.one(t::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(one(T),zero(T))
-Base.zero(::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(zero(T),zero(T))
-Base.one(t::Type{Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(one(T),zero(T))
+Base.zero(::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(zero(T),zero(T))
+Base.one(t::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(one(T),zero(T))
 
 equal(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)==realvalue(b) && imagvalue(a)==imagvalue(b)==0
 isapprox(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)≈realvalue(b) && imagvalue(a)≈imagvalue(b)≈0
