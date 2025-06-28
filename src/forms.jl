@@ -1053,7 +1053,8 @@ end
 +(a::DiagonalOperator,b::Endomorphism) = TensorOperator(a) + b
 for op ∈ (:plus,:minus,:+,:-)
     @eval @generated function $op(a::Outermorphism{V},b::Outermorphism{V}) where V
-        Expr(:call,:(Outermorphism{V}),Expr(:tuple,[:($$op(value(a)[$g],value(b)[$g])) for g ∈ list(1,mdims(V))]...))
+        N,M = mdims(V),mdims(_codomain(a))
+        Expr(:call,:(Outermorphism{V}),Expr(:tuple,[:($$op(value(a)[$g],value(b)[$g])) for g ∈ list(1,min(N,M))]...))
     end
     for operator ∈ (:TensorOperator,:DiagonalOperator)
         @eval $op(a::$operator,b::$operator) = $operator($op(value(a),value(b)))
