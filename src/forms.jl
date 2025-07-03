@@ -571,6 +571,7 @@ getindex(t::TensorOperator,i::Int,j::Int) = value(value(t.v)[j])[i]
 getindex(t::TensorOperator,i::Int) = value(t.v)[i]
 Base.lastindex(t::TensorOperator) = lastindex(value(t))
 Base.transpose(t::TensorOperator) = TensorOperator(transpose(value(t)))
+pfaffian(A::Endomorphism) = pfaffian(bivector(A))
 scalar(m::Endomorphism) = tr(m)/length(value(m))
 LinearAlgebra.tr(m::TensorOperator) = tr(value(m))
 LinearAlgebra.det(t::TensorOperator) = !∧(value(t))
@@ -590,6 +591,10 @@ for op ∈ (:(Base.inv),:adjugate)
 end
 for op ∈ (:(Base.exp),:(Base.expm1))
     @eval $op(t::Endomorphism{V,<:Chain} where V) = TensorOperator($op(value(t)))
+end
+
+@generated function bivector(A::Endomorphism{V,<:Simplex}) where V
+    Expr(:call,:(Chain{V,2}),[:(A[$(reverse(indices(b,2))...)]) for b ∈ indexbasis(mdims(V),2)]...)
 end
 
 Endomorphism(t::Projector) = Endomorphism(Chain(t))
@@ -710,6 +715,7 @@ DiagonalOperator(t::Outermorphism) = outermorphism(DiagonalOperator(TensorOperat
 value(t::Outermorphism) = t.v
 matrix(m::Outermorphism) = matrix(TensorOperator(m))
 getindex(t::Outermorphism{V},i::Int) where V = iszero(i) ? Chain{V,0}((Chain(One(V)),)) : t.v[i]
+pfaffian(A::Outermorphism) = pfaffian(compound(A,Val(1)))
 Base.transpose(m::Outermorphism) = Outermorphism(map(transpose,value(m)))
 scalar(m::Outermorphism{V}) where V = tr(m)/(1<<mdims(V))
 LinearAlgebra.tr(m::Outermorphism) = 1+sum(map(tr,value(m)))

@@ -17,7 +17,7 @@ export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 export coabs, coabs2, cosqrt, cocbrt, coinv, coscalar, coexp, colog, cometric, codot, @co
 export cocos, cosin, cotan, cocosh, cosinh, cotanh
-export vandermonde, invdet, adjugate, volumes, compound, companion
+export vandermonde, pfaffian, invdet, adjugate, volumes, compound, companion
 
 ## exponential & logarithm function
 
@@ -872,6 +872,16 @@ function vandermondeinterp(x,y,V,grid) # grid=384
         yp += coef[d+1].*xp.^d
     end # fill in polynomial terms
     return coef,xp,yp # coefficients, interpolation
+end
+
+pfaffian(A::Quaternion) = pfaffian(bivector(A))
+@generated function pfaffian(ω::Bivector{V}) where V
+    n = Int(floor(mdims(V)/2))
+    out = :ω
+    for i ∈ 2:n
+        out = :($out∧ω)
+    end
+    isone(n) ? :(!$out) : :(!$out/$(factorial(n)))
 end
 
 @pure list(a::Int,b::Int) = Values{max(0,b-a+1),Int}(a:b...)
