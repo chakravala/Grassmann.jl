@@ -621,6 +621,9 @@ DiagonalOperator(t::Endomorphism) = DiagonalOperator(LinearAlgebra.diag(t))
     X = mdims(V) ≤ mdims(W) ? V : W
     Expr(:call,:(Chain{$X,1}),[:(t[$i,$i]) for i ∈ list(1,mdims(X))]...)
 end
+@generated function LinearAlgebra.diag(t::Endomorphism{V,<:Simplex{V}}) where V
+    Expr(:call,:(Chain{V,1}),[:(t[$i,$i]) for i ∈ list(1,mdims(V))]...)
+end
 @generated function LinearAlgebra.diag(t::Endomorphism{V,<:Chain{V,G}}) where {V,G}
     Expr(:call,:(Chain{V,G}),[:(t[$i,$i]) for i ∈ list(1,binomial(mdims(V),G))]...)
 end
