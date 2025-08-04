@@ -138,83 +138,95 @@ pre_val(set,expr,val) = set≠:(=) ? :(isnull($expr) ? ($expr=Expr(:call,:($Sym.
 
 add_val(set,expr,val,OP) = Expr(OP∉(:-,:+) ? :.= : set,expr,OP∉(:-,:+) ? Expr(:.,OP,Expr(:tuple,expr,val)) : val)
 
-function generate_mutators(M,F,set_val,SUB,MUL,i,B)
-    for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
-        for (s,index) ∈ ((Symbol(op,:multi!),:basisindex),(Symbol(op,:blade!),:bladeindex),(Symbol(op,:spin!),:spinindex),(Symbol(op,:anti!),:antiindex))
-            spre = Symbol(s,:_pre)
-            @eval begin
-                @inline function $s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
-                    @inbounds $(set_val(set,:(out[$index(intlog(M),$i)]),:val))
-                    return out
-                end
-                @inline function $s(out::Q,val::S,i::$B,::Val{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
-                    @inbounds $(set_val(set,:(out[$index(N,$i)]),:val))
-                    return out
-                end
-                @inline function $spre(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
-                    ind = $index(intlog(M),$i)
-                    @inbounds $(pre_val(set,:(out[ind]),:val))
-                    return out
-                end
-                @inline function $spre(out::Q,val::S,i::$B,::Val{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
-                    ind = $index(N,$i)
-                    @inbounds $(pre_val(set,:(out[ind]),:val))
-                    return out
-                end
-            end
+for val1 ∈ (:multi!,:blade!,:spin!,:anti!)
+    for val2 ∈ (Symbol(:add,val1),Symbol(:set,val1))
+        for fun ∈ (val2,Symbol(:join,val2),Symbol(:geom,val2),Symbol(:meet,val2),Symbol(:skew,val2))
+            @eval function $fun end
+            @eval function $(Symbol(fun,:_pre)) end
         end
     end
 end
 
+function generate_mutators(M,F,set_val,SUB,MUL,i,B)
+    out = Any[]
+    for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
+        for (s,index) ∈ ((Symbol(op,:multi!),:basisindex),(Symbol(op,:blade!),:bladeindex),(Symbol(op,:spin!),:spinindex),(Symbol(op,:anti!),:antiindex))
+            spre = Symbol(s,:_pre)
+            push!(out,quote
+                @inline function Grassmann.$s(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
+                    @inbounds $(set_val(set,:(out[Grassmann.$index(intlog(M),$i)]),:val))
+                    return out
+                end
+                @inline function Grassmann.$s(out::Q,val::S,i::$B,::Val{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
+                    @inbounds $(set_val(set,:(out[Grassmann.$index(N,$i)]),:val))
+                    return out
+                end
+                @inline function Grassmann.$spre(out::$M,val::S,i::$B) where {M,T<:$F,S<:$F}
+                    ind = Grassmann.$index(intlog(M),$i)
+                    @inbounds $(pre_val(set,:(out[ind]),:val))
+                    return out
+                end
+                @inline function Grassmann.$spre(out::Q,val::S,i::$B,::Val{N}) where Q<:$M where {M,T<:$F,S<:$F,N}
+                    ind = Grassmann.$index(N,$i)
+                    @inbounds $(pre_val(set,:(out[ind]),:val))
+                    return out
+                end
+            end)
+        end
+    end
+    Expr(:block,out...)
+end
+
 function generate_mutators(M,F,set_val,SUB,MUL)
-    generate_mutators(M,F,set_val,SUB,MUL,:i,UInt)
-    generate_mutators(M,F,set_val,SUB,MUL,:(UInt(i)),Submanifold)
+    out = Any[]
+    push!(out,generate_mutators(M,F,set_val,SUB,MUL,:i,UInt))
+    push!(out,generate_mutators(M,F,set_val,SUB,MUL,:(UInt(i)),Submanifold))
     for (op,set) ∈ ((:add,:(+=)),(:set,:(=)))
         for s ∈ (Symbol(op,:multi!),Symbol(op,:blade!),Symbol(op,:spin!),Symbol(op,:anti!))
-            @eval @inline function $s(out::$M,val::S,i) where {M,T,S}
+            push!(out,:(@inline function Grassmann.$s(out::$M,val::S,i) where {M,T,S}
                 @inbounds $(set_val(set,:(out[i]),:val))
                 return out
-            end
+            end))
             spre = Symbol(s,:_pre)
             for j ∈ (:join,:geom)
                 for S ∈ (s,spre)
-                    @eval @inline function $(Symbol(j,S))(m::$M,v::S,A::Submanifold{V},B::Submanifold{V}) where {V,T<:$F,S<:$F,M}
-                        $(Symbol(j,S))(V,m,UInt(A),UInt(B),v)
-                    end
+                    push!(out,:(@inline function Grassmann.$(Symbol(j,S))(m::$M,v::S,A::Submanifold{V},B::Submanifold{V}) where {V,T<:$F,S<:$F,M}
+                        Grassmann.$(Symbol(j,S))(V,m,UInt(A),UInt(B),v)
+                    end))
                 end
             end
-            @eval begin
-                @inline function $(Symbol(:join,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
-                    if v ≠ 0 && !diffcheck(V,a,b)
-                        A,B,Q,Z = symmetricmask(V,a,b)
-                        val = $MUL(parityinner(grade(V),A,B),v)
+            push!(out,quote
+                @inline function Grassmann.$(Symbol(:join,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
+                    if v ≠ 0 && !Grassmann.diffcheck(V,a,b)
+                        A,B,Q,Z = Grassmann.symmetricmask(V,a,b)
+                        val = $MUL(Grassmann.parityinner(grade(V),A,B),v)
                         if diffvars(V)≠0
                             !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                             count_ones(Q)+order(val)>diffmode(V) && (return false)
                         end
-                        $s(m,val,(A⊻B)|Q,Val(mdims(V)))
+                        Grassmann.$s(m,val,(A⊻B)|Q,Val(mdims(V)))
                     end
                     return false
                 end
-                @inline function $(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S,field=nothing) where {T<:$F,S<:$F,M}
-                    if v ≠ 0 && !diffcheck(V,a,b)
-                        A,B,Q,Z = symmetricmask(V,a,b)
-                        val = :($$MUL($(parityinner(grade(V),A,B)),$v))
+                @inline function Grassmann.$(Symbol(:join,spre))(V,m::$M,a::UInt,b::UInt,v::S,field=nothing) where {T<:$F,S<:$F,M}
+                    if v ≠ 0 && !Grassmann.diffcheck(V,a,b)
+                        A,B,Q,Z = Grassmann.symmetricmask(V,a,b)
+                        val = :($$MUL($(Grassmann.parityinner(grade(V),A,B)),$v))
                         if diffvars(V)≠0
                             !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                             val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                         end
-                        $spre(m,val,(A⊻B)|Q,Val(mdims(V)))
+                        Grassmann.$spre(m,val,(A⊻B)|Q,Val(mdims(V)))
                     end
                     return false
                 end
-                @inline function $(Symbol(:geom,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
-                    if v ≠ 0 && !diffcheck(V,a,b)
-                        A,B,Q,Z = symmetricmask(V,a,b)
+                @inline function Grassmann.$(Symbol(:geom,s))(V,m::$M,a::UInt,b::UInt,v::S) where {T<:$F,S<:$F,M}
+                    if v ≠ 0 && !Grassmann.diffcheck(V,a,b)
+                        A,B,Q,Z = Grassmann.symmetricmask(V,a,b)
                         basg = if isdiag(V)
-                            Values(((A⊻B,parityinner(V,A,B)),))
+                            Values(((A⊻B,Grassmann.parityinner(V,A,B)),))
                         else
-                            paritygeometric(V,A,B)
+                            Grassmann.paritygeometric(V,A,B)
                         end
                         for (bas,g) ∈ basg
                             val = $MUL(g,v)
@@ -222,18 +234,18 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                                 !iszero(Z) && (T≠Any ? (return true) : (val *= getbasis(loworder(V),Z)))
                                 count_ones(Q)+order(val)>diffmode(V) && (return false)
                             end
-                            $s(m,val,bas|Q,Val(mdims(V)))
+                            Grassmann.$s(m,val,bas|Q,Val(mdims(V)))
                         end
                     end
                     return false
                 end
-                @inline function $(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S,vfield::Val{field}=Val(false)) where {T<:$F,S<:$F,M,field}
-                    if v ≠ 0 && !diffcheck(V,a,b)
-                        A,B,Q,Z = symmetricmask(V,a,b)
+                @inline function Grassmann.$(Symbol(:geom,spre))(V,m::$M,a::UInt,b::UInt,v::S,vfield::Val{field}=Val(false)) where {T<:$F,S<:$F,M,field}
+                    if v ≠ 0 && !Grassmann.diffcheck(V,a,b)
+                        A,B,Q,Z = Grassmann.symmetricmask(V,a,b)
                         basg = if isdiag(V)
-                            Values(((A⊻B,parityinner(V,A,B,vfield)),))
+                            Values(((A⊻B,Grassmann.parityinner(V,A,B,vfield)),))
                         else
-                            paritygeometric(V,A,B,vfield)
+                            Grassmann.paritygeometric(V,A,B,vfield)
                         end
                         for (bas,g) ∈ basg
                             val = :($$MUL($g,$v))
@@ -241,96 +253,96 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                                 !iszero(Z) && (val = Expr(:call,:*,val,getbasis(loworder(V),Z)))
                                 val = :(h=$val;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                             end
-                            $spre(m,val,bas|Q,Val(mdims(V)))
+                            Grassmann.$spre(m,val,bas|Q,Val(mdims(V)))
                         end
                     end
                     return false
                 end
-            end
+            end)
             for (prod,uct) ∈ ((:meet,:regressive),(:skew,:interior))
                 for S ∈ (s,spre)
-                    @eval @inline function $(Symbol(prod,S))(m::$M,A::Submanifold{V},B::Submanifold{V},v::T) where {V,T,M}
-                        $(Symbol(prod,S))(V,m,UInt(A),UInt(B),v)
-                    end
+                    push!(out,:(@inline function Grassmann.$(Symbol(prod,S))(m::$M,A::Submanifold{V},B::Submanifold{V},v::T) where {V,T,M}
+                        Grassmann.$(Symbol(prod,S))(V,m,UInt(A),UInt(B),v)
+                    end))
                 end
             end
-            @eval begin
-                @inline function $(Symbol(:meet,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
+            push!(out,quote
+                @inline function Grassmann.$(Symbol(:meet,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
                     if val ≠ 0
-                        g,C,t,Z = regressive(V,A,B)
+                        g,C,t,Z = Grassmann.regressive(V,A,B)
                         v = val
                         if istangent(V) && !iszero(Z)
                             T≠Any && (return true)
-                            _,_,Q,_ = symmetricmask(V,A,B)
+                            _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                             v *= getbasis(loworder(V),Z)
                             count_ones(Q)+order(v)>diffmode(V) && (return false)
                         end
-                        t && $s(m,$MUL(g,v),C,Val(mdims(V)))
+                        t && Grassmann.$s(m,$MUL(g,v),C,Val(mdims(V)))
                     end
                     return false
                 end
-                @inline function $(Symbol(:meet,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
+                @inline function Grassmann.$(Symbol(:meet,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
                     if val ≠ 0
-                        g,C,t,Z = regressive(V,A,B)
+                        g,C,t,Z = Grassmann.regressive(V,A,B)
                         v = val
                         if istangent(V) && !iszero(Z)
-                            _,_,Q,_ = symmetricmask(V,A,B)
+                            _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                             v = Expr(:call,:*,v,getbasis(loworder(V),Z))
                             v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                         end
-                        t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                        t && Grassmann.$spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
                     end
                     return false
                 end
-                @inline function $(Symbol(:skew,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
+                @inline function Grassmann.$(Symbol(:skew,s))(V,m::$M,A::UInt,B::UInt,val::T) where {T,M}
                     if val ≠ 0
                         if isdiag(V)
-                            g,C,t,Z = interior(V,A,B)
+                            g,C,t,Z = Grassmann.interior(V,A,B)
                             v = val
                             if istangent(V) && !iszero(Z)
                                 T≠Any && (return true)
-                                _,_,Q,_ = symmetricmask(V,A,B)
+                                _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                                 v *= getbasis(loworder(V),Z)
                                 count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
-                            t && $s(m,$MUL(g,v),C,Val(mdims(V)))
+                            t && Grassmann.$s(m,$MUL(g,v),C,Val(mdims(V)))
                         else
-                            Cg,Z = parityinterior(V,A,B,Val(true),false)
+                            Cg,Z = Grassmann.parityinterior(V,A,B,Val(true),false)
                             v = val
                             if istangent(V) && !iszero(Z)
                                 T≠Any && (return true)
-                                _,_,Q,_ = symmetricmask(V,A,B)
+                                _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                                 v *= getbasis(loworder(V),Z)
                                 count_ones(Q)+order(v)>diffmode(V) && (return false)
                             end
                             for (C,g) ∈ Cg
-                                $s(m,$MUL(g,v),C,Val(mdims(V)))
+                                Grassmann.$s(m,$MUL(g,v),C,Val(mdims(V)))
                             end
                         end
                     end
                     return false
                 end
-                @inline function $(Symbol(:skew,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
+                @inline function Grassmann.$(Symbol(:skew,spre))(V,m::$M,A::UInt,B::UInt,val::T,field::Val=Val(false)) where {T,M}
                     if val ≠ 0
                         if isdiag(V)
-                            g,C,t,Z = interior(V,A,B,Val(false),field)
+                            g,C,t,Z = Grassmann.interior(V,A,B,Val(false),field)
                             v = val
                             if istangent(V) && !iszero(Z)
-                                _,_,Q,_ = symmetricmask(V,A,B)
+                                _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                                 v = Expr(:call,:*,v,getbasis(loworder(V),Z))
                                 v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                             end
-                            t && $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                            t && Grassmann.$spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
                         else
-                            Cg,Z = parityinterior(V,A,B,Val(true),field)
+                            Cg,Z = Grassmann.parityinterior(V,A,B,Val(true),field)
                             v = val
                             if istangent(V) && !iszero(Z)
-                                _,_,Q,_ = symmetricmask(V,A,B)
+                                _,_,Q,_ = Grassmann.symmetricmask(V,A,B)
                                 v = Expr(:call,:*,v,getbasis(loworder(V),Z))
                                 v = :(h=$v;iszero(h)||$(count_ones(Q))+order(h)>$(diffmode(V)) ? 0 : h)
                             end
                             for (C,g) ∈ Cg
-                                $spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
+                                Grassmann.$spre(m,Expr(:call,$(QuoteNode(MUL)),g,v),C,Val(mdims(V)))
                             end
                         end
                     end
@@ -338,10 +350,11 @@ function generate_mutators(M,F,set_val,SUB,MUL)
                 end
 
 
-            end
+            end)
 
         end
     end
+    return Expr(:block,out...)
 end
 
 @inline exterbits(V,α,β) = diffvars(V)≠0 ? ((a,b)=symmetricmask(V,α,β);iszero(a&b)) : iszero(α&β)
@@ -1051,17 +1064,23 @@ end
     end
 end
 
-function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false)
+symfields = (SymField,:(SymPy.Sym))
+
+function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj,PAR=false,Field2=Field)
     VECS = Symbol(string(VEC)*"s")
-    if Field == Grassmann.Field
+    out = Any[]
+    push!(out,if Field == Grassmann.Field
         generate_mutators(:(Variables{M,T}),Number,Expr,SUB,MUL)
-    elseif Field ∈ (SymField,:(SymPy.Sym))
+    elseif Field ∈ symfields
         generate_mutators(:(FixedVector{M,T}),Field,set_val,SUB,MUL)
+    end)
+    if PAR
+        Leibniz.extend_field(Field2)
+        Grassmann.parsym = (parsym...,Field2)
     end
-    PAR && (Leibniz.extend_field(eval(Field)); global parsym = (parsym...,eval(Field)))
     TF = Field ∉ FieldsBig ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
-    Field ∉ Fields && @eval begin
+    Field ∉ Fields && push!(out,quote
         *(a::F,b::Submanifold{V}) where {F<:$EF,V} = Single{V}(a,b)
         *(a::Submanifold{V},b::F) where {F<:$EF,V} = Single{V}(b,a)
         *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = Couple{V,B}($Sym.:∏(a,realvalue(b)),$Sym.:∏(a,imagvalue(b)))
@@ -1085,21 +1104,21 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         adjoint(b::Single{V,G,B,T}) where {V,G,B,T<:$Field} = Single{dual(V),G,B',$TF}($CONJ(value(b)))
         #Base.promote_rule(::Type{Single{V,G,B,T}},::Type{S}) where {V,G,T,B,S<:$Field} = Single{V,G,B,promote_type(T,S)}
         #Base.promote_rule(::Type{Multivector{V,T,B}},::Type{S}) where {V,T,B,S<:$Field} = Multivector{V,promote_type(T,S),B}
-    end
-    #=Field ∉ Fields && Field≠Any && @eval begin
+    end)
+    #=Field ∉ Fields && Field≠Any && push!(out,quote
         Base.promote_rule(::Type{Chain{V,G,T,B}},::Type{S}) where {V,G,T,B,S<:$Field} = Chain{V,G,promote_type(T,S),B}
-    end=#
-    @eval begin
+    end)=#
+    push!(out,quote
         Base.:-(a::Single{V,G,B,T}) where {V,G,B,T<:$Field} = Single{V,G,B,$TF}($SUB(value(a)))
         function ⟑(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B}) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
-            v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
-            v*mul(ba,bb,v)
+            v = Grassmann.derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
+            v*Grassmann.mul(ba,bb,v)
         end
         function wedgedot_metric(a::Single{V,G,A,T} where {G,A},b::Single{V,L,B,S} where {L,B},g) where {V,T<:$Field,S<:$Field}
             ba,bb = basis(a),basis(b)
-            v = derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
-            v*mul_metric(ba,bb,g,v)
+            v = Grassmann.derive_mul(V,UInt(ba),UInt(bb),a.v,b.v,$MUL)
+            v*Grassmann.mul_metric(ba,bb,g,v)
         end
         ∨(a::$Field,b::$Field) = zero($Field)
         ∧(a::$Field,b::$Field) = $MUL(a,b)
@@ -1109,7 +1128,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         ∧(a::Chain{V,G,T},b::$Field) where {V,G,T<:$Field} = Chain{V,G,T}(a.v.*b)
         ∧(a::$Field,b::Multivector{V,T}) where {V,T<:$Field} = Multivector{V,T}(a.*b.v)
         ∧(a::Multivector{V,T},b::$Field) where {V,T<:$Field} = Multivector{V,T}(a.v.*b)=#
-    end
+    end)
+    Expr(:block,out...)
 end
 
 ### Product Algebra

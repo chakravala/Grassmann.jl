@@ -1,7 +1,7 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.8.36"
+version = "0.8.37"
 
 [deps]
 AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
@@ -12,6 +12,36 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[weakdeps]
+Reduce = "93e0c654-6965-5f22-aba9-9c1ae6b3c259"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
+GaloisFields = "8d0d7f98-d412-5cd4-8397-071c807280aa"
+LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
+#GraphPlot = "a2cc645c-3eea-5389-862e-a155d0052231"
+#Compose = "a81c6b42-2e10-5240-aca2-a61377ecd94b"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+
+[extensions]
+ReduceExt = "Reduce"
+SymbolicsExt = "Symbolics"
+SymPyExt = "SymPy"
+SymEngineExt = "SymEngine"
+AbstractAlgebraExt = "AbstractAlgebra"
+GaloisFieldsExt = "GaloisFields"
+LightGraphsExt = "LightGraphs"
+StaticArraysExt = "StaticArrays"
+MeshesExt = "Meshes"
+GeometryBasicsExt = "GeometryBasics"
+MakieExt = "Makie"
+UnicodePlotsExt = "UnicodePlots"
 
 [compat]
 julia = "1"

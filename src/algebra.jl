@@ -691,18 +691,20 @@ function robust_cdiv2_rev(a::Float64, b::Float64, c::Float64, d::Float64, r::Flo
 end
 
 function generate_inverses(Mod,T)
-    for (nv,d,ds) ∈ ((:inv,:/,:($Sym.:/)),(:inv_rat,://,:($Sym.://)))
+    out = Any[]
+    for (nv,d,ds) ∈ ((:(Base.inv),:/,:($Sym.:/)),(:(Grassmann.inv_rat),://,:($Sym.://)))
         for Term ∈ (:TensorGraded,:TensorMixed)
-            @eval $d(a::S,b::T) where {S<:$Term,T<:$Mod.$T} = a*$ds(1,b)
+            push!(out,:(Base.$d(a::S,b::T) where {S<:$Term,T<:$Mod.$T} = a*$ds(1,b)))
         end
-        @eval function $nv(b::Single{V,G,B,$Mod.$T}) where {V,G,B}
-            Single{V,G,B}($Mod.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B),value(b)))))
-        end
+        push!(out,:(function $nv(b::Single{V,G,B,$Mod.$T}) where {V,G,B}
+            Single{V,G,B}($Mod.$d(Grassmann.parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(Grassmann.abs2_inv(B),value(b)))))
+        end))
     end
+    Expr(:block,out...)
 end
 
 for T ∈ (:Real,:Complex)
-    generate_inverses(Base,T)
+    eval(generate_inverses(Base,T))
 end
 
 ### Algebra Constructors

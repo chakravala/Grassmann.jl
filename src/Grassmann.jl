@@ -20,7 +20,7 @@ module Grassmann
 #  \___^___/  /_/    \_\  \___^___/           \___/
 
 using SparseArrays, ComputedFieldTypes
-using AbstractTensors, Leibniz, DirectSum, Requires
+using AbstractTensors, Leibniz, DirectSum
 import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, vee
 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, Submanifold, Signature, DiagonalForm, value
@@ -273,9 +273,10 @@ function pointset(e)
     return out
 end
 
-export scalarfield, vectorfield, chainfield, rectanglefield # rectangle
+export scalarfield, vectorfield, pointfield, chainfield, rectanglefield # rectangle
 
 function pointfield end; const vectorfield = pointfield # deprecate ?
+function pointpair end; function ptype end
 
 chainfield(t,V=Manifold(t),W=V) = p->V(vector(↓(↑((V∪Manifold(t))(p))⊘t)))
 function scalarfield(t,ϕ::T) where T<:AbstractVector
@@ -313,129 +314,59 @@ function rectangle(p,nx=100,ny=nx)
 end
 rectanglefield(t,ϕ,nx=100,ny=nx) = chainfield(t,ϕ).(rectangle(points(t),nx,ny))
 
-generate_products()
-generate_products(Complex)
-generate_products(Rational{BigInt},:svec)
+eval(generate_products())
+eval(generate_products(Complex))
+eval(generate_products(Rational{BigInt},:svec))
 for Big ∈ (BigFloat,BigInt)
-    generate_products(Big,:svec)
-    generate_products(Complex{Big},:svec)
+    eval(generate_products(Big,:svec))
+    eval(generate_products(Complex{Big},:svec))
 end
-generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj))
+eval(generate_products(SymField,:svec,:($Sym.:∏),:($Sym.:∑),:($Sym.:-),:($Sym.conj)))
 function generate_derivation(m,t,d,c)
-    @eval derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(indexsymbol(Manifold(b),UInt(b))))
+    :(Grassmann.derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(Grassmann.indexsymbol(Manifold(b),UInt(b)))))
 end
-function generate_algebra(m,t,d=nothing,c=nothing)
-    generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true)
-    generate_inverses(m,t)
-    !isnothing(d) && generate_derivation(m,t,d,c)
+function generate_algebra(m,t,mt,d=nothing,c=nothing)
+    out = Any[]
+    push!(out,generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true,mt))
+    push!(out,generate_inverses(m,t))
+    !isnothing(d) && push!(out,generate_derivation(m,t,d,c))
+    Expr(:block,out...)
 end
 function generate_symbolic_methods(mod, symtype, methods_noargs, methods_args)
-    for method ∈ methods_noargs
-        @eval begin
-            local apply_symbolic(x) = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v) : v, x)
-            $mod.$method(x::T) where T<:TensorGraded = apply_symbolic(x)
-            $mod.$method(x::T) where T<:TensorMixed = apply_symbolic(x)
+    n,m = length(methods_noargs),length(methods_args)
+    out = Vector{Any}(undef,n+m)
+    for i ∈ 1:n
+        method = methods_noargs[i]
+        out[i] = quote
+            $mod.$method(x::T) where T<:TensorGraded = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v) : v, x)
+            $mod.$method(x::T) where T<:TensorMixed = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v) : v, x)
+
         end
     end
-    for method ∈ methods_args
-        @eval begin
-            local apply_symbolic(x, args...) = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v, args...) : v, x)
-            $mod.$method(x::T, args...) where T<:TensorGraded = apply_symbolic(x, args...)
-            $mod.$method(x::T, args...) where T<:TensorMixed = apply_symbolic(x, args...)
+    for i ∈ 1:m
+        method = methods_args[i]
+        out[n+i] = quote
+            $mod.$method(x::T, args...) where T<:TensorGraded = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v, args...) : v, x)
+            $mod.$method(x::T, args...) where T<:TensorMixed = map(v -> typeof(v) == $mod.$symtype ? $mod.$method(v, args...) : v, x)
         end
     end
+    Expr(:block,out...)
 end
 
+if !isdefined(Base, :get_extension)
+using Requires
+end
+
+@static if !isdefined(Base, :get_extension)
 function __init__()
-    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" begin
-        *(a::Reduce.RExpr,b::Submanifold{V}) where V = Single{V}(a,b)
-        *(a::Submanifold{V},b::Reduce.RExpr) where V = Single{V}(b,a)
-        *(a::Reduce.RExpr,b::Multivector{V,T}) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        *(a::Multivector{V,T},b::Reduce.RExpr) where {V,T} = Multivector{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
-        #*(a::Reduce.RExpr,b::MultiGrade{V}) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,Ref(a),b.v))
-        #*(a::MultiGrade{V},b::Reduce.RExpr) where V = MultiGrade{V}(broadcast(Reduce.Algebra.:*,a.v,Ref(b)))
-        ∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
-        ∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Single{V,G}(a,b)
-        ∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Single{V,G}(b,a)
-        Leibniz.extend_field(Reduce.RExpr)
-        parsym = (parsym...,Reduce.RExpr)
-        for T ∈ (:RExpr,:Symbol,:Expr)
-            @eval *(a::Reduce.$T,b::Chain{V,G,Any}) where {V,G} = (a*One(V))*b
-            @eval *(a::Chain{V,G,Any},b::Reduce.$T) where {V,G} = a*(b*One(V))
-            generate_inverses(:(Reduce.Algebra),T)
-            generate_derivation(:(Reduce.Algebra),T,:df,:RExpr)
-            #generate_algebra(:(Reduce.Algebra),T,:df,:RExpr)
-        end
-    end
-    @require Symbolics="0c5d862f-8b57-4792-8d23-62f2024744c7" begin
-        generate_algebra(:Symbolics,:Num)
-        generate_symbolic_methods(:Symbolics,:Num, (:expand,),(:simplify,:substitute))
-        *(a::Symbolics.Num,b::Multivector{V}) where V = Multivector{V}(a*b.v)
-        *(a::Multivector{V},b::Symbolics.Num) where V = Multivector{V}(a.v*b)
-        *(a::Symbolics.Num,b::Chain{V,G}) where {V,G} = Chain{V,G}(a*b.v)
-        *(a::Chain{V,G},b::Symbolics.Num) where {V,G} = Chain{V,G}(a.v*b)
-        *(a::Symbolics.Num,b::Single{V,G,B,T}) where {V,G,B,T<:Real} = Single{V}(a,b)
-        *(a::Single{V,G,B,T},b::Symbolics.Num) where {V,G,B,T<:Real} = Single{V}(b,a)
-        Base.iszero(a::Single{V,G,B,Symbolics.Num}) where {V,G,B} = false
-        isfixed(::Type{Symbolics.Num}) = true
-        for op ∈ (:+,:-)
-            for Term ∈ (:TensorGraded,:TensorMixed)
-                @eval begin
-                    $op(a::T,b::Symbolics.Num) where T<:$Term = $op(a,b*One(Manifold(a)))
-                    $op(a::Symbolics.Num,b::T) where T<:$Term = $op(a*One(Manifold(b)),b)
-                end
-            end
-        end
-    end
-    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
-        generate_algebra(:SymPy,:Sym,:diff,:symbols)
-        generate_symbolic_methods(:SymPy,:Sym, (:expand,:factor,:together,:apart,:cancel), (:N,:subs))
-        for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
-                    Multivector{V,SymPy.Sym} where V,
-                    Single{V,G,SymPy.Sym} where {V,G} )
-            SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
-        end
-    end
-    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" begin
-        generate_algebra(:SymEngine,:Basic,:diff,:symbols)
-        generate_symbolic_methods(:SymEngine,:Basic, (:expand,:N), (:subs,:evalf))
-    end
-    @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" generate_algebra(:AbstractAlgebra,:SetElem)
-    @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" generate_algebra(:GaloisFields,:AbstractGaloisField)
-    @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" begin
-        function LightGraphs.SimpleDiGraph(x::T,g=LightGraphs.SimpleDiGraph(rank(V))) where T<:TensorTerm{V} where V
-           ind = (signbit(value(x)) ? reverse : identity)(indices(basis(x)))
-           rank(x) == 2 ? LightGraphs.add_edge!(g,ind...) : LightGraphs.SimpleDiGraph(∂(x),g)
-           return g
-        end
-        function LightGraphs.SimpleDiGraph(x::Chain{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
-            N,G = mdims(V),rank(x)
-            ib = indexbasis(N,G)
-            for k ∈ 1:binomial(N,G)
-                if !iszero(x.v[k])
-                    B = symmetricmask(V,ib[k],ib[k])[1]
-                    count_ones(B) ≠1 && LightGraphs.SimpleDiGraph(x.v[k]*getbasis(V,B),g)
-                end
-            end
-            return g
-        end
-        function LightGraphs.SimpleDiGraph(x::Multivector{V},g=LightGraphs.SimpleDiGraph(rank(V))) where V
-           N = mdims(V)
-           for i ∈ 2:N
-                R = binomsum(N,i)
-                ib = indexbasis(N,i)
-                for k ∈ 1:binomial(N,i)
-                    if !iszero(x.v[k+R])
-                        B = symmetricmask(V,ib[k],ib[k])[1]
-                        count_ones(B) ≠ 1 && LightGraphs.SimpleDiGraph(x.v[k+R]*getbasis(V,B),g)
-                    end
-                end
-            end
-            return g
-        end
-    end
-    #=@require GraphPlot="a2cc645c-3eea-5389-862e-a155d0052231"
-    @require Compose="a81c6b42-2e10-5240-aca2-a61377ecd94b" begin
+    @require Reduce="93e0c654-6965-5f22-aba9-9c1ae6b3c259" include("../ext/ReduceExt.jl")
+    @require Symbolics="0c5d862f-8b57-4792-8d23-62f2024744c7" include("../ext/SymbolicsExt.jl")
+    @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" include("../ext/SymPyExt.jl")
+    @require SymEngine="123dc426-2d89-5057-bbad-38513e3affd8" include("../ext/SymEngineExt.jl")
+    @require AbstractAlgebra="c3fe647b-3220-5bb0-a1ea-a7954cac585d" include("../ext/AbstractAlgebraExt.jl")
+    @require GaloisFields="8d0d7f98-d412-5cd4-8397-071c807280aa" include("../ext/GaloisFieldsExt.jl")
+    @require LightGraphs="093fc24a-ae57-5d10-9952-331d41423f4d" include("../ext/LightGraphsExt.jl")
+    #=@require Compose="a81c6b42-2e10-5240-aca2-a61377ecd94b" begin
         import LightGraphs, GraphPlot, Cairo
         viewer = Base.Process(`$(haskey(ENV,"VIEWER") ? ENV["VIEWER"] : "xdg-open") simplex.pdf`,Ptr{Nothing}())
         function Compose.draw(img,x::T,l=layout=GraphPlot.circular_layout) where T<:TensorAlgebra
@@ -449,90 +380,12 @@ function __init__()
             viewer = run(cmd,(devnull,stdout,stderr),wait=false)
         end
     end=#
-    @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" begin
-        StaticArrays.SMatrix(m::Chain{V,G,<:Chain{W,G}}) where {V,W,G} = StaticArrays.SMatrix{binomial(mdims(W),G),binomial(mdims(V),G)}(vcat(value.(value(m))...))
-        Chain(m::StaticArrays.SMatrix{N,N}) where N = Chain{Submanifold(N),1}(m)
-        Chain{V,G}(m::StaticArrays.SMatrix{N,N}) where {V,G,N} = Chain{V,G}(Chain{V,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-        Chain{V,G,<:Chain{W,G}}(m::StaticArrays.SMatrix{M,N}) where {V,W,G,M,N} = Chain{V,G}(Chain{W,G}.(getindex.(Ref(m),:,StaticArrays.SVector{N}(1:N))))
-    end
-    @require Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa" begin
-        Meshes.Point(t::Values) = Meshes.Point(Tuple(t.v))
-        Meshes.Point(t::Variables) = Meshes.Point(Tuple(t.v))
-        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorTerm{V} where V = Meshes.Point(value(Chain{V,valuetype(t)}(vector(t))))
-        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorTerm{V,0} where V = Meshes.Point(zeros(valuetype(t),mdims(V))...)
-        Base.convert(::Type{Meshes.Point},t::T) where T<:TensorAlgebra = Meshes.Point(value(vector(t)))
-        Base.convert(::Type{Meshes.Point},t::Chain{V,G,T}) where {V,G,T} = G == 1 ? Meshes.Point(value(vector(t))) : Meshes.Point(zeros(T,mdims(V))...)
-        Meshes.Point(t::T) where T<:TensorAlgebra = convert(Meshes.Point,t)
-        pointpair(p,V) = Pair(Meshes.Point.(V.(value(p)))...)
-        @pure ptype(::Meshes.Point{N,T} where N) where T = T
-        export pointfield
-        pointfield(t,V=Manifold(t),W=V) = p->Meshes.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
-        function pointfield(t,ϕ::T) where T<:AbstractVector
-            M = Manifold(t)
-            V = Manifold(M)
-            z = mdims(V) ≠ 4 ? Meshes(0.0,0.0) : Meshes.Point(0.0,0.0,0.0)
-            p->begin
-                P = Chain{V,1}(one(ptype(p)),p.data...)
-                for i ∈ 1:length(t)
-                    ti = value(t[i])
-                    Pi = Chain{V,1}(M[ti])
-                    P ∈ Pi && (return Meshes.Point((Pi\P)⋅Chain{V,1}(ϕ[ti])))
-                end
-                return z
-            end
-        end
-    end
-    @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" begin
-        GeometryBasics.Point(t::Values) = GeometryBasics.Point(Tuple(t.v))
-        GeometryBasics.Point(t::Variables) = GeometryBasics.Point(Tuple(t.v))
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V} where V = convert(GeometryBasis.Point,Chain(t))
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorTerm{V,0} where V = GeometryBasics.Point(zeros(valuetype(t),mdims(V))...)
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:TensorAlgebra = GeometryBasics.Point(value(vector(t)))
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:Couple = GeometryBasics.Point(t.v.re,t.v.im)
-        Base.convert(::Type{GeometryBasics.Point},t::T) where T<:Phasor = GeometryBasics.Point(t.v.re,t.v.im)
-        Base.convert(::Type{GeometryBasics.Point},t::Chain{V,G,T}) where {V,G,T} = GeometryBasics.Point(value(t))
-        GeometryBasics.Point(t::T) where T<:TensorAlgebra = convert(GeometryBasics.Point,t)
-        pointpair(p,V) = Pair(GeometryBasics.Point.(V.(value(p)))...)
-        @pure ptype(::GeometryBasics.Point{N,T} where N) where T = T
-        export pointfield
-        pointfield(t,V=Manifold(t),W=V) = p->GeometryBasics.Point(V(vector(↓(↑((V∪Manifold(t))(Chain{W,1,ptype(p)}(p.data)))⊘t))))
-        function pointfield(t,ϕ::T) where T<:AbstractVector
-            M = Manifold(t)
-            V = Manifold(M)
-            z = mdims(V) ≠ 4 ? GeometryBasics(0.0,0.0) : GeometryBasics.Point(0.0,0.0,0.0)
-            p->begin
-                P = Chain{V,1}(one(ptype(p)),p.data...)
-                for i ∈ 1:length(t)
-                    ti = value(t[i])
-                    Pi = Chain{V,1}(M[ti])
-                    P ∈ Pi && (return GeometryBasics.Point((Pi\P)⋅Chain{V,1}(ϕ[ti])))
-                end
-                return z
-            end
-        end
-    end
-    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
-        Makie.convert_arguments(P::Makie.PointBased, a::Vector{<:Chain}) = Makie.convert_arguments(P, Makie.Point.(a))
-        Makie.convert_single_argument(a::Chain) = convert_arguments(P,Point(a))
-        Makie.arrows(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        Makie.arrows!(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows!(GeometryBasics.Point.(↓(V).(p)),GeometryBasics.Point.(value(v));args...)
-        Makie.lines(p::Vector{<:TensorAlgebra};args...) = Makie.lines(GeometryBasics.Point.(p);args...)
-        Makie.lines!(p::Vector{<:TensorAlgebra};args...) = Makie.lines!(GeometryBasics.Point.(p);args...)
-        Makie.lines(p::Vector{<:TensorTerm};args...) = Makie.lines(value.(p);args...)
-        Makie.lines!(p::Vector{<:TensorTerm};args...) = Makie.lines!(value.(p);args...)
-        Makie.lines(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines(getindex.(p,1);args...)
-        Makie.lines!(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines!(getindex.(p,1);args...)
-    end
-    @require UnicodePlots="b8865327-cd53-5732-bb35-84acbb429228" begin
-        vandermonde(x::Chain,y,V,grid) = vandermonde(value(x),y,V,grid)
-        function vandermonde(x,y,V,grid) # grid=384
-            coef,xp,yp = vandermondeinterp(x,y,V,grid)
-            p = UnicodePlots.scatterplot(x,value(y)) # overlay points
-            display(UnicodePlots.lineplot!(p,xp,yp)) # plot polynomial
-            println("||ϵ||: ",norm(approx.(x,Ref(value(coef))).-value(y)))
-            return coef # polynomial coefficients
-        end
-    end
+    @require StaticArrays="90137ffa-7385-5640-81b9-e52037218182" include("../ext/StaticArraysExt.jl")
+    @require Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa" include("../ext/MeshesExt.jl")
+    @require GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326" include("../ext/GeometryBasicsExt.jl")
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" include("../ext/MakieExt.jl")
+    @require UnicodePlots="b8865327-cd53-5732-bb35-84acbb429228" include("../ext/UnicodePlotsExt.jl")
+end
 end
 
 #   ____  ____    ____   _____  _____ ___ ___   ____  ____   ____
