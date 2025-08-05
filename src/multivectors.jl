@@ -18,7 +18,7 @@ export Zero, One, Chain, Phasor, Quaternion, GaussianInteger, AbstractSpinor, An
 export AbstractReal, AbstractComplex, AbstractRational, ScalarFloat, ScalarIrrational
 export AbstractInteger, AbstractBool, AbstractSigned, AbstractUnsigned, CoSpinor, Simplex
 
-import AbstractTensors: Scalar, GradedVector, Bivector, Trivector
+import AbstractTensors: Scalar, GradedVector, Bivector, Trivector, Manifold
 import AbstractTensors: TensorTerm, TensorGraded, TensorMixed, equal
 import Leibniz: grade, antigrade, showvalue, basis, order
 
