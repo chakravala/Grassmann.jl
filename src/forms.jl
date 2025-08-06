@@ -732,9 +732,9 @@ function ∧(m::Outermorphism{V}) where V
     end
 end
 
-Base.zero(t::Outermorphism) = Outermorphism(zero.(value(t)))
+Base.zero(t::Outermorphism{V}) where V = Outermorphism{V}(zero.(value(t)))
 @generated function Base.zero(t::Type{<:Outermorphism{V,T}}) where {V,T}
-    :(Outermorphism{V}($(zero.(([fieldtype(typ,i) for i ∈ 1:fieldcount(typ)]...,)))))
+    :(Outermorphism{V}($(zero.(([fieldtype(T,i) for i ∈ 1:fieldcount(T)]...,)))))
 end
 
 compound(m::Outermorphism,::Val{g}) where g = TensorOperator(value(m)[g])
