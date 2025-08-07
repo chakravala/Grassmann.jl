@@ -16,10 +16,11 @@ module SymEngineExt
 using Grassmann
 isdefined(Grassmann, :SymEngine) ? (import Grassmann: SymEngine) : (using SymEngine)
 import Grassmann: ⟑, wedgedot_metric, ∨, ∧, realvalue, imagvalue, intlog
-import Grassmann: getbasis, order, diffvars, diffmode, loworder
+import Grassmann: getbasis, order, diffvars, diffmode, loworder, FixedVector
 import Base: *, adjoint
 
 eval(Grassmann.generate_algebra(:SymEngine,:Basic,SymEngine.Basic,:diff,:symbols))
 eval(Grassmann.generate_symbolic_methods(:SymEngine,:Basic, (:expand,:N), (:subs,:evalf)))
+#Grassmann.isfixed(::Type{<:SymEngine.Basic}) = true
 
 end # module

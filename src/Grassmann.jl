@@ -326,7 +326,19 @@ function generate_derivation(m,t,d,c)
     :(Grassmann.derive(n::$(:($m.$t)),b) = $m.$d(n,$m.$c(Grassmann.indexsymbol(Manifold(b),UInt(b)))))
 end
 function generate_algebra(m,t,mt,d=nothing,c=nothing)
-    out = Any[]
+    out = Any[quote
+        Base.:*(a::$m.$t,b::Single{V,G,B,T}) where {V,G,B,T<:Real} = Single{V}(a,b)
+        Base.:*(a::Single{V,G,B,T},b::$m.$t) where {V,G,B,T<:Real} = Single{V}(b,a)
+        Base.iszero(a::Single{V,G,B,$m.$t}) where {V,G,B} = false
+    end]
+    for op ∈ (:+,:-)
+        for Term ∈ (:TensorGraded,:TensorMixed)
+            push!(out,quote
+                Base.$op(a::T,b::$m.$t) where T<:$Term = $op(a,b*One(Manifold(a)))
+                Base.$op(a::$m.$t,b::T) where T<:$Term = $op(a*One(Manifold(b)),b)
+            end)
+        end
+    end
     push!(out,generate_products(:($m.$t),:svec,:($m.:*),:($m.:+),:($m.:-),:($m.conj),true,mt))
     push!(out,generate_inverses(m,t))
     !isnothing(d) && push!(out,generate_derivation(m,t,d,c))
@@ -352,6 +364,11 @@ function generate_symbolic_methods(mod, symtype, methods_noargs, methods_args)
     end
     Expr(:block,out...)
 end
+
+check_parsym(Field) = Leibniz.check_field(Field)
+check_parsym(::Type{<:Symbol}) = true
+
+extend_parsym(Field) = (global parsym = (parsym...,Field))
 
 if !isdefined(Base, :get_extension)
 using Requires

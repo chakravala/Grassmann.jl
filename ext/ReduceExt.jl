@@ -24,6 +24,9 @@ Grassmann.:∧(a::Reduce.RExpr,b::Reduce.RExpr) = Reduce.Algebra.:*(a,b)
 Grassmann.:∧(a::Reduce.RExpr,b::B) where B<:TensorTerm{V,G} where {V,G} = Single{V,G}(a,b)
 Grassmann.:∧(a::A,b::Reduce.RExpr) where A<:TensorTerm{V,G} where {V,G} = Single{V,G}(b,a)
 Grassmann.Leibniz.extend_field(Reduce.RExpr)
+Grassmann.Leibniz.check_field(::Type{<:Reduce.RExpr}) = true
+Grassmann.extend_parsym(Reduce.RExpr)
+Grassmann.check_parsym(::Type{<:Reduce.RExpr}) = true
 Grassmann.parsym = (Grassmann.parsym...,Reduce.RExpr)
 for T ∈ (:RExpr,:Symbol,:Expr)
     @eval Base.:*(a::Reduce.$T,b::Chain{V,G,Any}) where {V,G} = (a*One(V))*b

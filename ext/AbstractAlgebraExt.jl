@@ -16,9 +16,10 @@ module AbstractAlgebraExt
 using Grassmann
 isdefined(Grassmann, :Requires) ? (import Grassmann: AbstractAlgebra) : (using AbstractAlgebra)
 import Grassmann: ⟑, wedgedot_metric, ∨, ∧, realvalue, imagvalue, intlog
-import Grassmann: getbasis, order, diffvars, diffmode, loworder
+import Grassmann: getbasis, order, diffvars, diffmode, loworder, FixedVector
 import Base: *, adjoint
 
 eval(Grassmann.generate_algebra(:AbstractAlgebra,:SetElem,AbstractAlgebra.SetElem))
+Grassmann.isfixed(::Type{<:AbstractAlgebra.SetElem}) = true
 
 end # module

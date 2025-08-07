@@ -16,7 +16,7 @@ module SymPyExt
 using Grassmann
 isdefined(Grassmann, :Requires) ? (import Grassmann: SymPy) : (using SymPy)
 import Grassmann: ⟑, wedgedot_metric, ∨, ∧, realvalue, imagvalue, intlog
-import Grassmann: getbasis, order, diffvars, diffmode, loworder
+import Grassmann: getbasis, order, diffvars, diffmode, loworder, FixedVector
 import Base: *, adjoint
 
 Grassmann.symfields = (Grassmann.symfields...,SymPy.Sym)
@@ -27,5 +27,6 @@ for T ∈ (   Chain{V,G,SymPy.Sym} where {V,G},
             Single{V,G,SymPy.Sym} where {V,G} )
     SymPy.collect(x::T, args...) = map(v -> typeof(v) == SymPy.Sym ? SymPy.collect(v, args...) : v, x)
 end
+#Grassmann.isfixed(::Type{<:SymPy.Sym}) = true
 
 end # module

@@ -44,7 +44,7 @@ compact = ( () -> begin
 compactio(io::IO) = compact() ? IOContext(io, :compact => true) : io
 
 function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
-    if !(|(broadcast(<:,T,parsym)...)) && signbit(i) && !isnan(i)
+    if !check_parsym(T) && signbit(i) && !isnan(i)
         print(io, compact ? "-" : " - ")
         if isa(i,Signed) && !isa(i,BigInt) && i == typemin(typeof(i))
             showvalue(io, V, B, -widen(i))
@@ -56,6 +56,12 @@ function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
         showvalue(io, V, B, i)
     end
 end
+
+isnum(T) = false
+isnum(::Type{<:Real}) = true
+isnum(::Type{<:Complex}) = true
+isnum(::Type{<:TensorAlgebra}) = true
+numtype(T,S=Int) = isnum(T) ? T : S
 
 ## Chain{V,G,𝕂}
 
@@ -124,9 +130,9 @@ isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ 
 @generated function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
     N = mdims(V)
     b = bladeindex(N,UInt(basis(v)))
-    bin,T = binomial(N,G),𝕂<:Number ? 𝕂 : Any
+    bin,T = binomial(N,G),numtype(𝕂,Any)
     if N<cache_limit
-        :(Chain{V,G,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
+        :(Chain{V,G,$T}(Values{$bin,$T}($([i==b ? :val : zero(numtype(𝕂)) for i ∈ 1:bin]...))))
     else
         :(Chain{V,G,$T}(setblade!(zeros($(mvec(N,G,T))),val,$(UInt(v)),$(Val(N)))))
     end
@@ -377,9 +383,9 @@ Single(v,b::Multivector) = v*b
 @generated function Multivector(val::𝕂,v::Submanifold{V,G}) where {V,𝕂,G}
     N = mdims(V)
     b = basisindex(N,UInt(basis(v)))
-    bin,T = 1<<N,𝕂<:Number ? 𝕂 : Any
+    bin,T = 1<<N,numtype(𝕂,Any)
     if N<cache_limit
-        :(Multivector{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
+        :(Multivector{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(numtype(𝕂)) for i ∈ 1:bin]...))))
     else
         :(Multivector{V,$T}(setmulti!(zeros($(mvec(N,T))),val,$(UInt(basis(v))),$(Val{N}()))))
     end
@@ -459,9 +465,9 @@ Spinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = Spinor{V,T}(one(T),v)
     isodd(G) && error("$v is not expressible as a Spinor")
     N = mdims(V)
     b = spinindex(N,UInt(basis(v)))
-    bin,T = 1<<(N-1),𝕂<:Number ? 𝕂 : Any
+    bin,T = 1<<(N-1),isnum(𝕂,Any)
     if N<cache_limit
-        :(Spinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
+        :(Spinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(isnum(𝕂)) for i ∈ 1:bin]...))))
     else
         :(Spinor{V,$T}(setspin!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end
@@ -478,9 +484,9 @@ CoSpinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = CoSpinor{V,T}(one(T),v)
     iseven(G) && error("$v is not expressible as an CoSpinor")
     N = mdims(V)
     b = antiindex(N,UInt(basis(v)))
-    bin,T = 1<<(N-1),𝕂<:Number ? 𝕂 : Any
+    bin,T = 1<<(N-1),isnum(𝕂,Any)
     if N<cache_limit
-        :(CoSpinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(𝕂<:Number ? 𝕂 : Int) for i ∈ 1:bin]...))))
+        :(CoSpinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(isnum(𝕂)) for i ∈ 1:bin]...))))
     else
         :(CoSpinor{V,$T}(setanti!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end

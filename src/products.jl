@@ -1076,11 +1076,15 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
     end)
     if PAR
         Leibniz.extend_field(Field2)
-        Grassmann.parsym = (parsym...,Field2)
+        Grassmann.extend_parsym(Field2)
+        push!(out,quote
+            Grassmann.Leibniz.check_field(::Type{<:$Field2}) = true
+            Grassmann.check_parsym(::Type{<:$Field2}) = true
+        end)
     end
     TF = Field ∉ FieldsBig ? :Any : :T
     EF = Field ≠ Any ? Field : ExprField
-    Field ∉ Fields && push!(out,quote
+    !Leibniz.check_field(Field) && push!(out,quote
         *(a::F,b::Submanifold{V}) where {F<:$EF,V} = Single{V}(a,b)
         *(a::Submanifold{V},b::F) where {F<:$EF,V} = Single{V}(b,a)
         *(a::F,b::Couple{V,B}) where {F<:$EF,V,B} = Couple{V,B}($Sym.:∏(a,realvalue(b)),$Sym.:∏(a,imagvalue(b)))

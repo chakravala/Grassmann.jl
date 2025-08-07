@@ -418,6 +418,7 @@ getindex(P::Proj{V,<:Chain{W,1,<:Chain}},i::Int) where {V,W} = Proj{V}(P.v[i],P.
 getindex(P::Proj{V,<:Chain{W,1,<:Chain}} where {V,W},i::Int,j::Int) = sum(column(P.v,i).*column(P.v,j))
 #getindex(P::Proj{V,<:Chain{V,1,<:TensorNested}} where V,i::Int,j::Int) = sum(getindex.(value(P.v),i,j))
 
+Leibniz.check_parnot(::Type{<:Projector}) = true
 Leibniz.extend_parnot(Projector)
 
 show(io::IO,P::Proj{V,T,Λ}) where {V,T,Λ<:Real} = print(io,isone(P.λ) ? "" : P.λ,"Proj(",P.v,")")
