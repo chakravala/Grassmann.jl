@@ -465,9 +465,9 @@ Spinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = Spinor{V,T}(one(T),v)
     isodd(G) && error("$v is not expressible as a Spinor")
     N = mdims(V)
     b = spinindex(N,UInt(basis(v)))
-    bin,T = 1<<(N-1),isnum(𝕂,Any)
+    bin,T = 1<<(N-1),numtype(𝕂,Any)
     if N<cache_limit
-        :(Spinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(isnum(𝕂)) for i ∈ 1:bin]...))))
+        :(Spinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(numtype(𝕂)) for i ∈ 1:bin]...))))
     else
         :(Spinor{V,$T}(setspin!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end
@@ -484,9 +484,9 @@ CoSpinor{V,T}(v::Submanifold{V,G}) where {V,G,T} = CoSpinor{V,T}(one(T),v)
     iseven(G) && error("$v is not expressible as an CoSpinor")
     N = mdims(V)
     b = antiindex(N,UInt(basis(v)))
-    bin,T = 1<<(N-1),isnum(𝕂,Any)
+    bin,T = 1<<(N-1),numtype(𝕂,Any)
     if N<cache_limit
-        :(CoSpinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(isnum(𝕂)) for i ∈ 1:bin]...))))
+        :(CoSpinor{V,$T}(Values{$bin,$T}($([i==b ? :val : zero(numtype(𝕂)) for i ∈ 1:bin]...))))
     else
         :(CoSpinor{V,$T}(setanti!(zeros($(mvecs(N,T))),val,$(UInt(v)),$(Val(N)))))
     end
@@ -879,8 +879,10 @@ function Base.abs2(z::Phasor{V,B}) where {V,B}
 end
 
 Base.angle(z::Phasor) = imagvalue(z)*basis(z)
+Base.angle(z::Chain) = angle(complexify(z))
 radius(z::Phasor) = realvalue(z)
 radius(z::Couple{V,B}) where {V,B} = sqrt(realvalue(z)^2 - imagvalue(z)^2*value(B*B))
+radius(z::TensorGraded{V,1} where V) = Real(abs(z))
 
 Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = a
 
@@ -945,6 +947,7 @@ export gdims, tdims, betti, χ, unit, ∠, radius, istensor, isgraded, isterm
 export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
 export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
+export realvalue, imagvalue
 
 const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
@@ -990,6 +993,16 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
         Multivector(t)
     end
 end
+
+complexify(t::Chain{V,1,T,2} where T) where V = Couple{V,Submanifold(V)}(value(t)...)
+complexify(t::Couple) = t
+complexify(t::PseudoCouple) = !t
+complexify(t::Complex) = t
+
+vectorize(t::Couple{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
+vectorize(t::PseudoCouple) = vectorize(!t)
+vectorize(t::Complex) = Chain(real(t),imag(t))
+vectorize(t::Chain) = t
 
 export quaternion, quatvalue, quatvalues
 quaternion(sijk::NTuple{4}) = quaternion(Submanifold(3),sijk...)
