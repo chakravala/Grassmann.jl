@@ -1004,6 +1004,8 @@ vectorize(t::PseudoCouple) = vectorize(!t)
 vectorize(t::Complex) = Chain(real(t),imag(t))
 vectorize(t::Chain) = t
 
+Base.@pure _subspace(::Submanifold{V,G},::Submanifold{W,L,B} where {W,L}) where {V,G,B} = Submanifold{V,G,B}()
+
 export quaternion, quatvalue, quatvalues
 quaternion(sijk::NTuple{4}) = quaternion(Submanifold(3),sijk...)
 quaternion(s,ijk::NTuple{3}) = quaternion(Submanifold(3),s,ijk...)
