@@ -441,7 +441,7 @@ end
         val = isone(d) ? sq : ^(sq,d,$(args...))
         return iszero(i%2) ? val : val*v
     elseif !$field && T<:Couple && value(basis(v)*basis(v))==-1
-        return Couple{V,basis(v)}(v.v^i)
+        return Couple{V,basis(v)}(Complex(v)^i)
     end
     out = One(V)
     if i < 8 # optimal choice ?

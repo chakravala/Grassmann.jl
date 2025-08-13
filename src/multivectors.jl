@@ -863,7 +863,6 @@ Phasor(v::Phasor{V,B,𝕂}) where {V,B,𝕂} = v
 @inline realvalue(z::Phasor) = z.v.v.:1
 @inline imagvalue(z::Phasor) = z.v.v.:2
 
-Phasor{V,B}(a,b) where {V,B} = Phasor{V,B}(promote(a,b)...)
 Phasor(a,b) = (V=Submanifold(2); Phasor{V,Submanifold(V)}(a,b))
 
 const ∠ = Phasor
@@ -901,7 +900,11 @@ Phasor(r::TensorTerm{V,0} where V,iθ) = Phasor(value(r),iθ)
 Couple(z::Phasor{V,B}) where {V,B} = radius(z)*exp(angle(z))
 Couple{V,B,T}(z::Phasor{V,B}) where {V,B,T} = Couple(z)
 
-(z::Phasor{V,B})(ωt) where {V,B} = Phasor{V,B}(radius(z),ωt+imagvalue(z))
+(z::Phasor{V,B})(t::Real) where {V,B} = Phasor{V,B}(realvalue(z),imagvalue(z)*t)
+(z::Phasor{V,B})(t::Real,θ) where {V,B} = Phasor{V,B}(realvalue(z),imagvalue(z)*t+θ)
+(z::Phasor)(tθ::Chain{W,G,T,2} where {W,G,T}) = z(value(θ)...)
+(z::Phasor)(tθ::Tuple) = z(tθ...)
+(z::Phasor)(tθ::Values) = z(tθ...)
 
 Multivector{V,T}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V,T}(Couple(z))
 Multivector{V}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V}(Couple(z))
@@ -996,10 +999,17 @@ end
 
 complexify(t::Chain{V,1,T,2} where T) where V = Couple{V,Submanifold(V)}(value(t)...)
 complexify(t::Couple) = t
+complexify(t::Phasor) = Couple(t)
 complexify(t::PseudoCouple) = !t
 complexify(t::Complex) = t
 
+polarize(t::Chain{V,1,T,2} where T) where V = Phasor{V,Submanifold(V)}(value(t)...)
+polarize(t) = Phasor(complexify(t))
+polarize(t::Phasor) = t
+polarize(t::Complex) = Phasor(Couple(t))
+
 vectorize(t::Couple{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
+vectorize(t::Phasor{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
 vectorize(t::PseudoCouple) = vectorize(!t)
 vectorize(t::Complex) = Chain(real(t),imag(t))
 vectorize(t::Chain) = t
@@ -1075,7 +1085,7 @@ Base.isapprox(a::S,b::T) where {S<:CoSpinor,T<:CoSpinor} = Manifold(a)==Manifold
 
 function isscalar(z::Phasor)
     if basis(z)*basis(z) == -1
-        (z.v.im%π) ≈ 0
+        (imagvalue(z)%π) ≈ 0
     else
         isscalar(Couple(z))
     end

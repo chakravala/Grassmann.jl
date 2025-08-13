@@ -476,8 +476,10 @@ end
 @inline Base.:^(a::Infinity,::Infinity,_=nothing) = a
 @inline Base.:^(a::Infinity{V},b::T,_=nothing) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
 
++(a::Phasor,b::Phasor) = Phasor(Couple(a)+Couple(b))
 +(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+Couple(b)
 +(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)+b
+-(a::Phasor,b::Phasor) = Phasor(Couple(a)-Couple(b))
 -(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a-Couple(b)
 -(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)-b
 ⟑(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a⟑Couple(b)
