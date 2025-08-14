@@ -416,6 +416,8 @@ antidot_metric(a,b) = complementleft(contraction_metric(complementright(a),compl
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{p}) where {p} = x^p
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{-1}) = inv(x)
 
+Base.:^(z::Phasor{V},n::Number) where V = Phasor{V}(radius(z)^n,n*angle(z))
+Base.:^(z::Phasor{V},n::Integer) where V = Phasor{V}(radius(z)^n,n*angle(z))
 for (op,field) ∈ ((:*,false),(:wedgedot_metric,true)); args = field ? (:g,) : ()
 @eval function Base.:^(v::T,i::S,$(args...)) where {T<:TensorTerm,S<:Integer}
     i == 0 && (return getbasis(Manifold(v),0))
@@ -542,6 +544,7 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         end
     end
 end
+inv(z::Phasor{V}) where V = Phasor{V}(inv(radius(z)),-angle(z))
 
 @eval /(a::TensorTerm{V,0},b::Couple{V,B,S},$(args...)) where {V,B,S} = a*inv(b,$(args...))
 @eval /(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(realvalue(a)/value(b),imagvalue(a)/value(b))

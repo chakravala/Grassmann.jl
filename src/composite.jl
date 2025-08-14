@@ -128,9 +128,9 @@ end
 end
 
 @eval Base.expm1(t::Phasor{V},$(args...)) where V = exp(t,$(args...))-One(V)
-@eval function Base.exp(t::Phasor{V,B},$(args...)) where {V,B}
-    z = exp(angle(t,$(args...)))
-    Phasor{V,B}(exp(radius(t,$(args...))+realvalue(z)),imagvalue(z))
+@eval function Base.exp(t::Phasor{V,<:TensorGraded},$(args...)) where V
+    z = exp(angle(t),$(args...))
+    Phasor{V}(exp(radius(t)+realvalue(z)),imagvalue(z))
 end
 
 @eval function Base.exp(t::T,$(args...)) where T<:TensorGraded
@@ -360,7 +360,7 @@ end
 @eval begin
     $logm(A::Chain{V,G,<:Chain{V,G}},$(args...)) where {V,G} = Chain{V,G,Chain{V,G}}(log(Matrix(A)))
     $logm(t::TensorTerm,$(args...)) = $logm(Couple(t),$(args...))
-    $logm(t::Phasor,$(args...)) = (r=radius(t,$(args...)); log(r)+angle(t,$(args...)))
+    $logm(t::Phasor,$(args...)) = (r=radius(t); $logm(r,$(args...))+angle(t))
     Base.log1p(t::Phasor{V},$(args...)) where V = $logm(One(V)+t,$(args...))
     $logm(t::Couple{V,B},$(args...)) where {V,B} = value($op(B,B,$(args...)))==-1 ? Couple{V,B}(log(Complex(t))) : $logm(radius(t,$(args...)))+angle(t,$(args...))
     Base.log1p(t::Couple{V,B},$(args...)) where {V,B} = value($op(B,B,$(args...)))==-1 ? Couple{V,B}(log1p(Complex(t))) : $logm(One(V)+t,$(args...))
@@ -445,7 +445,7 @@ for (qrt,n) ∈ ((:sqrt,2),(:cbrt,3))
             value(B*B)==-1 ? Couple{V,B}($qrt(Complex(t))) :
                 $qrt(radius(t))*exp(angle(t)/$n,$(args...))
         end
-        @inline Base.$qrt(t::Phasor,$(args...)) = Phasor($qrt(radius(t)),angle(t)/$n)
+        @inline Base.$qrt(t::Phasor,$(args...)) = Phasor($qrt(radius(t),$(args...)),angle(t)/$n)
         @inline Base.$qrt(t::Submanifold{V,0} where V,$(args...)) = t
         @inline Base.$qrt(t::T,$(args...)) where T<:TensorGraded{V,0} where V = Single{V}($Sym.$qrt(value(T<:TensorTerm ? t : scalar(t))))
     end

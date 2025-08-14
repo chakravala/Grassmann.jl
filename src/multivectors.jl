@@ -846,97 +846,89 @@ end
 """
     Phasor{V,B,T} <: AbstractSpinor{V,T} <: TensorAlgebra{V,T}
 
-Magnitude/phase angle with `V::Manifold`, basis `B::Submanifold`, scalar field `T::Type`.
+Magnitude/phase angle with `V::Manifold`, frequency `B::Type`, and amplitude `T::Type`.
 """
 struct Phasor{V,B,T} <: AbstractSpinor{V,T}
-    v::Values{2,T}
-    Phasor{V,B,T}(v) where {V,B,T} = new{DirectSum.submanifold(V),B,T}(v)
+    v::T
+    ω::B
+    Phasor{V}(v::T,ω::B) where {V,T,B} = new{V,B,T}(v,ω)
 end
 
-Phasor{V,B}(v::Complex{T}) where {V,B,T} = Phasor{V,B,T}(Values{2,T}(real(v),imag(v)))
-Phasor{V,B}(val::S) where {V,B,S<:AbstractVector{𝕂}} where 𝕂 = Phasor{V,B,𝕂}(val)
-Phasor{V,B}(val::NTuple{2,T}) where {V,B,T} = Phasor{V,B}(Values{2,T}(val))
-Phasor{V,B}(val::NTuple{2,Any}) where {V,B} = Phasor{V,B}(Values{2}(val))
-Phasor(v::Phasor{V,B,𝕂}) where {V,B,𝕂} = v
-@inline (::Type{T})(x...) where {T<:Phasor} = T(x)
+Phasor(v,ω::TensorAlgebra{V}) where V = Phasor{V}(v,ω)
+Phasor{V}(v::Complex) where V = Phasor(Couple{V}(v))
+#Phasor{V,B}(val::S) where {V,B,S<:AbstractVector{𝕂}} where 𝕂 = Phasor{V,B,𝕂}(val)
+#Phasor{V,B}(val::NTuple{2,T}) where {V,B,T} = Phasor{V,B}(Values{2,T}(val))
+#Phasor{V,B}(val::NTuple{2,Any}) where {V,B} = Phasor{V,B}(Values{2}(val))
+Phasor(v::Phasor) = v
+#@inline (::Type{T})(x...) where {T<:Phasor} = T(x)
 
-@inline realvalue(z::Phasor) = z.v.v.:1
-@inline imagvalue(z::Phasor) = z.v.v.:2
-
-Phasor(a,b) = (V=Submanifold(2); Phasor{V,Submanifold(V)}(a,b))
+Phasor(a,b) = Phasor{Submanifold(2)}(a,b)
 
 const ∠ = Phasor
-@pure DirectSum.basis(::Phasor{V,B}) where {V,B} = B
-Base.reim(z::Phasor) = (realvalue(z),imagvalue(z))
-Base.widen(z::Phasor{V,B}) where {V,B} = Phasor{V,B}(widen(realvalue(z)),widen(imagvalue(z)))
-function Base.abs2(z::Phasor{V,B}) where {V,B}
+#const SimplePhasor{V,B,T} = Phasor{V,<:TensorGraded{V,B},T<:Real}
+#Base.reim(z::Phasor) = (realvalue(z),imagvalue(z))
+#Base.widen(z::Phasor{V,B}) where {V,B} = Phasor{V,B}(widen(realvalue(z)),widen(imagvalue(z)))
+function Base.abs2(z::Phasor{V,<:TensorTerm}) where V
+    B = basis(angle(z))
     if B*B == -1
         Single{V}(radius(z)*radius(z))
     else
-        abs2(Couple(z))
+        abs2(complexify(z))
     end
 end
 
-Base.angle(z::Phasor) = imagvalue(z)*basis(z)
+Base.angle(z::Phasor) = z.ω
 Base.angle(z::Chain) = angle(complexify(z))
-radius(z::Phasor) = realvalue(z)
+radius(z::Phasor) = z.v
 radius(z::Couple{V,B}) where {V,B} = sqrt(realvalue(z)^2 - imagvalue(z)^2*value(B*B))
 radius(z::TensorGraded{V,1} where V) = Real(abs(z))
 
-Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = a
+Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = b
 
-grade(z::Phasor{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? angle(z) : G==0 ? radius(z) : Zero(V)
+#grade(z::Phasor{V,B},::Val{G}) where {V,G,B} = grade(B)==G ? angle(z) : G==0 ? radius(z) : Zero(V)
 
-(::Type{Complex})(m::Phasor) = Complex(Couple(m))
-(::Type{Complex{T}})(m::Phasor) where T<:Real = Complex{T}(Couple(m))
-Phasor(m::One{V}) where V = Phasor{V,basis(m)}(1,0)
-Phasor(m::Submanifold{V}) where V = Phasor{V,basis(m)}(1,1)
-Phasor(m::Single{V,0,B,T} where B) where {V,T} = Phasor{V,Submanifold(V)}(value(m),zero(T))
-Phasor(m::Single{V,G,B,T} where G) where {V,B,T} = Phasor{V,B}(one(T),value(m))
+(::Type{Complex})(m::Phasor) = Complex(complexify(m))
+(::Type{Complex{T}})(m::Phasor) where T<:Real = Complex{T}(complexify(m))
+Phasor(m::One{V}) where V = Phasor{V}(1,0)
+Phasor(m::Submanifold{V}) where V = Phasor{V}(1,m)
+Phasor(m::Single{V,0}) where V = Phasor{V}(value(m),0)
+Phasor(m::Single{V}) where V = Phasor{V}(1,m)
 Phasor(m::Couple) = Phasor(radius(m),angle(m))
-Phasor(r::Real,iθ::Single{V,G,B}) where {V,G,B} = Phasor{V,B}(r,value(iθ))
-Phasor(r::Real,iθ::Submanifold{V}) where V = Phasor{V,iθ}(r,value(iθ))
+Phasor(m::Spinor) = Phasor(radius(m),angle(m))
 Phasor(r::TensorTerm{V,0} where V,iθ) = Phasor(value(r),iθ)
-Couple(z::Phasor{V,B}) where {V,B} = radius(z)*exp(angle(z))
-Couple{V,B,T}(z::Phasor{V,B}) where {V,B,T} = Couple(z)
+Phasor(r::TensorTerm{V,0} where V,iθ::TensorAlgebra) = Phasor(value(r),iθ)
 
-(z::Phasor{V,B})(t::Real) where {V,B} = Phasor{V,B}(realvalue(z),imagvalue(z)*t)
-(z::Phasor{V,B})(t::Real,θ) where {V,B} = Phasor{V,B}(realvalue(z),imagvalue(z)*t+θ)
-(z::Phasor)(tθ::Chain{W,G,T,2} where {W,G,T}) = z(value(θ)...)
-(z::Phasor)(tθ::Tuple) = z(tθ...)
-(z::Phasor)(tθ::Values) = z(tθ...)
+Multivector{V,T}(z::Phasor{V}) where {V,T} = Multivector{V,T}(complexify(z))
+Multivector{V}(z::Phasor{V}) where V = Multivector{V}(complexify(z))
+Multivector(z::Phasor) = Multivector(complexify(z))
 
-Multivector{V,T}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V,T}(Couple(z))
-Multivector{V}(z::Phasor{V,B,T}) where {V,B,T} = Multivector{V}(Couple(z))
-Multivector(z::Phasor) = Multivector(Couple(z))
-
-Spinor{V}(val::Phasor{V}) where V = Couple(val)
+Spinor{V}(val::Phasor{V}) where V = Spinor(complexify(val))
 
 function Base.show(io::IO,z::Phasor)
     show(io, radius(z))
     print(io, " ∠ ", angle(z))
 end
 
-Base.zero(::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(zero(T),zero(T))
-Base.one(t::Phasor{V,B,T}) where {V,B,T} = Phasor{V,B}(one(T),zero(T))
-Base.zero(::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(zero(T),zero(T))
-Base.one(t::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V,B}(one(T),zero(T))
+Base.zero(::Phasor{V,B,T}) where {V,B,T} = Phasor{V}(zero(T),zero(B))
+Base.one(t::Phasor{V,B,T}) where {V,B,T} = Phasor{V}(one(T),zero(B))
+Base.zero(::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V}(zero(T),zero(B))
+Base.one(t::Type{<:Phasor{V,B,T}}) where {V,B,T} = Phasor{V}(one(T),zero(B))
 
-equal(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)==realvalue(b) && imagvalue(a)==imagvalue(b)==0
-isapprox(a::Phasor{V},b::Phasor{V}) where V = realvalue(a)≈realvalue(b) && imagvalue(a)≈imagvalue(b)≈0
+equal(a::Phasor{V},b::Phasor{V}) where V = radius(a)==radius(b) && angle(a)==angle(b)==0
+isapprox(a::Phasor{V},b::Phasor{V}) where V = radius(a)≈radius(b) && angle(a)≈angle(b)≈0
 
 for T ∈ Fields
     @eval begin
-        ==(a::T,b::Phasor) where T<:$T = isscalar(b) && a == realvalue(b)
+        ==(a::T,b::Phasor) where T<:$T = isscalar(b) && a == radius(b)
         ==(a::Phasor,b::T) where T<:$T = b == a
     end
 end
 
 for (eq,qe) ∈ ((:(Base.:(==)),:equal), (:(Base.isapprox),:(Base.isapprox)))
     @eval begin
-        $qe(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = (realvalue(a) == realvalue(b)) & (imagvalue(a) == imagvalue(b))
-        $qe(a::Phasor{V,B},b::Couple{V,B}) where {V,B} = $eq(Couple(a),b)
-        $qe(a::Couple{V,B},b::Phasor{V,B}) where {V,B} = $eq(a,Couple(b))
+        $qe(a::Phasor,b::Phasor) = (radius(a) == radius(b)) & (angle(a) == angle(b))
+        $qe(a::Phasor,b::Couple) = $eq(complexify(a),b)
+        $qe(a::Couple,b::Phasor) = $eq(a,complexify(b))
     end
 end
 
@@ -961,7 +953,7 @@ const GaussianInteger{V,B,T<:Integer} = Couple{V,B,T}
 #const ElementMesh{T<:Chain{V,1,<:Integer} where V} = AbstractVector{T}
 
 const AbstractReal = Union{Real,Single{V,G,B,<:Real} where {V,G,B},Chain{V,G,<:Real,1} where {V,G}}
-const AbstractComplex{T<:Real} = Union{Complex{T},Phasor{V,B,T} where {V,B},Couple{V,B,T} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
+const AbstractComplex{T<:Real} = Union{Complex{T},Phasor{V,<:TensorTerm,T} where V,Couple{V,B,T} where {V,B},Single{V,G,B,Complex{T}} where {V,G,B},Chain{V,G,Complex{T},1} where {V,G}}
 const AbstractBool = Union{Bool,Single{V,G,B,Bool} where {V,G,B},Chain{V,G,Bool,1} where {V,G}}
 const AbstractInteger = Union{Integer,Single{V,G,B,<:Integer} where {V,G,B},Chain{V,G,<:Integer,1} where {V,G}}
 const AbstractSigned = Union{Signed,Single{V,G,B,<:Signed} where {V,G,B},Chain{V,G,<:Signed,1} where {V,G}}
@@ -997,11 +989,33 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
     end
 end
 
+(z::Phasor{V})(t::Real) where V = Phasor{V}(radius(z),angle(z)*t)
+(z::Phasor{V,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:TensorTerm,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:TensorTerm,<:TensorTerm})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:TensorTerm,<:Couple})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:Couple,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:Couple,<:TensorTerm})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:Couple,<:Couple})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,B,<:AbstractReal} where B)(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+(z::Phasor{V})(t::Real,θ) where V = Phasor{V}(radius(z)⊘exp((θ/2)*unit(angle(z))),angle(z)*t)
+(z::Phasor)(tθ::Chain{W,G,T,2} where {W,G,T}) = z(value(θ)...)
+(z::Phasor)(tθ::Tuple) = z(tθ...)
+(z::Phasor)(tθ::Values{2}) = z(tθ...)
+
+complexify(z::Phasor{V,<:Real}) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V,<:Complex}) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V,<:TensorTerm}) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V,<:Couple}) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V,<:Chain{V,G,T,1} where {G,T}}) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V,B,<:AbstractReal} where B) where V = radius(z)*exp(angle(z))
+complexify(z::Phasor{V}) where V = radius(z)⊘exp(angle(z)/2)
+
 complexify(t::Chain{V,1,T,2} where T) where V = Couple{V,Submanifold(V)}(value(t)...)
 complexify(t::Couple) = t
-complexify(t::Phasor) = Couple(t)
 complexify(t::PseudoCouple) = !t
 complexify(t::Complex) = t
+complexify(t::Spinor) = t
 
 polarize(t::Chain{V,1,T,2} where T) where V = Phasor{V,Submanifold(V)}(value(t)...)
 polarize(t) = Phasor(complexify(t))
@@ -1009,7 +1023,7 @@ polarize(t::Phasor) = t
 polarize(t::Complex) = Phasor(Couple(t))
 
 vectorize(t::Couple{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
-vectorize(t::Phasor{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
+vectorize(t::Phasor{V,<:TensorGraded}) where V = Chain{_subspace(V,basis(angle(t))),1}(radius(t),Real(angle(t)))
 vectorize(t::PseudoCouple) = vectorize(!t)
 vectorize(t::Complex) = Chain(real(t),imag(t))
 vectorize(t::Chain) = t
@@ -1046,7 +1060,7 @@ Base.isapprox(a::S,b::T) where {S<:CoSpinor,T<:CoSpinor} = Manifold(a)==Manifold
 
 @inline scalar(z::Couple{V}) where V = Single{V}(realvalue(z))
 @inline scalar(z::PseudoCouple{V,B}) where {V,B} = grade(B)==0 ? Single{V}(realvalue(z)) : Zero(V)
-@inline scalar(z::Phasor) = scalar(Couple(z))
+@inline scalar(z::Phasor) = scalar(complexify(z))
 @inline scalar(t::Chain{V,0,T}) where {V,T} = Single{V}(t.v.v.:1)
 @inline scalar(t::Multivector{V}) where V = Single{V}(t.v.v.:1)
 @inline scalar(t::Spinor{V}) where V = Single{V}(t.v.v.:1)
@@ -1083,11 +1097,13 @@ Base.isapprox(a::S,b::T) where {S<:CoSpinor,T<:CoSpinor} = Manifold(a)==Manifold
 @inline istrivector(t) = norm(t) ≈ norm(trivector(t))
 @inline isvolume(t) = norm(t) ≈ norm(volume(t))
 
-function isscalar(z::Phasor)
-    if basis(z)*basis(z) == -1
-        (imagvalue(z)%π) ≈ 0
+isscalar(z::Phasor) = isscalar(complexify(z))
+function isscalar(z::Phasor{V,<:TensorGraded}) where V
+    B = basis(angle(z))
+    if B*B == -1
+        (Real(angle(z))%π) ≈ 0
     else
-        isscalar(Couple(z))
+        isscalar(complexify(z))
     end
 end
 

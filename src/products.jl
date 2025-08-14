@@ -476,26 +476,29 @@ end
 @inline Base.:^(a::Infinity,::Infinity,_=nothing) = a
 @inline Base.:^(a::Infinity{V},b::T,_=nothing) where {V,T<:Integer} = iszero(b) ? One(V) : isless(b,zero(b)) ? Zero(V) : a
 
-+(a::Phasor,b::Phasor) = Phasor(Couple(a)+Couple(b))
-+(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+Couple(b)
-+(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)+b
--(a::Phasor,b::Phasor) = Phasor(Couple(a)-Couple(b))
--(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a-Couple(b)
--(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)-b
-⟑(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a⟑Couple(b)
-⟑(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)⟑b
-/(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a/Couple(b)
-/(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)/b
-∧(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∧Couple(b)
-∧(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)∧b
-∨(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∨Couple(b)
-∨(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = Couple(a)∨b
-contraction(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = contraction(a,Couple(b))
-contraction(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = contraction(Couple(a),b)
-contraction_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = contraction_metric(a,Couple(b),g)
-contraction_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = contraction_metric(Couple(a),b,g)
-wedgedot_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(a,Couple(b),g)
-wedgedot_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(Couple(a),b,g)
+function /(a::Phasor{V},b::Phasor{V},g=nothing) where V
+    Phasor{V}(radius(a)/radius(b),angle(a)-angle(b))
+end
++(a::Phasor,b::Phasor) = Phasor(complexify(a)+complexify(b))
++(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a+complexify(b)
++(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)+b
+-(a::Phasor,b::Phasor) = Phasor(complexify(a)-complexify(b))
+-(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a-complexify(b)
+-(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)-b
+⟑(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a⟑complexify(b)
+⟑(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)⟑b
+/(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a/complexify(b)
+/(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)/b
+∧(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∧complexify(b)
+∧(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)∧b
+∨(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = a∨complexify(b)
+∨(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = complexify(a)∨b
+contraction(a::T,b::Phasor) where T<:TensorAlgebra{V} where V = contraction(a,complexify(b))
+contraction(a::Phasor,b::T) where T<:TensorAlgebra{V} where V = contraction(complexify(a),b)
+contraction_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = contraction_metric(a,complexify(b),g)
+contraction_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = contraction_metric(complexify(a),b,g)
+wedgedot_metric(a::T,b::Phasor,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(a,complexify(b),g)
+wedgedot_metric(a::Phasor,b::T,g) where T<:TensorAlgebra{V} where V = wedgedot_metric(complexify(a),b,g)
 
 plus(b::Chain{V,G},a::Submanifold{V,G}) where {V,G} = plus(a,b)
 plus(b::Chain{V,G},a::Submanifold{V,L}) where {V,G,L} = plus(a,b)
@@ -552,14 +555,13 @@ for (op,po) ∈ ((:plus,:+),(:minus,:-))
     @eval begin
         $op(a::Couple{V,B},b::Couple{V,B}) where {V,B} = Couple{V,B}($po(realvalue(a),realvalue(b)),$po(imagvalue(a),imagvalue(b)))
         $op(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B} = PseudoCouple{V,B}($po(realvalue(a),imagvalue(b)),$po(imagvalue(a),imagvalue(b)))
-        $op(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor($op(Couple(a),Couple(b)))
-        $op(a::Couple{V},b::Phasor{V}) where V = $op(a,Couple(b))
-        $op(a::Phasor{V},b::Couple{V}) where V = $op(Couple(a),b)
+        $op(a::Phasor{V},b::Phasor{V}) where V = Phasor($op(complexify(a),complexify(b)))
+        $op(a::Couple{V},b::Phasor{V}) where V = $op(a,complexify(b))
+        $op(a::Phasor{V},b::Couple{V}) where V = $op(complexify(a),b)
         $op(a::Couple{V},b::Couple{V}) where V = $op($op(a,scalar(b)),imaginary(b))
         $op(a::PseudoCouple{V},b::PseudoCouple{V}) where V = $op($op(a,volume(b)),imaginary(b))
         $op(a::Couple{V},b::PseudoCouple{V}) where V = $op($op(a,imaginary(b)),volume(b))
         $op(a::PseudoCouple{V},b::Couple{V}) where V = $op(imaginary(a),b)+volume(a)
-        $op(a::Phasor{V},b::Phasor{V}) where V = $op(Couple(a),Couple(b))
         $op(a::Spinor{V},b::CoSpinor{V}) where V = $op(Multivector(a),Multivector(b))
         $op(a::CoSpinor{V},b::Spinor{V}) where V = $op(Multivector(a),Multivector(b))
     end
@@ -574,8 +576,8 @@ for (op,args) ∈ ((:⟑,()),(:wedgedot_metric,(:g,)))
             out = imaginary(a)*volume(b)+volume(a)*imaginary(b)
             Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value($op(B,B,$(args...)))+value(volume(a)*volume(b)),value(out))
         end
-        function $op(a::Phasor{V,B},b::Phasor{V,B},$(args...)) where {V,B}
-            Phasor{V,B}(realvalue(a)*realvalue(b),imagvalue(a)+imagvalue(b))
+        function $op(a::Phasor{V},b::Phasor{V},$(args...)) where V
+            Phasor{V}(radius(a)*radius(b),angle(a)+angle(b))
         end
         $op(a::Couple{V},b::Couple{V},$(args...)) where V = (a⟑scalar(b))+$op(a,imaginary(b),$(args...))
         $op(a::PseudoCouple{V},b::PseudoCouple{V},$(args...)) where V = ($op(volume(a),volume(b),$(args...))+$op(imaginary(a),imaginary(b),$(args...)))+$op(imaginary(a),volume(b),$(args...))+$op(volume(b),imaginary(a),$(args...))
@@ -590,7 +592,7 @@ end
 function ∧(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     grade(B)==0 ? PseudoCouple{V,B}(realvalue(a)*realvalue(b),realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b)) : Zero(V)
 end
-∧(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∧Couple(b))
+∧(a::Phasor{V},b::Phasor{V}) where V = Phasor(complexify(a)∧complexify(b))
 
 function ∨(a::Couple{V,B},b::Couple{V,B}) where {V,B}
     grade(B)==grade(V) ? Couple{V,B}(realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b),imagvalue(a)*imagvalue(b)) : Zero(V)
@@ -598,7 +600,7 @@ end
 function ∨(a::PseudoCouple{V,B},b::PseudoCouple{V,B}) where {V,B}
     PseudoCouple{V,B}(realvalue(a)*imagvalue(b)+imagvalue(a)*realvalue(b),imagvalue(a)*imagvalue(b))
 end
-∨(a::Phasor{V,B},b::Phasor{V,B}) where {V,B} = Phasor(Couple(a)∨Couple(b))
+∨(a::Phasor{V},b::Phasor{V}) where V = Phasor(complexify(a)∨complexify(b))
 
 for (op,args) ∈ ((:contraction,()),(:contraction_metric,(:g,)))
     @eval begin
@@ -609,7 +611,7 @@ for (op,args) ∈ ((:contraction,()),(:contraction_metric,(:g,)))
             out = $op(volume(a),imaginary(b),$(args...))
             Couple{V,basis(out)}((realvalue(a)*realvalue(b))*value(abs2_inv(B,$(args...)))+(imagvalue(a)*imagvalue(b))*value(abs2_inv(V,$(args...))),value(out))
         end
-        $op(a::Phasor{V,B},b::Phasor{V,B},$(args...)) where {V,B} = Phasor($op(Couple(a),Couple(b),$(args...)))
+        $op(a::Phasor{V},b::Phasor{V},$(args...)) where V = Phasor($op(complexify(a),complexify(b),$(args...)))
         $op(a::Couple{V},b::Couple{V},$(args...)) where V = $op(a,imaginary(b),$(args...))+contraction(a,scalar(b))
         $op(a::PseudoCouple{V},b::PseudoCouple{V},$(args...)) where V = $op(imaginary(a),b,$(args...))+$op(volume(a),b,$(args...))
         $op(a::Couple{V},b::PseudoCouple{V},$(args...)) where V = contractn(scalar(a),imaginary(b))+$op(imaginary(a),b,$(args...))
@@ -830,8 +832,8 @@ for F ∈ Fields
         *(a::Couple{V,B},b::F) where {F<:$F,V,B} = Couple{V,B}(realvalue(a)*b,imagvalue(a)*b)
         *(a::F,b::PseudoCouple{V,B}) where {F<:$F,V,B} = PseudoCouple{V,B}(a*realvalue(b),a*imagvalue(b))
         *(a::PseudoCouple{V,B},b::F) where {F<:$F,V,B} = PseudoCouple{V,B}(realvalue(a)*b,imagvalue(a)*b)
-        *(a::F,b::Phasor{V,B}) where {F<:$F,V,B} = Phasor{V,B}(a*realvalue(b),imagvalue(b))
-        *(a::Phasor{V,B},b::F) where {F<:$F,V,B} = Phasor{V,B}(realvalue(a)*b,imagvalue(a))
+        *(a::F,b::Phasor{V}) where {F<:$F,V} = Phasor{V}(a*radius(b),angle(b))
+        *(a::Phasor{V},b::F) where {F<:$F,V} = Phasor{V}(radius(a)*b,angle(a))
         *(a::F,b::Multivector{V}) where {F<:$F,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$F,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$F,V} = Spinor{V}(a*b.v)
@@ -1093,8 +1095,8 @@ function generate_products(Field=Field,VEC=:mvec,MUL=:*,ADD=:+,SUB=:-,CONJ=:conj
         *(a::Couple{V,B},b::F) where {F<:$EF,V,B} = Couple{V,B}($Sym.:∏(realvalue(a),b),$Sym.:∏(imagvalue(a),b))
         *(a::F,b::PseudoCouple{V,B}) where {F<:$EF,V,B} = PseudoCouple{V,B}($Sym.:∏(a,realvalue(b)),$Sym.:∏(a,imagvalue(b)))
         *(a::PseudoCouple{V,B},b::F) where {F<:$EF,V,B} = PseudoCouple{V,B}($Sym.:∏(realvalue(a),b),$Sym.:∏(imagvalue(a),b))
-        *(a::F,b::Phasor{V,B}) where {F<:$EF,V,B} = Phasor{V,B}($Sym.:∏(a,realvalue(b)),imagvalue(b))
-        *(a::Phasor{V,B},b::F) where {F<:$EF,V,B} = Phasor{V,B}($Sym.:∏(realvalue(a),b),imagvalue(a))
+        *(a::F,b::Phasor{V}) where {F<:$EF,V} = Phasor{V}($Sym.:∏(a,radius(b)),imagvalue(b))
+        *(a::Phasor{V},b::F) where {F<:$EF,V} = Phasor{V}($Sym.:∏(radius(a),b),imagvalue(a))
         *(a::F,b::Multivector{V}) where {F<:$EF,V} = Multivector{V}(a*b.v)
         *(a::Multivector{V},b::F) where {F<:$EF,V} = Multivector{V}(a.v*b)
         *(a::F,b::Spinor{V}) where {F<:$EF,V} = Spinor{V}(a*b.v)
@@ -1326,7 +1328,7 @@ for side ∈ (:left,:right)
         args = ff ? (:g,) : ()
         adj = c≠cc ? :conj : :identity
         @eval begin
-            $c(z::Phasor,$(args...)) = $c(Couple(z),$(args...))
+            $c(z::Phasor,$(args...)) = $c(complexify(z),$(args...))
             function $c(z::Couple{V},$(args...)) where V
                 G = grade(V)
                 Single{V,G,getbasis(V,UInt(1)<<G-1)}(realvalue(z)) + $c(imaginary(z),$(args...))
@@ -1630,7 +1632,7 @@ for (side,field) ∈ ((:metric,false),(:anti,false),(:metric,true),(:anti,true))
     tenseven,tensodd = Symbol(side,:even),Symbol(side,:odd)
     args = field ? (:g,) : ()
     @eval begin
-        $c(z::Phasor,$(args...)) = $c(Couple(z),$(args...))
+        $c(z::Phasor,$(args...)) = $c(complexify(z),$(args...))
         $c(z::Couple{V},$(args...)) where V = scalar(z) + $c(imaginary(z),$(args...))
         $c(z::PseudoCouple{V},$(args...)) where V = $c(imaginary(z),$(args...)) + $c(volume(z),$(args...))
         @generated function $c(b::Chain{V,G,T},$(args...)) where {V,G,T}
@@ -1820,8 +1822,9 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
         function $reverse(z::PseudoCouple{V,B}) where {V,B}
             PseudoCouple{V,B}($p($g(B)) ? -realvalue(z) : reavalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z))
         end
-        function $reverse(z::Phasor{V,B}) where {V,B}
-            Phasor{V,B}(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z))
+        function $reverse(z::Phasor{V,<:TensorGraded}) where V
+            B = basis(angle(z))
+            Phasor{V}(radius(z),$p($g(B)) ? -angle(z) : angle(z))
         end
         @generated function $reverse(b::Chain{V,G,T}) where {V,G,T}
             SUB,VEC = subvec(b)
