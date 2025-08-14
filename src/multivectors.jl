@@ -864,6 +864,9 @@ Phasor(v::Phasor) = v
 
 Phasor(a,b) = Phasor{Submanifold(2)}(a,b)
 
+@inline realvalue(z::Phasor) = Real(radius(z))
+@inline imagvalue(z::Phasor) = Real(angle(z))
+
 const ∠ = Phasor
 #const SimplePhasor{V,B,T} = Phasor{V,<:TensorGraded{V,B},T<:Real}
 #Base.reim(z::Phasor) = (realvalue(z),imagvalue(z))
@@ -991,23 +994,20 @@ end
 
 (z::Phasor{V})(t::Real) where V = Phasor{V}(radius(z),angle(z)*t)
 (z::Phasor{V,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:TensorTerm,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:TensorTerm,<:TensorTerm})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:TensorTerm,<:Couple})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:Couple,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:Couple,<:TensorTerm})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,<:Couple,<:Couple})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
 (z::Phasor{V,B,<:AbstractReal} where B)(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
 (z::Phasor{V})(t::Real,θ) where V = Phasor{V}(radius(z)⊘exp((θ/2)*unit(angle(z))),angle(z)*t)
 (z::Phasor)(tθ::Chain{W,G,T,2} where {W,G,T}) = z(value(θ)...)
 (z::Phasor)(tθ::Tuple) = z(tθ...)
 (z::Phasor)(tθ::Values{2}) = z(tθ...)
-
-complexify(z::Phasor{V,<:Real}) where V = radius(z)*exp(angle(z))
-complexify(z::Phasor{V,<:Complex}) where V = radius(z)*exp(angle(z))
-complexify(z::Phasor{V,<:TensorTerm}) where V = radius(z)*exp(angle(z))
-complexify(z::Phasor{V,<:Couple}) where V = radius(z)*exp(angle(z))
-complexify(z::Phasor{V,<:Chain{V,G,T,1} where {G,T}}) where V = radius(z)*exp(angle(z))
+for typ ∈ (:AbstractReal,:Complex,:TensorTerm,:Couple,:(Chain{V,G,T,1} where {G,T}))
+    for TYP ∈ (:AbstractReal,:Complex,:TensorTerm,:Couple,:(Chain{V,G,T,1} where {G,T}))
+        @eval begin
+            (z::Phasor{V,<:$typ,<:$TYP})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+            complexify(z::Phasor{V,<:$typ,<:$TYP}) where V = radius(z)*exp(angle(z))
+        end
+    end
+end
+complexify(z::Phasor{V,<:AbstractReal}) where V = radius(z)*exp(angle(z))
 complexify(z::Phasor{V,B,<:AbstractReal} where B) where V = radius(z)*exp(angle(z))
 complexify(z::Phasor{V}) where V = radius(z)⊘exp(angle(z)/2)
 
@@ -1017,7 +1017,7 @@ complexify(t::PseudoCouple) = !t
 complexify(t::Complex) = t
 complexify(t::Spinor) = t
 
-polarize(t::Chain{V,1,T,2} where T) where V = Phasor{V,Submanifold(V)}(value(t)...)
+polarize(t::Chain{V,1,T,2} where T) where V = Phasor{V}((@inbounds t[1]),(@inbounds t[2])*Submanifold(V))
 polarize(t) = Phasor(complexify(t))
 polarize(t::Phasor) = t
 polarize(t::Complex) = Phasor(Couple(t))
