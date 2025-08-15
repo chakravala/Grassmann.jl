@@ -880,11 +880,25 @@ function Base.abs2(z::Phasor{V,<:TensorTerm}) where V
     end
 end
 
+unitangle(z::Phasor{V,<:TensorTerm} where V) = basis(angle(z))
+unitangle(z::Phasor{V,T}) where {V,T<:Real} = one(T)
+unitangle(z::T) where T<:Real = one(T)
+unitangle(z::Complex) = 1im
+unitangle(z) = unit(angle(z))
 Base.angle(z::Phasor) = z.ω
 Base.angle(z::Chain) = angle(complexify(z))
-radius(z::Phasor) = z.v
+phase(z::Phasor{V,B,T}) where {V,B,T<:Real} = zero(T)
+phase(z::Phasor{V,B,<:TensorTerm{W,0,T} where W}) where {V,B,T} = zero(T)
+#phase(z::Phasor{V,<:TensorTerm,<:TensorTerm} where V) = Real(angle(amplitude(z))/basis(z))
+phase(z::Phasor) = angle(amplitude(z))/unitangle(z)
+
+amplitude(z::Phasor) = z.v
+amplitude(z) = radius(z)
+radius(z::Real) = abs(z)
+radius(z::Complex) = abs(z)
+radius(z::TensorAlgebra) = Real(abs(z))
+radius(z::Phasor) = radius(amplitude(z))
 radius(z::Couple{V,B}) where {V,B} = sqrt(realvalue(z)^2 - imagvalue(z)^2*value(B*B))
-radius(z::TensorGraded{V,1} where V) = Real(abs(z))
 
 Base.promote_rule(a::Type{<:Couple},b::Type{<:Phasor}) = b
 
@@ -907,9 +921,9 @@ Multivector(z::Phasor) = Multivector(complexify(z))
 
 Spinor{V}(val::Phasor{V}) where V = Spinor(complexify(val))
 
-function Base.show(io::IO,z::Phasor)
-    show(io, radius(z))
-    print(io, " ∠ ", angle(z))
+function Base.show(io::IO,z::Phasor,compact=get(io,:compact,false))
+    show(io, amplitude(z))
+    print(io, compact ? "∠" : " ∠ ", angle(z))
 end
 
 Base.zero(::Phasor{V,B,T}) where {V,B,T} = Phasor{V}(zero(T),zero(B))
@@ -945,7 +959,7 @@ export gdims, tdims, betti, χ, unit, ∠, radius, istensor, isgraded, isterm
 export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
 export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
-export realvalue, imagvalue
+export realvalue, imagvalue, unitangle, phase, amplitude, complexify, vectorize, polarize
 
 const Imaginary{V,T} = Spinor{V,T,2}
 const Quaternion{V,T} = Spinor{V,T,4}
@@ -993,16 +1007,16 @@ function multispin(t::PseudoCouple{V,B}) where {V,B}
 end
 
 (z::Phasor{V})(t::Real) where V = Phasor{V}(radius(z),angle(z)*t)
-(z::Phasor{V,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V,B,<:AbstractReal} where B)(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
-(z::Phasor{V})(t::Real,θ) where V = Phasor{V}(radius(z)⊘exp((θ/2)*unit(angle(z))),angle(z)*t)
+(z::Phasor{V,<:AbstractReal})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unitangle(z)),angle(z)*t)
+(z::Phasor{V,B,<:AbstractReal} where B)(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unitangle(z)),angle(z)*t)
+(z::Phasor{V})(t::Real,θ) where V = Phasor{V}(radius(z)⊘exp((θ/2)*unitangle(z)),angle(z)*t)
 (z::Phasor)(tθ::Chain{W,G,T,2} where {W,G,T}) = z(value(θ)...)
 (z::Phasor)(tθ::Tuple) = z(tθ...)
 (z::Phasor)(tθ::Values{2}) = z(tθ...)
 for typ ∈ (:AbstractReal,:Complex,:TensorTerm,:Couple,:(Chain{V,G,T,1} where {G,T}))
     for TYP ∈ (:AbstractReal,:Complex,:TensorTerm,:Couple,:(Chain{V,G,T,1} where {G,T}))
         @eval begin
-            (z::Phasor{V,<:$typ,<:$TYP})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unit(angle(z))),angle(z)*t)
+            (z::Phasor{V,<:$typ,<:$TYP})(t::Real,θ) where V = Phasor{V}(radius(z)*exp(θ*unitangle(z)),angle(z)*t)
             complexify(z::Phasor{V,<:$typ,<:$TYP}) where V = radius(z)*exp(angle(z))
         end
     end
@@ -1023,12 +1037,12 @@ polarize(t::Phasor) = t
 polarize(t::Complex) = Phasor(Couple(t))
 
 vectorize(t::Couple{V,B}) where {V,B} = Chain{_subspace(V,B),1}(realvalue(t),imagvalue(t))
-vectorize(t::Phasor{V,<:TensorGraded}) where V = Chain{_subspace(V,basis(angle(t))),1}(radius(t),Real(angle(t)))
+vectorize(t::Phasor{V,<:TensorTerm}) where V = Chain{_subspace(V,unitangle(t)),1}(Real(amplitude(t)),Real(angle(t)))
 vectorize(t::PseudoCouple) = vectorize(!t)
 vectorize(t::Complex) = Chain(real(t),imag(t))
 vectorize(t::Chain) = t
 
-Base.@pure _subspace(::Submanifold{V,G},::Submanifold{W,L,B} where {W,L}) where {V,G,B} = Submanifold{V,G,B}()
+Base.@pure _subspace(::Submanifold{V},::Submanifold{W,G,B} where W) where {V,G,B} = Submanifold{V,G,B}()
 
 export quaternion, quatvalue, quatvalues
 quaternion(sijk::NTuple{4}) = quaternion(Submanifold(3),sijk...)
