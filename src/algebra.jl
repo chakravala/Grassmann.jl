@@ -416,9 +416,9 @@ antidot_metric(a,b) = complementleft(contraction_metric(complementright(a),compl
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{p}) where {p} = x^p
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{-1}) = inv(x)
 
-Base.:^(z::Phasor{V},n::Number) where V = Phasor{V}(radius(z)^n,n*angle(z))
-Base.:^(z::Phasor{V},n::Integer) where V = Phasor{V}(radius(z)^n,n*angle(z))
 for (op,field) ∈ ((:*,false),(:wedgedot_metric,true)); args = field ? (:g,) : ()
+@eval Base.:^(z::Phasor{V},n::Number,$(args...)) where V = Phasor{V}(^(amplitude(z),n,$(args...)),n*angle(z))
+@eval Base.:^(z::Phasor{V},n::Integer,$(args...)) where V = Phasor{V}(^(amplitude(z),n,$(args...)),n*angle(z))
 @eval function Base.:^(v::T,i::S,$(args...)) where {T<:TensorTerm,S<:Integer}
     i == 0 && (return getbasis(Manifold(v),0))
     i == 1 && (return v)
@@ -542,9 +542,11 @@ for (nv,d) ∈ ((:inv,:/),(:inv_rat,://))
         function $nv(b::Single{V,G,B,Any},$(args...)) where {V,G,B}
             Single{V,G,B}($Sym.$d(parityreverse(grade(V,B)) ? -1 : 1,value($Sym.:∏(abs2_inv(B,$(args...)),value(b)))))
         end
+        $nv(z::Phasor{V},$(args...)) where V = Phasor{V}($nv(amplitude(z),$(args...)),-angle(z))
+        $nv(z::Phasor{V,B,<:Real},$(args...)) where {B,V} = Phasor{V}($nv(amplitude(z)),-angle(z))
+        $nv(z::Phasor{V,B,<:Complex},$(args...)) where {B,V} = Phasor{V}($nv(amplitude(z)),-angle(z))
     end
 end
-inv(z::Phasor{V}) where V = Phasor{V}(inv(radius(z)),-angle(z))
 
 @eval /(a::TensorTerm{V,0},b::Couple{V,B,S},$(args...)) where {V,B,S} = a*inv(b,$(args...))
 @eval /(a::Couple{V,B},b::TensorTerm{V,0},$(args...)) where {V,B} = Couple{V,B}(realvalue(a)/value(b),imagvalue(a)/value(b))
