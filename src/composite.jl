@@ -34,7 +34,7 @@ for (op,field) ∈ ((:⟑,false),(:wedgedot_metric,true));
     if T<:Couple
         B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
-            return Couple{V,B}(expm1(t.v))
+            return Couple{V,B}(expm1(Complex(t)))
         end
     end
     S,term,f = t,$op(t,t,$(args...))/2,norm(t)
@@ -461,7 +461,7 @@ end
     if T<:Couple
         B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
-            return Couple{V,B}(cosh(t.v))
+            return Couple{V,B}(cosh(Complex(t)))
         end
     end
     τ = $op(t,t,$(args...))
@@ -520,7 +520,7 @@ end
     if T<:Couple
         B = basis(t); BB = value($op(B,B,$(args...)))
         if BB == -1
-            return Couple{V,B}(sinh(t.v))
+            return Couple{V,B}(sinh(Complex(t)))
         end
     end
     τ,f = $op(t,t,$(args...)),norm(t)
