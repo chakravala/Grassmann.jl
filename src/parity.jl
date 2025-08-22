@@ -440,6 +440,8 @@ construct_cache(:DiagonalForm)
 
 @pure signbit(V::Chain) = false
 @pure signbit(V::Single) = false
+@pure signbit(V::AbstractSpinor) = false
+@pure signbit(V::Multivector) = false
 @pure signbit(V::T) where T<:Manifold = (ib=indexbasis(rank(V)); parity.(Ref(V),ib,ib))
 @pure signbit(V::T,G) where T<:Manifold = (ib=indexbasis(rank(V),G); parity.(Ref(V),ib,ib))
 #=@pure angular(V::T) where T<:Manifold = Values(findall(signbit(V))...)
