@@ -28,6 +28,8 @@ Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+EllipticFunctions = "6a4e32cb-b31a-4929-85af-fb29d9a80738"
 
 [extensions]
 ReduceExt = "Reduce"
@@ -42,6 +44,8 @@ MeshesExt = "Meshes"
 GeometryBasicsExt = "GeometryBasics"
 MakieExt = "Makie"
 UnicodePlotsExt = "UnicodePlots"
+SpecialFunctionsExt = "SpecialFunctions"
+EllipticFunctionsExt = "EllipticFunctions"
 
 [compat]
 julia = "1"
