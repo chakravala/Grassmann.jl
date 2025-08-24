@@ -802,7 +802,7 @@ end=#
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
 
-@generated function grad(T::Values{M,<:Chain{V,1}}) where {M,V}
+@generated function gradient(T::Values{M,<:Chain{V,1}}) where {M,V}
     W = M≠mdims(V) ? Submanifold(M) : V; N = mdims(V)-1
     M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
     x,y,xy = Grassmann.Cramer(N)
@@ -843,7 +843,7 @@ Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{W,1}},g=nothing) where {W,V} = inv(value(t))
 invdet(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = invdet(value(t))
 adjugate(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = adjugate(value(t))
-grad(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = grad(value(t))
+gradient(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = gradient(value(t))
 
 @generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(mdims(V))))⋅y)
 approx(x,y::Values{N}) where N = value(polynom(x,Val(N)))⋅y
@@ -927,9 +927,18 @@ mean(m::Values{N}) where N = sum(m)/N
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
 barycenter(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
+#gradient(m::FixedVector{N,<:Chain{V}} where N) where V = gradient(Chain{V,1}(m))
+#gradient(m::Values{N,<:Chain{V}} where N) where V = gradient(Chain{V,1}(m))
+#gradient(m::TensorAlgebra) = d(m)
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::TensorAlgebra) = Manifold(m)(∇)×m
+divergence(m::FixedVector{N,<:Chain{V}} where N) where V = divergence(Chain{V,1}(m))
+divergence(m::Values{N,<:Chain{V}} where N) where V = divergence(Chain{V,1}(m))
+divergence(m::TensorAlgebra) = ∂(m)
+Base.div(m::TensorAlgebra) = divergence(m)
+Base.div(m::Values) = divergence(m)
+Base.div(m::FixedVector) = divergence(m)
 LinearAlgebra.det(t::Chain{V,1,<:Chain} where V) = !∧(t)
 LinearAlgebra.det(m::Vector{<:Chain{V}}) where V = .!∧(m)
 function ∧(m::DenseVector{<:Chain{V}}) where V
@@ -950,6 +959,7 @@ for op ∈ (:mean,:barycenter,:curl)
         @pure $ops(m,p) = $op.(getindex.(Ref(p),m))
     end
 end
+const grad = gradient
 
 function area(m::Vector{<:Chain})
     S = m[end]∧m[1]

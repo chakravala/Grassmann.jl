@@ -26,7 +26,7 @@ import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, 
 export ⊕, ℝ, @V_str, @S_str, @D_str, Manifold, Submanifold, Signature, DiagonalForm, value
 export @basis, @basis_str, @dualbasis, @dualbasis_str, @mixedbasis, @mixedbasis_str, Λ
 export ℝ0, ℝ1, ℝ2, ℝ3, ℝ4, ℝ5, ℝ6, ℝ7, ℝ8, ℝ9, mdims, tangent, metric, antimetric, cometric
-export hodge, wedge, vee, complement, dot, antidot, istangent, Values
+export hodge, wedge, vee, complement, dot, antidot, istangent, Values, divergence, grad
 
 import Base: @pure, ==, isapprox
 import Base: print, show, getindex, setindex!, promote_rule, convert, adjoint
@@ -71,8 +71,8 @@ export 𝕚,𝕛,𝕜
 const 𝕚,𝕛,𝕜 = hyperplanes(ℝ3)
 
 using Leibniz
-import Leibniz: ∇, Δ, d, ∂
-export ∇, Δ, ∂, d, δ, ↑, ↓
+import Leibniz: ∇, Δ, d, ∂, δ
+export ∇, Δ, ∂, d, δ, ↑, ↓, differential, codifferential, boundary, up, down, nabla
 
 #generate_products(:(Leibniz.Operator),:svec)
 for T ∈ (:(Chain{V}),:(Multivector{V}))
@@ -146,7 +146,7 @@ function betti(t::T) where T<:TensorAlgebra
     return Values(out)
 end
 
-@generated function ↑(ω::T) where T<:TensorAlgebra
+@generated function up(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
     T<:Submanifold && !isbasis(ω) && (return Leibniz.supermanifold(V))
     !(hasinf(V)||hasorigin(V)) && (return :ω)
@@ -163,18 +163,18 @@ end
     end
 end
 #↑(ω::ChainBundle) = ω
-function ↑(ω,b)
+function up(ω,b)
     ω2 = (~ω)⋅ω # ω^2
     iω2 = inv(ω2+1)
     (2iω2)*ω + ((ω2-1)*iω2)*b
 end
-function ↑(ω,p,m)
+function up(ω,p,m)
     ω2 = scalar((~ω)⋅ω) # ω^2
     iω2 = inv(ω2+1)
     (2iω2)*ω + ((ω2-1)*iω2)*p + ((ω2+1)*iω2)*m
 end
 
-@generated function ↓(ω::T) where T<:TensorAlgebra
+@generated function down(ω::T) where T<:TensorAlgebra
     V,M = Manifold(ω),T<:Submanifold && !isbasis(ω)
     !(hasinf(V)||hasorigin(V)) && (return M ? V(2:mdims(V)) : :ω)
     G = Λ(V)
@@ -190,9 +190,11 @@ end
         end
     end
 end
-#↓(ω::ChainBundle) = ω(list(2,mdims(ω)))
-↓(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
-↓(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
+#down(ω::ChainBundle) = ω(list(2,mdims(ω)))
+down(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
+down(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
+
+const ↑,↓ = up,down
 
 ## skeleton / subcomplex
 
