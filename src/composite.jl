@@ -927,9 +927,7 @@ mean(m::Values{N}) where N = sum(m)/N
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
 barycenter(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
-#gradient(m::FixedVector{N,<:Chain{V}} where N) where V = gradient(Chain{V,1}(m))
-#gradient(m::Values{N,<:Chain{V}} where N) where V = gradient(Chain{V,1}(m))
-#gradient(m::TensorAlgebra) = d(m)
+gradient(m::TensorAlgebra) = d(m)
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::TensorAlgebra) = Manifold(m)(∇)×m

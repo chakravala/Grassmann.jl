@@ -18,6 +18,8 @@ isdefined(Grassmann, :Requires) ? (import Grassmann: SpecialFunctions) : (using 
 
 for fun ∈ (:gamma,:loggamma,:logfactorial,:digamma,:invdigamma,:trigamma,:expinti,:expintx,:sinint,:cosint,:erf,:erfc,:erfcinv,:erfcx,:logerfc,:logerfcx,:erfi,:erfinv,:dawson,:faddeeva,:airyai,:airyaiprime,:airybi,:airybiprime,:airyaix,:airyaiprimex,:airybix,:airybiprimex,:besselj0,:besselj1,:bessely0,:bessely1,:jinc,:ellipk,:ellipe,:eta,:zeta)
     @eval begin
+        SpecialFunctions.$fun(t::TensorTerm{V}) where V = $fun(Couple(t))
+        SpecialFunctions.$fun(t::TensorTerm{V,0}) where V = Single{V}($fun(Real(t)))
         SpecialFunctions.$fun(t::Couple{V,B}) where {V,B} = Couple{V,B}($fun(Complex(t)))
         SpecialFunctions.$fun(t::Chain) = vectorize($fun(complexify(t)))
         SpecialFunctions.$fun(t::Phasor) = $fun(complexify(t))
@@ -25,6 +27,8 @@ for fun ∈ (:gamma,:loggamma,:logfactorial,:digamma,:invdigamma,:trigamma,:expi
 end
 for fun ∈ (:polygamma,:gamma,:loggamma,:besselj,:besseljx,:sphericalbesselj,:bessely,:besselyx,:sphericalbessely,:hankelh1,:hankelh1x,:hankelh2,:hankelh2x,:besseli,:besselix,:besselk,:besselkx)
     @eval begin
+        SpecialFunctions.$fun(m,t::TensorTerm{V}) where V = $fun(m,Couple(t))
+        SpecialFunctions.$fun(m,t::TensorTerm{V,0}) where V = Single{V}($fun(m,Real(t)))
         SpecialFunctions.$fun(m,t::Couple{V,B}) where {V,B} = Couple{V,B}($fun(m,Complex(t)))
         SpecialFunctions.$fun(m,t::Chain) = vectorize($fun(m,complexify(t)))
         SpecialFunctions.$fun(m,t::Phasor) = $fun(m,complexify(t))
@@ -32,6 +36,8 @@ for fun ∈ (:polygamma,:gamma,:loggamma,:besselj,:besseljx,:sphericalbesselj,:b
 end
 for fun ∈ (:gamma,:loggamma)
     @eval begin
+        SpecialFunctions.$fun(a::TensorTerm{V},z) where V = $fun(Couple(a),z)
+        SpecialFunctions.$fun(a::TensorTerm{V,0},z) where V = Single{V}($fun(Real(a),z))
         SpecialFunctions.$fun(a::Couple{V,B},z) where {V,B} = Couple{V,B}($fun(Complex(a),z))
         SpecialFunctions.$fun(a::Chain,z) = vectorize($fun(complexify(a),z))
         SpecialFunctions.$fun(a::Phasor,z) = $fun(complexify(a),z)
@@ -39,11 +45,15 @@ for fun ∈ (:gamma,:loggamma)
 end
 for fun ∈ (:gamma,:loggamma,:beta,:logbeta,:logabsbeta,:logabsbinomial,:expint,:erf)
     @eval begin
+        SpecialFunctions.$fun(x::TensorTerm{V},y::TensorTerm{V}) where V = $fun(Couple(x),Couple(y))
+        SpecialFunctions.$fun(x::TensorTerm{V,0},y::TensorTerm{V,0}) where V = Single{V}($fun(Real(x),Real(y)))
         SpecialFunctions.$fun(x::Couple{V,B},y::Couple{V,B}) where {V,B} = Couple{V,B}($fun(Complex(x),Complex(y)))
         SpecialFunctions.$fun(x::Chain,y::Chain) = vectorize($fun(complexify(x),complexify(y)))
         SpecialFunctions.$fun(x::Phasor,y::Phasor) = $fun(complexify(x),complexify(y))
     end
 end
+SpecialFunctions.besselh(nu,k,t::TensorTerm{V}) where V = besselh(nu,k,Couple(t))
+SpecialFunctions.besselh(nu,k,t::TensorTerm{V,0}) where V = Single{V}(besselh(nu,k,Real(t)))
 SpecialFunctions.besselh(nu,k,t::Couple{V,B}) where {V,B} = Couple{V,B}(besselh(nu,k,Complex(t)))
 SpecialFunctions.besselh(nu,k,t::Chain) = vectorize(besselh(nu,k,complexify(t)))
 SpecialFunctions.besselh(nu,k,t::Phasor) = besselh(nu,k,complexify(t))
