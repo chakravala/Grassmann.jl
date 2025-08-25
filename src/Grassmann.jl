@@ -19,7 +19,7 @@ module Grassmann
 # | |_/ \_| |  / /  \ \  | |_/ \_| | (_____) | |_| |
 #  \___^___/  /_/    \_\  \___^___/           \___/
 
-using SparseArrays, ComputedFieldTypes
+using SparseArrays, ComputedFieldTypes, AbstractFFTs
 using AbstractTensors, Leibniz, DirectSum
 import AbstractTensors: Values, Variables, FixedVector, clifford, hodge, wedge, vee
 
@@ -72,7 +72,7 @@ const 𝕚,𝕛,𝕜 = hyperplanes(ℝ3)
 
 using Leibniz
 import Leibniz: ∇, Δ, d, ∂, δ
-export ∇, Δ, ∂, d, δ, ↑, ↓, differential, codifferential, boundary, up, down, nabla
+export ∇, Δ, ∂, d, δ, ↑, ↓, differential, codifferential, boundary, nabla, project, reject
 
 #generate_products(:(Leibniz.Operator),:svec)
 for T ∈ (:(Chain{V}),:(Multivector{V}))
@@ -110,6 +110,13 @@ end
 d(ω::T) where T<:TensorAlgebra = Manifold(ω)(∇)∧ω
 δ(ω::T) where T<:TensorAlgebra = -∂(ω)
 
+"""
+    boundary_rank(t)
+
+Returns the rank of the combinatorial boundary operator evaluated on `t`, which can be an element of the `TensorAlgebra`.
+Internally the function counts how many graded dimensions of `t` remain after applying the boundary operator `∂` on it, minimized to not exceed the original graded space.
+This results in a list of `Values` whose entries `rₖ` satisfy `0 ≤ rₖ ≤ dₖ` computed with `d = count_gdims(t)` as utility methods.
+"""
 function boundary_rank(t,d=count_gdims(t))
     out = count_gdims(∂(t))
     out[1] = 0
@@ -119,6 +126,13 @@ function boundary_rank(t,d=count_gdims(t))
     return Values(out)
 end
 
+"""
+    boundary_null(t)
+
+Dimension of the nullspace (kernel) of the combinatorial boundary operator on `t`, which can be an element of the `TensorAlgebra`.
+For each grade `k` the function lists `Values` with entries `dₖ₊₁ - rₖ`, where the computation follows from `d = count_gdims(t)` and `r = boundary_rank(t)` utility methods.
+Intuitively, this measures how many `k`‑chains are boundaries of (k+1)‑chains and therefore vanish under the `∂` operation.
+"""
 function boundary_null(t)
     d = count_gdims(t)
     r = boundary_rank(t,d)
@@ -133,7 +147,7 @@ end
 """
     betti(::TensorAlgebra)
 
-Compute the Betti numbers.
+Compute combinatoric Betti numbers based on the `count_gdims` and `boundary_rank` methods.
 """
 function betti(t::T) where T<:TensorAlgebra
     d = count_gdims(t)
@@ -146,7 +160,7 @@ function betti(t::T) where T<:TensorAlgebra
     return Values(out)
 end
 
-@generated function up(ω::T) where T<:TensorAlgebra
+@generated function project(ω::T) where T<:TensorAlgebra
     V = Manifold(ω)
     T<:Submanifold && !isbasis(ω) && (return Leibniz.supermanifold(V))
     !(hasinf(V)||hasorigin(V)) && (return :ω)
@@ -162,19 +176,19 @@ end
         end
     end
 end
-#↑(ω::ChainBundle) = ω
-function up(ω,b)
+#project(ω::ChainBundle) = ω
+function project(ω,b)
     ω2 = (~ω)⋅ω # ω^2
     iω2 = inv(ω2+1)
     (2iω2)*ω + ((ω2-1)*iω2)*b
 end
-function up(ω,p,m)
+function project(ω,p,m)
     ω2 = scalar((~ω)⋅ω) # ω^2
     iω2 = inv(ω2+1)
     (2iω2)*ω + ((ω2-1)*iω2)*p + ((ω2+1)*iω2)*m
 end
 
-@generated function down(ω::T) where T<:TensorAlgebra
+@generated function reject(ω::T) where T<:TensorAlgebra
     V,M = Manifold(ω),T<:Submanifold && !isbasis(ω)
     !(hasinf(V)||hasorigin(V)) && (return M ? V(2:mdims(V)) : :ω)
     G = Λ(V)
@@ -190,11 +204,27 @@ end
         end
     end
 end
-#down(ω::ChainBundle) = ω(list(2,mdims(ω)))
-down(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
-down(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
+#reject(ω::ChainBundle) = ω(list(2,mdims(ω)))
+reject(ω,b) = (~(b∧ω)⋅b)/(1-ω⋅b) # ((b∧ω)*b)/(1-ω⋅b)
+reject(ω,∞,∅) = (m=∞∧∅;((m∧ω)⋅~inv(m))/(-ω⋅∞)) #(m=∞∧∅;inv(m)*(m∧ω)/(-ω⋅∞))
 
-const ↑,↓ = up,down
+const ↑,↓ = project,reject
+
+@doc """
+    ↑(ω::TensorAlgebra{V}) where V # project
+
+Canonical up-`project` operation from the space `V`, based on either Euclidean projective geometry, or the Riemann sphere, or conformal geometric algebra, or potentially other future canonical specifications.
+Optional arguments expose lower-level building blocks: `↑(ω,b)` — use an explicit projective basis element `b`, or in the CGA context `↑(ω,p,m)` — parameterise the conformal split with point-like part `p` and Minkowski part `m`.
+See also `↓` for the inverse down-`reject` operation.
+""" project, ↑
+
+@doc """
+    ↓(ω::TensorAlgebra{V}) where V # reject
+
+Canonical down-`reject` operation from the space `V`, based on either Euclidean projective geometry, or the Riemann sphere, or conformal geometric algebra, or potentially other future canonical specifications.
+Optional arguments expose lower-level building blocks: `↓(ω,b)` — use an explicit projective basis element `b`, or in the CGA context `↓(ω,p,m)` — parameterise the conformal split with point-like part `p` and Minkowski part `m`.
+See also `↑` for the inverse up-`project` operation.
+""" reject, ↓
 
 ## skeleton / subcomplex
 
@@ -315,6 +345,16 @@ function rectangle(p,nx=100,ny=nx)
     Chain{Manifold(p),1}.(1.0,real.(z),imag.(z))
 end
 rectanglefield(t,ϕ,nx=100,ny=nx) = chainfield(t,ϕ).(rectangle(points(t),nx,ny))
+
+for fun ∈ (:fft,:fft!,:ifft,:ifft!,:bfft,:bfft!,:rfft,:irfft,:brfft)
+    @eval begin
+        AbstractFFTs.$fun(t::AbstractArray{<:TensorGraded{V,0}},args...) where V = $fun(Real.(t),args...)
+        AbstractFFTs.$fun(t::AbstractArray{<:TensorGraded{V}},args...) where V = $fun(Couple.(t),args...)
+        AbstractFFTs.$fun(t::AbstractArray{<:Couple{V,B}},args...) where {V,B} = Couple{V,B}.($fun(Complex.(t),args...))
+        AbstractFFTs.$fun(t::AbstractArray{<:Chain},args...) = $fun(complexify.(t),args...)
+        AbstractFFTs.$fun(t::AbstractArray{<:Phasor},args...) = $fun(complexify.(t),args...)
+    end
+end
 
 eval(generate_products())
 eval(generate_products(Complex))
