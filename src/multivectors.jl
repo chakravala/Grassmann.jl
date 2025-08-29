@@ -1046,6 +1046,8 @@ complexify(t::Couple,g=nothing) = t
 complexify(t::PseudoCouple,g=nothing) = !t
 complexify(t::Complex,g=nothing) = t
 complexify(t::Spinor,g=nothing) = t
+complexify(t::TensorTerm) = Couple(t)
+complexify(t::Real) = Complex(t)
 
 polarize(t::Chain{V,1,T,2} where T,g=nothing) where V = Phasor{V}((@inbounds t[1]),(@inbounds t[2])*Submanifold(V))
 polarize(t) = polarize(complexify(t))
@@ -1054,8 +1056,8 @@ polarize(t::Phasor,g=nothing) = t
 polarize(t::Complex,g=nothing) = polarize(Couple(t))
 polarize(m::One{V},g=nothing) where V = Phasor{V}(1,0)
 polarize(m::Submanifold{V},g=nothing) where V = Phasor{V}(1,m)
-polarize(m::Single{V,0},g=nothing) where V = Phasor{V}(value(m),0)
-polarize(m::Single{V},g=nothing) where V = Phasor{V}(1,m)
+polarize(m::TensorTerm{V,0},g=nothing) where V = Phasor{V}(value(m),0)
+polarize(m::TensorTerm{V},g=nothing) where V = Phasor{V}(1,m)
 polarize(m::Couple) = Phasor(radius(m),angle(m))
 polarize(m::Couple,g) = Phasor(radius(m,g),angle(m,g))
 polarize(m::Spinor) = Phasor(radius(m),angle(m))
@@ -1066,7 +1068,8 @@ vectorize(t::Phasor{V,<:TensorTerm}) where V = Chain{_subspace(V,unitangle(t)),1
 vectorize(t::PseudoCouple) = vectorize(!t)
 vectorize(t::Complex) = Chain(real(t),imag(t))
 vectorize(t::Chain) = t
-
+vectorize(t::TensorTerm{V,1} where V) = Chain(t)
+vectorize(t::TensorTerm{V} where V) = vectorize(Couple(t))
 
 Base.@pure _subspace(a::Submanifold{V,G},::Submanifold{W,G,B} where W) where {V,G,B} = a
 Base.@pure _subspace(::Submanifold{V},::Submanifold{W,G,B} where W) where {V,G,B} = Submanifold{V,G,B}()

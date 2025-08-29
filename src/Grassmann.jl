@@ -72,7 +72,8 @@ const 𝕚,𝕛,𝕜 = hyperplanes(ℝ3)
 
 using Leibniz
 import Leibniz: ∇, Δ, d, ∂, δ
-export ∇, Δ, ∂, d, δ, ↑, ↓, differential, codifferential, boundary, nabla, project, reject
+export ∇, Δ, ∂, d, δ, ↑, ↓, differential, codifferential, boundary, project, reject
+export nabla, Nabla, Laplacian
 
 #generate_products(:(Leibniz.Operator),:svec)
 for T ∈ (:(Chain{V}),:(Multivector{V}))
@@ -254,7 +255,7 @@ function chain(t::S,::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
 end
 path(t) = chain(t,Val{false}())
 
-@inline (::Leibniz.Derivation)(x::T,v=Val{true}()) where T<:TensorAlgebra = skeleton(x,v)
+#@inline (::Leibniz.Derivation{Bool,2})(x::T,v=Val{true}()) where T<:TensorAlgebra = skeleton(x,v)
 𝒫(t::T) where T<:TensorAlgebra = Δ(t,Val{false}())
 subcomplex(x::S,v=Val{true}()) where S<:TensorAlgebra = Δ(absym(∂(x)),v)
 function skeleton(x::S,v::Val{T}=Val{true}()) where S<:TensorTerm{V} where {V,T}
