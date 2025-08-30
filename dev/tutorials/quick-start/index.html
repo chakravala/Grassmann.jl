@@ -1,4 +1,275 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quick start (G2) · Grassmann.jl</title><meta name="title" content="Quick start (G2) · Grassmann.jl"/><meta property="og:title" content="Quick start (G2) · Grassmann.jl"/><meta property="twitter:title" content="Quick start (G2) · Grassmann.jl"/><meta name="description" content="Documentation for Grassmann.jl."/><meta property="og:description" content="Documentation for Grassmann.jl."/><meta property="twitter:description" content="Documentation for Grassmann.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Grassmann.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Grassmann.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../design/">Design</a></li><li><a class="tocitem" href="../../algebra/">Algebra</a></li><li><a class="tocitem" href="../../videos/">Videos</a></li><li><a class="tocitem" href="../../library/">Library</a></li><li><a class="tocitem" href="../../agpl/">AGPL-3.0</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../install/">Installation</a></li><li class="is-active"><a class="tocitem" href>Quick start (G2)</a><ul class="internal"><li><a class="tocitem" href="#Reflection"><span>Reflection</span></a></li><li><a class="tocitem" href="#Rotation"><span>Rotation</span></a></li></ul></li><li><a class="tocitem" href="../algebra-of-space/">The Algebra of Space (G3)</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Quick start (G2)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Quick start (G2)</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Quick-start-(G2)"><a class="docs-heading-anchor" href="#Quick-start-(G2)">Quick start (G2)</a><a id="Quick-start-(G2)-1"></a><a class="docs-heading-anchor-permalink" href="#Quick-start-(G2)" title="Permalink"></a></h1><p>Import the <code>Grassmann</code> package and instantiate a two-dimensional algebra (G2),</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; using Grassmann</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; @basis ℝ^2</code><code class="nohighlight hljs ansi" style="display:block;">(⟨++⟩, v, v₁, v₂, v₁₂)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; v1*v2 # geometric product</code><code class="nohighlight hljs ansi" style="display:block;">v₁₂</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; v1|v2 # inner product</code><code class="nohighlight hljs ansi" style="display:block;">𝟎</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; v1∧v2 # exterior product</code><code class="nohighlight hljs ansi" style="display:block;">v₁₂</code></pre><h2 id="Reflection"><a class="docs-heading-anchor" href="#Reflection">Reflection</a><a id="Reflection-1"></a><a class="docs-heading-anchor-permalink" href="#Reflection" title="Permalink"></a></h2><pre><code class="language-julia hljs">a = v1+v2
+<html lang="en">
+<head>
+  <meta name="generator" content=
+  "HTML Tidy for HTML5 for Linux version 5.7.45">
+  <meta charset="UTF-8">
+  <meta name="viewport" content=
+  "width=device-width, initial-scale=1.0">
+  <title>Quick start (G2) · Grassmann.jl</title>
+  <meta name="title" content="Quick start (G2) · Grassmann.jl">
+  <meta property="og:title" content=
+  "Quick start (G2) · Grassmann.jl">
+  <meta property="twitter:title" content=
+  "Quick start (G2) · Grassmann.jl">
+  <meta name="description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="og:description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="twitter:description" content=
+  "Documentation for Grassmann.jl.">
+  <script data-outdated-warner="" src=
+  "../../assets/warner.js"></script>
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css"
+  rel="stylesheet" type="text/css">
+  <script>
+  documenterBaseURL="../.."
+  </script>
+  <script src=
+  "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+  data-main="../../assets/documenter.js"></script>
+  <script src="../../search_index.js"></script>
+  <script src="../../siteinfo.js"></script>
+  <script src="../../../versions.js"></script>
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-mocha.css" data-theme-name=
+  "catppuccin-mocha">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-macchiato.css"
+  data-theme-name="catppuccin-macchiato">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-frappe.css" data-theme-name=
+  "catppuccin-frappe">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-latte.css" data-theme-name=
+  "catppuccin-latte">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/documenter-dark.css" data-theme-name=
+  "documenter-dark" data-theme-primary-dark="">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/documenter-light.css" data-theme-name=
+  "documenter-light" data-theme-primary="">
+  <script src="../../assets/themeswap.js"></script>
+</head>
+<body>
+  <div id="documenter">
+    <nav class="docs-sidebar">
+      <a class="docs-logo" href="../../"><img src=
+      "../../assets/logo.png" alt="Grassmann.jl logo"></a>
+      <div class="docs-package-name">
+        <span class="docs-autofit"><a href=
+        "../../">Grassmann.jl</a></span>
+      </div><button class=
+      "docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2"
+      id="documenter-search-query">Search docs (Ctrl + /)</button>
+      <ul class="docs-menu">
+        <li>
+          <a class="tocitem" href="../../">Home</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../design/">Design</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../algebra/">Algebra</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../videos/">Videos</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../library/">Library</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../agpl/">AGPL-3.0</a>
+        </li>
+        <li>
+          <span class="tocitem">Tutorials</span>
+          <ul>
+            <li>
+              <a class="tocitem" href=
+              "../install/">Installation</a>
+            </li>
+            <li class="is-active">
+              <a class="tocitem" href="">Quick start (G2)</a>
+              <ul class="internal">
+                <li>
+                  <a class="tocitem" href=
+                  "#Reflection"><span>Reflection</span></a>
+                </li>
+                <li>
+                  <a class="tocitem" href=
+                  "#Rotation"><span>Rotation</span></a>
+                </li>
+              </ul>
+            </li>
+            <li>
+              <a class="tocitem" href="../algebra-of-space/">The
+              Algebra of Space (G3)</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a class="tocitem" href=
+          "../../references/">References</a>
+        </li>
+      </ul>
+      <div class="docs-version-selector field has-addons">
+        <div class="control">
+          <span class=
+          "docs-label button is-static is-size-7">Version</span>
+        </div>
+        <div class="docs-selector control is-expanded">
+          <div class="select is-fullwidth is-size-7">
+            <select id="documenter-version-selector">
+            </select>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="docs-main">
+      <header class="docs-navbar">
+        <a class=
+        "docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop"
+        id="documenter-sidebar-button" href="#"></a>
+        <nav class="breadcrumb">
+          <ul class="is-hidden-mobile">
+            <li>
+              <a class="is-disabled">Tutorials</a>
+            </li>
+            <li class="is-active">
+              <a href="">Quick start (G2)</a>
+            </li>
+          </ul>
+          <ul class="is-hidden-tablet">
+            <li class="is-active">
+              <a href="">Quick start (G2)</a>
+            </li>
+          </ul>
+        </nav>
+        <div class="docs-right">
+          <a class=
+          "docs-settings-button docs-navbar-link fa-solid fa-gear"
+          id="documenter-settings-button" href="#" title=
+          "Settings"></a><a class=
+          "docs-article-toggle-button fa-solid fa-chevron-up" id=
+          "documenter-article-toggle-button" href="javascript:;"
+          title="Collapse all docstrings"></a>
+        </div>
+      </header>
+      <article class="content" id="documenter-page">
+        <h1 id="Quick-start-(G2)"><a class="docs-heading-anchor"
+        href="#Quick-start-(G2)">Quick start (G2)</a><a id=
+        "Quick-start-(G2)-1"></a><a class=
+        "docs-heading-anchor-permalink" href="#Quick-start-(G2)"
+        title="Permalink"></a></h1>
+        <p>Import the <code>Grassmann</code> package and
+        instantiate a two-dimensional algebra (G2),</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; using Grassmann</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; @basis ℝ^2</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">(⟨++⟩, v, v₁, v₂, v₁₂)</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; v1*v2 # geometric product</code><code class="nohighlight hljs ansi"
+style="display:block;">v₁₂</code><br><code class=
+"language-julia-repl hljs" style=
+"display:block;">julia&gt; v1|v2 # inner product</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">𝟎</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; v1∧v2 # exterior product</code><code class="nohighlight hljs ansi"
+style="display:block;">v₁₂</code></pre>
+        <h2 id="Reflection"><a class="docs-heading-anchor" href=
+        "#Reflection">Reflection</a><a id=
+        "Reflection-1"></a><a class="docs-heading-anchor-permalink"
+        href="#Reflection" title="Permalink"></a></h2>
+        <pre><code class="language-julia hljs">a = v1+v2
 n = v1
--n*a/n # reflect a in hyperplane normal to n</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-1.0v₁ + 1.0v₂</code></pre><h2 id="Rotation"><a class="docs-heading-anchor" href="#Rotation">Rotation</a><a id="Rotation-1"></a><a class="docs-heading-anchor-permalink" href="#Rotation" title="Permalink"></a></h2><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; R = exp(π/4*v12)</code><code class="nohighlight hljs ansi" style="display:block;">0.7071067811865476 + 0.7071067811865475v₁₂</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; ~R*v1*R</code><code class="nohighlight hljs ansi" style="display:block;">2.22045e-16v₁ + 1.0v₂</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../install/">« Installation</a><a class="docs-footer-nextpage" href="../algebra-of-space/">The Algebra of Space (G3) »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Wednesday 11 June 2025 03:54">Wednesday 11 June 2025</span>. Using Julia version 1.11.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+-n*a/n # reflect a in hyperplane normal to n</code></pre>
+        <pre class="documenter-example-output"><code class=
+        "nohighlight hljs ansi">-1.0v₁ + 1.0v₂</code></pre>
+        <h2 id="Rotation"><a class="docs-heading-anchor" href=
+        "#Rotation">Rotation</a><a id="Rotation-1"></a><a class=
+        "docs-heading-anchor-permalink" href="#Rotation" title=
+        "Permalink"></a></h2>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; R = exp(π/4*v12)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">0.7071067811865476 + 0.7071067811865475v₁₂</code><br><code class="language-julia-repl hljs"
+style="display:block;">julia&gt; ~R*v1*R</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">2.22045e-16v₁ + 1.0v₂</code></pre>
+      </article>
+      <nav class="docs-footer">
+        <a class="docs-footer-prevpage" href="../install/">«
+        Installation</a><a class="docs-footer-nextpage" href=
+        "../algebra-of-space/">The Algebra of Space (G3) »</a>
+        <div class="flexbox-break"></div>
+        <p class="footer-message">Powered by <a href=
+        "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+        and the <a href="https://julialang.org/">Julia Programming
+        Language</a>.</p>
+      </nav>
+    </div>
+    <div class="modal" id="documenter-settings">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Settings</p>
+        </header>
+        <section class="modal-card-body">
+          <p><label class="label">Theme</label></p>
+          <div class="select">
+            <select id="documenter-themepicker">
+              <option value="auto">
+                Automatic (OS)
+              </option>
+              <option value="documenter-light">
+                documenter-light
+              </option>
+              <option value="documenter-dark">
+                documenter-dark
+              </option>
+              <option value="catppuccin-latte">
+                catppuccin-latte
+              </option>
+              <option value="catppuccin-frappe">
+                catppuccin-frappe
+              </option>
+              <option value="catppuccin-macchiato">
+                catppuccin-macchiato
+              </option>
+              <option value="catppuccin-mocha">
+                catppuccin-mocha
+              </option>
+            </select>
+          </div>
+          <hr>
+          <p>This document was generated with <a href=
+          "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+          version 1.14.1 on <span class="colophon-date" title=
+          "Saturday 30 August 2025 12:02">Saturday 30 August
+          2025</span>. Using Julia version 1.11.1.</p>
+        </section>
+        <footer class="modal-card-foot"></footer>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

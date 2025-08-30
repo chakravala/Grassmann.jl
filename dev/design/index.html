@@ -1,7 +1,558 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Design · Grassmann.jl</title><meta name="title" content="Design · Grassmann.jl"/><meta property="og:title" content="Design · Grassmann.jl"/><meta property="twitter:title" content="Design · Grassmann.jl"/><meta name="description" content="Documentation for Grassmann.jl."/><meta property="og:description" content="Documentation for Grassmann.jl."/><meta property="twitter:description" content="Documentation for Grassmann.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.png" alt="Grassmann.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Grassmann.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Design</a><ul class="internal"><li><a class="tocitem" href="#Direct-sum-parametric-type-polymorphism"><span>Direct sum parametric type polymorphism</span></a></li><li><a class="tocitem" href="#Higher-dimensions-with-SparseBasis-and-ExtendedBasis"><span>Higher dimensions with <code>SparseBasis</code> and <code>ExtendedBasis</code></span></a></li><li><a class="tocitem" href="#Interoperability-for-TensorAlgebra{V}"><span>Interoperability for <code>TensorAlgebra{V}</code></span></a></li></ul></li><li><a class="tocitem" href="../algebra/">Algebra</a></li><li><a class="tocitem" href="../videos/">Videos</a></li><li><a class="tocitem" href="../library/">Library</a></li><li><a class="tocitem" href="../agpl/">AGPL-3.0</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../tutorials/install/">Installation</a></li><li><a class="tocitem" href="../tutorials/quick-start/">Quick start (G2)</a></li><li><a class="tocitem" href="../tutorials/algebra-of-space/">The Algebra of Space (G3)</a></li></ul></li><li><a class="tocitem" href="../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Design</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Design</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="TensorAlgebra{V}-design-and-code-generation"><a class="docs-heading-anchor" href="#TensorAlgebra{V}-design-and-code-generation"><code>TensorAlgebra{V}</code> design and code generation</a><a id="TensorAlgebra{V}-design-and-code-generation-1"></a><a class="docs-heading-anchor-permalink" href="#TensorAlgebra{V}-design-and-code-generation" title="Permalink"></a></h1><p>Mathematical foundations and definitions specific to the <a href="https://github.com/chakravala/Grassmann.jl">Grassmann.jl</a> implementation provide an extensible platform for computing with a universal language for finite element methods based on a discrete manifold bundle.  Tools built on these foundations enable computations based on multi-linear algebra and spin groups using the geometric algebra known as Grassmann algebra or Clifford algebra. This foundation is built on a <a href="https://github.com/chakravala/DirectSum.jl">DirectSum.jl</a> parametric type system for tangent bundles and vector spaces generating the algorithms for local tangent algebras in a global context. With this unifying mathematical foundation, it is possible to improve efficiency of multi-disciplinary research using geometric tensor calculus by relying on universal mathematical principles.</p><ul><li><strong>AbstractTensors.jl</strong>: Tensor algebra abstract type interoperability setup</li><li><strong>DirectSum.jl</strong>: Tangent bundle, vector space and <code>Submanifold</code> definition</li><li><strong>Grassmann.jl</strong>: ⟨Grassmann-Clifford-Hodge⟩ multilinear differential geometric algebra</li></ul><h2 id="Direct-sum-parametric-type-polymorphism"><a class="docs-heading-anchor" href="#Direct-sum-parametric-type-polymorphism">Direct sum parametric type polymorphism</a><a id="Direct-sum-parametric-type-polymorphism-1"></a><a class="docs-heading-anchor-permalink" href="#Direct-sum-parametric-type-polymorphism" title="Permalink"></a></h2><p><a href="https://zenodo.org/badge/latestdoi/169765288"><img src="https://zenodo.org/badge/169765288.svg" alt="DOI"/></a> <a href="https://github.com/chakravala/DirectSum.jl/releases"><img src="https://img.shields.io/github/v/release/chakravala/DirectSum.jl" alt="GitHub release (latest SemVer)"/></a> <a href="https://github.com/chakravala/DirectSum.jl/commits"><img src="https://img.shields.io/github/commits-since/chakravala/DirectSum.jl/latest?label=new%20commits" alt="GitHub commits since latest release"/></a> <a href="https://ci.appveyor.com/project/chakravala/directsum-jl"><img src="https://ci.appveyor.com/api/projects/status/ipaggdeq2f1509pl?svg=true" alt="Build status"/></a></p><p>The <em>DirectSum.jl</em> package is a work in progress providing the necessary tools to work with an arbitrary <code>Manifold</code> specified by an encoding. Due to the parametric type system for the generating <code>TensorBundle</code>, the Julia compiler can fully preallocate and often cache values efficiently ahead of run-time. Although intended for use with the <em>Grassmann.jl</em> package, <code>DirectSum</code> can be used independently.</p><p>Let <span>$M = T^\mu V$</span> be a <span>$\mathbb{K}$</span>-module of rank <span>$n$</span>, then an instance for <span>$T^\mu V$</span> can be the tuple <span>$(n,\mathbb{P},g,\nu,\mu)$</span> with <span>$\mathbb{P}\subseteq \langle v_\infty,v_\emptyset\rangle$</span> specifying the presence of the projective basis and <span>$g:V\times V\rightarrow\mathbb{K}$</span> is a metric tensor specification. The type <code>TensorBundle{n,</code><span>$\mathbb{P}$</span><code>,g,</code><span>$\nu$</span><code>,</code><span>$\mu$</span><code>}</code> encodes this information as <em>byte-encoded</em> data available at pre-compilation, where <span>$\mu$</span> is an integer specifying the order of the tangent bundle (i.e. multiplicity limit of the Leibniz-Taylor monomials). Lastly, <span>$\nu$</span> is the number of tangent variables.</p><p class="math-container">\[\langle v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu\rangle=M\leftrightarrow M&#39; = \langle w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu\rangle\]</p><p>where <span>$v_i$</span> and <span>$w_i$</span> are bases for the vectors and covectors, while <span>$\partial_i$</span> and <span>$\epsilon_j$</span> are bases for differential operators and scalar functions. The purpose of the <code>TensorBundle</code> type is to specify the <span>$\mathbb{K}$</span>-module basis at compile time. When assigned in a workspace, <code>V = Submanifold(::TensorBundle)</code> is used.</p><p>The metric signature of the <code>Submanifold{V,1}</code> elements of a vector space <span>$V$</span> can be specified with the <code>V&quot;...&quot;</code> by using <span>$+$</span> or <span>$-$</span> to specify whether the <code>Submanifold{V,1}</code> element of the corresponding index squares to <span>$+1$</span> or <span>$-1$</span>. For example, <code>S&quot;+++&quot;</code> constructs a positive definite 3-dimensional <code>TensorBundle</code>, so constructors such as <code>S&quot;...&quot;</code> and <code>D&quot;...&quot;</code> are convenient.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℝ^3 == V&quot;+++&quot; == Manifold(3)</code><code class="nohighlight hljs ansi" style="display:block;">true</code></pre><p>It is also possible to change the diagonal scaling, such as with <code>D&quot;1,1,1,0&quot;</code>, although the <code>Signature</code> format has a more compact representation if limited to <span>$+1$</span> and <span>$-1$</span>. It is also possible to change the diagonal scaling, such as with <code>D&quot;0.3,2.4,1&quot;</code>. Fully general <code>MetricTensor</code> as a type with non-diagonal components requires a matrix, e.g. <code>MetricTensor([1 2; 2 3])</code>.</p><p>Declaring an additional point at infinity is done by specifying it in the string constructor with <span>$\infty$</span> at the first index (i.e. Riemann sphere <code>S&quot;∞+++&quot;</code>). The hyperbolic geometry can be declared by <span>$\emptyset$</span> subsequently (i.e. hyperbolic projection <code>S&quot;∅+++&quot;</code>). Additionally, the <em>null-basis</em> based on the projective split for conformal geometric algebra would be specified with <code>S&quot;∞∅+++&quot;</code>. These two declared basis elements are interpreted in the type system. The <code>tangent(V,μ,ν)</code>  map can be used to specify <span>$\mu$</span> and <span>$\nu$</span>.</p><p>To assign <code>V = Submanifold(::TensorBundle)</code> along with associated basis elements of the <code>DirectSum.Basis</code> to the local Julia session workspace, it is typical to use <code>Submanifold</code> elements created by the <code>@basis</code> macro,</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; using Grassmann; @basis S&quot;-++&quot; # macro or basis&quot;-++&quot;</code><code class="nohighlight hljs ansi" style="display:block;">(⟨-++⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre><p>the macro <code>@basis V</code> delcares a local basis in Julia. As a result of this macro, all <code>Submanifold{V,G}</code> elements generated with <code>M::TensorBundle</code> become available in the local workspace with the specified naming arguments. The first argument provides signature specifications, the second argument is the variable name for <span>$V$</span> the <span>$\mathbb{K}$</span>-module, and the third and fourth argument are prefixes of the <code>Submanifold</code> vector names (and covector names). Default is <span>$V$</span> assigned <code>Submanifold{M}</code> and <span>$v$</span> is prefix for the <code>Submanifold{V}</code>.</p><p>It is entirely possible to assign multiple different bases having different signatures without any problems. The <code>@basis</code> macro arguments are used to assign the vector space name to <span>$V$</span> and the basis elements to <span>$v_i$</span>, but other assigned names can be chosen so that their local names don&#39;t interfere: If it is undesirable to assign these variables to a local workspace, the versatile constructs of <code>DirectSum.Basis{V}</code> can be used to contain or access them, which is exported to the user as the method <code>DirectSum.Basis(V)</code>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; DirectSum.Basis(V)</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨-++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre><p><code>V(::Int...)</code> provides a convenient way to define a <code>Submanifold</code> by using integer indices to reference specific direct sums within the ambient space <span>$V$</span>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; (ℝ^5)(3,5)</code><code class="nohighlight hljs ansi" style="display:block;">⟨__+_+⟩</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; dump(ans)</code><code class="nohighlight hljs ansi" style="display:block;">Submanifold{⟨+++++⟩, 2, 0x0000000000000014} ⟨__+_+⟩</code></pre><p>Here, calling a <code>Manifold</code> with a set of indices produces a <code>Submanifold</code> representation.</p><p>The direct sum operator <span>$\oplus$</span> can be used to join spaces (alternatively <span>$+$</span>), and the dual space functor <span>$&#39;$</span> is an involution which toggles a dual vector space with inverted signature.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; V = ℝ&#39;⊕ℝ^3</code><code class="nohighlight hljs ansi" style="display:block;">⟨-+++⟩</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; V&#39;</code><code class="nohighlight hljs ansi" style="display:block;">⟨+---⟩&#39;</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; W = V⊕V&#39;</code><code class="nohighlight hljs ansi" style="display:block;">⟨-++++---⟩*</code></pre><p>The direct sum of a <code>TensorBundle</code> and its dual <span>$V\oplus V&#39;$</span> represents the full mother space <span>$V*$</span>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; collect(V) # all Submanifold vector basis elements</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨-+++⟩,16}(⟨____⟩, ⟨-___⟩, ⟨_+__⟩, ⟨__+_⟩, ⟨___+⟩, ⟨-+__⟩, ⟨-_+_⟩, ⟨-__+⟩, ⟨_++_⟩, ⟨_+_+⟩, ⟨__++⟩, ⟨-++_⟩, ⟨-+_+⟩, ⟨-_++⟩, ⟨_+++⟩, ⟨-+++⟩)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; collect(Submanifold(V&#39;)) # all covector basis elements</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨+---⟩&#39;,16}(w, w¹, w², w³, w⁴, w¹², w¹³, w¹⁴, w²³, w²⁴, w³⁴, w¹²³, w¹²⁴, w¹³⁴, w²³⁴, w¹²³⁴)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; collect(Submanifold(W)) # all mixed basis elements</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨-++++---⟩*,256}(v, v₁, v₂, v₃, v₄, w¹, w², w³, w⁴, v₁₂, v₁₃, v₁₄, v₁w¹, v₁w², v₁w³, v₁w⁴, v₂₃, v₂₄, v₂w¹, v₂w², v₂w³, v₂w⁴, v₃₄, v₃w¹, v₃w², v₃w³, v₃w⁴, v₄w¹, v₄w², v₄w³, v₄w⁴, w¹², w¹³, w¹⁴, w²³, w²⁴, w³⁴, v₁₂₃, v₁₂₄, v₁₂w¹, v₁₂w², v₁₂w³, v₁₂w⁴, v₁₃₄, v₁₃w¹, v₁₃w², v₁₃w³, v₁₃w⁴, v₁₄w¹, v₁₄w², v₁₄w³, v₁₄w⁴, v₁w¹², v₁w¹³, v₁w¹⁴, v₁w²³, v₁w²⁴, v₁w³⁴, v₂₃₄, v₂₃w¹, v₂₃w², v₂₃w³, v₂₃w⁴, v₂₄w¹, v₂₄w², v₂₄w³, v₂₄w⁴, v₂w¹², v₂w¹³, v₂w¹⁴, v₂w²³, v₂w²⁴, v₂w³⁴, v₃₄w¹, v₃₄w², v₃₄w³, v₃₄w⁴, v₃w¹², v₃w¹³, v₃w¹⁴, v₃w²³, v₃w²⁴, v₃w³⁴, v₄w¹², v₄w¹³, v₄w¹⁴, v₄w²³, v₄w²⁴, v₄w³⁴, w¹²³, w¹²⁴, w¹³⁴, w²³⁴, v₁₂₃₄, v₁₂₃w¹, v₁₂₃w², v₁₂₃w³, v₁₂₃w⁴, v₁₂₄w¹, v₁₂₄w², v₁₂₄w³, v₁₂₄w⁴, v₁₂w¹², v₁₂w¹³, v₁₂w¹⁴, v₁₂w²³, v₁₂w²⁴, v₁₂w³⁴, v₁₃₄w¹, v₁₃₄w², v₁₃₄w³, v₁₃₄w⁴, v₁₃w¹², v₁₃w¹³, v₁₃w¹⁴, v₁₃w²³, v₁₃w²⁴, v₁₃w³⁴, v₁₄w¹², v₁₄w¹³, v₁₄w¹⁴, v₁₄w²³, v₁₄w²⁴, v₁₄w³⁴, v₁w¹²³, v₁w¹²⁴, v₁w¹³⁴, v₁w²³⁴, v₂₃₄w¹, v₂₃₄w², v₂₃₄w³, v₂₃₄w⁴, v₂₃w¹², v₂₃w¹³, v₂₃w¹⁴, v₂₃w²³, v₂₃w²⁴, v₂₃w³⁴, v₂₄w¹², v₂₄w¹³, v₂₄w¹⁴, v₂₄w²³, v₂₄w²⁴, v₂₄w³⁴, v₂w¹²³, v₂w¹²⁴, v₂w¹³⁴, v₂w²³⁴, v₃₄w¹², v₃₄w¹³, v₃₄w¹⁴, v₃₄w²³, v₃₄w²⁴, v₃₄w³⁴, v₃w¹²³, v₃w¹²⁴, v₃w¹³⁴, v₃w²³⁴, v₄w¹²³, v₄w¹²⁴, v₄w¹³⁴, v₄w²³⁴, w¹²³⁴, v₁₂₃₄w¹, v₁₂₃₄w², v₁₂₃₄w³, v₁₂₃₄w⁴, v₁₂₃w¹², v₁₂₃w¹³, v₁₂₃w¹⁴, v₁₂₃w²³, v₁₂₃w²⁴, v₁₂₃w³⁴, v₁₂₄w¹², v₁₂₄w¹³, v₁₂₄w¹⁴, v₁₂₄w²³, v₁₂₄w²⁴, v₁₂₄w³⁴, v₁₂w¹²³, v₁₂w¹²⁴, v₁₂w¹³⁴, v₁₂w²³⁴, v₁₃₄w¹², v₁₃₄w¹³, v₁₃₄w¹⁴, v₁₃₄w²³, v₁₃₄w²⁴, v₁₃₄w³⁴, v₁₃w¹²³, v₁₃w¹²⁴, v₁₃w¹³⁴, v₁₃w²³⁴, v₁₄w¹²³, v₁₄w¹²⁴, v₁₄w¹³⁴, v₁₄w²³⁴, v₁w¹²³⁴, v₂₃₄w¹², v₂₃₄w¹³, v₂₃₄w¹⁴, v₂₃₄w²³, v₂₃₄w²⁴, v₂₃₄w³⁴, v₂₃w¹²³, v₂₃w¹²⁴, v₂₃w¹³⁴, v₂₃w²³⁴, v₂₄w¹²³, v₂₄w¹²⁴, v₂₄w¹³⁴, v₂₄w²³⁴, v₂w¹²³⁴, v₃₄w¹²³, v₃₄w¹²⁴, v₃₄w¹³⁴, v₃₄w²³⁴, v₃w¹²³⁴, v₄w¹²³⁴, v₁₂₃₄w¹², v₁₂₃₄w¹³, v₁₂₃₄w¹⁴, v₁₂₃₄w²³, v₁₂₃₄w²⁴, v₁₂₃₄w³⁴, v₁₂₃w¹²³, v₁₂₃w¹²⁴, v₁₂₃w¹³⁴, v₁₂₃w²³⁴, v₁₂₄w¹²³, v₁₂₄w¹²⁴, v₁₂₄w¹³⁴, v₁₂₄w²³⁴, v₁₂w¹²³⁴, v₁₃₄w¹²³, v₁₃₄w¹²⁴, v₁₃₄w¹³⁴, v₁₃₄w²³⁴, v₁₃w¹²³⁴, v₁₄w¹²³⁴, v₂₃₄w¹²³, v₂₃₄w¹²⁴, v₂₃₄w¹³⁴, v₂₃₄w²³⁴, v₂₃w¹²³⁴, v₂₄w¹²³⁴, v₃₄w¹²³⁴, v₁₂₃₄w¹²³, v₁₂₃₄w¹²⁴, v₁₂₃₄w¹³⁴, v₁₂₃₄w²³⁴, v₁₂₃w¹²³⁴, v₁₂₄w¹²³⁴, v₁₃₄w¹²³⁴, v₂₃₄w¹²³⁴, v₁₂₃₄w¹²³⁴)</code></pre><p>In addition to the direct-sum operation, several other operations are supported, such as <span>$\cup,\cap,\subseteq,\supseteq$</span> for set operations. Due to the design of the <code>TensorBundle</code> dispatch, these operations enable code optimizations at compile-time provided by the bit parameters.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℝ⊕ℝ&#39; ⊇ Manifold(1)</code><code class="nohighlight hljs ansi" style="display:block;">true</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℝ ∩ ℝ&#39; == Manifold(0)</code><code class="nohighlight hljs ansi" style="display:block;">true</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℝ ∪ ℝ&#39; == ℝ⊕ℝ&#39;</code><code class="nohighlight hljs ansi" style="display:block;">true</code></pre><p>Operations on <code>Manifold</code> types is automatically handled at compile time.</p><p>More information about <code>DirectSum</code> is available  at <a href="https://github.com/chakravala/DirectSum.jl">https://github.com/chakravala/DirectSum.jl</a></p><h2 id="Higher-dimensions-with-SparseBasis-and-ExtendedBasis"><a class="docs-heading-anchor" href="#Higher-dimensions-with-SparseBasis-and-ExtendedBasis">Higher dimensions with <code>SparseBasis</code> and <code>ExtendedBasis</code></a><a id="Higher-dimensions-with-SparseBasis-and-ExtendedBasis-1"></a><a class="docs-heading-anchor-permalink" href="#Higher-dimensions-with-SparseBasis-and-ExtendedBasis" title="Permalink"></a></h2><p>In order to work with a <code>TensorAlgebra{V}</code>, it is necessary for some computations to be cached. This is usually done automatically when accessed.</p><pre><code class="language-julia hljs">julia&gt; Λ(7) ⊕ Λ(7)&#39;
-DirectSum.SparseBasis{⟨+++++++-------⟩*,16384}(v, ..., v₁₂₃₄₅₆₇w¹²³⁴⁵⁶⁷)</code></pre><p>One way of declaring the cache for all 3 combinations of a <code>TensorBundle{N}</code> and its dual is to ask for the sum <code>Λ(V) + Λ(V)&#39;</code>, which is equivalent to <code>Λ(V⊕V&#39;)</code>, but this does not initialize the cache of all 3 combinations unlike the former.</p><p>Staging of precompilation and caching is designed so that a user can smoothly transition between very high dimensional and low dimensional algebras in a single session, with varying levels of extra caching and optimizations. The parametric type formalism in <code>Grassmann</code> is highly expressive and enables pre-allocation of geometric algebra computations involving specific sparse subalgebras, including the representation of rotational groups.</p><p>It is possible to reach elements with up to <span>$N=62$</span> vertices from a <code>TensorAlgebra</code> having higher maximum dimensions than supported by Julia natively.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; Λ(62)</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.ExtendedBasis{⟨11111111111111111111111111111111111111111111111111111111111111⟩,4611686018427387904}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Λ(62).v32a87Ng</code><code class="nohighlight hljs ansi" style="display:block;">-1v₂₃₇₈agN</code></pre><p>The 62 indices require full alpha-numeric labeling with lower-case and capital letters. This now allows you to reach up to <span>$4,611,686,018,427,387,904$</span> dimensions with Julia <code>using Grassmann</code>. Then the volume element is</p><pre class="documenter-example-output"><code class="nohighlight hljs ansi">v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ</code></pre><p>Full <code>Multivector</code> allocations are only possible for <span>$N\leq22$</span>, but sparse operations are also available at higher dimensions. While <code>DirectSum.Basis{V}</code> is a container for the <code>TensorAlgebra</code> generators of <span>$V$</span>, the <code>Basis</code> is only cached for <span>$N\leq8$</span>. For the range of dimensions <span>$8&lt;N\leq22$</span>, the <code>SparseBasis</code> type is used.</p><pre><code class="language-julia hljs">julia&gt; Λ(22)
-DirectSum.SparseBasis{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)</code></pre><p>This is the largest <code>SparseBasis</code> that can be generated with Julia, due to array size limitations.</p><p>To reach higher dimensions with <span>$N&gt;22$</span>, the <code>DirectSum.ExtendedBasis</code> type is used. It is suficient to work with a 64-bit representation (which is the default). And it turns out that with 62 standard keyboard characters, this fits.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; V = ℝ^22</code><code class="nohighlight hljs ansi" style="display:block;">⟨++++++++++++++++++++++⟩</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Λ(V+V&#39;)</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.ExtendedBasis{⟨++++++++++++++++++++++----------------------⟩*,17592186044416}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklw¹²³⁴⁵⁶⁷⁸⁹⁰ABCDEFGHIJKL)</code></pre><p>At 22 dimensions and lower there is better caching, with further extra caching for 8 dimensions or less. Thus, the largest Hilbert space that is fully reachable has 4,194,304 dimensions, but we can still reach out to 4,611,686,018,427,387,904 dimensions with the <code>ExtendedBasis</code> built in. It is still feasible to extend to a further super-extended 128-bit representation using the <code>UInt128</code> type (but this will require further modifications of internals and helper functions. To reach into infinity even further, it is theoretically possible to construct ultra-extensions also using dictionaries. Full <code>Multivector</code> elements are not representable when <code>ExtendedBasis</code> is used, but the performance of the <code>Basis</code> and sparse elements should be just as fast as for lower dimensions for the current <code>SubAlgebra</code> and <code>TensorAlgebra</code> types. The sparse representations are a work in progress to be improved with time.</p><h2 id="Interoperability-for-TensorAlgebra{V}"><a class="docs-heading-anchor" href="#Interoperability-for-TensorAlgebra{V}">Interoperability for <code>TensorAlgebra{V}</code></a><a id="Interoperability-for-TensorAlgebra{V}-1"></a><a class="docs-heading-anchor-permalink" href="#Interoperability-for-TensorAlgebra{V}" title="Permalink"></a></h2><p><a href="https://zenodo.org/badge/latestdoi/169811826"><img src="https://zenodo.org/badge/169811826.svg" alt="DOI"/></a> <a href="https://github.com/chakravala/AbstractTensors.jl/releases"><img src="https://img.shields.io/github/v/release/chakravala/AbstractTensors.jl" alt="GitHub release (latest SemVer)"/></a> <a href="https://github.com/chakravala/AbstractTensors.jl/commits"><img src="https://img.shields.io/github/commits-since/chakravala/AbstractTensors.jl/latest?label=new%20commits" alt="GitHub commits since latest release"/></a> <a href="https://ci.appveyor.com/project/chakravala/abstracttensors-jl"><img src="https://ci.appveyor.com/api/projects/status/yey8huk505h4b81u?svg=true" alt="Build status"/></a></p><p>The <code>AbstractTensors</code> package is intended for universal interoperation of the abstract <code>TensorAlgebra</code> type system. All <code>TensorAlgebra{V}</code> subtypes have type parameter <span>$V$</span>, used to store a <code>Submanifold{M}</code> value, which is parametrized by <span>$M$</span> the <code>TensorBundle</code> choice. This means that different tensor types can have a commonly shared underlying <span>$\mathbb{K}$</span>-module parametric type expressed by defining <code>V::Submanifold{M}</code>. Each <code>TensorAlgebra</code> subtype must be accompanied by a corresponding <code>TensorBundle</code> parameter, which is fully static at compile time. Due to the parametric type system for the <span>$\mathbb{K}$</span>-module types, the compiler can fully pre-allocate and often cache.</p><p>Since <code>TensorBundle</code> choices are fundamental to <code>TensorAlgebra</code> operations, the universal interoperability between <code>TensorAlgebra{V}</code> elements with different associated <code>TensorBundle</code> choices is naturally realized by applying the <code>union</code> morphism to operations, e.g. <span>$\bigwedge :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g \rightarrow \Lambda^{\sum_kp_k}\bigcup_k V_k$</span>. Some of the method names like <span>$+,-,*,\otimes,\circledast,\odot,\boxtimes,\star$</span> for <code>TensorAlgebra</code> elements are shared across different packages, with interoperability.</p><pre><code class="language-julia hljs">function op(::TensorAlgebra{V},::TensorAlgebra{V}) where V
+<html lang="en">
+<head>
+  <meta name="generator" content=
+  "HTML Tidy for HTML5 for Linux version 5.7.45">
+  <meta charset="UTF-8">
+  <meta name="viewport" content=
+  "width=device-width, initial-scale=1.0">
+  <title>Design · Grassmann.jl</title>
+  <meta name="title" content="Design · Grassmann.jl">
+  <meta property="og:title" content="Design · Grassmann.jl">
+  <meta property="twitter:title" content="Design · Grassmann.jl">
+  <meta name="description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="og:description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="twitter:description" content=
+  "Documentation for Grassmann.jl.">
+  <script data-outdated-warner="" src=
+  "../assets/warner.js"></script>
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css"
+  rel="stylesheet" type="text/css">
+  <script>
+  documenterBaseURL=".."
+  </script>
+  <script src=
+  "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+  data-main="../assets/documenter.js"></script>
+  <script src="../search_index.js"></script>
+  <script src="../siteinfo.js"></script>
+  <script src="../../versions.js"></script>
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/catppuccin-mocha.css" data-theme-name=
+  "catppuccin-mocha">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/catppuccin-macchiato.css" data-theme-name=
+  "catppuccin-macchiato">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/catppuccin-frappe.css" data-theme-name=
+  "catppuccin-frappe">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/catppuccin-latte.css" data-theme-name=
+  "catppuccin-latte">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/documenter-dark.css" data-theme-name=
+  "documenter-dark" data-theme-primary-dark="">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../assets/themes/documenter-light.css" data-theme-name=
+  "documenter-light" data-theme-primary="">
+  <script src="../assets/themeswap.js"></script>
+</head>
+<body>
+  <div id="documenter">
+    <nav class="docs-sidebar">
+      <a class="docs-logo" href="../"><img src="../assets/logo.png"
+      alt="Grassmann.jl logo"></a>
+      <div class="docs-package-name">
+        <span class="docs-autofit"><a href=
+        "../">Grassmann.jl</a></span>
+      </div><button class=
+      "docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2"
+      id="documenter-search-query">Search docs (Ctrl + /)</button>
+      <ul class="docs-menu">
+        <li>
+          <a class="tocitem" href="../">Home</a>
+        </li>
+        <li class="is-active">
+          <a class="tocitem" href="">Design</a>
+          <ul class="internal">
+            <li>
+              <a class="tocitem" href=
+              "#Direct-sum-parametric-type-polymorphism"><span>Direct
+              sum parametric type polymorphism</span></a>
+            </li>
+            <li>
+              <a class="tocitem" href=
+              "#Higher-dimensions-with-SparseBasis-and-ExtendedBasis">
+              <span>Higher dimensions with <code>SparseBasis</code>
+              and <code>ExtendedBasis</code></span></a>
+            </li>
+            <li>
+              <a class="tocitem" href=
+              "#Interoperability-for-TensorAlgebra{V}"><span>Interoperability
+              for <code>TensorAlgebra{V}</code></span></a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a class="tocitem" href="../algebra/">Algebra</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../videos/">Videos</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../library/">Library</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../agpl/">AGPL-3.0</a>
+        </li>
+        <li>
+          <span class="tocitem">Tutorials</span>
+          <ul>
+            <li>
+              <a class="tocitem" href=
+              "../tutorials/install/">Installation</a>
+            </li>
+            <li>
+              <a class="tocitem" href=
+              "../tutorials/quick-start/">Quick start (G2)</a>
+            </li>
+            <li>
+              <a class="tocitem" href=
+              "../tutorials/algebra-of-space/">The Algebra of Space
+              (G3)</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a class="tocitem" href="../references/">References</a>
+        </li>
+      </ul>
+      <div class="docs-version-selector field has-addons">
+        <div class="control">
+          <span class=
+          "docs-label button is-static is-size-7">Version</span>
+        </div>
+        <div class="docs-selector control is-expanded">
+          <div class="select is-fullwidth is-size-7">
+            <select id="documenter-version-selector">
+            </select>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="docs-main">
+      <header class="docs-navbar">
+        <a class=
+        "docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop"
+        id="documenter-sidebar-button" href="#"></a>
+        <nav class="breadcrumb">
+          <ul class="is-hidden-mobile">
+            <li class="is-active">
+              <a href="">Design</a>
+            </li>
+          </ul>
+          <ul class="is-hidden-tablet">
+            <li class="is-active">
+              <a href="">Design</a>
+            </li>
+          </ul>
+        </nav>
+        <div class="docs-right">
+          <a class=
+          "docs-settings-button docs-navbar-link fa-solid fa-gear"
+          id="documenter-settings-button" href="#" title=
+          "Settings"></a><a class=
+          "docs-article-toggle-button fa-solid fa-chevron-up" id=
+          "documenter-article-toggle-button" href="javascript:;"
+          title="Collapse all docstrings"></a>
+        </div>
+      </header>
+      <article class="content" id="documenter-page">
+        <h1 id="TensorAlgebra{V}-design-and-code-generation">
+        <a class="docs-heading-anchor" href=
+        "#TensorAlgebra{V}-design-and-code-generation"><code>TensorAlgebra{V}</code>
+        design and code generation</a><a id=
+        "TensorAlgebra{V}-design-and-code-generation-1"></a><a class="docs-heading-anchor-permalink"
+        href="#TensorAlgebra{V}-design-and-code-generation" title=
+        "Permalink"></a></h1>
+        <p>Mathematical foundations and definitions specific to the
+        <a href=
+        "https://github.com/chakravala/Grassmann.jl">Grassmann.jl</a>
+        implementation provide an extensible platform for computing
+        with a universal language for finite element methods based
+        on a discrete manifold bundle. Tools built on these
+        foundations enable computations based on multi-linear
+        algebra and spin groups using the geometric algebra known
+        as Grassmann algebra or Clifford algebra. This foundation
+        is built on a <a href=
+        "https://github.com/chakravala/DirectSum.jl">DirectSum.jl</a>
+        parametric type system for tangent bundles and vector
+        spaces generating the algorithms for local tangent algebras
+        in a global context. With this unifying mathematical
+        foundation, it is possible to improve efficiency of
+        multi-disciplinary research using geometric tensor calculus
+        by relying on universal mathematical principles.</p>
+        <ul>
+          <li><strong>AbstractTensors.jl</strong>: Tensor algebra
+          abstract type interoperability setup</li>
+          <li><strong>DirectSum.jl</strong>: Tangent bundle, vector
+          space and <code>Submanifold</code> definition</li>
+          <li><strong>Grassmann.jl</strong>:
+          ⟨Grassmann-Clifford-Hodge⟩ multilinear differential
+          geometric algebra</li>
+        </ul>
+        <h2 id="Direct-sum-parametric-type-polymorphism"><a class=
+        "docs-heading-anchor" href=
+        "#Direct-sum-parametric-type-polymorphism">Direct sum
+        parametric type polymorphism</a><a id=
+        "Direct-sum-parametric-type-polymorphism-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Direct-sum-parametric-type-polymorphism" title=
+        "Permalink"></a></h2>
+        <p><a href=
+        "https://zenodo.org/badge/latestdoi/169765288"><img src=
+        "https://zenodo.org/badge/169765288.svg" alt="DOI"></a>
+        <a href=
+        "https://github.com/chakravala/DirectSum.jl/releases"><img src="https://img.shields.io/github/v/release/chakravala/DirectSum.jl"
+        alt="GitHub release (latest SemVer)"></a> <a href=
+        "https://github.com/chakravala/DirectSum.jl/commits"><img src="https://img.shields.io/github/commits-since/chakravala/DirectSum.jl/latest?label=new%20commits"
+        alt="GitHub commits since latest release"></a> <a href=
+        "https://ci.appveyor.com/project/chakravala/directsum-jl"><img src="https://ci.appveyor.com/api/projects/status/ipaggdeq2f1509pl?svg=true"
+        alt="Build status"></a></p>
+        <p>The <em>DirectSum.jl</em> package is a work in progress
+        providing the necessary tools to work with an arbitrary
+        <code>Manifold</code> specified by an encoding. Due to the
+        parametric type system for the generating
+        <code>TensorBundle</code>, the Julia compiler can fully
+        preallocate and often cache values efficiently ahead of
+        run-time. Although intended for use with the
+        <em>Grassmann.jl</em> package, <code>DirectSum</code> can
+        be used independently.</p>
+        <p>Let <span>$M = T^\mu V$</span> be a
+        <span>$\mathbb{K}$</span>-module of rank <span>$n$</span>,
+        then an instance for <span>$T^\mu V$</span> can be the
+        tuple <span>$(n,\mathbb{P},g,\nu,\mu)$</span> with
+        <span>$\mathbb{P}\subseteq \langle
+        v_\infty,v_\emptyset\rangle$</span> specifying the presence
+        of the projective basis and <span>$g:V\times
+        V\rightarrow\mathbb{K}$</span> is a metric tensor
+        specification. The type
+        <code>TensorBundle{n,</code><span>$\mathbb{P}$</span><code>,g,</code><span>$\nu$</span><code>,</code><span>$\mu$</span><code>}</code>
+        encodes this information as <em>byte-encoded</em> data
+        available at pre-compilation, where <span>$\mu$</span> is
+        an integer specifying the order of the tangent bundle (i.e.
+        multiplicity limit of the Leibniz-Taylor monomials).
+        Lastly, <span>$\nu$</span> is the number of tangent
+        variables.</p>
+        <p class="math-container">\[\langle
+        v_1,\dots,v_{n-\nu},\partial_1,\dots,\partial_\nu\rangle=M\leftrightarrow
+        M' = \langle
+        w_1,\dots,w_{n-\nu},\epsilon_1,\dots,\epsilon_\nu\rangle\]</p>
+        <p>where <span>$v_i$</span> and <span>$w_i$</span> are
+        bases for the vectors and covectors, while
+        <span>$\partial_i$</span> and <span>$\epsilon_j$</span> are
+        bases for differential operators and scalar functions. The
+        purpose of the <code>TensorBundle</code> type is to specify
+        the <span>$\mathbb{K}$</span>-module basis at compile time.
+        When assigned in a workspace, <code>V =
+        Submanifold(::TensorBundle)</code> is used.</p>
+        <p>The metric signature of the
+        <code>Submanifold{V,1}</code> elements of a vector space
+        <span>$V$</span> can be specified with the
+        <code>V"..."</code> by using <span>$+$</span> or
+        <span>$-$</span> to specify whether the
+        <code>Submanifold{V,1}</code> element of the corresponding
+        index squares to <span>$+1$</span> or <span>$-1$</span>.
+        For example, <code>S"+++"</code> constructs a positive
+        definite 3-dimensional <code>TensorBundle</code>, so
+        constructors such as <code>S"..."</code> and
+        <code>D"..."</code> are convenient.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℝ^3 == V"+++" == Manifold(3)</code><code class="nohighlight hljs ansi"
+style="display:block;">true</code></pre>
+        <p>It is also possible to change the diagonal scaling, such
+        as with <code>D"1,1,1,0"</code>, although the
+        <code>Signature</code> format has a more compact
+        representation if limited to <span>$+1$</span> and
+        <span>$-1$</span>. It is also possible to change the
+        diagonal scaling, such as with <code>D"0.3,2.4,1"</code>.
+        Fully general <code>MetricTensor</code> as a type with
+        non-diagonal components requires a matrix, e.g.
+        <code>MetricTensor([1 2; 2 3])</code>.</p>
+        <p>Declaring an additional point at infinity is done by
+        specifying it in the string constructor with
+        <span>$\infty$</span> at the first index (i.e. Riemann
+        sphere <code>S"∞+++"</code>). The hyperbolic geometry can
+        be declared by <span>$\emptyset$</span> subsequently (i.e.
+        hyperbolic projection <code>S"∅+++"</code>). Additionally,
+        the <em>null-basis</em> based on the projective split for
+        conformal geometric algebra would be specified with
+        <code>S"∞∅+++"</code>. These two declared basis elements
+        are interpreted in the type system. The
+        <code>tangent(V,μ,ν)</code> map can be used to specify
+        <span>$\mu$</span> and <span>$\nu$</span>.</p>
+        <p>To assign <code>V = Submanifold(::TensorBundle)</code>
+        along with associated basis elements of the
+        <code>DirectSum.Basis</code> to the local Julia session
+        workspace, it is typical to use <code>Submanifold</code>
+        elements created by the <code>@basis</code> macro,</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; using Grassmann; @basis S"-++" # macro or basis"-++"</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">(⟨-++⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre>
+        <p>the macro <code>@basis V</code> delcares a local basis
+        in Julia. As a result of this macro, all
+        <code>Submanifold{V,G}</code> elements generated with
+        <code>M::TensorBundle</code> become available in the local
+        workspace with the specified naming arguments. The first
+        argument provides signature specifications, the second
+        argument is the variable name for <span>$V$</span> the
+        <span>$\mathbb{K}$</span>-module, and the third and fourth
+        argument are prefixes of the <code>Submanifold</code>
+        vector names (and covector names). Default is
+        <span>$V$</span> assigned <code>Submanifold{M}</code> and
+        <span>$v$</span> is prefix for the
+        <code>Submanifold{V}</code>.</p>
+        <p>It is entirely possible to assign multiple different
+        bases having different signatures without any problems. The
+        <code>@basis</code> macro arguments are used to assign the
+        vector space name to <span>$V$</span> and the basis
+        elements to <span>$v_i$</span>, but other assigned names
+        can be chosen so that their local names don't interfere: If
+        it is undesirable to assign these variables to a local
+        workspace, the versatile constructs of
+        <code>DirectSum.Basis{V}</code> can be used to contain or
+        access them, which is exported to the user as the method
+        <code>DirectSum.Basis(V)</code>.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; DirectSum.Basis(V)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">DirectSum.Basis{⟨-++⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre>
+        <p><code>V(::Int...)</code> provides a convenient way to
+        define a <code>Submanifold</code> by using integer indices
+        to reference specific direct sums within the ambient space
+        <span>$V$</span>.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; (ℝ^5)(3,5)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">⟨__+_+⟩</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; dump(ans)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">Submanifold{⟨+++++⟩, 2, 0x0000000000000014} ⟨__+_+⟩</code></pre>
+        <p>Here, calling a <code>Manifold</code> with a set of
+        indices produces a <code>Submanifold</code>
+        representation.</p>
+        <p>The direct sum operator <span>$\oplus$</span> can be
+        used to join spaces (alternatively <span>$+$</span>), and
+        the dual space functor <span>$'$</span> is an involution
+        which toggles a dual vector space with inverted
+        signature.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; V = ℝ'⊕ℝ^3</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">⟨-+++⟩</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; V'</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">⟨+---⟩'</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; W = V⊕V'</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">⟨-++++---⟩*</code></pre>
+        <p>The direct sum of a <code>TensorBundle</code> and its
+        dual <span>$V\oplus V'$</span> represents the full mother
+        space <span>$V*$</span>.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; collect(V) # all Submanifold vector basis elements</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">DirectSum.Basis{⟨-+++⟩,16}(⟨____⟩, ⟨-___⟩, ⟨_+__⟩, ⟨__+_⟩, ⟨___+⟩, ⟨-+__⟩, ⟨-_+_⟩, ⟨-__+⟩, ⟨_++_⟩, ⟨_+_+⟩, ⟨__++⟩, ⟨-++_⟩, ⟨-+_+⟩, ⟨-_++⟩, ⟨_+++⟩, ⟨-+++⟩)</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; collect(Submanifold(V')) # all covector basis elements</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">DirectSum.Basis{⟨+---⟩',16}(w, w¹, w², w³, w⁴, w¹², w¹³, w¹⁴, w²³, w²⁴, w³⁴, w¹²³, w¹²⁴, w¹³⁴, w²³⁴, w¹²³⁴)</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; collect(Submanifold(W)) # all mixed basis elements</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">DirectSum.Basis{⟨-++++---⟩*,256}(v, v₁, v₂, v₃, v₄, w¹, w², w³, w⁴, v₁₂, v₁₃, v₁₄, v₁w¹, v₁w², v₁w³, v₁w⁴, v₂₃, v₂₄, v₂w¹, v₂w², v₂w³, v₂w⁴, v₃₄, v₃w¹, v₃w², v₃w³, v₃w⁴, v₄w¹, v₄w², v₄w³, v₄w⁴, w¹², w¹³, w¹⁴, w²³, w²⁴, w³⁴, v₁₂₃, v₁₂₄, v₁₂w¹, v₁₂w², v₁₂w³, v₁₂w⁴, v₁₃₄, v₁₃w¹, v₁₃w², v₁₃w³, v₁₃w⁴, v₁₄w¹, v₁₄w², v₁₄w³, v₁₄w⁴, v₁w¹², v₁w¹³, v₁w¹⁴, v₁w²³, v₁w²⁴, v₁w³⁴, v₂₃₄, v₂₃w¹, v₂₃w², v₂₃w³, v₂₃w⁴, v₂₄w¹, v₂₄w², v₂₄w³, v₂₄w⁴, v₂w¹², v₂w¹³, v₂w¹⁴, v₂w²³, v₂w²⁴, v₂w³⁴, v₃₄w¹, v₃₄w², v₃₄w³, v₃₄w⁴, v₃w¹², v₃w¹³, v₃w¹⁴, v₃w²³, v₃w²⁴, v₃w³⁴, v₄w¹², v₄w¹³, v₄w¹⁴, v₄w²³, v₄w²⁴, v₄w³⁴, w¹²³, w¹²⁴, w¹³⁴, w²³⁴, v₁₂₃₄, v₁₂₃w¹, v₁₂₃w², v₁₂₃w³, v₁₂₃w⁴, v₁₂₄w¹, v₁₂₄w², v₁₂₄w³, v₁₂₄w⁴, v₁₂w¹², v₁₂w¹³, v₁₂w¹⁴, v₁₂w²³, v₁₂w²⁴, v₁₂w³⁴, v₁₃₄w¹, v₁₃₄w², v₁₃₄w³, v₁₃₄w⁴, v₁₃w¹², v₁₃w¹³, v₁₃w¹⁴, v₁₃w²³, v₁₃w²⁴, v₁₃w³⁴, v₁₄w¹², v₁₄w¹³, v₁₄w¹⁴, v₁₄w²³, v₁₄w²⁴, v₁₄w³⁴, v₁w¹²³, v₁w¹²⁴, v₁w¹³⁴, v₁w²³⁴, v₂₃₄w¹, v₂₃₄w², v₂₃₄w³, v₂₃₄w⁴, v₂₃w¹², v₂₃w¹³, v₂₃w¹⁴, v₂₃w²³, v₂₃w²⁴, v₂₃w³⁴, v₂₄w¹², v₂₄w¹³, v₂₄w¹⁴, v₂₄w²³, v₂₄w²⁴, v₂₄w³⁴, v₂w¹²³, v₂w¹²⁴, v₂w¹³⁴, v₂w²³⁴, v₃₄w¹², v₃₄w¹³, v₃₄w¹⁴, v₃₄w²³, v₃₄w²⁴, v₃₄w³⁴, v₃w¹²³, v₃w¹²⁴, v₃w¹³⁴, v₃w²³⁴, v₄w¹²³, v₄w¹²⁴, v₄w¹³⁴, v₄w²³⁴, w¹²³⁴, v₁₂₃₄w¹, v₁₂₃₄w², v₁₂₃₄w³, v₁₂₃₄w⁴, v₁₂₃w¹², v₁₂₃w¹³, v₁₂₃w¹⁴, v₁₂₃w²³, v₁₂₃w²⁴, v₁₂₃w³⁴, v₁₂₄w¹², v₁₂₄w¹³, v₁₂₄w¹⁴, v₁₂₄w²³, v₁₂₄w²⁴, v₁₂₄w³⁴, v₁₂w¹²³, v₁₂w¹²⁴, v₁₂w¹³⁴, v₁₂w²³⁴, v₁₃₄w¹², v₁₃₄w¹³, v₁₃₄w¹⁴, v₁₃₄w²³, v₁₃₄w²⁴, v₁₃₄w³⁴, v₁₃w¹²³, v₁₃w¹²⁴, v₁₃w¹³⁴, v₁₃w²³⁴, v₁₄w¹²³, v₁₄w¹²⁴, v₁₄w¹³⁴, v₁₄w²³⁴, v₁w¹²³⁴, v₂₃₄w¹², v₂₃₄w¹³, v₂₃₄w¹⁴, v₂₃₄w²³, v₂₃₄w²⁴, v₂₃₄w³⁴, v₂₃w¹²³, v₂₃w¹²⁴, v₂₃w¹³⁴, v₂₃w²³⁴, v₂₄w¹²³, v₂₄w¹²⁴, v₂₄w¹³⁴, v₂₄w²³⁴, v₂w¹²³⁴, v₃₄w¹²³, v₃₄w¹²⁴, v₃₄w¹³⁴, v₃₄w²³⁴, v₃w¹²³⁴, v₄w¹²³⁴, v₁₂₃₄w¹², v₁₂₃₄w¹³, v₁₂₃₄w¹⁴, v₁₂₃₄w²³, v₁₂₃₄w²⁴, v₁₂₃₄w³⁴, v₁₂₃w¹²³, v₁₂₃w¹²⁴, v₁₂₃w¹³⁴, v₁₂₃w²³⁴, v₁₂₄w¹²³, v₁₂₄w¹²⁴, v₁₂₄w¹³⁴, v₁₂₄w²³⁴, v₁₂w¹²³⁴, v₁₃₄w¹²³, v₁₃₄w¹²⁴, v₁₃₄w¹³⁴, v₁₃₄w²³⁴, v₁₃w¹²³⁴, v₁₄w¹²³⁴, v₂₃₄w¹²³, v₂₃₄w¹²⁴, v₂₃₄w¹³⁴, v₂₃₄w²³⁴, v₂₃w¹²³⁴, v₂₄w¹²³⁴, v₃₄w¹²³⁴, v₁₂₃₄w¹²³, v₁₂₃₄w¹²⁴, v₁₂₃₄w¹³⁴, v₁₂₃₄w²³⁴, v₁₂₃w¹²³⁴, v₁₂₄w¹²³⁴, v₁₃₄w¹²³⁴, v₂₃₄w¹²³⁴, v₁₂₃₄w¹²³⁴)</code></pre>
+        <p>In addition to the direct-sum operation, several other
+        operations are supported, such as
+        <span>$\cup,\cap,\subseteq,\supseteq$</span> for set
+        operations. Due to the design of the
+        <code>TensorBundle</code> dispatch, these operations enable
+        code optimizations at compile-time provided by the bit
+        parameters.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℝ⊕ℝ' ⊇ Manifold(1)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">true</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℝ ∩ ℝ' == Manifold(0)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">true</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℝ ∪ ℝ' == ℝ⊕ℝ'</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">true</code></pre>
+        <p>Operations on <code>Manifold</code> types is
+        automatically handled at compile time.</p>
+        <p>More information about <code>DirectSum</code> is
+        available at <a href=
+        "https://github.com/chakravala/DirectSum.jl">https://github.com/chakravala/DirectSum.jl</a></p>
+        <h2 id=
+        "Higher-dimensions-with-SparseBasis-and-ExtendedBasis">
+        <a class="docs-heading-anchor" href=
+        "#Higher-dimensions-with-SparseBasis-and-ExtendedBasis">Higher
+        dimensions with <code>SparseBasis</code> and
+        <code>ExtendedBasis</code></a><a id=
+        "Higher-dimensions-with-SparseBasis-and-ExtendedBasis-1"></a><a class="docs-heading-anchor-permalink"
+        href=
+        "#Higher-dimensions-with-SparseBasis-and-ExtendedBasis"
+        title="Permalink"></a></h2>
+        <p>In order to work with a <code>TensorAlgebra{V}</code>,
+        it is necessary for some computations to be cached. This is
+        usually done automatically when accessed.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Λ(7) ⊕ Λ(7)'
+DirectSum.SparseBasis{⟨+++++++-------⟩*,16384}(v, ..., v₁₂₃₄₅₆₇w¹²³⁴⁵⁶⁷)</code></pre>
+        <p>One way of declaring the cache for all 3 combinations of
+        a <code>TensorBundle{N}</code> and its dual is to ask for
+        the sum <code>Λ(V) + Λ(V)'</code>, which is equivalent to
+        <code>Λ(V⊕V')</code>, but this does not initialize the
+        cache of all 3 combinations unlike the former.</p>
+        <p>Staging of precompilation and caching is designed so
+        that a user can smoothly transition between very high
+        dimensional and low dimensional algebras in a single
+        session, with varying levels of extra caching and
+        optimizations. The parametric type formalism in
+        <code>Grassmann</code> is highly expressive and enables
+        pre-allocation of geometric algebra computations involving
+        specific sparse subalgebras, including the representation
+        of rotational groups.</p>
+        <p>It is possible to reach elements with up to
+        <span>$N=62$</span> vertices from a
+        <code>TensorAlgebra</code> having higher maximum dimensions
+        than supported by Julia natively.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; Λ(62)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">DirectSum.ExtendedBasis{⟨11111111111111111111111111111111111111111111111111111111111111⟩,4611686018427387904}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)</code><br><code class="language-julia-repl hljs"
+style="display:block;">julia&gt; Λ(62).v32a87Ng</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">-1v₂₃₇₈agN</code></pre>
+        <p>The 62 indices require full alpha-numeric labeling with
+        lower-case and capital letters. This now allows you to
+        reach up to <span>$4,611,686,018,427,387,904$</span>
+        dimensions with Julia <code>using Grassmann</code>. Then
+        the volume element is</p>
+        <pre class="documenter-example-output"><code class=
+        "nohighlight hljs ansi">v₁₂₃₄₅₆₇₈₉₀abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ</code></pre>
+        <p>Full <code>Multivector</code> allocations are only
+        possible for <span>$N\leq22$</span>, but sparse operations
+        are also available at higher dimensions. While
+        <code>DirectSum.Basis{V}</code> is a container for the
+        <code>TensorAlgebra</code> generators of <span>$V$</span>,
+        the <code>Basis</code> is only cached for
+        <span>$N\leq8$</span>. For the range of dimensions
+        <span>$8&lt;N\leq22$</span>, the <code>SparseBasis</code>
+        type is used.</p>
+        <pre><code class="language-julia hljs">julia&gt; Λ(22)
+DirectSum.SparseBasis{⟨++++++++++++++++++++++⟩,4194304}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijkl)</code></pre>
+        <p>This is the largest <code>SparseBasis</code> that can be
+        generated with Julia, due to array size limitations.</p>
+        <p>To reach higher dimensions with <span>$N&gt;22$</span>,
+        the <code>DirectSum.ExtendedBasis</code> type is used. It
+        is suficient to work with a 64-bit representation (which is
+        the default). And it turns out that with 62 standard
+        keyboard characters, this fits.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; V = ℝ^22</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">⟨++++++++++++++++++++++⟩</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; Λ(V+V')</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">DirectSum.ExtendedBasis{⟨++++++++++++++++++++++----------------------⟩*,17592186044416}(v, ..., v₁₂₃₄₅₆₇₈₉₀abcdefghijklw¹²³⁴⁵⁶⁷⁸⁹⁰ABCDEFGHIJKL)</code></pre>
+        <p>At 22 dimensions and lower there is better caching, with
+        further extra caching for 8 dimensions or less. Thus, the
+        largest Hilbert space that is fully reachable has 4,194,304
+        dimensions, but we can still reach out to
+        4,611,686,018,427,387,904 dimensions with the
+        <code>ExtendedBasis</code> built in. It is still feasible
+        to extend to a further super-extended 128-bit
+        representation using the <code>UInt128</code> type (but
+        this will require further modifications of internals and
+        helper functions. To reach into infinity even further, it
+        is theoretically possible to construct ultra-extensions
+        also using dictionaries. Full <code>Multivector</code>
+        elements are not representable when
+        <code>ExtendedBasis</code> is used, but the performance of
+        the <code>Basis</code> and sparse elements should be just
+        as fast as for lower dimensions for the current
+        <code>SubAlgebra</code> and <code>TensorAlgebra</code>
+        types. The sparse representations are a work in progress to
+        be improved with time.</p>
+        <h2 id="Interoperability-for-TensorAlgebra{V}"><a class=
+        "docs-heading-anchor" href=
+        "#Interoperability-for-TensorAlgebra{V}">Interoperability
+        for <code>TensorAlgebra{V}</code></a><a id=
+        "Interoperability-for-TensorAlgebra{V}-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Interoperability-for-TensorAlgebra{V}" title=
+        "Permalink"></a></h2>
+        <p><a href=
+        "https://zenodo.org/badge/latestdoi/169811826"><img src=
+        "https://zenodo.org/badge/169811826.svg" alt="DOI"></a>
+        <a href=
+        "https://github.com/chakravala/AbstractTensors.jl/releases">
+        <img src=
+        "https://img.shields.io/github/v/release/chakravala/AbstractTensors.jl"
+        alt="GitHub release (latest SemVer)"></a> <a href=
+        "https://github.com/chakravala/AbstractTensors.jl/commits"><img src="https://img.shields.io/github/commits-since/chakravala/AbstractTensors.jl/latest?label=new%20commits"
+        alt="GitHub commits since latest release"></a> <a href=
+        "https://ci.appveyor.com/project/chakravala/abstracttensors-jl">
+        <img src=
+        "https://ci.appveyor.com/api/projects/status/yey8huk505h4b81u?svg=true"
+        alt="Build status"></a></p>
+        <p>The <code>AbstractTensors</code> package is intended for
+        universal interoperation of the abstract
+        <code>TensorAlgebra</code> type system. All
+        <code>TensorAlgebra{V}</code> subtypes have type parameter
+        <span>$V$</span>, used to store a
+        <code>Submanifold{M}</code> value, which is parametrized by
+        <span>$M$</span> the <code>TensorBundle</code> choice. This
+        means that different tensor types can have a commonly
+        shared underlying <span>$\mathbb{K}$</span>-module
+        parametric type expressed by defining
+        <code>V::Submanifold{M}</code>. Each
+        <code>TensorAlgebra</code> subtype must be accompanied by a
+        corresponding <code>TensorBundle</code> parameter, which is
+        fully static at compile time. Due to the parametric type
+        system for the <span>$\mathbb{K}$</span>-module types, the
+        compiler can fully pre-allocate and often cache.</p>
+        <p>Since <code>TensorBundle</code> choices are fundamental
+        to <code>TensorAlgebra</code> operations, the universal
+        interoperability between <code>TensorAlgebra{V}</code>
+        elements with different associated
+        <code>TensorBundle</code> choices is naturally realized by
+        applying the <code>union</code> morphism to operations,
+        e.g. <span>$\bigwedge
+        :\Lambda^{p_1}V_1\times\dots\times\Lambda^{p_g}V_g
+        \rightarrow \Lambda^{\sum_kp_k}\bigcup_k V_k$</span>. Some
+        of the method names like
+        <span>$+,-,*,\otimes,\circledast,\odot,\boxtimes,\star$</span>
+        for <code>TensorAlgebra</code> elements are shared across
+        different packages, with interoperability.</p>
+        <pre><code class=
+        "language-julia hljs">function op(::TensorAlgebra{V},::TensorAlgebra{V}) where V
     # well defined operations if V is shared
 end # but what if V ≠ W in the input types?
 
@@ -10,4 +561,82 @@ function op(a::TensorAlgebra{V},b::TensorAlgebra{W}) where {V,W}
     op(VW(a),VW(b))   # makes call well-defined
 end # this option is automatic with interop(a,b)
 
-# alternatively for evaluation of forms, VW(a)(VW(b))</code></pre><p>Additionally, a universal unit volume element can be specified in terms of <code>LinearAlgebra.UniformScaling</code>, which is independent of <span>$V$</span> and has its interpretation only instantiated by context of <code>TensorAlgebra{V}</code> elements being operated on. Interoperability of <code>LinearAlgebra.UniformScaling</code> as a pseudoscalar element which takes on the <code>TensorBundle</code> form of any other <code>TensorAlgebra</code> element is handled globally. This enables the usage of <code>I</code> from <code>LinearAlgebra</code> as a universal pseudoscalar element defined at every point <span>$x$</span> of a <code>Manifold</code>, which is mathematically denoted by <span>$I = I(x)$</span> and specified by the <span>$g(x)$</span> bilinear tensor field of <span>$TM$</span>.</p><p>More information about <code>AbstractTensors</code> is available  at <a href="https://github.com/chakravala/AbstractTensors.jl">https://github.com/chakravala/AbstractTensors.jl</a></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../algebra/">Algebra »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Wednesday 11 June 2025 03:54">Wednesday 11 June 2025</span>. Using Julia version 1.11.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+# alternatively for evaluation of forms, VW(a)(VW(b))</code></pre>
+        <p>Additionally, a universal unit volume element can be
+        specified in terms of
+        <code>LinearAlgebra.UniformScaling</code>, which is
+        independent of <span>$V$</span> and has its interpretation
+        only instantiated by context of
+        <code>TensorAlgebra{V}</code> elements being operated on.
+        Interoperability of
+        <code>LinearAlgebra.UniformScaling</code> as a pseudoscalar
+        element which takes on the <code>TensorBundle</code> form
+        of any other <code>TensorAlgebra</code> element is handled
+        globally. This enables the usage of <code>I</code> from
+        <code>LinearAlgebra</code> as a universal pseudoscalar
+        element defined at every point <span>$x$</span> of a
+        <code>Manifold</code>, which is mathematically denoted by
+        <span>$I = I(x)$</span> and specified by the
+        <span>$g(x)$</span> bilinear tensor field of
+        <span>$TM$</span>.</p>
+        <p>More information about <code>AbstractTensors</code> is
+        available at <a href=
+        "https://github.com/chakravala/AbstractTensors.jl">https://github.com/chakravala/AbstractTensors.jl</a></p>
+      </article>
+      <nav class="docs-footer">
+        <a class="docs-footer-prevpage" href="../">«
+        Home</a><a class="docs-footer-nextpage" href=
+        "../algebra/">Algebra »</a>
+        <div class="flexbox-break"></div>
+        <p class="footer-message">Powered by <a href=
+        "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+        and the <a href="https://julialang.org/">Julia Programming
+        Language</a>.</p>
+      </nav>
+    </div>
+    <div class="modal" id="documenter-settings">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Settings</p>
+        </header>
+        <section class="modal-card-body">
+          <p><label class="label">Theme</label></p>
+          <div class="select">
+            <select id="documenter-themepicker">
+              <option value="auto">
+                Automatic (OS)
+              </option>
+              <option value="documenter-light">
+                documenter-light
+              </option>
+              <option value="documenter-dark">
+                documenter-dark
+              </option>
+              <option value="catppuccin-latte">
+                catppuccin-latte
+              </option>
+              <option value="catppuccin-frappe">
+                catppuccin-frappe
+              </option>
+              <option value="catppuccin-macchiato">
+                catppuccin-macchiato
+              </option>
+              <option value="catppuccin-mocha">
+                catppuccin-mocha
+              </option>
+            </select>
+          </div>
+          <hr>
+          <p>This document was generated with <a href=
+          "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+          version 1.14.1 on <span class="colophon-date" title=
+          "Saturday 30 August 2025 12:02">Saturday 30 August
+          2025</span>. Using Julia version 1.11.1.</p>
+        </section>
+        <footer class="modal-card-foot"></footer>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,25 +1,255 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Dyadic tensor product ⊗ · Grassmann.jl</title><meta name="title" content="Dyadic tensor product ⊗ · Grassmann.jl"/><meta property="og:title" content="Dyadic tensor product ⊗ · Grassmann.jl"/><meta property="twitter:title" content="Dyadic tensor product ⊗ · Grassmann.jl"/><meta name="description" content="Documentation for Grassmann.jl."/><meta property="og:description" content="Documentation for Grassmann.jl."/><meta property="twitter:description" content="Documentation for Grassmann.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Grassmann.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Grassmann.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../design/">Design</a></li><li><a class="tocitem" href="../../algebra/">Algebra</a></li><li><a class="tocitem" href="../../videos/">Videos</a></li><li><a class="tocitem" href="../../library/">Library</a></li><li><a class="tocitem" href="../../agpl/">AGPL-3.0</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../install/">Installation</a></li><li><a class="tocitem" href="../quick-start/">Quick start (G2)</a></li><li><a class="tocitem" href="../algebra-of-space/">The Algebra of Space (G3)</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Dyadic tensor product ⊗</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Dyadic tensor product ⊗</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Dyadic-tensor-product"><a class="docs-heading-anchor" href="#Dyadic-tensor-product">Dyadic tensor product ⊗</a><a id="Dyadic-tensor-product-1"></a><a class="docs-heading-anchor-permalink" href="#Dyadic-tensor-product" title="Permalink"></a></h1><p>Dyadic tensors are represented with the Grassmann’s exterior product algebra or nested <code>Chain{V,1,Chain{V,1}}</code> elements, generating a <span>$2^{2n}$</span>-dimensional mother algebra with the direct sum of the <span>$n$</span>-dimensional vector space and its dual vector space. The product of the vector basis and covector basis elements form the <span>$n^2$</span>-dimensional bivector subspace of the full <span>$\frac{(2n)!}{2(2n−2)!}$</span>-dimensional bivector sub-algebra. The package <code>Grassmann</code> is working towards making the full extent of this number system available in Julia by using static compiled parametric type information to handle sparse sub-algebras, such as the dyadic (1,1)-tensor bivector algebra or mother algebra.</p><h2 id="Nested-dyadic-algebra"><a class="docs-heading-anchor" href="#Nested-dyadic-algebra">Nested dyadic algebra</a><a id="Nested-dyadic-algebra-1"></a><a class="docs-heading-anchor-permalink" href="#Nested-dyadic-algebra" title="Permalink"></a></h2><p>In this algebra, it&#39;s possible to compute on a mesh of arbitrary 5 dimensional conformal geometric algebra simplices, which can be represented by a bundle of  nested dyadic tensors.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; using Grassmann, StaticArrays; basis&quot;+-+++&quot;</code><code class="nohighlight hljs ansi" style="display:block;">(⟨+-+++⟩, v, v₁, v₂, v₃, v₄, v₅, v₁₂, v₁₃, v₁₄, v₁₅, v₂₃, v₂₄, v₂₅, v₃₄, v₃₅, v₄₅, v₁₂₃, v₁₂₄, v₁₂₅, v₁₃₄, v₁₃₅, v₁₄₅, v₂₃₄, v₂₃₅, v₂₄₅, v₃₄₅, v₁₂₃₄, v₁₂₃₅, v₁₂₄₅, v₁₃₄₅, v₂₃₄₅, v₁₂₃₄₅)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; value(rand(Chain{V,1,Chain{V,1}}))</code><code class="nohighlight hljs ansi" style="display:block;">5-element Values{5, Chain{⟨+-+++⟩, 1}} with indices SOneTo(5):
-     0.42244v₁ - 0.496938v₂ + 0.331625v₃ - 0.124189v₄ + 0.146368v₅
-   -0.170811v₁ + 0.0877207v₂ + 0.114417v₃ + 0.76306v₄ + 0.719777v₅
- -0.00917539v₁ - 0.403361v₂ - 0.992274v₃ + 0.175121v₄ + 0.736749v₅
-    0.484127v₁ + 0.729119v₂ + 0.741894v₃ + 0.968377v₄ - 0.954264v₅
-  -0.171562v₁ - 0.778839v₂ - 0.0429714v₃ - 0.661133v₄ + 0.145206v₅</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; A = Chain{V,1}(rand(SMatrix{5,5}))</code><code class="nohighlight hljs ansi" style="display:block;">(0.222606v₁+0.530632v₂+0.3064v₃+0.10361v₄+0.0830534v₅)v₁ + (0.990465v₁+0.740987v₂+0.555154v₃+0.944945v₄+0.73978v₅)v₂ + (0.665265v₁+0.344455v₂+0.763963v₃+0.0701172v₄+0.249132v₅)v₃ + (0.766171v₁+0.86614v₂+0.822177v₃+0.308786v₄+0.356488v₅)v₄ + (0.263561v₁+0.407883v₂+0.320368v₃+0.726267v₄+0.766961v₅)v₅</code></pre><p>Additionally, in Grassmann.jl we prefer the nested usage of pure <code>ChainBundle</code> parametric types for large re-usable global cell geometries, from which local dyadics can be selected.</p><p>Programming the <code>A\b</code> method is straight forward with some Julia language metaprogramming and Grassmann.jl by first instantiating some Cramer symbols</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; Base.@pure function Grassmann.Cramer(N::Int)
+<html lang="en">
+<head>
+  <meta name="generator" content=
+  "HTML Tidy for HTML5 for Linux version 5.7.45">
+  <meta charset="UTF-8">
+  <meta name="viewport" content=
+  "width=device-width, initial-scale=1.0">
+  <title>Dyadic tensor product ⊗ · Grassmann.jl</title>
+  <meta name="title" content=
+  "Dyadic tensor product ⊗ · Grassmann.jl">
+  <meta property="og:title" content=
+  "Dyadic tensor product ⊗ · Grassmann.jl">
+  <meta property="twitter:title" content=
+  "Dyadic tensor product ⊗ · Grassmann.jl">
+  <meta name="description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="og:description" content=
+  "Documentation for Grassmann.jl.">
+  <meta property="twitter:description" content=
+  "Documentation for Grassmann.jl.">
+  <script data-outdated-warner="" src=
+  "../../assets/warner.js"></script>
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css"
+  rel="stylesheet" type="text/css">
+  <link href=
+  "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css"
+  rel="stylesheet" type="text/css">
+  <script>
+  documenterBaseURL="../.."
+  </script>
+  <script src=
+  "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+  data-main="../../assets/documenter.js"></script>
+  <script src="../../search_index.js"></script>
+  <script src="../../siteinfo.js"></script>
+  <script src="../../../versions.js"></script>
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-mocha.css" data-theme-name=
+  "catppuccin-mocha">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-macchiato.css"
+  data-theme-name="catppuccin-macchiato">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-frappe.css" data-theme-name=
+  "catppuccin-frappe">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/catppuccin-latte.css" data-theme-name=
+  "catppuccin-latte">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/documenter-dark.css" data-theme-name=
+  "documenter-dark" data-theme-primary-dark="">
+  <link class="docs-theme-link" rel="stylesheet" type="text/css"
+  href="../../assets/themes/documenter-light.css" data-theme-name=
+  "documenter-light" data-theme-primary="">
+  <script src="../../assets/themeswap.js"></script>
+</head>
+<body>
+  <div id="documenter">
+    <nav class="docs-sidebar">
+      <a class="docs-logo" href="../../"><img src=
+      "../../assets/logo.png" alt="Grassmann.jl logo"></a>
+      <div class="docs-package-name">
+        <span class="docs-autofit"><a href=
+        "../../">Grassmann.jl</a></span>
+      </div><button class=
+      "docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2"
+      id="documenter-search-query">Search docs (Ctrl + /)</button>
+      <ul class="docs-menu">
+        <li>
+          <a class="tocitem" href="../../">Home</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../design/">Design</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../algebra/">Algebra</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../videos/">Videos</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../library/">Library</a>
+        </li>
+        <li>
+          <a class="tocitem" href="../../agpl/">AGPL-3.0</a>
+        </li>
+        <li>
+          <span class="tocitem">Tutorials</span>
+          <ul>
+            <li>
+              <a class="tocitem" href=
+              "../install/">Installation</a>
+            </li>
+            <li>
+              <a class="tocitem" href="../quick-start/">Quick start
+              (G2)</a>
+            </li>
+            <li>
+              <a class="tocitem" href="../algebra-of-space/">The
+              Algebra of Space (G3)</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a class="tocitem" href=
+          "../../references/">References</a>
+        </li>
+      </ul>
+      <div class="docs-version-selector field has-addons">
+        <div class="control">
+          <span class=
+          "docs-label button is-static is-size-7">Version</span>
+        </div>
+        <div class="docs-selector control is-expanded">
+          <div class="select is-fullwidth is-size-7">
+            <select id="documenter-version-selector">
+            </select>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="docs-main">
+      <header class="docs-navbar">
+        <a class=
+        "docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop"
+        id="documenter-sidebar-button" href="#"></a>
+        <nav class="breadcrumb">
+          <ul class="is-hidden-mobile">
+            <li class="is-active">
+              <a href="">Dyadic tensor product ⊗</a>
+            </li>
+          </ul>
+          <ul class="is-hidden-tablet">
+            <li class="is-active">
+              <a href="">Dyadic tensor product ⊗</a>
+            </li>
+          </ul>
+        </nav>
+        <div class="docs-right">
+          <a class=
+          "docs-settings-button docs-navbar-link fa-solid fa-gear"
+          id="documenter-settings-button" href="#" title=
+          "Settings"></a><a class=
+          "docs-article-toggle-button fa-solid fa-chevron-up" id=
+          "documenter-article-toggle-button" href="javascript:;"
+          title="Collapse all docstrings"></a>
+        </div>
+      </header>
+      <article class="content" id="documenter-page">
+        <h1 id="Dyadic-tensor-product"><a class=
+        "docs-heading-anchor" href="#Dyadic-tensor-product">Dyadic
+        tensor product ⊗</a><a id=
+        "Dyadic-tensor-product-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Dyadic-tensor-product" title="Permalink"></a></h1>
+        <p>Dyadic tensors are represented with the Grassmann’s
+        exterior product algebra or nested
+        <code>Chain{V,1,Chain{V,1}}</code> elements, generating a
+        <span>$2^{2n}$</span>-dimensional mother algebra with the
+        direct sum of the <span>$n$</span>-dimensional vector space
+        and its dual vector space. The product of the vector basis
+        and covector basis elements form the
+        <span>$n^2$</span>-dimensional bivector subspace of the
+        full <span>$\frac{(2n)!}{2(2n−2)!}$</span>-dimensional
+        bivector sub-algebra. The package <code>Grassmann</code> is
+        working towards making the full extent of this number
+        system available in Julia by using static compiled
+        parametric type information to handle sparse sub-algebras,
+        such as the dyadic (1,1)-tensor bivector algebra or mother
+        algebra.</p>
+        <h2 id="Nested-dyadic-algebra"><a class=
+        "docs-heading-anchor" href="#Nested-dyadic-algebra">Nested
+        dyadic algebra</a><a id=
+        "Nested-dyadic-algebra-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Nested-dyadic-algebra" title="Permalink"></a></h2>
+        <p>In this algebra, it's possible to compute on a mesh of
+        arbitrary 5 dimensional conformal geometric algebra
+        simplices, which can be represented by a bundle of nested
+        dyadic tensors.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; using Grassmann, StaticArrays; basis"+-+++"</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">(⟨+-+++⟩, v, v₁, v₂, v₃, v₄, v₅, v₁₂, v₁₃, v₁₄, v₁₅, v₂₃, v₂₄, v₂₅, v₃₄, v₃₅, v₄₅, v₁₂₃, v₁₂₄, v₁₂₅, v₁₃₄, v₁₃₅, v₁₄₅, v₂₃₄, v₂₃₅, v₂₄₅, v₃₄₅, v₁₂₃₄, v₁₂₃₅, v₁₂₄₅, v₁₃₄₅, v₂₃₄₅, v₁₂₃₄₅)</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; value(rand(Chain{V,1,Chain{V,1}}))</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">5-element Values{5, Chain{⟨+-+++⟩, 1}} with indices SOneTo(5):
+    0.811309v₁ + 0.819754v₂ + 0.978929v₃ + 0.60966v₄ + 0.406656v₅
+   0.936018v₁ - 0.140807v₂ + 0.597128v₃ + 0.405145v₄ - 0.551934v₅
+ -0.106691v₁ + 0.875287v₂ + 0.509549v₃ + 0.0350532v₄ - 0.252754v₅
+ -0.0387932v₁ - 0.376618v₂ + 0.989887v₃ + 0.595954v₄ + 0.490055v₅
+ -0.237868v₁ - 0.647482v₂ + 0.37111v₃ - 0.00499849v₄ + 0.295921v₅</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; A = Chain{V,1}(rand(SMatrix{5,5}))</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">(0.585434v₁+0.0639376v₂+0.274858v₃+0.564351v₄+0.0310541v₅)v₁ + (0.158229v₁+0.895529v₂+0.0375865v₃+0.683585v₄+0.0928829v₅)v₂ + (0.374523v₁+0.959813v₂+0.183036v₃+0.465702v₄+0.114261v₅)v₃ + (0.0406361v₁+0.155372v₂+0.817529v₃+0.803852v₄+0.722683v₅)v₄ + (0.717076v₁+0.48188v₂+0.665802v₃+0.0641773v₄+0.268439v₅)v₅</code></pre>
+        <p>Additionally, in Grassmann.jl we prefer the nested usage
+        of pure <code>ChainBundle</code> parametric types for large
+        re-usable global cell geometries, from which local dyadics
+        can be selected.</p>
+        <p>Programming the <code>A\b</code> method is straight
+        forward with some Julia language metaprogramming and
+        Grassmann.jl by first instantiating some Cramer symbols</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; Base.@pure function Grassmann.Cramer(N::Int)
            x,y = SVector{N}([Symbol(:x,i) for i ∈ 1:N]),SVector{N}([Symbol(:y,i) for i ∈ 1:N])
            xy = [:(($(x[1+i]),$(y[1+i])) = ($(x[i])∧t[$(1+i)],t[end-$i]∧$(y[i]))) for i ∈ 1:N-1]
            return x,y,xy
-       end</code></pre><p>These are exterior product variants of the Cramer determinant symbols (<span>$N!$</span> times <span>$N$</span>-simplex hypervolumes), which can be combined to directly solve a linear system:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; @generated function Base.:\(t::Chain{V,1,&lt;:Chain{V,1}},v::Chain{V,1}) where V
+       end</code></pre>
+        <p>These are exterior product variants of the Cramer
+        determinant symbols (<span>$N!$</span> times
+        <span>$N$</span>-simplex hypervolumes), which can be
+        combined to directly solve a linear system:</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; @generated function Base.:\(t::Chain{V,1,&lt;:Chain{V,1}},v::Chain{V,1}) where V
            N = ndims(V)-1 # paste this into the REPL for faster eval
            x,y,xy = Grassmann.Cramer(N)
            mid = [:($(x[i])∧v∧$(y[end-i])) for i ∈ 1:N-1]
            out = Expr(:call,:SVector,:(v∧$(y[end])),mid...,:($(x[end])∧v))
            return Expr(:block,:((x1,y1)=(t[1],t[end])),xy...,
                :(Chain{V,1}(getindex.($(Expr(:call,:./,out,:(t[1]∧$(y[end])))),1))))
-       end</code></pre><p>Which results in the following highly efficient <code>@generated</code> code for solving the linear system,</p><pre><code class="language-Julia hljs">(x1, y1) = (t[1], t[end])
+       end</code></pre>
+        <p>Which results in the following highly efficient
+        <code>@generated</code> code for solving the linear
+        system,</p>
+        <pre><code class=
+        "language-Julia hljs">(x1, y1) = (t[1], t[end])
 (x2, y2) = (x1 ∧ t[2], t[end - 1] ∧ y1)
 (x3, y3) = (x2 ∧ t[3], t[end - 2] ∧ y2)
 (x4, y4) = (x3 ∧ t[4], t[end - 3] ∧ y3)
-Chain{V, 1}(getindex.(SVector(v ∧ y4, (x1 ∧ v) ∧ y3, (x2 ∧ v) ∧ y2, (x3 ∧ v) ∧ y1, x4 ∧ v) ./ (t[1] ∧ y4), 1))</code></pre><p>Benchmarks with that algebra indicate a <span>$3\times$</span> faster performance than <code>SMatrix</code> for applying <code>A\b</code> to bundles of dyadic elements.</p><pre><code class="language-Julia hljs">julia&gt; @btime $(rand(SMatrix{5,5},10000)).\Ref($(SVector(1,2,3,4,5)));
+Chain{V, 1}(getindex.(SVector(v ∧ y4, (x1 ∧ v) ∧ y3, (x2 ∧ v) ∧ y2, (x3 ∧ v) ∧ y1, x4 ∧ v) ./ (t[1] ∧ y4), 1))</code></pre>
+        <p>Benchmarks with that algebra indicate a
+        <span>$3\times$</span> faster performance than
+        <code>SMatrix</code> for applying <code>A\b</code> to
+        bundles of dyadic elements.</p>
+        <pre><code class=
+        "language-Julia hljs">julia&gt; @btime $(rand(SMatrix{5,5},10000)).\Ref($(SVector(1,2,3,4,5)));
   2.588 ms (29496 allocations: 1.44 MiB)
 
 julia&gt; @btime $(Chain{V,1}.(rand(SMatrix{5,5},10000))).\$(v1+2v2+3v3+4v4+5v5);
@@ -36,9 +266,112 @@ julia&gt; @btime $(SMatrix(A))\$(SVector(1,2,3,4,5))
 
 julia&gt; @btime $A\$(v1+2v2+3v3+4v4+5v5)
   72.405 ns (0 allocations: 0 bytes)
--4.783720495603519v₁ + 6.034887114999605v₂ + 1.017847212237964v₃ + 6.379374861538393v₄ - 4.1581165381110505v₅</code></pre><p>Such a solution is not only more efficient than Julia&#39;s <a href="https://github.com/JuliaArrays/StaticArrays.jl">StaticArrays.jl</a> method for <code>SMatrix</code>, but is also useful to minimize allocations in Grassmann.jl finite element assembly.</p><p>Similarly, the Cramer symbols can also be manipulated to invert the linear system or for determining whether a point is within a simplex.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; using Grassmann; @basis ℝ3</code><code class="nohighlight hljs ansi" style="display:block;">(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; T = Chain{V,1}(Chain(v1),v1+v2,v1+v3)</code><code class="nohighlight hljs ansi" style="display:block;">(1v₁+0v₂+0v₃)v₁ + (1v₁+1v₂+0v₃)v₂ + (1v₁+0v₂+1v₃)v₃</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; barycenter(T) ∈ T, (v1+v2+v3) ∈ T</code><code class="nohighlight hljs ansi" style="display:block;">(true, false)</code></pre><p>Of course, there are multiple equivalent ways of computing the same results using the <code>⋅</code> and <code>:</code> dyadic products.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; T\barycenter(T) == inv(T)⋅barycenter(T)</code><code class="nohighlight hljs ansi" style="display:block;">ERROR: DimensionMismatch: expected input array of length -1, got length 0</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; sqrt(T:T) == norm(SMatrix(T))</code><code class="nohighlight hljs ansi" style="display:block;">true</code></pre><p>It is possible to generate a <a href="https://github.com/JuliaPlots/Makie.jl">Makie.jl</a> <code>streamplot</code> diagrams with the <code>Grassmann.Cramer</code> method for interpolated data of finite element solutions.</p><h2 id="Mother-algebra-formalism"><a class="docs-heading-anchor" href="#Mother-algebra-formalism">Mother algebra formalism</a><a id="Mother-algebra-formalism-1"></a><a class="docs-heading-anchor-permalink" href="#Mother-algebra-formalism" title="Permalink"></a></h2><p>Note that <code>Λ(ℝ3)</code> gives the vector basis, and <code>Λ(ℝ3)&#39;</code> gives the covector basis:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; Λ(ℝ3)</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨111⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Λ(ℝ3)&#39;</code><code class="nohighlight hljs ansi" style="display:block;">DirectSum.Basis{⟨---⟩&#39;,8}(w, w¹, w², w³, w¹², w¹³, w²³, w¹²³)</code></pre><p>The following command yields a local 2D vector and covector basis,</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; @mixedbasis ℝ2</code><code class="nohighlight hljs ansi" style="display:block;">(⟨++--⟩*, v, v₁, v₂, w¹, w², v₁₂, v₁w¹, v₁w², v₂w¹, v₂w², w¹², v₁₂w¹, v₁₂w², v₁w¹², v₂w¹², v₁₂w¹²)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; w1+2w2</code><code class="nohighlight hljs ansi" style="display:block;">1w¹ + 2w²</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; ans(v1+v2)</code><code class="nohighlight hljs ansi" style="display:block;">0v</code></pre><p>The sum <code>w1+2w2</code> is interpreted as a covector element of the dual vector space, which can be evaluated as a linear functional when a vector argument is input. Using these in the workspace, it is possible to use the Grassmann exterior <span>$\wedge$</span>-tensor product operation to construct elements <code>ℒ</code> of the dyadic (1,1)-bivector subspace of linear transformations from the mother algebra.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℒ = (v1+2v2)∧(3w1+4w2)</code><code class="nohighlight hljs ansi" style="display:block;">0v₁₂ + 3v₁w¹ + 4v₁w² + 6v₂w¹ + 8v₂w² + 0w¹²</code></pre><p>The element <code>ℒ</code> is a linear form which can be evaluated,</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; ℒ(v1+v2)</code><code class="nohighlight hljs ansi" style="display:block;">0v₁ + 0v₂ + 9w¹ + 12w²</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; L = [1,2] * [3,4]&#39;; L * [1,1]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{Int64}:
+-4.783720495603519v₁ + 6.034887114999605v₂ + 1.017847212237964v₃ + 6.379374861538393v₄ - 4.1581165381110505v₅</code></pre>
+        <p>Such a solution is not only more efficient than Julia's
+        <a href=
+        "https://github.com/JuliaArrays/StaticArrays.jl">StaticArrays.jl</a>
+        method for <code>SMatrix</code>, but is also useful to
+        minimize allocations in Grassmann.jl finite element
+        assembly.</p>
+        <p>Similarly, the Cramer symbols can also be manipulated to
+        invert the linear system or for determining whether a point
+        is within a simplex.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; using Grassmann; @basis ℝ3</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; T = Chain{V,1}(Chain(v1),v1+v2,v1+v3)</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">(1v₁+0v₂+0v₃)v₁ + (1v₁+1v₂+0v₃)v₂ + (1v₁+0v₂+1v₃)v₃</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; barycenter(T) ∈ T, (v1+v2+v3) ∈ T</code><code class="nohighlight hljs ansi"
+style="display:block;">(true, false)</code></pre>
+        <p>Of course, there are multiple equivalent ways of
+        computing the same results using the <code>⋅</code> and
+        <code>:</code> dyadic products.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; T\barycenter(T) == inv(T)⋅barycenter(T)</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">ERROR: DimensionMismatch: expected input array of length -1, got length 0</code><br><code class="language-julia-repl hljs"
+style=
+"display:block;">julia&gt; sqrt(T:T) == norm(SMatrix(T))</code><code class="nohighlight hljs ansi"
+style="display:block;">true</code></pre>
+        <p>It is possible to generate a <a href=
+        "https://github.com/JuliaPlots/Makie.jl">Makie.jl</a>
+        <code>streamplot</code> diagrams with the
+        <code>Grassmann.Cramer</code> method for interpolated data
+        of finite element solutions.</p>
+        <h2 id="Mother-algebra-formalism"><a class=
+        "docs-heading-anchor" href=
+        "#Mother-algebra-formalism">Mother algebra
+        formalism</a><a id=
+        "Mother-algebra-formalism-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Mother-algebra-formalism" title="Permalink"></a></h2>
+        <p>Note that <code>Λ(ℝ3)</code> gives the vector basis, and
+        <code>Λ(ℝ3)'</code> gives the covector basis:</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; Λ(ℝ3)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">DirectSum.Basis{⟨111⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code><br><code class="language-julia-repl hljs"
+style="display:block;">julia&gt; Λ(ℝ3)'</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">DirectSum.Basis{⟨---⟩',8}(w, w¹, w², w³, w¹², w¹³, w²³, w¹²³)</code></pre>
+        <p>The following command yields a local 2D vector and
+        covector basis,</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; @mixedbasis ℝ2</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">(⟨++--⟩*, v, v₁, v₂, w¹, w², v₁₂, v₁w¹, v₁w², v₂w¹, v₂w², w¹², v₁₂w¹, v₁₂w², v₁w¹², v₂w¹², v₁₂w¹²)</code><br><code class="language-julia-repl hljs"
+style="display:block;">julia&gt; w1+2w2</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">1w¹ + 2w²</code><br><code class=
+"language-julia-repl hljs" style=
+"display:block;">julia&gt; ans(v1+v2)</code><code class=
+"nohighlight hljs ansi" style="display:block;">0v</code></pre>
+        <p>The sum <code>w1+2w2</code> is interpreted as a covector
+        element of the dual vector space, which can be evaluated as
+        a linear functional when a vector argument is input. Using
+        these in the workspace, it is possible to use the Grassmann
+        exterior <span>$\wedge$</span>-tensor product operation to
+        construct elements <code>ℒ</code> of the dyadic
+        (1,1)-bivector subspace of linear transformations from the
+        mother algebra.</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℒ = (v1+2v2)∧(3w1+4w2)</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">0v₁₂ + 3v₁w¹ + 4v₁w² + 6v₂w¹ + 8v₂w² + 0w¹²</code></pre>
+        <p>The element <code>ℒ</code> is a linear form which can be
+        evaluated,</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; ℒ(v1+v2)</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">0v₁ + 0v₂ + 9w¹ + 12w²</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; L = [1,2] * [3,4]'; L * [1,1]</code><code class="nohighlight hljs ansi"
+style="display:block;">2-element Vector{Int64}:
   7
- 14</code></pre><p>which is a computation equivalent to a matrix computation.</p><p>The <code>TensorAlgebra</code> evalution is still a work in progress, and the API and implementation may change as more features and algebraic operations and product structure are added.</p><h3 id="Importing-the-Leech-lattice-generator"><a class="docs-heading-anchor" href="#Importing-the-Leech-lattice-generator">Importing the Leech lattice generator</a><a id="Importing-the-Leech-lattice-generator-1"></a><a class="docs-heading-anchor-permalink" href="#Importing-the-Leech-lattice-generator" title="Permalink"></a></h3><p>In the example below, we define a constant <code>Leech</code> which can be used to obtain linear combinations of the Leech lattice,</p><pre><code class="language-julia hljs">julia&gt; using Grassmann
+ 14</code></pre>
+        <p>which is a computation equivalent to a matrix
+        computation.</p>
+        <p>The <code>TensorAlgebra</code> evalution is still a work
+        in progress, and the API and implementation may change as
+        more features and algebraic operations and product
+        structure are added.</p>
+        <h3 id="Importing-the-Leech-lattice-generator"><a class=
+        "docs-heading-anchor" href=
+        "#Importing-the-Leech-lattice-generator">Importing the
+        Leech lattice generator</a><a id=
+        "Importing-the-Leech-lattice-generator-1"></a><a class=
+        "docs-heading-anchor-permalink" href=
+        "#Importing-the-Leech-lattice-generator" title=
+        "Permalink"></a></h3>
+        <p>In the example below, we define a constant
+        <code>Leech</code> which can be used to obtain linear
+        combinations of the Leech lattice,</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; using Grassmann
 
 julia&gt; generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
        4 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
@@ -65,7 +398,7 @@ julia&gt; generator = [8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
        0 0 0 0 0 0 0 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0;
        -3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
 
-julia&gt; const E24,W24 = Λ(24), ℝ^24⊕(ℝ^24)&#39;;
+julia&gt; const E24,W24 = Λ(24), ℝ^24⊕(ℝ^24)';
 
 julia&gt; const Leech = Chain{Submanifold(W24),Float64}(generator./sqrt(8));
 
@@ -73,7 +406,12 @@ julia&gt; typeof(Leech)
 Chain{⟨++++++++++++++++++++++++------------------------⟩*,2,Float64,1128}
 
 julia&gt; ndims(Manifold(Leech))
-48</code></pre><p>The <code>Leech</code> generator matrix is contained in the 1128-dimensional bivector subalgebra of the space with 48 indices.</p><pre><code class="language-julia hljs">julia&gt; Leech(E24.v1)
+48</code></pre>
+        <p>The <code>Leech</code> generator matrix is contained in
+        the 1128-dimensional bivector subalgebra of the space with
+        48 indices.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Leech(E24.v1)
 2.82842712474619v₁ + 0.0v₂ + 0.0v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 0.0va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.0w² + 0.0w³ + 0.0w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
 
 julia&gt; Leech(E24.v2)
@@ -82,7 +420,12 @@ julia&gt; Leech(E24.v2)
 julia&gt; Leech(E24.v3)
 1.414213562373095v₁ + 0.0v₂ + 1.414213562373095v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 0.0va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.0w² + 0.0w³ + 0.0w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
 
-...</code></pre><p>Then a <code>TensorAlgebra</code> evaluation of <code>Leech</code> at an <code>Integer</code> linear combination would be</p><pre><code class="language-julia hljs">julia&gt; Leech(E24.v1 + 2*E24.v2)
+...</code></pre>
+        <p>Then a <code>TensorAlgebra</code> evaluation of
+        <code>Leech</code> at an <code>Integer</code> linear
+        combination would be</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Leech(E24.v1 + 2*E24.v2)
 5.65685424949238v₁ + 2.82842712474619v₂ + 0.0v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 0.0va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.0w² + 0.0w³ + 0.0w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
 
 julia&gt; ans⋅ans
@@ -92,4 +435,68 @@ julia&gt; Leech(E24.v2 + E24.v5)
 2.82842712474619v₁ + 1.414213562373095v₂ + 0.0v₃ + 0.0v₄ + 0.0v₅ + 0.0v₆ + 0.0v₇ + 0.0v₈ + 0.0v₉ + 0.0v₀ + 1.414213562373095va + 0.0vb + 0.0vc + 0.0vd + 0.0ve + 0.0vf + 0.0vg + 0.0vh + 0.0vi + 0.0vj + 0.0vk + 0.0vl + 0.0vm + 0.0vn + 0.0w¹ + 0.7071067811865475w² + 1.414213562373095w³ + 1.414213562373095w⁴ + 0.0w⁵ + 0.0w⁶ + 0.0w⁷ + 0.0w⁸ + 0.0w⁹ + 0.0w⁰ + 0.0wA + 0.0wB + 0.0wC + 0.0wD + 0.0wE + 0.0wF + 0.0wG + 0.0wH + 0.0wI + 0.0wJ + 0.0wK + 0.0wL + 0.0wM + 0.0wN
 
 julia&gt; ans⋅ans
-7.499999999999998v</code></pre><p>The <code>Grassmann</code> package is designed to smoothly handle high-dimensional bivector algebras with headroom to spare. Although some of these calculations may have an initial delay, repeated calls are fast due to built-in caching and pre-compilation.</p><p>In future updates, more emphasis will be placed on increased type-stability with more robust sparse output allocation in the computational graph and minimal footprint but maximal type-stability for intermediate results and output.</p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Wednesday 11 June 2025 03:54">Wednesday 11 June 2025</span>. Using Julia version 1.11.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+7.499999999999998v</code></pre>
+        <p>The <code>Grassmann</code> package is designed to
+        smoothly handle high-dimensional bivector algebras with
+        headroom to spare. Although some of these calculations may
+        have an initial delay, repeated calls are fast due to
+        built-in caching and pre-compilation.</p>
+        <p>In future updates, more emphasis will be placed on
+        increased type-stability with more robust sparse output
+        allocation in the computational graph and minimal footprint
+        but maximal type-stability for intermediate results and
+        output.</p>
+      </article>
+      <nav class="docs-footer">
+        <p class="footer-message">Powered by <a href=
+        "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+        and the <a href="https://julialang.org/">Julia Programming
+        Language</a>.</p>
+      </nav>
+    </div>
+    <div class="modal" id="documenter-settings">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Settings</p>
+        </header>
+        <section class="modal-card-body">
+          <p><label class="label">Theme</label></p>
+          <div class="select">
+            <select id="documenter-themepicker">
+              <option value="auto">
+                Automatic (OS)
+              </option>
+              <option value="documenter-light">
+                documenter-light
+              </option>
+              <option value="documenter-dark">
+                documenter-dark
+              </option>
+              <option value="catppuccin-latte">
+                catppuccin-latte
+              </option>
+              <option value="catppuccin-frappe">
+                catppuccin-frappe
+              </option>
+              <option value="catppuccin-macchiato">
+                catppuccin-macchiato
+              </option>
+              <option value="catppuccin-mocha">
+                catppuccin-mocha
+              </option>
+            </select>
+          </div>
+          <hr>
+          <p>This document was generated with <a href=
+          "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
+          version 1.14.1 on <span class="colophon-date" title=
+          "Saturday 30 August 2025 12:02">Saturday 30 August
+          2025</span>. Using Julia version 1.11.1.</p>
+        </section>
+        <footer class="modal-card-foot"></footer>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
