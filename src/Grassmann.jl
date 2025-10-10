@@ -447,6 +447,7 @@ function __init__()
     @require UnicodePlots="b8865327-cd53-5732-bb35-84acbb429228" include("../ext/UnicodePlotsExt.jl")
     @require SpecialFunctions="276daf66-3868-5448-9aa4-cd146d93841b" include("../ext/SpecialFunctionsExt.jl")
     @require EllipticFunctions="6a4e32cb-b31a-4929-85af-fb29d9a80738" include("../ext/EllipticFunctionsExt.jl")
+    @require FewSpecialFunctions="6fcbd3ca-4273-49c4-98b3-81b765566de6" include("../ext/FewSpecialFunctions.jl")
 end
 end
 

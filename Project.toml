@@ -1,7 +1,7 @@
 name = "Grassmann"
 uuid = "4df31cd9-4c27-5bea-88d0-e6a7146666d8"
 authors = ["Michael Reed"]
-version = "0.8.42"
+version = "0.8.43"
 
 [deps]
 AbstractTensors = "a8e43f4a-99b7-5565-8bf1-0165161caaea"
@@ -31,6 +31,7 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 EllipticFunctions = "6a4e32cb-b31a-4929-85af-fb29d9a80738"
+FewSpecialFunctions = "6fcbd3ca-4273-49c4-98b3-81b765566de6"
 
 [extensions]
 ReduceExt = "Reduce"
@@ -47,6 +48,7 @@ MakieExt = "Makie"
 UnicodePlotsExt = "UnicodePlots"
 SpecialFunctionsExt = "SpecialFunctions"
 EllipticFunctionsExt = "EllipticFunctions"
+FewSpecialFunctionsExt = "FewSpecialFunctions"
 
 [compat]
 julia = "1"
