@@ -410,6 +410,7 @@ Base.exp(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(exp,P.λ))
 Base.log(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(log,P.λ))
 Base.inv(P::SpectralOperator{V}) where V = Proj{V}(P.v,map(inv,P.λ))
 invdet(P::SpectralOperator{V}) where V = (inv(P),det(P))
+LinearAlgebra.tr(P::Proj) = sum(value(P.λ))
 LinearAlgebra.det(P::SpectralOperator{V}) where V = Chain{V,0}(prod(P.λ))
 ∧(P::SpectralOperator) = !det(P)
 
@@ -448,6 +449,7 @@ end
 Base.expm1(P::Dyadic) = expm1(Endomorphism(P))
 Base.exp(P::Dyadic) = exp(Endomorphism(P))
 Base.log(P::Dyadic) = log(Endomorphism(P))
+LinearAlgebra.tr(P::Dyadic) = value(P.x)⋅value(P.y)
 
 getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
 Base.transpose(P::Dyadic) = Dyadic(P.y,P.x)

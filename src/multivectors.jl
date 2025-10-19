@@ -88,6 +88,7 @@ Chain(v::Chain{V,G,𝕂}) where {V,G,𝕂} = v
 Chain(v::Zero{V}) where V = zero(Chain{V,0})
 #Chain{𝕂}(v::Chain{V,G}) where {V,G,𝕂} = Chain{V,G}(Values{binomial(mdims(V),G),𝕂}(v.v))
 @inline (::Type{T})(x...) where {T<:Chain} = T(x)
+@inline (::Type{T})(x::Union{<:Real,<:Complex,<:TensorAlgebra}...) where T<:Chain = T(x)
 
 #const Simplex{V,W,T<:GradedVector{W},N} = Chain{V,1,T,N}
 const Simplex{V,T<:GradedVector,N} = Chain{V,1,T,N}
