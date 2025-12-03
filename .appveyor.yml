@@ -4,6 +4,7 @@ environment:
   - julia_version: 1.6
   - julia_version: 1.10
   - julia_version: 1.11
+  - julia_version: 1.12
   - julia_version: nightly
 
 platform:

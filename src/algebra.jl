@@ -415,6 +415,8 @@ antidot_metric(a,b) = complementleft(contraction_metric(complementright(a),compl
 # don't use the inv(x) transformation here since float^p is slightly more accurate
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{p}) where {p} = x^p
 @inline literal_pow(::typeof(^), x::Scalar{V,<:AbstractFloat} where V, ::Val{-1}) = inv(x)
+@inline literal_pow(::typeof(^), x::Chain{V,0,<:AbstractFloat} where V, ::Val{p}) where {p} = x^p
+@inline literal_pow(::typeof(^), x::Chain{V,0,<:AbstractFloat} where V, ::Val{-1}) = inv(x)
 
 for (op,field) ∈ ((:*,false),(:wedgedot_metric,true)); args = field ? (:g,) : ()
 @eval Base.:^(z::Phasor{V},n::Number,$(args...)) where V = Phasor{V}(^(amplitude(z),n,$(args...)),n*angle(z))

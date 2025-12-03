@@ -34,11 +34,11 @@ import DirectSum: V0, ⊕, generate, basis, getalgebra, getbasis, dual, Zero, On
 import Leibniz: hasinf, hasorigin, dyadmode, value, pre, vsn, metric, mdims, gdims
 import Leibniz: bit2int, indexbits, indices, diffvars, diffmask, hasconformal
 import Leibniz: symmetricmask, indexstring, indexsymbol, combo, digits_fast
-import DirectSum: Single, Signature, metrichash, antimetric, cometric, signbool
+import DirectSum: Basis, Single, Signature, metrichash, antimetric, cometric, signbool
 
 import AbstractTensors: valuetype, scalar, isscalar, trivector, istrivector, ⊗, complement
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume
-import AbstractTensors: wedgedot_metric, contraction_metric, log_metric
+import AbstractTensors: wedgedot_metric, contraction_metric, log_metric, pseudoscalar
 
 ## cache
 

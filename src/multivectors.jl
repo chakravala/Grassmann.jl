@@ -128,7 +128,7 @@ equal(a::Chain{V},b::Chain{V}) where V = prod(0 .==value(a)) && prod(0 .== value
 isapprox(a::Chain{V,G,T},b::Chain{V,G,S}) where {V,G,T,S} = prod(a.v .≈ b.v)
 isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ value(b))
 
-@generated function Chain{V,G,𝕂}(val,v::Submanifold{V,G}) where {V,G,𝕂}
+@generated function Chain{V,G,𝕂}(val,v::Submanifold{V,G},::Nothing) where {V,G,𝕂}
     N = mdims(V)
     b = bladeindex(N,UInt(basis(v)))
     bin,T = binomial(N,G),numtype(𝕂,Any)
@@ -138,13 +138,13 @@ isapprox(a::Chain{V},b::Chain{V}) where V = prod(0 .≈value(a)) && prod(0 .≈ 
         :(Chain{V,G,$T}(setblade!(zeros($(mvec(N,G,T))),val,$(UInt(v)),$(Val(N)))))
     end
 end
-Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(val,v)
-Chain(v::Submanifold) = Chain(one(Int),v)
-Chain(v::Single) = Chain(v.v,basis(v))
-Chain{V,G,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Chain(one(𝕂),v)
-Chain{V,G,𝕂}(v::Single{V}) where {V,G,𝕂} = Chain{V,G,𝕂}(value(v),basis(v))
+Chain(val::𝕂,v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(val,v,nothing)
+Chain(v::Submanifold{V,G}) where {V,G} = Chain{V,G,Int}(one(Int),v,nothing)
+Chain(v::Single{V,G,B,T}) where {V,G,B,T} = Chain{V,G,T}(v.v,basis(v),nothing)
+Chain{V,G,𝕂}(v::Submanifold{V,G}) where {V,G,𝕂} = Chain{V,G,𝕂}(one(𝕂),v,nothing)
+Chain{V,G,𝕂}(v::Single{V}) where {V,G,𝕂} = Chain{V,G,𝕂}(value(v),basis(v),nothing)
 Chain{V,G,T,X}(x::Single{V,0}) where {V,G,T,X} = Chain{V,G}(zeros(mvec(mdims(V),G,T)))
-Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v} = Chain{V,0,T}(value(x),basis(x))
+Chain{V,0,T,X}(x::Single{V,0,v}) where {V,T,X,v} = Chain{V,0,T}(value(x),basis(x),nothing)
 
 Single(m::Chain{V,0,T,1} where {V,T}) = scalar(m)
 Single(m::Chain{V,G,T,1} where {V,G,T}) = volume(m)
@@ -961,10 +961,10 @@ import Base: isinf, isapprox
 import AbstractTensors: antiabs, antiabs2, geomabs, unit, unitize, unitnorm
 import AbstractTensors: value, valuetype, scalar, isscalar, involute, even, odd
 import AbstractTensors: vector, isvector, bivector, isbivector, volume, isvolume, ⋆
-export gdims, tdims, betti, χ, unit, ∠, radius, istensor, isgraded, isterm
+export gdims, tdims, betti, χ, unit, ∠, radius, istensor, isgraded, isterm, pseudoscalar
 export basis, grade, pseudograde, antigrade, hasinf, hasorigin, scalar, norm, unitnorm
 export valuetype, scalar, isscalar, vector, isvector, indices, imaginary, unitize, geomabs
-export bivector, isbivector, trivector, istrivector, volume, isvolume, antiabs, antiabs2
+export bivector, isbivector, trivector, istrivector, isvolume, antiabs, antiabs2
 export realvalue, imagvalue, unitangle, phase, amplitude, complexify, vectorize, polarize
 
 const Imaginary{V,T} = Spinor{V,T,2}

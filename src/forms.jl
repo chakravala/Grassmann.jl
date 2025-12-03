@@ -5,7 +5,9 @@ export TensorNested, Projector, Dyadic, Proj, outer, operator, gerschgorin, diag
 export DiagonalOperator, TensorOperator, Endomorphism, Outermorphism, outermorphism
 export sylvester, characteristic, eigen, eigvecs, eigvals, eigpolys, eigprods, eigmults
 export eigvalsreal, eigvalscomplex, eigvecsreal, eigvecscomplex, eigenreal, eigencomplex
+export discriminant, disc, discriminantreal, discreal, discriminantcomplex, disccomplex
 export MetricTensor, metrictensor, metricextensor, InducedMetric
+export vandermondereal, vandermondecomplex
 export @TensorOperator, @Endomorphism, @Outermorphism, @SpectralOperator
 import LinearAlgebra: eigvals, eigvecs, eigen, diag
 
@@ -1448,6 +1450,26 @@ function gerschgorin(x::Endomorphism)
     sum.(map(value,map.(abs,value(value(transpose(x-DiagonalOperator(x)))))))
 end
 
+isrealmatrix(x::TensorOperator) =  valuetype(valuetype(value(x))) <: Real
+_make_real_disc(x,Δ) = isrealmatrix(x) ? real(Δ) : Δ
+
+vandermonde(x::Chain{V}) where V = TensorOperator(vandermonde(x,V))
+vandermonde(x::Values{N}) where N = TensorOperator(vandermonde(x,Submanifold(N)))
+vandermonde(x::Endomorphism{V}) where V = TensorOperator(vandermonde(eigvals(x),V))
+vandermondereal(x::Endomorphism{V}) where V = TensorOperator(vandermonde(eigvalsreal(x),V))
+vandermondecomplex(x::Endomorphism{V}) where V = TensorOperator(vandermonde(eigvalscomplex(x),V))
+discriminant(x) = value(Single(det(vandermonde(x))))^2
+function discriminant(x::Endomorphism)
+    mdims(x)==2 ? tr(x)^2-4value(Single(det(x))) : _make_real_disc(x,value(Single(det(vandermonde(x))))^2)
+end
+function discriminantreal(x::Endomorphism)
+    mdims(x)==2 ? tr(x)^2-4value(Single(det(x))) : _make_real_disc(x,value(Single(det(vandermondereal(x))))^2)
+end
+function discriminantcomplex(x::Endomorphism)
+    mdims(x)==2 ? tr(x)^2-4value(Single(det(x))) : _make_real_disc(x,value(Single(det(vandermondecomplex(x))))^2)
+end
+const disc,discreal,disccomplex = discriminant,discriminantreal,discriminantcomplex
+
 export 𝓛, Lie, LieBracket, LieDerivative, bracket
 
 struct LieBracket end
@@ -1630,5 +1652,42 @@ function Base.findlast(P,t::AbstractVector{<:TensorOperator})
         @inbounds P ∈ value(t[i]) && (return i)
     end
     return 0
+end
+
+# implement vcat hcat
+
+const subscrepl = Dict(
+    '∞' => "_{\\infty}",
+    '∅' => "_{\\emptyset}",
+    '𝟎' => "0",
+    '₀' => "_{0}",
+    '₁' => "_{1}",
+    '₂' => "_{2}",
+    '₃' => "_{3}",
+    '₄' => "_{4}",
+    '₅' => "_{5}",
+    '₆' => "_{6}",
+    '₇' => "_{7}",
+    '₈' => "_{8}",
+    '₉' => "_{9}")
+function printtex(io::IO,data)
+    n,m = size(data)
+    for j ∈ 1:n
+        for i ∈ 1:m
+            @inbounds print(io,data[j,i])
+            i≠n && print(io," & ")
+        end
+        j≠m && print(io," \\\\\n")
+    end
+end
+function printtex(data)
+    io = IOBuffer()
+    printtex(io,data)
+    replace(replace(String(take!(io)),subscrepl...),"}_{"=>"")
+end
+printtex(data::Endomorphism) = printtex(display_matrix(data.v))
+
+function alltex(V,ops=[∧,∨,<,>,<<,>>])
+    printtex.(cayley.(Ref(V),ops))
 end
 

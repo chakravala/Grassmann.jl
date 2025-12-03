@@ -925,8 +925,10 @@ detsimplex(m::Vector{<:Chain{V}}) where V = det(m)/factorial(mdims(V)-1)
 mean(m::AbstractVector) = sum(m)/length(m)
 mean(m::Values{N}) where N = sum(m)/N
 mean(m::Chain{V,1,<:Chain} where V) = mean(value(m))
-barycenter(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
+barycenter(m::AbstractVector{<:Chain}) = sum(m)
 barycenter(m::Chain{V,1,<:Chain} where V) = barycenter(value(m))
+centroid(m::AbstractVector{<:Chain}) = (s=sum(m);@inbounds s/s[1])
+centroid(m::Chain{V,1,<:Chain} where V) = centroid(value(m))
 gradient(m::TensorAlgebra) = d(m)
 curl(m::FixedVector{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
 curl(m::Values{N,<:Chain{V}} where N) where V = curl(Chain{V,1}(m))
@@ -947,7 +949,7 @@ function ∧(m::DenseVector{<:Chain{V}}) where V
         Chain{↓(Manifold(V)),mdims(V)-1}.(value.(.∧(pm)))
     end
 end
-for op ∈ (:mean,:barycenter,:curl)
+for op ∈ (:mean,:centroid,:barycenter,:curl)
     ops = Symbol(op,:s)
     @eval begin
         export $op, $ops
