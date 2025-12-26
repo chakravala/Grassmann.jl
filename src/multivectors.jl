@@ -44,7 +44,7 @@ compact = ( () -> begin
 compactio(io::IO) = compact() ? IOContext(io, :compact => true) : io
 
 function showterm(io::IO,V,B::UInt,i::T,compact=get(io,:compact,false)) where T
-    if check_parsym(T) && signbit(i) && !isnan(i)
+    if check_parsym(T) && (T<:Real && signbit(i)) && !isnan(i)
         print(io, compact ? "-" : " - ")
         if isa(i,Signed) && !isa(i,BigInt) && i == typemin(typeof(i))
             showvalue(io, V, B, -widen(i))
