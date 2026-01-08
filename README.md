@@ -37,9 +37,11 @@ Abstract vector space type operations happen at compile-time, resulting in a dif
  |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
  l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
 ```
-This `Grassmann` package for the Julia language was created by [github.com/chakravala](https://github.com/chakravala) for mathematics and computer algebra research with differential geometric algebras.
-These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
-Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Bandcamp](https://music.crucialflow.com) or contribute (documentation, tests, examples) in the repositories.
+
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/hardcover/product-kv6n8j8.html) (Hardcover, 2025)
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/paperback/product-yvk7zqr.html) (Paperback, 2025)
+
+Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or contribute (documentation, tests, examples) in the repositories.
 
 * [Requirements](#requirements)
 * [DirectSum.jl parametric type polymorphism](#directsumjl-parametric-type-polymorphism)
@@ -97,7 +99,7 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [GeometryBasics.jl](https://github.com/JuliaGeometry/GeometryBasics.jl),
 [Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl),
 
-Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or [Bandcamp](https://music.crucialflow.com), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Tidelift (Learn more)](https://tidelift.com/subscription/pkg/julia-grassmann?utm_source=julia-grassmann&utm_medium=referral&utm_campaign=enterprise&utm_term=repo).
+Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or [Lulu](https://lulu.com/spotlight/chakravala).
 
 ## DirectSum.jl parametric type polymorphism
 
