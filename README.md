@@ -10,6 +10,8 @@
 [![PDF 2019](https://img.shields.io/badge/PDF-2019-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-juliacon-2019.pdf)
 [![PDF 2021](https://img.shields.io/badge/PDF-2021-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=differential-geometric-algebra-2021.pdf)
 [![PDF 2025](https://img.shields.io/badge/PDF-2025-blue.svg)](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-cartan-2025.pdf)
+[![Hardcover 2025](https://img.shields.io/badge/Hardcover-2025-blue.svg)](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/hardcover/product-kv6n8j8.html)
+[![Paperback 2025](https://img.shields.io/badge/Paperback-2025-blue.svg)](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/paperback/product-yvk7zqr.html)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://grassmann.crucialflow.com/dev)
 
 The [Grassmann.jl](https://github.com/chakravala/Grassmann.jl) package provides tools for computations based on multi-linear algebra and spin groups using the extended geometric algebra known as Grassmann-Clifford-Hodge algebra.
@@ -34,9 +36,11 @@ Abstract vector space type operations happen at compile-time, resulting in a dif
  |     ||  .  Y|  |  | \    | \    ||   |   ||  |  ||  |  ||  |  |
  l___,_jl__j\_jl__j__j  \___j  \___jl___j___jl__j__jl__j__jl__j__j
 ```
-This `Grassmann` package for the Julia language was created by [github.com/chakravala](https://github.com/chakravala) for mathematics and computer algebra research with differential geometric algebras.
-These projects and repositories were started entirely independently and are available as free software to help spread the ideas to a wider audience.
-Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Bandcamp](https://music.crucialflow.com) or contribute (documentation, tests, examples) in the repositories.
+
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/hardcover/product-kv6n8j8.html) (Hardcover, 2025)
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/paperback/product-yvk7zqr.html) (Paperback, 2025)
+
+Please consider donating to show your thanks and appreciation to this project at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or contribute (documentation, tests, examples) in the repositories.
 
 * [Requirements](#requirements)
 * [DirectSum.jl parametric type polymorphism](#directsumjl-parametric-type-polymorphism)
@@ -94,7 +98,7 @@ The package is compatible via [Requires.jl](https://github.com/MikeInnes/Require
 [GeometryBasics.jl](https://github.com/JuliaGeometry/GeometryBasics.jl),
 [Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl),
 
-Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or [Bandcamp](https://music.crucialflow.com), [Tidelift](https://tidelift.com/funding/github/julia/Grassmann), [Tidelift (Learn more)](https://tidelift.com/subscription/pkg/julia-grassmann?utm_source=julia-grassmann&utm_medium=referral&utm_campaign=enterprise&utm_term=repo).
+Sponsor this at [liberapay](https://liberapay.com/chakravala), [GitHub Sponsors](https://github.com/sponsors/chakravala), [Patreon](https://patreon.com/dreamscatter), or [Lulu](https://lulu.com/spotlight/chakravala).
 
 ## DirectSum.jl parametric type polymorphism
 
@@ -312,16 +316,10 @@ lines(V(2,3,4).(points(f)))
 
 ## References
 * Michael Reed, [Differential geometric algebra with Leibniz and Grassmann](https://crucialflow.com/grassmann-juliacon-2019.pdf), JuliaCon (2019)
-* Michael Reed, [Foundatons of differential geometric algebra](https://vixra.org/abs/2304.0228) (2021)
+* Michael Reed, [Foundations of differential geometric algebra](https://vixra.org/abs/2304.0228) (2021)
 * Michael Reed, [Multilinear Lie bracket recursion formula](https://vixra.org/abs/2412.0034) (2024)
 * Michael Reed, [Differential geometric algebra: compute using Grassmann.jl and Cartan.jl](https://www.dropbox.com/sh/tphh6anw0qwija4/AAACiaXig5djrLVAKLPFmGV-a/Geometric-Algebra?preview=grassmann-cartan-2025.pdf) (2025)
-* Emil Artin, [Geometric Algebra](https://archive.org/details/geometricalgebra033556mbp) (1957)
-* John Browne, [Grassmann Algebra, Volume 1: Foundations](https://www.grassmannalgebra.com/) (2011)
-* C. Doran, D. Hestenes, F. Sommen, and N. Van Acker, [Lie groups as spin groups](http://geocalc.clas.asu.edu/pdf/LGasSG.pdf), J. Math Phys. (1993)
-* David Hestenes, [Universal Geometric Algebra](http://lomont.org/math/geometric-algebra/Universal%20Geometric%20Algebra%20-%20Hestenes%20-%201988.pdf), Pure and Applied (1988)
-* David Hestenes, Renatus Ziegler, [Projective Geometry with Clifford Algebra](http://geocalc.clas.asu.edu/pdf/PGwithCA.pdf), Acta Appl. Math. (1991)
-* David Hestenes, [Tutorial on geometric calculus](http://geocalc.clas.asu.edu/pdf/Tutorial%20on%20Geometric%20Calculus.pdf). Advances in Applied Clifford Algebra (2013)
-* Lachlan Gunn, Derek Abbott, James Chappell, Ashar Iqbal, [Functions of multivector variables](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4361175/pdf/pone.0116943.pdf) (2011)
-* Aaron D. Schutte, [A nilpotent algebra approach to Lagrangian mechanics and constrained motion](https://www-robotics.jpl.nasa.gov/publications/Aaron_Schutte/schutte_nonlinear_dynamics_1.pdf) (2016)
-* Vladimir and Tijana Ivancevic, [Undergraduate lecture notes in DeRahm-Hodge theory](https://arxiv.org/abs/0807.4991). arXiv (2011)
-* Peter Woit, [Clifford algebras and spin groups](http://www.math.columbia.edu/~woit/LieGroups-2012/cliffalgsandspingroups.pdf), Lecture Notes (2012)
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/hardcover/product-kv6n8j8.html) (Hardcover, 2025)
+* Michael Reed, [Principal Differential Geometric Algebra: compute using Grassmann.jl, Cartan.jl](https://www.lulu.com/shop/michael-reed/principal-differential-geometric-algebra/paperback/product-yvk7zqr.html) (Paperback, 2025)
+
+
