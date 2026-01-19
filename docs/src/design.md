@@ -32,6 +32,18 @@ where ``v_i`` and ``w_i`` are bases for the vectors and covectors, while ``\part
 The purpose of the `TensorBundle` type is to specify the ``\mathbb{K}``-module basis at compile time.
 When assigned in a workspace, `V = Submanifold(::TensorBundle)` is used.
 
+The adjoint operation `V'` (applied to `V`) swaps between opposite metric signatures, which is a feature that has been built-in to `Grassmann` from the start; but this is not necessary for standard geometric algebra.
+Notation of extra Leibniz-Taylor monomoial indices is also an optional feature which can be entirely ignored for standard geometric algebra purposes.
+Standard geometric algebra is only concerned with the vector basis indices ``v_i``.
+
+`TensorBundle` definition specifies generators of `DirectSum.Basis` algebra
+- `Int` value induces a Euclidean metric of counted dimension
+- `Signature` uses `S"..."` with + and - specifying the metric
+- `DiagonalForm` uses `D"..."` for defining any diagonal metric
+- `MetricTensor` can accept non-diagonal metric tensor array
+
+Each of these have various constructors available and can be expressed into a `V = Submanifold(::TensorBundle)`, so that the `Submanifold` syntax layer can unify utility methods based on different subtypes of `TensorBundle`.
+
 The metric signature of the `Submanifold{V,1}` elements of a vector space ``V`` can be specified with the `V"..."` by using ``+`` or ``-`` to specify whether the `Submanifold{V,1}` element of the corresponding index squares to ``+1`` or ``-1``.
 For example, `S"+++"` constructs a positive definite 3-dimensional `TensorBundle`, so constructors such as `S"..."` and `D"..."` are convenient.
 ```@setup ds
@@ -42,7 +54,7 @@ using DirectSum
 ```
 It is also possible to change the diagonal scaling, such as with `D"1,1,1,0"`, although the `Signature` format has a more compact representation if limited to ``+1`` and ``-1``.
 It is also possible to change the diagonal scaling, such as with `D"0.3,2.4,1"`.
-Fully general `MetricTensor` as a type with non-diagonal components requires a matrix, e.g. `MetricTensor([1 2; 2 3])`.
+Fully general `MetricTensor` as a type with non-diagonal components requires a matrix, e.g. `MetricTensor([1 1; 1 1])`.
 
 Declaring an additional point at infinity is done by specifying it in the string constructor with ``\infty`` at the first index (i.e. Riemann sphere `S"∞+++"`).
 The hyperbolic geometry can be declared by ``\emptyset`` subsequently (i.e. hyperbolic projection `S"∅+++"`).

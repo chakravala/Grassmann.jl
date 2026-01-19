@@ -1,55 +1,131 @@
 # Grassmann elements and geometric algebra Λ(V)
 
-**Definition** (Vector space ``\Lambda^1 V = V`` is a field's ``\mathbb K``-module instance).
-	Let ``V`` be a ``\mathbb K``-module (abelian group with respect to ``+``) with an element ``1\in\mathbb K`` such that ``1V = V`` by scalar multiplication ``\mathbb K\times V\rightarrow V`` over field ``\mathbb K`` satisfying
-1. `` a(x+y) = ax+ ay`` distribution of vector addition,
-2. `` (a+b)x = ax + bd`` distribution of field addition,
-3. `` (ab)x = a(bx)`` associative compatibility.
+**Definition** (Vector space ``\Lambda^1 V = V`` is a field's ``\mathbb K``-module).
+	Let ``V`` be a ``\mathbb K``-module (abelian group with respect to ``+``) with an element ``1\in\mathbb K`` such that ``1V = V`` by scalar multiplication ``\otimes:\mathbb K\times V\rightarrow V`` over field ``\mathbb K`` satisfying
+1. `` a\otimes(x+y) = a\otimes x+ a\otimes y`` is distribution of vector addition,
+2. `` (a+b)\otimes x = a\otimes x + b\otimes d`` is distribution of field addition,
+3. `` (ab)\otimes x = a\otimes (b\otimes x)`` is multiplicative associative compatibility.
 
 In the software package `Grassmann`, a generating vector space ``\mathbb{K}``-module is specified as a value of `<:TensorBundle` (an abstract type).
+
+
+A vector space has addition ``+`` and a multiplication operation ``\cdot`` or ``\otimes``,
+1. Let ``x,y\in V``, then vector addition ``x+y\in V`` exists.
+2. Let ``x,y\in V``, then vector addition ``x+y = y+x`` is commutative.
+3. Let ``x,y,z\in V``, then ``(x+y)+z = x+(y+z)`` is associative.
+4. Let ``x\in V``, then additive ``0\in V`` existst such that ``x+0=x``.
+5. Let ``x\in V``, then negation ``-x\in V`` exists such that ``x+(-x)=0``.
+6. Let ``x\in V``, then multiplicative ``1\in\mathbb K`` exists so that ``1\otimes x = x\otimes 1 = x``.
+7. Let ``a\in\mathbb K`` and ``x\in V``, then scalar multiple ``a\otimes x=x\otimes a\in V`` exists.
+8. Let ``a\in\mathbb K`` and ``x,y\in V``, then ``a\otimes (x+y) = a\otimes x+a\otimes y`` distributes.
+9. Let ``a,b\in\mathbb K`` and ``x\in V``, then ``(a+b)\otimes x = a\otimes x + b\otimes x`` distributes.
+10. Let ``a,b\in\mathbb K`` and ``x\in V``, then ``a\otimes(b\otimes x) = (ab)\otimes x`` is ``\mathbb K``-compatible.
+
+The `StaticVectors` package has been custom made for the `Grassmann` project specifically to serve as its ``\mathbb K``-module foundation, used as underlying type for constructing algebra elements with additional contextual metadata.
+```julia
+julia> using StaticVectors
+
+julia> Values(1,2,3) + Values(2,3,4)
+3-element Values{3, Int64} with indices SOneTo(3):
+ 3
+ 5
+ 7
+```
+
+In geometric algebra contexts, it is desirable to inherit the properties of a ``\mathbb K``-module and then extend its algebra with more operations by having the context introduced from additional metadata associated to the ``\mathbb K``-module.
+The additional algebra operations would become ambiguous and difficult to express without attaching desirable metadata to the objects and types.
+
+As a comprehensive project to create a more robust and standard type system specification for geometric algebra purposes, the `TensorAlgebra{V}` type system has been custom designed and pioneered in such a way that type information associated to `V` provides the necessary background information to compile computer algebra code by context of the object types.
+
+
+
+
 
 **Definition** (Linear dependence).
 	Let ``V`` be a vector space over field $\mathbb K$, then the set ``\{v_i\}_i`` is linearly dependent if and only if ``\sum_{i=1}^n k_iv_i = 0`` for some ``0\ne k\in\mathbb K^n``.
 
-**Definition** (``\wedge``-product annihilation).
+**Axiom**.
+Let ``V`` be a ``\mathbb K``-module, `TensorAlgebra{V}` has tensor products
+1. Let ``a\in\mathbb K`` and ``x,y\in V``, then ``a\otimes(x\otimes y) = (a\otimes x)\otimes y = x\otimes(a\otimes y) ``.
+
+**Axiom** (Exterior algebra).
+Associative tensors with exterior products ``\wedge \subset \otimes`` of vectors having *anti-symmetric* negation applied distributively:
+1. Let ``x,y\in V``, then ``x\wedge y = -y\wedge x`` is Grassmann's exterior product.
+2. Let ``x,y,z\in V``, then ``(x\wedge y)\wedge z = x\wedge(y\wedge z)`` is associative.
+3. Let ``x,y,z\in V``, then ``x\wedge (y+z) = x\wedge y + x\wedge z`` is distributive.
+
+Notation: let ``x,y,z\in V=\Lambda^1V``, then ``x\wedge y \in\Lambda^2 V`` and ``x\wedge y\wedge z\in\Lambda^3 V``, etc.
+
+
+**Theorem** (``\wedge``-product annihilation).
 	For a linearly dependent set ``\{v_i\}_1^n\subset V`` 
 ```math
 v_1\wedge v_2\wedge\dots\wedge v_n = 0.
 ```
 
-Initially, it is enough to understand that ``\wedge:\Lambda^n V\times\Lambda^m V\rightarrow\Lambda^{n+m}V`` is an operation which is zero for linearly dependent arguments. 
-However, this idea comes from extending Grassmann's product ``v_i\wedge v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i`` to yield a tool for characterizing linear dependence.
+*Proof*. Initially, it is enough to understand that ``\wedge:\Lambda^n V\times\Lambda^m V\rightarrow\Lambda^{n+m}V`` is an operation which is zero for linearly dependent arguments. 
+However, this idea occurs from extending Grassmann's product ``v_i\wedge v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i`` to yield a tool for characterizing linear dependence.
+For example, observe that ``k_1v_i+k_2v_i = 0`` is linearly dependent with ``k_1=-k_2`` and ``v_i\wedge v_i=0``.
 
-**Definition** (Dimension ``n``-Submanifold in ``\Lambda^n V``).
-	Note that writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`Submanifold`.
-
-Furthermore, ``\mathbb{K}\times\{v_1\wedge v_2\wedge\cdots\wedge v_n\}\cong\mathbb{K}`` shows the ``1``-dimensional basis subspace is induced by any ``n``-`Submanifold`.
+**Corollary** (Dimension ``n``-Submanifold in ``\Lambda^n V``).
+	Note that writing the product ``v_1\wedge v_2\wedge\cdots\wedge v_n\ne0`` implies a linearly independent set ``\{v_i\}_1^n\subseteq V`` isomorphic to an ``n``-`Submanifold` with
+``\mathbb{K}\times\{v_1\wedge v_2\wedge\cdots\wedge v_n\}\cong\mathbb{K}`` being the ``1``-dimensional basis subspace which scales any ``n``-`Submanifold`.
 
 *Example*. Therefore, ``\mathbb K = \Lambda^0\mathbb K \cong \Lambda^1\mathbb K`` is a vector space or a 0-Submanifold.
 
 *Example*. ``\Lambda^n V`` is a vector space with ``\Lambda^1\Lambda^n V = \Lambda^nV`` and ``\Lambda^0\Lambda^nV = \Lambda^0V``.
 
-Denote ``V^* = V\backslash\{0\}`` as the set ``V`` excluding the 0 element in next:
+
 
 **Definition** (Direct sum ``\oplus``).
-	To consider a set of linearly independent spaces,
-	let ``\pi_i: V\rightarrow V_i`` be projections with vector space ``V_i\subset V``, define
+Let ``\pi_i:V\rightarrow V_i`` be projections with vector space ``V_i\subset V``, if for every ``k\in V\backslash\{0\}`` there exist ``v_1\wedge\dots\wedge v_n\ne`` such that
 ```math
-V_1\oplus V_2\oplus\cdots\oplus V_n = V \iff
-\bigwedge : V_1^*\times V_2^*\times\cdots\times V_n^* \rightarrow \Lambda^n V^* .
+k = \sum_{i=1}^n\pi_i(k) = \sum_{i=1}^n k_i \pi_i(v_i) = \sum_{i=1}^nk_iv_i, \qquad \pi_i(v_j) = \begin{cases} v_j, & i = j, \\ 0, & i\ne j, \end{cases}
 ```
+then *direct sum* ``V_1\oplus V_2\oplus\cdots\oplus V_n = V`` has a linear span basis ``v_1\wedge\dots\wedge v_n\ne 0``.
 
-DirectSum of a full  non-zero product implies an ``n``-Submanifold.
 
 **Ddefinition**
-	Grade-``m`` projection is defined as ``\langle\Lambda V\,\rangle_m = \Lambda^m V`` such that
+Grade-``m`` projection `grade(x,m)` is defined as ``\langle\Lambda V\,\rangle_m = \Lambda^m V`` such that
 ```math
 \Lambda V = \bigoplus_{m=0}^n \langle\Lambda V\,\rangle_m = \Lambda^0V\oplus\Lambda^1V\oplus\cdots\oplus\Lambda^nV, \qquad \langle\Lambda V\,\rangle_m = \bigoplus_{m=1}^{n\choose m}\mathbb K.
 ```
-Note that ``\dim \langle\Lambda V\,\rangle_m = {n\choose m}`` and hence ``\dim\Lambda V = \sum_{m=0}^n {n\choose m} = 2^n``.
+Binomial ``\dim \langle\Lambda V\,\rangle_m = {n\choose m}`` and hence ``\dim\Lambda V = \sum_{m=0}^n {n\choose m} = 2^n``.
+
+
+*Example*.
+Let ``\sigma\in S_n`` and ``v_i,v_j\in V``, then ``v_i\wedge v_j = \varepsilon(\sigma)v_{\sigma(i)}\wedge v_{\sigma(j)}``,
+```math
+v_{i_1}\wedge\cdots\wedge v_{i_g} = \varepsilon(\sigma)v_{\sigma(i_1)}\wedge\cdots\wedge v_{\sigma(i_{g})}, \quad v_{i_1},\dots,v_{i_g}\in V.
+```
+Changing the ordering of an exterior product is an oriented permutation:
+```math
+		u(i_1,\dots,i_g) = \{\varepsilon(\sigma)v_{\sigma(i_1)}\wedge\cdots\wedge v_{\sigma(i_g)} \mid \sigma\in S_n\},
+```
+```math
+		u(1,2) = \{(-1)^0v_1\wedge v_2, (-1)^1v_2\wedge v_1\},
+```
+```math
+		u(1,3) = \{(-1)^0v_1\wedge v_3, (-1)^1v_3\wedge v_1\},
+```
+```math
+		u(2,3) = \{(-1)^0v_2\wedge v_3, (-1)^1v_3\wedge v_2\},
+```
+```math
+		u(1,2,3) = \{(-1)^0v_1\wedge v_2\wedge v_3,(-1)^1v_1\wedge v_3\wedge v_2, (-1)^1v_2\wedge v_1\wedge v_3,
+```
+```math
+				 \quad\quad (-1)^2v_2\wedge v_3\wedge v_1, (-1)^2v_3\wedge v_1\wedge v_2,(-1)^3v_3\wedge v_2\wedge v_1 \}.
+```
+Elements of ``u(i_1,\dots,i_g)`` are all equivalent, making it a singleton set.
+Since there is a whole permutation group for possible expressions with equivalent exterior product, it is helpful to pick a choice making algebraic expressions standard.
+Most convenient is to use ordering ``i_1<\cdots<i_g`` as the canonical choice for product expressions with ordinal indices ``i_1,\dots,i_g\in\{1,\dots,n\}``.
+
+
+
 
 *Example* (Combinatorics of power set ``\mathcal P(V)``).
-Let ``v_1,v_2,v_3 \in\mathbb R^3``, then the power set of elements is:
+Let ``v_1,v_2,v_3 \in\mathbb R^3``, then the power set of elements has ``\operatorname{dim}\langle\Lambda V\rangle_m = {n\choose m} = \frac{n!}{m!(n-m)}`` binomial,
 ```math
 \mathcal P(\mathbb R^3) = \{\emptyset,\{v_1\},\{v_2\},\{v_3\},\{v_1,v_2\},\{v_1,v_3\},\{v_2,v_3\},\{v_1,v_2,v_3\}\}
 ```
@@ -105,11 +181,11 @@ Combined, the mixed-symmetry algebra yield a multi-linear propositional lattice.
 The formal sum of equal `grade` elements is an oriented `Chain` and with mixed `grade` it is a `Multivector` simplicial complex.
 Thus, various standard operations on the oriented multi-sets are possible including ``\cup,\cap,\oplus`` and the index operation ``\ominus``, which is symmetric difference operation.
 
-Grassmann's exterior product is an anti-symmetric tensor product
+Grassmann's exterior product is an anti-symmetric tensor product, this leads to
 ```math
 v_i \wedge v_j = - v_j\wedge v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i,
 ```
-which generalizes the multilinear determinant transposition property
+and the generalized multilinear determinant transposition property
 ```math
 v_{\omega_1}\wedge\cdots\wedge v_{\omega_m}\wedge v_{\eta_1}\wedge\cdots\wedge v_{\eta_n} = (-1)^{mn} v_{\eta_1} \wedge \cdots \wedge v_{\eta_n} \wedge v_{\omega_1} \wedge \cdots \wedge v_{\omega_m}.
 ```
@@ -131,6 +207,11 @@ In order to shorten the notation, the operation symbol is left out:
 ```
 The canonical choice of orientation is with indices in sorted order, so that for example anti-symmetry is applied to rewrite ``v_{21} = -v_{12}`` or the property ``\partial_2\circ\partial_1 = \partial_1\circ\partial_2`` is applied for differential operators.
 In general, permutations of the indices get rendered as orientations of ``(-1)^k`` of a basis ``\mathbb{K}``-module.
+
+
+
+
+
 
 **Definition** (Permutations).
 Consider ``\displaystyle\sigma_j(\omega) = \sum_{k=0}^n(-1)^{\binom{k}{2^{j-1}}}\langle\omega\rangle_k``,
@@ -179,7 +260,6 @@ In general, this can be extended to ``\mathbb{Z}_2``-grading projections ``\sigm
     * `CoSpinor{V,```\mathbb{K}```}` has complete basis for `odd` ``\mathbb{Z}_2``-graded terms
 * `Multivector{V,```\mathbb{K}```}` has complete basis for all ``\Lambda V`` with ``\mathbb{K}``-module
 
-
 **Definition**. `TensorNested{V,T}` subtypes are linear transformations
 * `TensorOperator{V,W,T}` linear map ``V\rightarrow W`` with `T::DataType`
     * `Endomorphism{V,T}` linear map ``V\rightarrow V`` with `T::DataType`
@@ -197,6 +277,84 @@ F(v_1)\wedge\cdots\wedge F(v_n) = F(v_1\wedge\cdots\wedge v_n)
 * `Dyadic{V,X,Y}` linear map ``V\rightarrow V`` with `Dyadic(x,y)` ``= x\otimes y``
 
 *Grassmann.jl* was first to define a comprehensive `TensorAlgebra{V}` type system from scratch around the idea of the `V::Submanifold{M}` value to express algebra subtypes for a specified ``\mathbb{K}``-module structure.
+
+In `Grassmann`, a standard vector space is initialized with `Submanifold(N)`.
+```julia
+julia> V = Submanifold(4)
+⟨1111⟩
+```
+The type parameters of `Submanifold{V, G, B}` are encoded with integers.
+```julia
+julia> dump(V)
+Submanifold{4, 4, 0x000000000000000f} ⟨1111⟩
+```
+Calling `collect(V)` or `Λ(V)` produces a `DirectSum.Basis`.
+```julia
+julia> G4 = collect(V)
+DirectSum.Basis{⟨1111⟩,16}(v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
+
+julia> dump(G4.v12)
+Submanifold{⟨1111⟩, 2, 0x0000000000000003} v₁₂
+```
+The object `G4::DirectSum.Basis` can be used to access algebra elements.
+```julia
+julia> G4.v12 + 2G4.v14
+1v₁₂ + 0v₁₃ + 2v₁₄ + 0v₂₃ + 0v₂₄ + 0v₃₄
+
+julia> typeof(G4.v12 + G4.v14)
+Chain{⟨1111⟩, 2, Int64, 6}
+```
+Subalgebra generated by `V(1,4)` can be assigned to `G42`, for example.
+```julia
+julia> G42 = collect(V(1,4))
+DirectSum.Basis{⟨1__1⟩,4}(v, v₁, v₄, v₁₄)
+
+julia> sqrt(2) + G42.v14
+1.4142135623730951 + 1.0v₁₄
+
+julia> typeof(ans)
+Couple{⟨1__1⟩, v₁₄, Float64}
+```
+Otherwise, the `@basis` macro or `basis"..."` can assign local symbols.
+```julia
+julia> @basis 3
+(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+```
+The `One{V}` type is an alias of `Submanifold{V,0}` types, e.g. try `dump(v)`.
+```julia
+julia> 1 + v12 - v13
+1 + 1v₁₂ - 1v₁₃ + 0v₂₃
+
+julia> typeof(ans)
+Quaternion{⟨111⟩, Int64} (alias for Spinor{⟨111⟩, Int64, 4})
+```
+Hence, algebra elements can be created from the generating basis.
+
+The direct way to construct elements is with `Values`,
+```julia
+julia> Chain{V,1}(Values(4,5,6)) # Chain{V,1}(4,5,6)
+4v₁ + 5v₂ + 6v₃
+```
+while the `value` function returns the `Values` representation
+```julia
+julia> value(Chain(4,5,6))
+3-element Values{3, Int64} with indices SOneTo(3):
+ 4
+ 5
+ 6
+```
+where `Chain(::Vararg{<:Number,N})` auto-selects `V = Submanifold(N)`.
+```julia
+julia> wedge(Chain(1,2,3),Chain(4,5,6))
+-3v₁₂ - 6v₁₃ - 3v₂₃
+```
+Constructors for `Spinor`, `CoSpinor`, `Multivector` are similar.
+```julia
+julia> Spinor{V}(1,2,3,4)
+1 + 2v₁₂ + 3v₁₃ + 4v₂₃
+```
+
+
 
 **Definition**. Common unary operations on `TensorAlgebra` elements
 * `Manifold` returns the parameter `V::Submanifold{M}` ``\mathbb{K}``-module
@@ -273,6 +431,23 @@ Custom methods related to tensor operators and roots of polynomials
 Accessing `metrictensor(V)` produces a linear map ``g: V\rightarrow V`` which can be extended to ``\Lambda g:\Lambda V\rightarrow\Lambda V`` outermorphism given by `metricextensor`.
 To apply the `metricextensor` to any `Grassmann` element of ``\Lambda V``, the function `metric` can be used on the element, `cometric` applies a complement metric.
 
+`complexify` converts two dimensional values into its complex number form.
+```julia
+julia> complexify(1+im)
+1 + 1im
+
+julia> complexify(Chain(1,2))
+1 + 2v₁₂
+```
+`vectorize` converts two dimensional complex numbers into vector form.
+```julia
+julia> vectorize(1+2im)
+1v₁ + 2v₂
+
+julia> vectorize(Couple(1,2))
+1v₁ + 2v₂
+```
+
 ## Grassmann-Hodge complement
 
 John Browne has discussed the Grassmann duality principle, stating that every theorem (involving either of the exterior and regressive products) can be translated into its dual theorem by replacing the ``\wedge`` and ``\vee`` operations and applying Grassmann complements!
@@ -294,6 +469,16 @@ Together, these form an orthocomplementary propositional lattice ``!,\wedge,\vee
 ```
 where the regressive product ``\vee`` satisfies the Grassmann laws with ``!`` and ``\wedge``.
 
+- `complementright` Euclidean metric Grassmann right complement,
+- `complementleft` Euclidean metric Grassmann left complement.
+```julia
+julia> complementright(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃
+
+julia> complementleft(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃
+```
+
 **Definition** (Hodge ``\star`` complement).
 Expressed as unary operator ``\star``, define the composition of ``\star = `` `complementright` ``\circ`` `metric` as linear operator.
 ```math
@@ -301,12 +486,30 @@ Expressed as unary operator ``\star``, define the composition of ``\star = `` `c
 ```
 This linear operator is also called `complementrighthodge` or only `hodge`.
 
+- `complementrighthodge` Grassmann-Hodge right complement ``\widetilde\omega I``
+- `complementlefthodge` Grassmann-Hodge left complement ``I\widetilde\omega``
+```julia
+julia> complementrighthodge(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃
+```
+
 **Remark**. Original Grassmann complement is equivalent to the Hodge complement with a Euclidean metric tensor, making `metric` an `identity`.
+```julia
+julia> @basis S"++-"
+(⟨++-⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+
+julia> hodge(Multivector{V}(1,2,3,4,5,6,7,8))
+-8 - 7v₁ + 6v₂ + 5v₃ - 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃
+```
 
 **Definition**.
 The interior contraction ``\eta\cdot\omega = \eta\vee\star\omega`` is defined in terms of the regressive product and also the Hodge complement.
 By default the right contraction ``>`` is used, but there is also a left contraction ``<`` with swapped arguments ``\eta<\omega = \omega\vee\star\eta``,
 and also ``\eta >> \omega = \widetilde\eta >\omega`` with ``\eta << \omega = \eta <\widetilde{\omega} ``.
+```julia
+julia> vee(Chain{V}(1,2,3),hodge(Chain{V}(4,5,6)))
+-4v
+```
 
 **Remark**. Using coupled subspaces in the block matrix structure of metric tensors, a basis element can be factorized in a corresponding way.
 In particular, for the diagonal metric this is simply the basis index factorization.
@@ -327,71 +530,22 @@ In Julia, the multiplication symbol `*` can be used for geometric products.
 ```math
 \omega_X\ominus \eta_Y = \underbrace{\overbrace{(-1)^{\Pi(X,Y)}}^{\text{orient parity}}\overbrace{\det\left[g_{\Lambda(X\cap Y)}\right]}^{\text{intersect metric}} (\overbrace{\bigotimes_{k\in \Lambda(X\ominus Y)} v^{i_k}}^{(X\cup Y)\backslash(X\cap Y)}}_{\Lambda^1-anti-symmetric,\, \Lambda^g-mixed-symmetry})\otimes (\underbrace{\overbrace{\bigotimes_{k\in L(X\oplus Y)} \partial_{i_k}^{\otimes\mu_k}}^{\text{multi-set sum}}}_{L^g-symmetric})
 ```
+**Remark**. For any ``v_i \in \Lambda^1V``, we define ``v_i^2 = v_iv_i = g_{ii}``, so typically the diagonal metric ``g`` of the algebra is often defined by relations like these.
+```julia
+julia> Chain(1,2,3)*Chain(4,5,6)
+32 - 3v₁₂ - 6v₁₃ - 3v₂₃
+```
 **Remark**:
 The product symbol ``\ominus`` will be used to denote explicitly usage of the diagonal geometric product, although the standard number product ``*`` notation could also be used.
 The ``\ominus`` choice helps emphasize that the diagonal geometric product is characterized by symmetric differencing of anti-symmetric indices.
-
-**Remark**. For any ``v_i \in \Lambda^1V``, we define ``v_i^2 = v_iv_i = g_{ii}``, so typically the diagonal metric ``g`` of the algebra is often defined by relations like these.
-
-The elements of the `Basis` can be generated in many ways using the `Submanifold` elements created by the `@basis` macro,
-```@repl ga
-using Grassmann; @basis ℝ'⊕ℝ^3 # equivalent to basis"-+++"
-```
-As a result of this macro, all of the `Submanifold{V,G}` elements generated by that `TensorBundle` become available in the local workspace with the specified naming.
-The first argument provides signature specifications, the second argument is the variable name for the `TensorBundle`, and the third and fourth argument are prefixes of the `Submanifold` vector names (and covector basis names). By default, ``V`` is assigned the `TensorBundle` and ``v`` is the prefix for the `Submanifold` elements.
-```@repl ga
-V # Minkowski spacetime
-typeof(V) # dispatch by vector space
-typeof(v13) # extensive type info
-2v1 + v3 # vector Chain{V,1} element
-5 + v2 + v234 # Multivector{V} element
-```
-It is entirely possible to assign multiple different bases with different signatures without any problems. In the following command, the `@basis` macro arguments are used to assign the vector space name to ``S`` instead of ``V`` and basis elements to ``b`` instead of ``v``, so that their local names do not interfere:
-```@repl ga
-@basis "++++" S b;
-let k = (b1 + b2) - b3
-   for j ∈ 1:9
-	   k = k * (b234 + b134)
-	   println(k)
-end end
-```
-Alternatively, if you do not wish to assign these variables to your local workspace, the versatile constructors of `DirectSum.Basis{V}` can be used to contain them, which is exported to the user as the method `Λ(V)`,
-```@repl ga
-G3 = Λ(3) # equivalent to Λ(V"+++"), Λ(ℝ^3), Λ.V3
-G3.v13 ⊖ G3.v12
-```
-The multiplication product used: ``*`` or ``\ominus`` is the geometric algebraic product.
-```@repl ga
-(1 + 2v34) ⊖ (3 + 4v34), (1 + 2v34) * (3 + 4v34), (1 + 2im) * (3 + 4im)
-```
-Symmetry properties of the tensor algebra can be characterized in terms of the geometric product by two averaging operations, which are the symmetrization ``\odot`` and anti-symmetrization ``\boxtimes`` operators.
-These products satisfy various `Multivector` properties, including the associative and distributive laws.
 
 **Definition**. The geometric product can be applied in two averaging operations, which are symmetrization and anti-symmetrization operations:
 ```math
 \bigodot_{k=1}^j\omega_k = \frac{1}{j!} \sum_{\sigma\in S_j} \prod\omega_{\sigma(k)}, \qquad \bigwedge_{k=1}^j \omega_k = \sum_{\sigma\in S_j} \frac{(-1)^{\varepsilon(\sigma)}}{j!} \prod_k\omega_{\sigma(k)}
 ```
 
-**Definition** (Exterior product):
-Let ``w_k\in\Lambda^{p_k}V``, then for all ``\sigma\in S_{\sum p_k}`` define an equivalence relation ``\sim`` such that
-```math
-\bigwedge_k \omega_k(v_{1},\dots,v_{p_k}) \sim (-1)^{\Pi(\sigma)}(\bigotimes_k \omega_k)(v_{\sigma(1)},\dots,v_{\sigma(\sum p_k)})
-```
-if and only if ``\ominus_k\omega_k = \boxtimes_k\omega_k`` holds.
-It has become typical to use the ``\wedge`` product symbol to denote products of such elements as ``\bigwedge\Lambda V \equiv \bigotimes\Lambda V/\sim`` modulo anti-symmetrization.
-```@repl ga
-v3 ∧ v4, v4 ∧ v3, v3 ∧ v3
-```
-**Remark**. Observe that the anti-symmetric property implies that ``\omega\otimes\omega=0``, while the symmetric property neither implies nor denies such a property.
-Grassmann remarked in 1862 that the symmetric algebra of functions is by far more complicated than his anti-symmetric exterior algebra.
-The first part of the book focused on anti-symmetric exterior algebra, while the more complex symmetric function algebra of Leibniz was subject of the second multivariable part of the book.
-Elements ``\omega_k`` in the space ``\Lambda V`` of anti-symmetric algebra are often studied as unit quantum state vectors in a unitary probability space, where ``\sum_k\omega_k\neq\bigotimes_k\omega_k`` is entanglement.
-
 *Example* (Reverse, involute, conjugate).
 The `reverse` of ``\langle\omega\rangle_r`` is defined as ``\langle\tilde\omega\rangle_r = (-1)^{(r-1)r/2}\langle\omega\rangle_r``, while the `involute` is ``\langle\omega\rangle_r^\times=(-1)^r\langle\omega\rangle_r`` and `clifford`  ``\langle\omega\rangle_r^\ddagger`` is the composition of `involute` and `reverse`.
-```@repl ga
-clifford(v234) == involute(~v234)
-```
 
 **Definition** (Reversed product).
 Consider the reversed product ``\langle\widetilde\omega\omega\rangle``.
@@ -403,16 +557,10 @@ Consider the reversed product ``\langle\widetilde\omega\omega\rangle``.
 
 *Example* (Inverse).
 ``\omega^{-1} = \widetilde\omega(\widetilde\omega\omega)^{-1} = \widetilde\omega/|\omega|^2``, with ``\eta/\omega = \eta\omega^{-1}`` and ``\eta\backslash\omega = \eta^{-1}\omega``.
-```@repl ga
-1/v34, inv(v34) == ~v34/abs2(v34)
-```
 
 **Definition** (Sandwich product).
 Define operator as ``\eta\oslash\omega = \overline\omega^{-1}\eta\omega ``.
 Alternatively, the reversed definition is ``\eta\omega\overline\eta^{-1}`` typically notated ``\eta`` `>>>` ``\omega``.
-```@repl ga
-(2v3+5v4) ⊘ v3 == inv(v3)*(2v3+5v4)*involute(v3)
-```
 
 The `real` part ``\Re\omega = (\omega+\tilde\omega)/2`` is defined by ``|\Re\omega|^2 = (\Re\omega)^{\ominus2}`` and the `imag` part ``\Im\omega = (\omega-\tilde\omega)/2`` by ``|\Im\omega|^2 = -(\Im\omega)^{\ominus2}``, such that ``\omega = \Re\omega+\Im\omega`` has real and imaginary partitioned by
 ```math
@@ -425,21 +573,6 @@ which is a unique partitioning completely independent of the metric space and ma
 Since ``\langle(\widetilde\omega+\omega)(\omega+\widetilde\omega)\rangle = (\omega+\widetilde\omega)^2``, it follows ``|\mathfrak{R}\omega|^2 = (\mathfrak{R}\omega)^2``.
 Similarly, ``\langle(\widetilde\omega-\omega)(\omega-\widetilde\omega)\rangle = -(\omega+\widetilde\omega)^2`` implies ``|\mathfrak{I}\omega|^2 = -(\mathfrak{I}\omega)^2``.
 Due to the ``\mathbb{Z}_2``-grading induced by ``\omega = \mathfrak{R}\omega + \mathfrak{I}\omega``, it has real and imaginary.
-
-It is possible to assign the **quaternion** generators ``i,j,k`` with
-```@repl ga
-i,j,k = hyperplanes(ℝ^3)
-i^2, j^2, k^2, i*j*k
--(j+k) * (j+k)
--(j+k) * i
-```
-Alternatively, another representation of the quaternions is
-```@repl ga
-basis"--"
-v1^2, v2^2, v12^2, v1*v2*v12
-```
-The parametric type formalism in `Grassmann` is highly expressive to enable the pre-allocation of geometric algebra computations for specific sparse-subalgebras, including the representation of rotational groups, Lie bivector algebras, and affine projective geometry.
-All of this is enabled by the psuedoscalar complement duality.
 
 
 *Lemma* Let ``\omega\in\Lambda^m V``, then ``I\vee\omega = \omega``.
@@ -485,16 +618,280 @@ However, many authors such as Dorst prefer the Conventional contraction, which i
 --- | --- | ---
 |Grassmann |``\langle\eta\rangle_s < \langle\omega\rangle_r = \langle\tilde\eta\omega\rangle_{s-r}`` | ``\langle\eta\rangle_r > \langle\omega\rangle_s = \langle\tilde\eta\omega\rangle_{r-s}``|
 |Reversed |``\langle\tilde\eta\rangle_s < \langle\tilde\omega\rangle_r = \langle\eta\tilde\omega\rangle_{s-r}`` | ``\langle\tilde\eta\rangle_r > \langle\tilde\omega\rangle_s = \langle\eta\tilde\omega\rangle_{r-s}``|
-|Conventional |``\langle\eta\rangle_s < \langle\tilde \omega\rangle_r = \langle\eta\omega\rangle_{s-r}`` | ``\langle\tilde \eta\rangle_r > \langle\omega\rangle_s = \langle\eta\omega\rangle_{r-s}``|
-```julia
-julia> (v1 + v2) ⋅ (1.5v2 + v3)
-1.5v
-```
-```@repl ga
-(G3.v1 + G3.v2) ⋅ (1.5G3.v2 + G3.v3)
-```
+|Conventional |``\langle\eta\rangle_s << \langle\omega\rangle_r = \langle\eta\omega\rangle_{s-r}`` | ``\langle\eta\rangle_r >> \langle\omega\rangle_s = \langle\eta\omega\rangle_{r-s}``|
 
 When `using Grassmann` in a session, the `cayley` table can be used to recall geometric algebra information, e.g. to compare ``>`` and ``>>`` contractions:
+
+```julia
+cayley(Submanifold(1),wedge)
+cayley(Submanifold(1),vee)
+```
+```math
+\begin{array}{c|cc}
+\wedge & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & v_{1} & 0
+\end{array}, \qquad
+\begin{array}{c|cc}
+\vee & v & v_{1} \\
+\hline
+v & 0 & v \\
+v_{1} & v & v_{1}
+\end{array}
+```
+
+```julia
+cayley(Submanifold(1),<)
+cayley(Submanifold(1),>)
+```
+```math
+\begin{array}{c|cc}
+< & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & 0 & v
+\end{array}, \qquad
+\begin{array}{c|cc}
+> & v & v_{1} \\
+\hline
+v & v & 0 \\
+v_{1} & v_{1} & v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(1),<<)
+cayley(Submanifold(1),>>)
+```
+```math
+\begin{array}{c|cc}
+<< & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & 0 & v
+\end{array}, \qquad
+\begin{array}{c|cc}
+>> & v & v_{1} \\
+\hline
+v & v & 0 \\
+v_{1} & v_{1} & v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(S"-"),wedge)
+cayley(Submanifold(S"-"),vee)
+```
+```math
+\begin{array}{c|cc}
+\wedge & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & v_{1} & 0
+\end{array}, \qquad
+\begin{array}{c|cc}
+\vee & v & v_{1} \\
+\hline
+v & 0 & v \\
+v_{1} & v & v_{1}
+\end{array}
+```
+
+```julia
+cayley(Submanifold(S"-"),<)
+cayley(Submanifold(S"-"),>)
+```
+```math
+\begin{array}{c|cc}
+< & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & 0 & -1v
+\end{array}, \qquad
+\begin{array}{c|cc}
+> & v & v_{1} \\
+\hline
+v & v & 0 \\
+v_{1} & v_{1} & -1v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(S"-"),<<)
+cayley(Submanifold(S"-"),>>)
+```
+```math
+\begin{array}{c|cc}
+<< & v & v_{1} \\
+\hline
+v & v & v_{1} \\
+v_{1} & 0 & -1v
+\end{array}, \qquad
+\begin{array}{c|cc}
+>> & v & v_{1} \\
+\hline
+v & v & 0 \\
+v_{1} & v_{1} & -1v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(2),wedge) # ...
+```
+```math
+\begin{array}{c|cccc}
+\wedge & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & v_{1} & 0 & v_{12} & 0 \\
+v_{2} & v_{2} & -1v_{12} & 0 & 0 \\
+v_{12} & v_{12} & 0 & 0 & 0
+\end{array}, \qquad
+\begin{array}{c|cccc}
+\vee & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & 0 & 0 & 0 & v \\
+v_{1} & 0 & 0 & v & v_{1} \\
+v_{2} & 0 & -1v & 0 & v_{2} \\
+v_{12} & v & v_{1} & v_{2} & v_{12}
+\end{array}
+```
+
+```math
+\begin{array}{c|cccc}
+< & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & 0 & v & 0 & v_{2} \\
+v_{2} & 0 & 0 & v & -1v_{1} \\
+v_{12} & 0 & 0 & 0 & v
+\end{array}, \qquad
+\begin{array}{c|cccc}
+> & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & 0 & 0 & 0 \\
+v_{1} & v_{1} & v & 0 & 0 \\
+v_{2} & v_{2} & 0 & v & 0 \\
+v_{12} & v_{12} & v_{2} & -1v_{1} & v
+\end{array}
+```
+
+```math
+\begin{array}{c|cccc}
+<< & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & 0 & v & 0 & v_{2} \\
+v_{2} & 0 & 0 & v & -1v_{1} \\
+v_{12} & 0 & 0 & 0 & -1v
+\end{array}, \qquad
+\begin{array}{c|cccc}
+>> & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & 0 & 0 & 0 \\
+v_{1} & v_{1} & v & 0 & 0 \\
+v_{2} & v_{2} & 0 & v & 0 \\
+v_{12} & -1v_{12} & -1v_{2} & 1v_{1} & -1v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(S"+-"),wedge) # ...
+```
+```math
+\begin{array}{c|cccc}
+\wedge & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & v_{1} & 0 & v_{12} & 0 \\
+v_{2} & v_{2} & -1v_{12} & 0 & 0 \\
+v_{12} & v_{12} & 0 & 0 & 0
+\end{array}, \qquad
+\begin{array}{c|cccc}
+\vee & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & 0 & 0 & 0 & v \\
+v_{1} & 0 & 0 & v & v_{1} \\
+v_{2} & 0 & -1v & 0 & v_{2} \\
+v_{12} & v & v_{1} & v_{2} & v_{12}
+\end{array}
+```
+
+```math
+\begin{array}{c|cccc}
+< & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & 0 & v & 0 & v_{2} \\
+v_{2} & 0 & 0 & -1v & v_{1} \\
+v_{12} & 0 & 0 & 0 & -1v
+\end{array}, \qquad
+\begin{array}{c|cccc}
+> & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & 0 & 0 & 0 \\
+v_{1} & v_{1} & v & 0 & 0 \\
+v_{2} & v_{2} & 0 & -1v & 0 \\
+v_{12} & v_{12} & v_{2} & v_{1} & -1v
+\end{array}
+```
+
+```math
+\begin{array}{c|cccc}
+<< & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & v_{1} & v_{2} & v_{12} \\
+v_{1} & 0 & v & 0 & v_{2} \\
+v_{2} & 0 & 0 & -1v & v_{1} \\
+v_{12} & 0 & 0 & 0 & 1v
+\end{array}, \qquad
+\begin{array}{c|cccc}
+>> & v & v_{1} & v_{2} & v_{12} \\
+\hline
+v & v & 0 & 0 & 0 \\
+v_{1} & v_{1} & v & 0 & 0 \\
+v_{2} & v_{2} & 0 & -1v & 0 \\
+v_{12} & -1v_{12} & -1v_{2} & -1v_{1} & 1v
+\end{array}
+```
+
+```julia
+cayley(Submanifold(3),wedge)
+```
+```math
+\begin{array}{c|cccccccc}
+\wedge & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+\hline
+v & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+v_{1} & v_{1} & 0 & v_{12} & v_{13} & 0 & 0 & v_{123} & 0 \\
+v_{2} & v_{2} & -1v_{12} & 0 & v_{23} & 0 & -1v_{123} & 0 & 0 \\
+v_{3} & v_{3} & -1v_{13} & -1v_{23} & 0 & v_{123} & 0 & 0 & 0 \\
+v_{12} & v_{12} & 0 & 0 & v_{123} & 0 & 0 & 0 & 0 \\
+v_{13} & v_{13} & 0 & -1v_{123} & 0 & 0 & 0 & 0 & 0 \\
+v_{23} & v_{23} & v_{123} & 0 & 0 & 0 & 0 & 0 & 0 \\
+v_{123} & v_{123} & 0 & 0 & 0 & 0 & 0 & 0 & 0
+\end{array}
+```
+
+```julia
+cayley(Submanifold(3),vee)
+```
+```math
+\begin{array}{c|cccccccc}
+\vee & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+\hline
+v & 0 & 0 & 0 & 0 & 0 & 0 & 0 & v \\
+v_{1} & 0 & 0 & 0 & 0 & 0 & 0 & v & v_{1} \\
+v_{2} & 0 & 0 & 0 & 0 & 0 & -1v & 0 & v_{2} \\
+v_{3} & 0 & 0 & 0 & 0 & v & 0 & 0 & v_{3} \\
+v_{12} & 0 & 0 & 0 & v & 0 & v_{1} & v_{2} & v_{12} \\
+v_{13} & 0 & 0 & -1v & 0 & -1v_{1} & 0 & v_{3} & v_{13} \\
+v_{23} & 0 & v & 0 & 0 & -1v_{2} & -1v_{3} & 0 & v_{23} \\
+v_{123} & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123}
+\end{array}
+```
+
 ```julia
 cayley(Submanifold(3),*) # Clifford geometric product *
 ```
@@ -511,6 +908,44 @@ cayley(Submanifold(3),*) # Clifford geometric product *
 	v_{23} & v_{23} & v_{123} & -v_3 & v_2 & -v_{13} & v_{12} & -v & -v_1 \\
 	v_{123} & v_{123} & v_{23} & -v_{13} & v_{12} & -v_3 & v_2 & -v_1 & -v
 \end{array}
+```
+
+```julia
+cayley(Submanifold(3),<)
+```
+```math
+\begin{array}{c|cccccccc}
+< & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+\hline
+v & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+v_{1} & 0 & v & 0 & 0 & v_{2} & v_{3} & 0 & v_{23} \\
+v_{2} & 0 & 0 & v & 0 & -1v_{1} & 0 & v_{3} & -1v_{13} \\
+v_{3} & 0 & 0 & 0 & v & 0 & -1v_{1} & -1v_{2} & v_{12} \\
+v_{12} & 0 & 0 & 0 & 0 & v & 0 & 0 & v_{3} \\
+v_{13} & 0 & 0 & 0 & 0 & 0 & v & 0 & -1v_{2} \\
+v_{23} & 0 & 0 & 0 & 0 & 0 & 0 & v & v_{1} \\
+v_{123} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & v
+\end{array}
+```
+
+Side note, demonstration of \verb`using Grassmann` algebra laws:
+
+```julia
+julia> basis"3"
+(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+
+julia> wedge(!v12,!v23)
+-1v₁₃
+```
+
+Side note, demonstration of Grassmann algebra laws:
+
+```julia
+julia> !vee(v12,v23)
+-1v₁₃
+
+julia> wedge(v12,!v12)
+1v₁₂₃
 ```
 
 ```julia
@@ -532,6 +967,25 @@ cayley(Submanifold(3),>) # Grassmann contraction >
 ```
 
 ```julia
+cayley(Submanifold(3),<<)
+```
+```math
+\begin{array}{c|cccccccc}
+<< & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+\hline
+v & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} & v_{123} \\
+v_{1} & 0 & v & 0 & 0 & v_{2} & v_{3} & 0 & v_{23} \\
+v_{2} & 0 & 0 & v & 0 & -1v_{1} & 0 & v_{3} & -1v_{13} \\
+v_{3} & 0 & 0 & 0 & v & 0 & -1v_{1} & -1v_{2} & v_{12} \\
+v_{12} & 0 & 0 & 0 & 0 & -1v & 0 & 0 & -1v_{3} \\
+v_{13} & 0 & 0 & 0 & 0 & 0 & -1v & 0 & 1v_{2} \\
+v_{23} & 0 & 0 & 0 & 0 & 0 & 0 & -1v & -1v_{1} \\
+v_{123} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & -1v
+\end{array}
+```
+
+
+```julia
 cayley(Submanifold(3),>>) # Conventional contraction >>
 ```
 ```math
@@ -547,6 +1001,42 @@ cayley(Submanifold(3),>>) # Conventional contraction >>
 	v_{23} & -v_{23} & 0 & -v_3 & v_2 & 0 & 0 & -v & 0 \\
 	v_{123} & -v_{123} & -v_{23} & v_{13} & -v_{12} & -v_3 & v_2 & -v_1 & -v
 \end{array}
+```
+
+`Grassmann` does not implement `Quaternion` as a struct, but quaternions are realized as an alias `Grassmann.Quaternion (alias for Spinor{V, T, 4} where {V, T})`.
+
+Comparison of quaternions in the context of `Grassmann` to other quaternion implementations is characterized by syntax design differences to fit into a larger mathematical formalism.
+Differences such as performance or edge cases can always be smoothed out, while syntax and design choices are fundamentally different.
+With `Grassmann` geometric algebra it is possible to achieve much more out of quaternions due to the immediate access to its fully general mathematical formalism.
+
+Quaternion algebra exists as a specialized sub-algebra within a more general `Grassmann` geometric algebra, where the goal is to seamlessly transition between quaternion abstractions and algebraic generalizations.
+There are several ways to assign `i,j,k` with `Grassmann` elements, perhaps the standard would be `i = v12`, `j = -v13`, `k = v23` (although this is not a unique choice).
+Since `j` and `v13` have opposite sign in this notation, the `quatvalues` method is exported to output the coefficients with the sign convention of `s,i,j,k`.
+* assign `Grassmann` elements for quaternion usage: `using Grassmann; basis"3"`
+* basis: `v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃` or `v, v1, v2, v3, v12, v13, v23, v123`
+* assign quaternion basis: `s, i, j, k = v, v12, -v13, v23` could be a standard choice
+* `quatvalues(::Quaternion)` returns the coefficient values according to `s, i, j, k`
+* `quaternion(s,i,j,k)` returns the `Grassmann` quaternion from the `s, i, j, k` standard
+
+As a result of the framework of geometric algebra implemented in `Grassmann`, vector algebra and quaternion algebra are compatible in a unified formalism.
+Given a quaternion operator `R` and a vector `x` the operator can be applied with either the `R>>>x` (evaluated as `R*x*conj(R)` operator) or `x⊘R` (evaluated as `conj(R)*x*R` operator) to transform vectors with quaternions.
+Converting a quaternion operator `R` on a three dimensional vector to a matrix (with the `x⊘R` evaluation)  can be done with `Matrix(operator(R))` for convenience.
+
+In the traditional quaternion packages there is only access to a limited mathematical scope constrained to rotations in three dimensions, while in `Grassmann` there are rotational algebras for lower and higher dimensions and it is also natural to deal with reflection operator compositions and more.
+This developer (for example), will feel a loss of mathematical expressibility when downgrading from `Grassmann` to a more limited quaternion formalism, as `Grassmann` can express the full graded algebra structure compared to the mere sub-algebra of quaternions.
+Programming using a more general and sophisticated mathematical formalism typically involves a more abstract and verbose syntax, and this is the case for Grassman.jl as compared to Quaternions.jl
+
+It is possible to assign the **quaternion** generators ``i,j,k`` with
+```@repl ga
+i,j,k = hyperplanes(ℝ^3)
+i^2, j^2, k^2, i*j*k
+-(j+k) * (j+k)
+-(j+k) * i
+```
+Alternatively, another representation of the quaternions is
+```@repl ga
+basis"--"
+v1^2, v2^2, v12^2, v1*v2*v12
 ```
 
 **Theorem** (Linear system of equations)
