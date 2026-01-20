@@ -264,6 +264,34 @@
         the <span>$\mathbb{K}$</span>-module basis at compile time.
         When assigned in a workspace, <code>V =
         Submanifold(::TensorBundle)</code> is used.</p>
+        <p>The adjoint operation <code>V'</code> (applied to
+        <code>V</code>) swaps between opposite metric signatures,
+        which is a feature that has been built-in to
+        <code>Grassmann</code> from the start; but this is not
+        necessary for standard geometric algebra. Notation of extra
+        Leibniz-Taylor monomoial indices is also an optional
+        feature which can be entirely ignored for standard
+        geometric algebra purposes. Standard geometric algebra is
+        only concerned with the vector basis indices
+        <span>$v_i$</span>.</p>
+        <p><code>TensorBundle</code> definition specifies
+        generators of <code>DirectSum.Basis</code> algebra</p>
+        <ul>
+          <li><code>Int</code> value induces a Euclidean metric of
+          counted dimension</li>
+          <li><code>Signature</code> uses <code>S"..."</code> with
+          + and - specifying the metric</li>
+          <li><code>DiagonalForm</code> uses <code>D"..."</code>
+          for defining any diagonal metric</li>
+          <li><code>MetricTensor</code> can accept non-diagonal
+          metric tensor array</li>
+        </ul>
+        <p>Each of these have various constructors available and
+        can be expressed into a <code>V =
+        Submanifold(::TensorBundle)</code>, so that the
+        <code>Submanifold</code> syntax layer can unify utility
+        methods based on different subtypes of
+        <code>TensorBundle</code>.</p>
         <p>The metric signature of the
         <code>Submanifold{V,1}</code> elements of a vector space
         <span>$V$</span> can be specified with the
@@ -286,7 +314,7 @@ style="display:block;">true</code></pre>
         diagonal scaling, such as with <code>D"0.3,2.4,1"</code>.
         Fully general <code>MetricTensor</code> as a type with
         non-diagonal components requires a matrix, e.g.
-        <code>MetricTensor([1 2; 2 3])</code>.</p>
+        <code>MetricTensor([1 1; 1 1])</code>.</p>
         <p>Declaring an additional point at infinity is done by
         specifying it in the string constructor with
         <span>$\infty$</span> at the first index (i.e. Riemann
@@ -631,7 +659,7 @@ end # this option is automatic with interop(a,b)
           <p>This document was generated with <a href=
           "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
           version 1.16.1 on <span class="colophon-date" title=
-          "Thursday 8 January 2026 04:22">Thursday 8 January
+          "Monday 19 January 2026 16:40">Monday 19 January
           2026</span>. Using Julia version 1.12.1.</p>
         </section>
         <footer class="modal-card-foot"></footer>

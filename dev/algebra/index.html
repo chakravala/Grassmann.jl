@@ -184,90 +184,209 @@
         title="Permalink"></a></h1>
         <p><strong>Definition</strong> (Vector space
         <span>$\Lambda^1 V = V$</span> is a field's <span>$\mathbb
-        K$</span>-module instance). Let <span>$V$</span> be a
-        <span>$\mathbb K$</span>-module (abelian group with respect
-        to <span>$+$</span>) with an element <span>$1\in\mathbb
+        K$</span>-module). Let <span>$V$</span> be a <span>$\mathbb
+        K$</span>-module (abelian group with respect to
+        <span>$+$</span>) with an element <span>$1\in\mathbb
         K$</span> such that <span>$1V = V$</span> by scalar
-        multiplication <span>$\mathbb K\times V\rightarrow
+        multiplication <span>$\otimes:\mathbb K\times V\rightarrow
         V$</span> over field <span>$\mathbb K$</span>
         satisfying</p>
         <ol>
-          <li><span>$a(x+y) = ax+ ay$</span> distribution of vector
-          addition,</li>
-          <li><span>$(a+b)x = ax + bd$</span> distribution of field
-          addition,</li>
-          <li><span>$(ab)x = a(bx)$</span> associative
-          compatibility.</li>
+          <li><span>$a\otimes(x+y) = a\otimes x+ a\otimes y$</span>
+          is distribution of vector addition,</li>
+          <li><span>$(a+b)\otimes x = a\otimes x + b\otimes
+          d$</span> is distribution of field addition,</li>
+          <li><span>$(ab)\otimes x = a\otimes (b\otimes x)$</span>
+          is multiplicative associative compatibility.</li>
         </ol>
         <p>In the software package <code>Grassmann</code>, a
         generating vector space <span>$\mathbb{K}$</span>-module is
         specified as a value of <code>&lt;:TensorBundle</code> (an
         abstract type).</p>
+        <p>A vector space has addition <span>$+$</span> and a
+        multiplication operation <span>$\cdot$</span> or
+        <span>$\otimes$</span>,</p>
+        <ol>
+          <li>Let <span>$x,y\in V$</span>, then vector addition
+          <span>$x+y\in V$</span> exists.</li>
+          <li>Let <span>$x,y\in V$</span>, then vector addition
+          <span>$x+y = y+x$</span> is commutative.</li>
+          <li>Let <span>$x,y,z\in V$</span>, then <span>$(x+y)+z =
+          x+(y+z)$</span> is associative.</li>
+          <li>Let <span>$x\in V$</span>, then additive <span>$0\in
+          V$</span> existst such that <span>$x+0=x$</span>.</li>
+          <li>Let <span>$x\in V$</span>, then negation <span>$-x\in
+          V$</span> exists such that <span>$x+(-x)=0$</span>.</li>
+          <li>Let <span>$x\in V$</span>, then multiplicative
+          <span>$1\in\mathbb K$</span> exists so that
+          <span>$1\otimes x = x\otimes 1 = x$</span>.</li>
+          <li>Let <span>$a\in\mathbb K$</span> and <span>$x\in
+          V$</span>, then scalar multiple <span>$a\otimes
+          x=x\otimes a\in V$</span> exists.</li>
+          <li>Let <span>$a\in\mathbb K$</span> and <span>$x,y\in
+          V$</span>, then <span>$a\otimes (x+y) = a\otimes
+          x+a\otimes y$</span> distributes.</li>
+          <li>Let <span>$a,b\in\mathbb K$</span> and <span>$x\in
+          V$</span>, then <span>$(a+b)\otimes x = a\otimes x +
+          b\otimes x$</span> distributes.</li>
+          <li>Let <span>$a,b\in\mathbb K$</span> and <span>$x\in
+          V$</span>, then <span>$a\otimes(b\otimes x) = (ab)\otimes
+          x$</span> is <span>$\mathbb K$</span>-compatible.</li>
+        </ol>
+        <p>The <code>StaticVectors</code> package has been custom
+        made for the <code>Grassmann</code> project specifically to
+        serve as its <span>$\mathbb K$</span>-module foundation,
+        used as underlying type for constructing algebra elements
+        with additional contextual metadata.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; using StaticVectors
+
+julia&gt; Values(1,2,3) + Values(2,3,4)
+3-element Values{3, Int64} with indices SOneTo(3):
+ 3
+ 5
+ 7</code></pre>
+        <p>In geometric algebra contexts, it is desirable to
+        inherit the properties of a <span>$\mathbb K$</span>-module
+        and then extend its algebra with more operations by having
+        the context introduced from additional metadata associated
+        to the <span>$\mathbb K$</span>-module. The additional
+        algebra operations would become ambiguous and difficult to
+        express without attaching desirable metadata to the objects
+        and types.</p>
+        <p>As a comprehensive project to create a more robust and
+        standard type system specification for geometric algebra
+        purposes, the <code>TensorAlgebra{V}</code> type system has
+        been custom designed and pioneered in such a way that type
+        information associated to <code>V</code> provides the
+        necessary background information to compile computer
+        algebra code by context of the object types.</p>
         <p><strong>Definition</strong> (Linear dependence). Let
         <span>$V$</span> be a vector space over field
         <span>$\mathbb K$</span>, then the set
         <span>$\{v_i\}_i$</span> is linearly dependent if and only
         if <span>$\sum_{i=1}^n k_iv_i = 0$</span> for some
         <span>$0\ne k\in\mathbb K^n$</span>.</p>
-        <p><strong>Definition</strong>
-        (<span>$\wedge$</span>-product annihilation). For a
-        linearly dependent set <span>$\{v_i\}_1^n\subset
-        V$</span></p>
+        <p><strong>Axiom</strong>. Let <span>$V$</span> be a
+        <span>$\mathbb K$</span>-module,
+        <code>TensorAlgebra{V}</code> has tensor products</p>
+        <ol>
+          <li>Let <span>$a\in\mathbb K$</span> and <span>$x,y\in
+          V$</span>, then <span>$a\otimes(x\otimes y) = (a\otimes
+          x)\otimes y = x\otimes(a\otimes y)$</span>.</li>
+        </ol>
+        <p><strong>Axiom</strong> (Exterior algebra). Associative
+        tensors with exterior products <span>$\wedge \subset
+        \otimes$</span> of vectors having <em>anti-symmetric</em>
+        negation applied distributively:</p>
+        <ol>
+          <li>Let <span>$x,y\in V$</span>, then <span>$x\wedge y =
+          -y\wedge x$</span> is Grassmann's exterior product.</li>
+          <li>Let <span>$x,y,z\in V$</span>, then <span>$(x\wedge
+          y)\wedge z = x\wedge(y\wedge z)$</span> is
+          associative.</li>
+          <li>Let <span>$x,y,z\in V$</span>, then <span>$x\wedge
+          (y+z) = x\wedge y + x\wedge z$</span> is
+          distributive.</li>
+        </ol>
+        <p>Notation: let <span>$x,y,z\in V=\Lambda^1V$</span>, then
+        <span>$x\wedge y \in\Lambda^2 V$</span> and <span>$x\wedge
+        y\wedge z\in\Lambda^3 V$</span>, etc.</p>
+        <p><strong>Theorem</strong> (<span>$\wedge$</span>-product
+        annihilation). For a linearly dependent set
+        <span>$\{v_i\}_1^n\subset V$</span></p>
         <p class="math-container">\[v_1\wedge v_2\wedge\dots\wedge
         v_n = 0.\]</p>
-        <p>Initially, it is enough to understand that
-        <span>$\wedge:\Lambda^n V\times\Lambda^m
+        <p><em>Proof</em>. Initially, it is enough to understand
+        that <span>$\wedge:\Lambda^n V\times\Lambda^m
         V\rightarrow\Lambda^{n+m}V$</span> is an operation which is
         zero for linearly dependent arguments. However, this idea
-        comes from extending Grassmann's product <span>$v_i\wedge
+        occurs from extending Grassmann's product <span>$v_i\wedge
         v_j = -v_j\wedge v_i \implies v_i\wedge v_i = 0 =
         -v_i\wedge v_i$</span> to yield a tool for characterizing
-        linear dependence.</p>
-        <p><strong>Definition</strong> (Dimension
+        linear dependence. For example, observe that
+        <span>$k_1v_i+k_2v_i = 0$</span> is linearly dependent with
+        <span>$k_1=-k_2$</span> and <span>$v_i\wedge
+        v_i=0$</span>.</p>
+        <p><strong>Corollary</strong> (Dimension
         <span>$n$</span>-Submanifold in <span>$\Lambda^n
         V$</span>). Note that writing the product <span>$v_1\wedge
         v_2\wedge\cdots\wedge v_n\ne0$</span> implies a linearly
         independent set <span>$\{v_i\}_1^n\subseteq V$</span>
-        isomorphic to an
-        <span>$n$</span>-<code>Submanifold</code>.</p>
-        <p>Furthermore, <span>$\mathbb{K}\times\{v_1\wedge
-        v_2\wedge\cdots\wedge v_n\}\cong\mathbb{K}$</span> shows
-        the <span>$1$</span>-dimensional basis subspace is induced
-        by any <span>$n$</span>-<code>Submanifold</code>.</p>
+        isomorphic to an <span>$n$</span>-<code>Submanifold</code>
+        with <span>$\mathbb{K}\times\{v_1\wedge
+        v_2\wedge\cdots\wedge v_n\}\cong\mathbb{K}$</span> being
+        the <span>$1$</span>-dimensional basis subspace which
+        scales any <span>$n$</span>-<code>Submanifold</code>.</p>
         <p><em>Example</em>. Therefore, <span>$\mathbb K =
         \Lambda^0\mathbb K \cong \Lambda^1\mathbb K$</span> is a
         vector space or a 0-Submanifold.</p>
         <p><em>Example</em>. <span>$\Lambda^n V$</span> is a vector
         space with <span>$\Lambda^1\Lambda^n V = \Lambda^nV$</span>
         and <span>$\Lambda^0\Lambda^nV = \Lambda^0V$</span>.</p>
-        <p>Denote <span>$V^* = V\backslash\{0\}$</span> as the set
-        <span>$V$</span> excluding the 0 element in next:</p>
         <p><strong>Definition</strong> (Direct sum
-        <span>$\oplus$</span>). To consider a set of linearly
-        independent spaces, let <span>$\pi_i: V\rightarrow
+        <span>$\oplus$</span>). Let <span>$\pi_i:V\rightarrow
         V_i$</span> be projections with vector space
-        <span>$V_i\subset V$</span>, define</p>
-        <p class="math-container">\[V_1\oplus V_2\oplus\cdots\oplus
-        V_n = V \iff \bigwedge : V_1^*\times
-        V_2^*\times\cdots\times V_n^* \rightarrow \Lambda^n V^*
-        .\]</p>
-        <p>DirectSum of a full non-zero product implies an
-        <span>$n$</span>-Submanifold.</p>
+        <span>$V_i\subset V$</span>, if for every <span>$k\in
+        V\backslash\{0\}$</span> there exist
+        <span>$v_1\wedge\dots\wedge v_n\ne$</span> such that</p>
+        <p class="math-container">\[k = \sum_{i=1}^n\pi_i(k) =
+        \sum_{i=1}^n k_i \pi_i(v_i) = \sum_{i=1}^nk_iv_i, \qquad
+        \pi_i(v_j) = \begin{cases} v_j, & i = j, \\ 0, & i\ne j,
+        \end{cases}\]</p>
+        <p>then <em>direct sum</em> <span>$V_1\oplus
+        V_2\oplus\cdots\oplus V_n = V$</span> has a linear span
+        basis <span>$v_1\wedge\dots\wedge v_n\ne 0$</span>.</p>
         <p><strong>Ddefinition</strong> Grade-<span>$m$</span>
-        projection is defined as <span>$\langle\Lambda V\,\rangle_m
-        = \Lambda^m V$</span> such that</p>
+        projection <code>grade(x,m)</code> is defined as
+        <span>$\langle\Lambda V\,\rangle_m = \Lambda^m V$</span>
+        such that</p>
         <p class="math-container">\[\Lambda V = \bigoplus_{m=0}^n
         \langle\Lambda V\,\rangle_m =
         \Lambda^0V\oplus\Lambda^1V\oplus\cdots\oplus\Lambda^nV,
         \qquad \langle\Lambda V\,\rangle_m =
         \bigoplus_{m=1}^{n\choose m}\mathbb K.\]</p>
-        <p>Note that <span>$\dim \langle\Lambda V\,\rangle_m =
+        <p>Binomial <span>$\dim \langle\Lambda V\,\rangle_m =
         {n\choose m}$</span> and hence <span>$\dim\Lambda V =
         \sum_{m=0}^n {n\choose m} = 2^n$</span>.</p>
+        <p><em>Example</em>. Let <span>$\sigma\in S_n$</span> and
+        <span>$v_i,v_j\in V$</span>, then <span>$v_i\wedge v_j =
+        \varepsilon(\sigma)v_{\sigma(i)}\wedge
+        v_{\sigma(j)}$</span>,</p>
+        <p class="math-container">\[v_{i_1}\wedge\cdots\wedge
+        v_{i_g} =
+        \varepsilon(\sigma)v_{\sigma(i_1)}\wedge\cdots\wedge
+        v_{\sigma(i_{g})}, \quad v_{i_1},\dots,v_{i_g}\in V.\]</p>
+        <p>Changing the ordering of an exterior product is an
+        oriented permutation:</p>
+        <p class="math-container">\[ u(i_1,\dots,i_g) =
+        \{\varepsilon(\sigma)v_{\sigma(i_1)}\wedge\cdots\wedge
+        v_{\sigma(i_g)} \mid \sigma\in S_n\},\]</p>
+        <p class="math-container">\[ u(1,2) = \{(-1)^0v_1\wedge
+        v_2, (-1)^1v_2\wedge v_1\},\]</p>
+        <p class="math-container">\[ u(1,3) = \{(-1)^0v_1\wedge
+        v_3, (-1)^1v_3\wedge v_1\},\]</p>
+        <p class="math-container">\[ u(2,3) = \{(-1)^0v_2\wedge
+        v_3, (-1)^1v_3\wedge v_2\},\]</p>
+        <p class="math-container">\[ u(1,2,3) = \{(-1)^0v_1\wedge
+        v_2\wedge v_3,(-1)^1v_1\wedge v_3\wedge v_2,
+        (-1)^1v_2\wedge v_1\wedge v_3,\]</p>
+        <p class="math-container">\[ \quad\quad (-1)^2v_2\wedge
+        v_3\wedge v_1, (-1)^2v_3\wedge v_1\wedge
+        v_2,(-1)^3v_3\wedge v_2\wedge v_1 \}.\]</p>
+        <p>Elements of <span>$u(i_1,\dots,i_g)$</span> are all
+        equivalent, making it a singleton set. Since there is a
+        whole permutation group for possible expressions with
+        equivalent exterior product, it is helpful to pick a choice
+        making algebraic expressions standard. Most convenient is
+        to use ordering <span>$i_1&lt;\cdots&lt;i_g$</span> as the
+        canonical choice for product expressions with ordinal
+        indices <span>$i_1,\dots,i_g\in\{1,\dots,n\}$</span>.</p>
         <p><em>Example</em> (Combinatorics of power set
         <span>$\mathcal P(V)$</span>). Let <span>$v_1,v_2,v_3
-        \in\mathbb R^3$</span>, then the power set of elements
-        is:</p>
+        \in\mathbb R^3$</span>, then the power set of elements has
+        <span>$\operatorname{dim}\langle\Lambda V\rangle_m =
+        {n\choose m} = \frac{n!}{m!(n-m)}$</span> binomial,</p>
         <p class="math-container">\[\mathcal P(\mathbb R^3) =
         \{\emptyset,\{v_1\},\{v_2\},\{v_3\},\{v_1,v_2\},\{v_1,v_3\},\{v_2,v_3\},\{v_1,v_2,v_3\}\}\]</p>
         <p>Form a direct sum over the elements of <span>$\mathcal
@@ -408,10 +527,10 @@ style=
         <span>$\ominus$</span>, which is symmetric difference
         operation.</p>
         <p>Grassmann's exterior product is an anti-symmetric tensor
-        product</p>
+        product, this leads to</p>
         <p class="math-container">\[v_i \wedge v_j = - v_j\wedge
         v_i \implies v_i\wedge v_i = 0 = -v_i\wedge v_i,\]</p>
-        <p>which generalizes the multilinear determinant
+        <p>and the generalized multilinear determinant
         transposition property</p>
         <p class="math-container">\[v_{\omega_1}\wedge\cdots\wedge
         v_{\omega_m}\wedge v_{\eta_1}\wedge\cdots\wedge v_{\eta_n}
@@ -646,6 +765,81 @@ style=
         <code>V::Submanifold{M}</code> value to express algebra
         subtypes for a specified <span>$\mathbb{K}$</span>-module
         structure.</p>
+        <p>In <code>Grassmann</code>, a standard vector space is
+        initialized with <code>Submanifold(N)</code>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; V = Submanifold(4)
+⟨1111⟩</code></pre>
+        <p>The type parameters of <code>Submanifold{V, G, B}</code>
+        are encoded with integers.</p>
+        <pre><code class="language-julia hljs">julia&gt; dump(V)
+Submanifold{4, 4, 0x000000000000000f} ⟨1111⟩</code></pre>
+        <p>Calling <code>collect(V)</code> or <code>Λ(V)</code>
+        produces a <code>DirectSum.Basis</code>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; G4 = collect(V)
+DirectSum.Basis{⟨1111⟩,16}(v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)
+
+julia&gt; dump(G4.v12)
+Submanifold{⟨1111⟩, 2, 0x0000000000000003} v₁₂</code></pre>
+        <p>The object <code>G4::DirectSum.Basis</code> can be used
+        to access algebra elements.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; G4.v12 + 2G4.v14
+1v₁₂ + 0v₁₃ + 2v₁₄ + 0v₂₃ + 0v₂₄ + 0v₃₄
+
+julia&gt; typeof(G4.v12 + G4.v14)
+Chain{⟨1111⟩, 2, Int64, 6}</code></pre>
+        <p>Subalgebra generated by <code>V(1,4)</code> can be
+        assigned to <code>G42</code>, for example.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; G42 = collect(V(1,4))
+DirectSum.Basis{⟨1__1⟩,4}(v, v₁, v₄, v₁₄)
+
+julia&gt; sqrt(2) + G42.v14
+1.4142135623730951 + 1.0v₁₄
+
+julia&gt; typeof(ans)
+Couple{⟨1__1⟩, v₁₄, Float64}</code></pre>
+        <p>Otherwise, the <code>@basis</code> macro or
+        <code>basis"..."</code> can assign local symbols.</p>
+        <pre><code class="language-julia hljs">julia&gt; @basis 3
+(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code></pre>
+        <p>The <code>One{V}</code> type is an alias of
+        <code>Submanifold{V,0}</code> types, e.g. try
+        <code>dump(v)</code>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; 1 + v12 - v13
+1 + 1v₁₂ - 1v₁₃ + 0v₂₃
+
+julia&gt; typeof(ans)
+Quaternion{⟨111⟩, Int64} (alias for Spinor{⟨111⟩, Int64, 4})</code></pre>
+        <p>Hence, algebra elements can be created from the
+        generating basis.</p>
+        <p>The direct way to construct elements is with
+        <code>Values</code>,</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Chain{V,1}(Values(4,5,6)) # Chain{V,1}(4,5,6)
+4v₁ + 5v₂ + 6v₃</code></pre>
+        <p>while the <code>value</code> function returns the
+        <code>Values</code> representation</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; value(Chain(4,5,6))
+3-element Values{3, Int64} with indices SOneTo(3):
+ 4
+ 5
+ 6</code></pre>
+        <p>where <code>Chain(::Vararg{&lt;:Number,N})</code>
+        auto-selects <code>V = Submanifold(N)</code>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; wedge(Chain(1,2,3),Chain(4,5,6))
+-3v₁₂ - 6v₁₃ - 3v₂₃</code></pre>
+        <p>Constructors for <code>Spinor</code>,
+        <code>CoSpinor</code>, <code>Multivector</code> are
+        similar.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Spinor{V}(1,2,3,4)
+1 + 2v₁₂ + 3v₁₃ + 4v₂₃</code></pre>
         <p><strong>Definition</strong>. Common unary operations on
         <code>TensorAlgebra</code> elements</p>
         <ul>
@@ -847,6 +1041,22 @@ style=
         the function <code>metric</code> can be used on the
         element, <code>cometric</code> applies a complement
         metric.</p>
+        <p><code>complexify</code> converts two dimensional values
+        into its complex number form.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; complexify(1+im)
+1 + 1im
+
+julia&gt; complexify(Chain(1,2))
+1 + 2v₁₂</code></pre>
+        <p><code>vectorize</code> converts two dimensional complex
+        numbers into vector form.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; vectorize(1+2im)
+1v₁ + 2v₂
+
+julia&gt; vectorize(Couple(1,2))
+1v₁ + 2v₂</code></pre>
         <h2 id="Grassmann-Hodge-complement"><a class=
         "docs-heading-anchor" href=
         "#Grassmann-Hodge-complement">Grassmann-Hodge
@@ -886,6 +1096,18 @@ style=
         <p>where the regressive product <span>$\vee$</span>
         satisfies the Grassmann laws with <span>$!$</span> and
         <span>$\wedge$</span>.</p>
+        <ul>
+          <li><code>complementright</code> Euclidean metric
+          Grassmann right complement,</li>
+          <li><code>complementleft</code> Euclidean metric
+          Grassmann left complement.</li>
+        </ul>
+        <pre><code class=
+        "language-julia hljs">julia&gt; complementright(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃
+
+julia&gt; complementleft(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃</code></pre>
         <p><strong>Definition</strong> (Hodge <span>$\star$</span>
         complement). Expressed as unary operator
         <span>$\star$</span>, define the composition of
@@ -897,10 +1119,25 @@ style=
         <p>This linear operator is also called
         <code>complementrighthodge</code> or only
         <code>hodge</code>.</p>
+        <ul>
+          <li><code>complementrighthodge</code> Grassmann-Hodge
+          right complement <span>$\widetilde\omega I$</span></li>
+          <li><code>complementlefthodge</code> Grassmann-Hodge left
+          complement <span>$I\widetilde\omega$</span></li>
+        </ul>
+        <pre><code class=
+        "language-julia hljs">julia&gt; complementrighthodge(Multivector(1,2,3,4,5,6,7,8))
+8 + 7v₁ - 6v₂ + 5v₃ + 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃</code></pre>
         <p><strong>Remark</strong>. Original Grassmann complement
         is equivalent to the Hodge complement with a Euclidean
         metric tensor, making <code>metric</code> an
         <code>identity</code>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; @basis S"++-"
+(⟨++-⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+
+julia&gt; hodge(Multivector{V}(1,2,3,4,5,6,7,8))
+-8 - 7v₁ + 6v₂ + 5v₃ - 4v₁₂ - 3v₁₃ + 2v₂₃ + 1v₁₂₃</code></pre>
         <p><strong>Definition</strong>. The interior contraction
         <span>$\eta\cdot\omega = \eta\vee\star\omega$</span> is
         defined in terms of the regressive product and also the
@@ -911,6 +1148,9 @@ style=
         also <span>$\eta &gt;&gt; \omega = \widetilde\eta
         &gt;\omega$</span> with <span>$\eta &lt;&lt; \omega = \eta
         &lt;\widetilde{\omega}$</span>.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; vee(Chain{V}(1,2,3),hodge(Chain{V}(4,5,6)))
+-4v</code></pre>
         <p><strong>Remark</strong>. Using coupled subspaces in the
         block matrix structure of metric tensors, a basis element
         can be factorized in a corresponding way. In particular,
@@ -955,6 +1195,14 @@ style=
         (\underbrace{\overbrace{\bigotimes_{k\in L(X\oplus Y)}
         \partial_{i_k}^{\otimes\mu_k}}^{\text{multi-set
         sum}}}_{L^g-symmetric})\]</p>
+        <p><strong>Remark</strong>. For any <span>$v_i \in
+        \Lambda^1V$</span>, we define <span>$v_i^2 = v_iv_i =
+        g_{ii}$</span>, so typically the diagonal metric
+        <span>$g$</span> of the algebra is often defined by
+        relations like these.</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; Chain(1,2,3)*Chain(4,5,6)
+32 - 3v₁₂ - 6v₁₃ - 3v₂₃</code></pre>
         <p><strong>Remark</strong>: The product symbol
         <span>$\ominus$</span> will be used to denote explicitly
         usage of the diagonal geometric product, although the
@@ -963,94 +1211,6 @@ style=
         emphasize that the diagonal geometric product is
         characterized by symmetric differencing of anti-symmetric
         indices.</p>
-        <p><strong>Remark</strong>. For any <span>$v_i \in
-        \Lambda^1V$</span>, we define <span>$v_i^2 = v_iv_i =
-        g_{ii}$</span>, so typically the diagonal metric
-        <span>$g$</span> of the algebra is often defined by
-        relations like these.</p>
-        <p>The elements of the <code>Basis</code> can be generated
-        in many ways using the <code>Submanifold</code> elements
-        created by the <code>@basis</code> macro,</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; using Grassmann; @basis ℝ'⊕ℝ^3 # equivalent to basis"-+++"</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">(⟨-+++⟩, v, v₁, v₂, v₃, v₄, v₁₂, v₁₃, v₁₄, v₂₃, v₂₄, v₃₄, v₁₂₃, v₁₂₄, v₁₃₄, v₂₃₄, v₁₂₃₄)</code></pre>
-        <p>As a result of this macro, all of the
-        <code>Submanifold{V,G}</code> elements generated by that
-        <code>TensorBundle</code> become available in the local
-        workspace with the specified naming. The first argument
-        provides signature specifications, the second argument is
-        the variable name for the <code>TensorBundle</code>, and
-        the third and fourth argument are prefixes of the
-        <code>Submanifold</code> vector names (and covector basis
-        names). By default, <span>$V$</span> is assigned the
-        <code>TensorBundle</code> and <span>$v$</span> is the
-        prefix for the <code>Submanifold</code> elements.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; V # Minkowski spacetime</code><code class="nohighlight hljs ansi"
-style="display:block;">⟨-+++⟩</code><br><code class=
-"language-julia-repl hljs" style=
-"display:block;">julia&gt; typeof(V) # dispatch by vector space</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">Submanifold{⟨-+++⟩, 4, 0x000000000000000f}</code><br><code class="language-julia-repl hljs"
-style=
-"display:block;">julia&gt; typeof(v13) # extensive type info</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">Submanifold{⟨-+++⟩, 2, 0x0000000000000005}</code><br><code class="language-julia-repl hljs"
-style=
-"display:block;">julia&gt; 2v1 + v3 # vector Chain{V,1} element</code><code class="nohighlight hljs ansi"
-style="display:block;">2v₁ + 0v₂ + 1v₃ + 0v₄</code><br><code class=
-"language-julia-repl hljs" style=
-"display:block;">julia&gt; 5 + v2 + v234 # Multivector{V} element</code><code class="nohighlight hljs ansi"
-style="display:block;">5 + 1v₂ + 1v₂₃₄</code></pre>
-        <p>It is entirely possible to assign multiple different
-        bases with different signatures without any problems. In
-        the following command, the <code>@basis</code> macro
-        arguments are used to assign the vector space name to
-        <span>$S$</span> instead of <span>$V$</span> and basis
-        elements to <span>$b$</span> instead of <span>$v$</span>,
-        so that their local names do not interfere:</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; @basis "++++" S b;</code><br><code class="language-julia-repl hljs"
-style="display:block;">julia&gt; let k = (b1 + b2) - b3
-          for j ∈ 1:9
-           k = k * (b234 + b134)
-           println(k)
-       end end</code><code class="nohighlight hljs ansi" style=
-"display:block;">0 + 0v₁₂ + 0v₁₃ + 1v₁₄ + 0v₂₃ + 1v₂₄ + 2v₃₄ + 0v₁₂₃₄
--2v₁ - 2v₂ + 2v₃ + 0v₄ + 0v₁₂₃ + 0v₁₂₄ + 0v₁₃₄ + 0v₂₃₄
-0 + 0v₁₂ + 0v₁₃ - 2v₁₄ + 0v₂₃ - 2v₂₄ - 4v₃₄ + 0v₁₂₃₄
-4v₁ + 4v₂ - 4v₃ + 0v₄ + 0v₁₂₃ + 0v₁₂₄ + 0v₁₃₄ + 0v₂₃₄
-0 + 0v₁₂ + 0v₁₃ + 4v₁₄ + 0v₂₃ + 4v₂₄ + 8v₃₄ + 0v₁₂₃₄
--8v₁ - 8v₂ + 8v₃ + 0v₄ + 0v₁₂₃ + 0v₁₂₄ + 0v₁₃₄ + 0v₂₃₄
-0 + 0v₁₂ + 0v₁₃ - 8v₁₄ + 0v₂₃ - 8v₂₄ - 16v₃₄ + 0v₁₂₃₄
-16v₁ + 16v₂ - 16v₃ + 0v₄ + 0v₁₂₃ + 0v₁₂₄ + 0v₁₃₄ + 0v₂₃₄
-0 + 0v₁₂ + 0v₁₃ + 16v₁₄ + 0v₂₃ + 16v₂₄ + 32v₃₄ + 0v₁₂₃₄</code></pre>
-        <p>Alternatively, if you do not wish to assign these
-        variables to your local workspace, the versatile
-        constructors of <code>DirectSum.Basis{V}</code> can be used
-        to contain them, which is exported to the user as the
-        method <code>Λ(V)</code>,</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; G3 = Λ(3) # equivalent to Λ(V"+++"), Λ(ℝ^3), Λ.V3</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">DirectSum.Basis{⟨111⟩,8}(v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)</code><br><code class="language-julia-repl hljs"
-style="display:block;">julia&gt; G3.v13 ⊖ G3.v12</code><code class=
-"nohighlight hljs ansi" style="display:block;">1v₂₃</code></pre>
-        <p>The multiplication product used: <span>$*$</span> or
-        <span>$\ominus$</span> is the geometric algebraic
-        product.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; (1 + 2v34) ⊖ (3 + 4v34), (1 + 2v34) * (3 + 4v34), (1 + 2im) * (3 + 4im)</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">(-5 + 10v₃₄, -5 + 10v₃₄, -5 + 10im)</code></pre>
-        <p>Symmetry properties of the tensor algebra can be
-        characterized in terms of the geometric product by two
-        averaging operations, which are the symmetrization
-        <span>$\odot$</span> and anti-symmetrization
-        <span>$\boxtimes$</span> operators. These products satisfy
-        various <code>Multivector</code> properties, including the
-        associative and distributive laws.</p>
         <p><strong>Definition</strong>. The geometric product can
         be applied in two averaging operations, which are
         symmetrization and anti-symmetrization operations:</p>
@@ -1059,38 +1219,6 @@ style=
         \qquad \bigwedge_{k=1}^j \omega_k = \sum_{\sigma\in S_j}
         \frac{(-1)^{\varepsilon(\sigma)}}{j!}
         \prod_k\omega_{\sigma(k)}\]</p>
-        <p><strong>Definition</strong> (Exterior product): Let
-        <span>$w_k\in\Lambda^{p_k}V$</span>, then for all
-        <span>$\sigma\in S_{\sum p_k}$</span> define an equivalence
-        relation <span>$\sim$</span> such that</p>
-        <p class="math-container">\[\bigwedge_k
-        \omega_k(v_{1},\dots,v_{p_k}) \sim
-        (-1)^{\Pi(\sigma)}(\bigotimes_k
-        \omega_k)(v_{\sigma(1)},\dots,v_{\sigma(\sum p_k)})\]</p>
-        <p>if and only if <span>$\ominus_k\omega_k =
-        \boxtimes_k\omega_k$</span> holds. It has become typical to
-        use the <span>$\wedge$</span> product symbol to denote
-        products of such elements as <span>$\bigwedge\Lambda V
-        \equiv \bigotimes\Lambda V/\sim$</span> modulo
-        anti-symmetrization.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; v3 ∧ v4, v4 ∧ v3, v3 ∧ v3</code><code class="nohighlight hljs ansi"
-style="display:block;">(v₃₄, -1v₃₄, 𝟎)</code></pre>
-        <p><strong>Remark</strong>. Observe that the anti-symmetric
-        property implies that <span>$\omega\otimes\omega=0$</span>,
-        while the symmetric property neither implies nor denies
-        such a property. Grassmann remarked in 1862 that the
-        symmetric algebra of functions is by far more complicated
-        than his anti-symmetric exterior algebra. The first part of
-        the book focused on anti-symmetric exterior algebra, while
-        the more complex symmetric function algebra of Leibniz was
-        subject of the second multivariable part of the book.
-        Elements <span>$\omega_k$</span> in the space
-        <span>$\Lambda V$</span> of anti-symmetric algebra are
-        often studied as unit quantum state vectors in a unitary
-        probability space, where
-        <span>$\sum_k\omega_k\neq\bigotimes_k\omega_k$</span> is
-        entanglement.</p>
         <p><em>Example</em> (Reverse, involute, conjugate). The
         <code>reverse</code> of
         <span>$\langle\omega\rangle_r$</span> is defined as
@@ -1102,9 +1230,6 @@ style="display:block;">(v₃₄, -1v₃₄, 𝟎)</code></pre>
         <span>$\langle\omega\rangle_r^\ddagger$</span> is the
         composition of <code>involute</code> and
         <code>reverse</code>.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; clifford(v234) == involute(~v234)</code><code class="nohighlight hljs ansi"
-style="display:block;">true</code></pre>
         <p><strong>Definition</strong> (Reversed product). Consider
         the reversed product
         <span>$\langle\widetilde\omega\omega\rangle$</span>.</p>
@@ -1120,9 +1245,6 @@ style="display:block;">true</code></pre>
         \widetilde\omega/|\omega|^2$</span>, with
         <span>$\eta/\omega = \eta\omega^{-1}$</span> and
         <span>$\eta\backslash\omega = \eta^{-1}\omega$</span>.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; 1/v34, inv(v34) == ~v34/abs2(v34)</code><code class="nohighlight hljs ansi"
-style="display:block;">(-1.0v₃₄, true)</code></pre>
         <p><strong>Definition</strong> (Sandwich product). Define
         operator as <span>$\eta\oslash\omega =
         \overline\omega^{-1}\eta\omega$</span>. Alternatively, the
@@ -1130,9 +1252,6 @@ style="display:block;">(-1.0v₃₄, true)</code></pre>
         <span>$\eta\omega\overline\eta^{-1}$</span> typically
         notated <span>$\eta$</span> <code>&gt;&gt;&gt;</code>
         <span>$\omega$</span>.</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; (2v3+5v4) ⊘ v3 == inv(v3)*(2v3+5v4)*involute(v3)</code><code class="nohighlight hljs ansi"
-style="display:block;">true</code></pre>
         <p>The <code>real</code> part <span>$\Re\omega =
         (\omega+\tilde\omega)/2$</span> is defined by
         <span>$|\Re\omega|^2 = (\Re\omega)^{\ominus2}$</span> and
@@ -1166,42 +1285,6 @@ style="display:block;">true</code></pre>
         <span>$\mathbb{Z}_2$</span>-grading induced by
         <span>$\omega = \mathfrak{R}\omega +
         \mathfrak{I}\omega$</span>, it has real and imaginary.</p>
-        <p>It is possible to assign the <strong>quaternion</strong>
-        generators <span>$i,j,k$</span> with</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; i,j,k = hyperplanes(ℝ^3)</code><code class="nohighlight hljs ansi"
-style=
-"display:block;">3-element Vector{Single{⟨+++⟩, 2, B, Int64} where B}:
-  1v₂₃
- -1v₁₃
-  1v₁₂</code><br><code class="language-julia-repl hljs" style=
-"display:block;">julia&gt; i^2, j^2, k^2, i*j*k</code><code class=
-"nohighlight hljs ansi" style=
-"display:block;">(-1v, -1v, -1v, 1v)</code><br><code class=
-"language-julia-repl hljs" style=
-"display:block;">julia&gt; -(j+k) * (j+k)</code><code class=
-"nohighlight hljs ansi" style=
-"display:block;">2 + 0v₁₂ + 0v₁₃ + 0v₂₃</code><br><code class=
-"language-julia-repl hljs" style=
-"display:block;">julia&gt; -(j+k) * i</code><code class=
-"nohighlight hljs ansi" style=
-"display:block;">0 - 1v₁₂ - 1v₁₃ + 0v₂₃</code></pre>
-        <p>Alternatively, another representation of the quaternions
-        is</p>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; basis"--"</code><code class=
-        "nohighlight hljs ansi" style=
-        "display:block;">(⟨--⟩, v, v₁, v₂, v₁₂)</code><br><code class=
-        "language-julia-repl hljs" style=
-        "display:block;">julia&gt; v1^2, v2^2, v12^2, v1*v2*v12</code><code class="nohighlight hljs ansi"
-style="display:block;">(-1v, -1v, -1v, -1v)</code></pre>
-        <p>The parametric type formalism in <code>Grassmann</code>
-        is highly expressive to enable the pre-allocation of
-        geometric algebra computations for specific
-        sparse-subalgebras, including the representation of
-        rotational groups, Lie bivector algebras, and affine
-        projective geometry. All of this is enabled by the
-        psuedoscalar complement duality.</p>
         <p><em>Lemma</em> Let <span>$\omega\in\Lambda^m V$</span>,
         then <span>$I\vee\omega = \omega$</span>.</p>
         <p><em>Proof</em>. Lemma proved by Michael Reed in
@@ -1290,24 +1373,140 @@ style="display:block;">(-1v, -1v, -1v, -1v)</code></pre>
           <tr>
             <td style="text-align: right">Conventional</td>
             <td style="text-align: right">
-            <span>$\langle\eta\rangle_s &lt; \langle\tilde
-            \omega\rangle_r =
+            <span>$\langle\eta\rangle_s &lt;&lt;
+            \langle\omega\rangle_r =
             \langle\eta\omega\rangle_{s-r}$</span></td>
-            <td style="text-align: right"><span>$\langle\tilde
-            \eta\rangle_r &gt; \langle\omega\rangle_s =
+            <td style="text-align: right">
+            <span>$\langle\eta\rangle_r &gt;&gt;
+            \langle\omega\rangle_s =
             \langle\eta\omega\rangle_{r-s}$</span></td>
           </tr>
         </table>
-        <pre><code class=
-        "language-julia hljs">julia&gt; (v1 + v2) ⋅ (1.5v2 + v3)
-1.5v</code></pre>
-        <pre><code class="language-julia-repl hljs" style=
-        "display:block;">julia&gt; (G3.v1 + G3.v2) ⋅ (1.5G3.v2 + G3.v3)</code><code class="nohighlight hljs ansi"
-style="display:block;">1.5v</code></pre>
         <p>When <code>using Grassmann</code> in a session, the
         <code>cayley</code> table can be used to recall geometric
         algebra information, e.g. to compare <span>$&gt;$</span>
         and <span>$&gt;&gt;$</span> contractions:</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(1),wedge)
+cayley(Submanifold(1),vee)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} \wedge & v
+        & v_{1} \\ \hline v & v & v_{1} \\ v_{1} & v_{1} & 0
+        \end{array}, \qquad \begin{array}{c|cc} \vee & v & v_{1} \\
+        \hline v & 0 & v \\ v_{1} & v & v_{1} \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(1),&lt;)
+cayley(Submanifold(1),&gt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} &lt; & v &
+        v_{1} \\ \hline v & v & v_{1} \\ v_{1} & 0 & v \end{array},
+        \qquad \begin{array}{c|cc} &gt; & v & v_{1} \\ \hline v & v
+        & 0 \\ v_{1} & v_{1} & v \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(1),&lt;&lt;)
+cayley(Submanifold(1),&gt;&gt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} &lt;&lt; &
+        v & v_{1} \\ \hline v & v & v_{1} \\ v_{1} & 0 & v
+        \end{array}, \qquad \begin{array}{c|cc} &gt;&gt; & v &
+        v_{1} \\ \hline v & v & 0 \\ v_{1} & v_{1} & v
+        \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(S"-"),wedge)
+cayley(Submanifold(S"-"),vee)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} \wedge & v
+        & v_{1} \\ \hline v & v & v_{1} \\ v_{1} & v_{1} & 0
+        \end{array}, \qquad \begin{array}{c|cc} \vee & v & v_{1} \\
+        \hline v & 0 & v \\ v_{1} & v & v_{1} \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(S"-"),&lt;)
+cayley(Submanifold(S"-"),&gt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} &lt; & v &
+        v_{1} \\ \hline v & v & v_{1} \\ v_{1} & 0 & -1v
+        \end{array}, \qquad \begin{array}{c|cc} &gt; & v & v_{1} \\
+        \hline v & v & 0 \\ v_{1} & v_{1} & -1v \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(S"-"),&lt;&lt;)
+cayley(Submanifold(S"-"),&gt;&gt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cc} &lt;&lt; &
+        v & v_{1} \\ \hline v & v & v_{1} \\ v_{1} & 0 & -1v
+        \end{array}, \qquad \begin{array}{c|cc} &gt;&gt; & v &
+        v_{1} \\ \hline v & v & 0 \\ v_{1} & v_{1} & -1v
+        \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(2),wedge) # ...</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccc} \wedge &
+        v & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} & v_{2}
+        & v_{12} \\ v_{1} & v_{1} & 0 & v_{12} & 0 \\ v_{2} & v_{2}
+        & -1v_{12} & 0 & 0 \\ v_{12} & v_{12} & 0 & 0 & 0
+        \end{array}, \qquad \begin{array}{c|cccc} \vee & v & v_{1}
+        & v_{2} & v_{12} \\ \hline v & 0 & 0 & 0 & v \\ v_{1} & 0 &
+        0 & v & v_{1} \\ v_{2} & 0 & -1v & 0 & v_{2} \\ v_{12} & v
+        & v_{1} & v_{2} & v_{12} \end{array}\]</p>
+        <p class="math-container">\[\begin{array}{c|cccc} &lt; & v
+        & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} & v_{2} &
+        v_{12} \\ v_{1} & 0 & v & 0 & v_{2} \\ v_{2} & 0 & 0 & v &
+        -1v_{1} \\ v_{12} & 0 & 0 & 0 & v \end{array}, \qquad
+        \begin{array}{c|cccc} &gt; & v & v_{1} & v_{2} & v_{12} \\
+        \hline v & v & 0 & 0 & 0 \\ v_{1} & v_{1} & v & 0 & 0 \\
+        v_{2} & v_{2} & 0 & v & 0 \\ v_{12} & v_{12} & v_{2} &
+        -1v_{1} & v \end{array}\]</p>
+        <p class="math-container">\[\begin{array}{c|cccc} &lt;&lt;
+        & v & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} &
+        v_{2} & v_{12} \\ v_{1} & 0 & v & 0 & v_{2} \\ v_{2} & 0 &
+        0 & v & -1v_{1} \\ v_{12} & 0 & 0 & 0 & -1v \end{array},
+        \qquad \begin{array}{c|cccc} &gt;&gt; & v & v_{1} & v_{2} &
+        v_{12} \\ \hline v & v & 0 & 0 & 0 \\ v_{1} & v_{1} & v & 0
+        & 0 \\ v_{2} & v_{2} & 0 & v & 0 \\ v_{12} & -1v_{12} &
+        -1v_{2} & 1v_{1} & -1v \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(S"+-"),wedge) # ...</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccc} \wedge &
+        v & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} & v_{2}
+        & v_{12} \\ v_{1} & v_{1} & 0 & v_{12} & 0 \\ v_{2} & v_{2}
+        & -1v_{12} & 0 & 0 \\ v_{12} & v_{12} & 0 & 0 & 0
+        \end{array}, \qquad \begin{array}{c|cccc} \vee & v & v_{1}
+        & v_{2} & v_{12} \\ \hline v & 0 & 0 & 0 & v \\ v_{1} & 0 &
+        0 & v & v_{1} \\ v_{2} & 0 & -1v & 0 & v_{2} \\ v_{12} & v
+        & v_{1} & v_{2} & v_{12} \end{array}\]</p>
+        <p class="math-container">\[\begin{array}{c|cccc} &lt; & v
+        & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} & v_{2} &
+        v_{12} \\ v_{1} & 0 & v & 0 & v_{2} \\ v_{2} & 0 & 0 & -1v
+        & v_{1} \\ v_{12} & 0 & 0 & 0 & -1v \end{array}, \qquad
+        \begin{array}{c|cccc} &gt; & v & v_{1} & v_{2} & v_{12} \\
+        \hline v & v & 0 & 0 & 0 \\ v_{1} & v_{1} & v & 0 & 0 \\
+        v_{2} & v_{2} & 0 & -1v & 0 \\ v_{12} & v_{12} & v_{2} &
+        v_{1} & -1v \end{array}\]</p>
+        <p class="math-container">\[\begin{array}{c|cccc} &lt;&lt;
+        & v & v_{1} & v_{2} & v_{12} \\ \hline v & v & v_{1} &
+        v_{2} & v_{12} \\ v_{1} & 0 & v & 0 & v_{2} \\ v_{2} & 0 &
+        0 & -1v & v_{1} \\ v_{12} & 0 & 0 & 0 & 1v \end{array},
+        \qquad \begin{array}{c|cccc} &gt;&gt; & v & v_{1} & v_{2} &
+        v_{12} \\ \hline v & v & 0 & 0 & 0 \\ v_{1} & v_{1} & v & 0
+        & 0 \\ v_{2} & v_{2} & 0 & -1v & 0 \\ v_{12} & -1v_{12} &
+        -1v_{2} & -1v_{1} & 1v \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(3),wedge)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccccccc}
+        \wedge & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} &
+        v_{23} & v_{123} \\ \hline v & v & v_{1} & v_{2} & v_{3} &
+        v_{12} & v_{13} & v_{23} & v_{123} \\ v_{1} & v_{1} & 0 &
+        v_{12} & v_{13} & 0 & 0 & v_{123} & 0 \\ v_{2} & v_{2} &
+        -1v_{12} & 0 & v_{23} & 0 & -1v_{123} & 0 & 0 \\ v_{3} &
+        v_{3} & -1v_{13} & -1v_{23} & 0 & v_{123} & 0 & 0 & 0 \\
+        v_{12} & v_{12} & 0 & 0 & v_{123} & 0 & 0 & 0 & 0 \\ v_{13}
+        & v_{13} & 0 & -1v_{123} & 0 & 0 & 0 & 0 & 0 \\ v_{23} &
+        v_{23} & v_{123} & 0 & 0 & 0 & 0 & 0 & 0 \\ v_{123} &
+        v_{123} & 0 & 0 & 0 & 0 & 0 & 0 & 0 \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(3),vee)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccccccc} \vee
+        & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} &
+        v_{123} \\ \hline v & 0 & 0 & 0 & 0 & 0 & 0 & 0 & v \\
+        v_{1} & 0 & 0 & 0 & 0 & 0 & 0 & v & v_{1} \\ v_{2} & 0 & 0
+        & 0 & 0 & 0 & -1v & 0 & v_{2} \\ v_{3} & 0 & 0 & 0 & 0 & v
+        & 0 & 0 & v_{3} \\ v_{12} & 0 & 0 & 0 & v & 0 & v_{1} &
+        v_{2} & v_{12} \\ v_{13} & 0 & 0 & -1v & 0 & -1v_{1} & 0 &
+        v_{3} & v_{13} \\ v_{23} & 0 & v & 0 & 0 & -1v_{2} &
+        -1v_{3} & 0 & v_{23} \\ v_{123} & v & v_{1} & v_{2} & v_{3}
+        & v_{12} & v_{13} & v_{23} & v_{123} \end{array}\]</p>
         <pre><code class=
         "language-julia hljs">cayley(Submanifold(3),*) # Clifford geometric product *</code></pre>
         <p class="math-container">\[\begin{array}{c|cccccccc} * & v
@@ -1324,6 +1523,32 @@ style="display:block;">1.5v</code></pre>
         & -v_{13} & v_{12} & -v_3 & v_2 & -v_1 & -v
         \end{array}\]</p>
         <pre><code class=
+        "language-julia hljs">cayley(Submanifold(3),&lt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccccccc} &lt;
+        & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} & v_{23} &
+        v_{123} \\ \hline v & v & v_{1} & v_{2} & v_{3} & v_{12} &
+        v_{13} & v_{23} & v_{123} \\ v_{1} & 0 & v & 0 & 0 & v_{2}
+        & v_{3} & 0 & v_{23} \\ v_{2} & 0 & 0 & v & 0 & -1v_{1} & 0
+        & v_{3} & -1v_{13} \\ v_{3} & 0 & 0 & 0 & v & 0 & -1v_{1} &
+        -1v_{2} & v_{12} \\ v_{12} & 0 & 0 & 0 & 0 & v & 0 & 0 &
+        v_{3} \\ v_{13} & 0 & 0 & 0 & 0 & 0 & v & 0 & -1v_{2} \\
+        v_{23} & 0 & 0 & 0 & 0 & 0 & 0 & v & v_{1} \\ v_{123} & 0 &
+        0 & 0 & 0 & 0 & 0 & 0 & v \end{array}\]</p>
+        <p>Side note, demonstration of \verb<code>using
+        Grassmann</code> algebra laws:</p>
+        <pre><code class="language-julia hljs">julia&gt; basis"3"
+(⟨111⟩, v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃, v₁₂₃)
+
+julia&gt; wedge(!v12,!v23)
+-1v₁₃</code></pre>
+        <p>Side note, demonstration of Grassmann algebra laws:</p>
+        <pre><code class=
+        "language-julia hljs">julia&gt; !vee(v12,v23)
+-1v₁₃
+
+julia&gt; wedge(v12,!v12)
+1v₁₂₃</code></pre>
+        <pre><code class=
         "language-julia hljs">cayley(Submanifold(3),&gt;) # Grassmann contraction &gt;</code></pre>
         <p class="math-container">\[\begin{array}{c|cccccccc} &gt;
         & v & v_1 & v_2 & v_3 & v_{12} & v_{13} & v_{23} & v_{123}
@@ -1334,6 +1559,19 @@ style="display:block;">1.5v</code></pre>
         v_{13} & v_3 & 0 & -v_1 & 0 & v & 0 & 0 \\ v_{23} & v_{23}
         & 0 & v_3 & -v_2 & 0 & 0 & v & 0 \\ v_{123} & v_{123} &
         v_{23} & -v_{13} & v_{12} & v_3 & -v_2 & v_1 & v
+        \end{array}\]</p>
+        <pre><code class=
+        "language-julia hljs">cayley(Submanifold(3),&lt;&lt;)</code></pre>
+        <p class="math-container">\[\begin{array}{c|cccccccc}
+        &lt;&lt; & v & v_{1} & v_{2} & v_{3} & v_{12} & v_{13} &
+        v_{23} & v_{123} \\ \hline v & v & v_{1} & v_{2} & v_{3} &
+        v_{12} & v_{13} & v_{23} & v_{123} \\ v_{1} & 0 & v & 0 & 0
+        & v_{2} & v_{3} & 0 & v_{23} \\ v_{2} & 0 & 0 & v & 0 &
+        -1v_{1} & 0 & v_{3} & -1v_{13} \\ v_{3} & 0 & 0 & 0 & v & 0
+        & -1v_{1} & -1v_{2} & v_{12} \\ v_{12} & 0 & 0 & 0 & 0 &
+        -1v & 0 & 0 & -1v_{3} \\ v_{13} & 0 & 0 & 0 & 0 & 0 & -1v &
+        0 & 1v_{2} \\ v_{23} & 0 & 0 & 0 & 0 & 0 & 0 & -1v &
+        -1v_{1} \\ v_{123} & 0 & 0 & 0 & 0 & 0 & 0 & 0 & -1v
         \end{array}\]</p>
         <pre><code class=
         "language-julia hljs">cayley(Submanifold(3),&gt;&gt;) # Conventional contraction &gt;&gt;</code></pre>
@@ -1347,6 +1585,102 @@ style="display:block;">1.5v</code></pre>
         v_{23} & -v_{23} & 0 & -v_3 & v_2 & 0 & 0 & -v & 0 \\
         v_{123} & -v_{123} & -v_{23} & v_{13} & -v_{12} & -v_3 &
         v_2 & -v_1 & -v \end{array}\]</p>
+        <p><code>Grassmann</code> does not implement
+        <code>Quaternion</code> as a struct, but quaternions are
+        realized as an alias <code>Grassmann.Quaternion (alias for
+        Spinor{V, T, 4} where {V, T})</code>.</p>
+        <p>Comparison of quaternions in the context of
+        <code>Grassmann</code> to other quaternion implementations
+        is characterized by syntax design differences to fit into a
+        larger mathematical formalism. Differences such as
+        performance or edge cases can always be smoothed out, while
+        syntax and design choices are fundamentally different. With
+        <code>Grassmann</code> geometric algebra it is possible to
+        achieve much more out of quaternions due to the immediate
+        access to its fully general mathematical formalism.</p>
+        <p>Quaternion algebra exists as a specialized sub-algebra
+        within a more general <code>Grassmann</code> geometric
+        algebra, where the goal is to seamlessly transition between
+        quaternion abstractions and algebraic generalizations.
+        There are several ways to assign <code>i,j,k</code> with
+        <code>Grassmann</code> elements, perhaps the standard would
+        be <code>i = v12</code>, <code>j = -v13</code>, <code>k =
+        v23</code> (although this is not a unique choice). Since
+        <code>j</code> and <code>v13</code> have opposite sign in
+        this notation, the <code>quatvalues</code> method is
+        exported to output the coefficients with the sign
+        convention of <code>s,i,j,k</code>.</p>
+        <ul>
+          <li>assign <code>Grassmann</code> elements for quaternion
+          usage: <code>using Grassmann; basis"3"</code></li>
+          <li>basis: <code>v, v₁, v₂, v₃, v₁₂, v₁₃, v₂₃,
+          v₁₂₃</code> or <code>v, v1, v2, v3, v12, v13, v23,
+          v123</code></li>
+          <li>assign quaternion basis: <code>s, i, j, k = v, v12,
+          -v13, v23</code> could be a standard choice</li>
+          <li><code>quatvalues(::Quaternion)</code> returns the
+          coefficient values according to <code>s, i, j,
+          k</code></li>
+          <li><code>quaternion(s,i,j,k)</code> returns the
+          <code>Grassmann</code> quaternion from the <code>s, i, j,
+          k</code> standard</li>
+        </ul>
+        <p>As a result of the framework of geometric algebra
+        implemented in <code>Grassmann</code>, vector algebra and
+        quaternion algebra are compatible in a unified formalism.
+        Given a quaternion operator <code>R</code> and a vector
+        <code>x</code> the operator can be applied with either the
+        <code>R&gt;&gt;&gt;x</code> (evaluated as
+        <code>R*x*conj(R)</code> operator) or <code>x⊘R</code>
+        (evaluated as <code>conj(R)*x*R</code> operator) to
+        transform vectors with quaternions. Converting a quaternion
+        operator <code>R</code> on a three dimensional vector to a
+        matrix (with the <code>x⊘R</code> evaluation) can be done
+        with <code>Matrix(operator(R))</code> for convenience.</p>
+        <p>In the traditional quaternion packages there is only
+        access to a limited mathematical scope constrained to
+        rotations in three dimensions, while in
+        <code>Grassmann</code> there are rotational algebras for
+        lower and higher dimensions and it is also natural to deal
+        with reflection operator compositions and more. This
+        developer (for example), will feel a loss of mathematical
+        expressibility when downgrading from <code>Grassmann</code>
+        to a more limited quaternion formalism, as
+        <code>Grassmann</code> can express the full graded algebra
+        structure compared to the mere sub-algebra of quaternions.
+        Programming using a more general and sophisticated
+        mathematical formalism typically involves a more abstract
+        and verbose syntax, and this is the case for Grassman.jl as
+        compared to Quaternions.jl</p>
+        <p>It is possible to assign the <strong>quaternion</strong>
+        generators <span>$i,j,k$</span> with</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; i,j,k = hyperplanes(ℝ^3)</code><code class="nohighlight hljs ansi"
+style=
+"display:block;">3-element Vector{Single{⟨+++⟩, 2, B, Int64} where B}:
+  1v₂₃
+ -1v₁₃
+  1v₁₂</code><br><code class="language-julia-repl hljs" style=
+"display:block;">julia&gt; i^2, j^2, k^2, i*j*k</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">(-1v, -1v, -1v, 1v)</code><br><code class=
+"language-julia-repl hljs" style=
+"display:block;">julia&gt; -(j+k) * (j+k)</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">2 + 0v₁₂ + 0v₁₃ + 0v₂₃</code><br><code class=
+"language-julia-repl hljs" style=
+"display:block;">julia&gt; -(j+k) * i</code><code class=
+"nohighlight hljs ansi" style=
+"display:block;">0 - 1v₁₂ - 1v₁₃ + 0v₂₃</code></pre>
+        <p>Alternatively, another representation of the quaternions
+        is</p>
+        <pre><code class="language-julia-repl hljs" style=
+        "display:block;">julia&gt; basis"--"</code><code class=
+        "nohighlight hljs ansi" style=
+        "display:block;">(⟨--⟩, v, v₁, v₂, v₁₂)</code><br><code class=
+        "language-julia-repl hljs" style=
+        "display:block;">julia&gt; v1^2, v2^2, v12^2, v1*v2*v12</code><code class="nohighlight hljs ansi"
+style="display:block;">(-1v, -1v, -1v, -1v)</code></pre>
         <p><strong>Theorem</strong> (Linear system of equations)
         Let <span>$p_0,\dots,p_n \in \Lambda^1V$</span>,</p>
         <p class="math-container">\[[p_1,\dots,p_n] \vee
@@ -2007,7 +2341,7 @@ julia&gt; P∧Q∧R
           <p>This document was generated with <a href=
           "https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a>
           version 1.16.1 on <span class="colophon-date" title=
-          "Thursday 8 January 2026 04:22">Thursday 8 January
+          "Monday 19 January 2026 16:40">Monday 19 January
           2026</span>. Using Julia version 1.12.1.</p>
         </section>
         <footer class="modal-card-foot"></footer>
