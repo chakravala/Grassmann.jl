@@ -891,6 +891,7 @@ unitangle(z,g) = unit(angle(z,g),g)
 Base.angle(z::Phasor,g=nothing) = z.ω
 Base.angle(z::Chain) = angle(complexify(z))
 Base.angle(z::Chain,g) = angle(complexify(z,g),g)
+Base.angle(x::Chain{V,G},y::Chain{V,G}) where {V,G} = acos(Real(contraction(x,y)/(abs(x)*abs(y))))
 phase(z::Phasor{V,B,T},g=nothing) where {V,B,T<:Real} = zero(T)
 phase(z::Phasor{V,B,<:TensorTerm{W,0,T} where W},g=nothing) where {V,B,T} = zero(T)
 #phase(z::Phasor{V,<:TensorTerm,<:TensorTerm} where V) = Real(angle(amplitude(z))/basis(z))

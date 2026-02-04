@@ -432,6 +432,11 @@ Chain{V}(P::Proj{V,<:Chain{W,1,<:Chain}}) where {V,W} = sum(outer.(value(P.v).*v
 Chain{V}(P::Proj{V}) where V = outer(P.v*P.λ,P.v)
 Chain(P::Proj{V}) where V = Chain{V}(P)
 
+Base.:*(x::Real,y::Proj) = Proj(y.v,x*y.λ)
+Base.:*(x::Complex,y::Proj) = Proj(y.v,x*y.λ)
+Base.:*(x::Proj,y::Real) = Proj(x.v,x.λ*y)
+Base.:*(x::Proj,y::Complex) = Proj(x.v,x.λ*y)
+
 struct Dyadic{V,X,Y} <: TensorNested{V,X}
     x::X
     y::Y
@@ -460,6 +465,11 @@ show(io::IO,P::Dyadic) = print(io,"(",P.x,")⊗(",P.y,")")
 
 Chain{V}(P::Dyadic{V}) where V = outer(P.x,P.y)
 Chain(P::Dyadic{V}) where V = Chain{V}(P)
+
+Base.:*(x::Real,y::Dyadic) = Dyadic(x*y.x,y.y)
+Base.:*(x::Complex,y::Dyadic) = Dyadic(x*y.x,y.y)
+Base.:*(x::Dyadic,y::Real) = Dyadic(x.x*y,x.y)
+Base.:*(x::Dyadic,y::Complex) = Dyadic(x.x*y,x.y)
 
 # DiagonalOperator
 
