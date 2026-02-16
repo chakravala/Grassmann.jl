@@ -1224,8 +1224,9 @@ eigmults(X::TensorNested) = eigmults(eigvals(X))
 end
 
 function eigpolys(X::TensorNested{V}) where V
-    if mdims(V)≠2
-        eigpolys(eigvalsreal(X))
+    N = mdims(V)
+    if N≠2 # eigpolys(eigvalsreal(X))
+        Chain{V}(reverse(value(characteristic(X)))./binomial.(N,list(1,N)).*(-1).^list(1,N))
     else
         Chain{V}(eigpolys(X,Val(1)),eigpolys(X,Val(2)))
     end
@@ -1235,8 +1236,14 @@ end
 end
 eigpolys(X,G::Int) = eigpolys(X,Val(G))
 eigpolys(::TensorAlgebra{V} where V,::Val{0}) = 1
-function eigpolys(X::TensorNested{V},g::Val{G}) where {V,G}
-    mdims(V)≠G ? sum(value(eigprods(X,g)))/binomial(mdims(V),G) : Real(det(X))
+function eigpolys(X::TensorNested{V},::Val{G}) where {V,G}
+    N = mdims(V)
+    if N≠G # sum(value(eigprods(X,g)))/binomial(mdims(V),G)
+        c = characteristic(X,Val(N-G+1))/binomial(N,G)
+        isodd(G) ? -c : c
+    else
+        Real(det(X))
+    end
 end
 function eigpolys(x::Chain{V,1},g::Val{G}) where {V,G}
     mdims(V)≠G ? sum(value(eigprods(x,g)))/binomial(mdims(V),G) : prod(value(x))
@@ -1441,6 +1448,43 @@ function characteristic(X::Endomorphism{V,<:Simplex}) where V
     end
 end
 
+characteristic(X,m::Int) = characteristic(X,Val(m))
+characteristic(X::DiagonalOperator,m::Val) = characteristic_exact(X,m)
+function characteristic(X::Outermorphism{V},m::Val) where V
+    mdims(V) < 5 ? (@inbounds characteristic(TensorOperator(value(X)[1]),m)) : characteristic_exact(X,m)
+end
+function characteristic(X::Endomorphism{V,<:Simplex},m::Val{M}) where {V,M}
+    N = mdims(V)
+    if N == 1
+        -X[1]
+    elseif N == 2
+        isone(M) ? Real(det(X)) : -tr(X)
+    elseif N == 3
+        if isone(M)
+            -Real(det(X))
+        else
+            a2 = tr(X)
+            M==2 ? (a2*a2-tr(X⋅X))/2 : -a2
+        end
+    elseif N == 4
+        if isone(M)
+            Real(det(X))
+        else
+            a3 = tr(X)
+            if M==4
+                -a3
+            else
+                X2 = X⋅X
+                a32,trX2 = a3*a3,tr(X2)
+                M==3 ? (a32 - trX2)/2 : (a3*(a32 - 3trX2) + 2tr(X2⋅X))/-6
+            end
+        end
+    else
+        characteristic_exact(X,m)
+    end
+end
+
+characteristic_exact(X,m::Int) = characteristic_exact(X,Val(m))
 characteristic_exact(X::Endomorphism{V,<:Simplex} where V) = characteristic_exact(outermorphism(X))
 characteristic_exact(X::DiagonalMorphism) = characteristic_exact(outermorphism(X))
 @generated function characteristic_exact(X::DiagonalOutermorphism{V}) where V
@@ -1452,6 +1496,11 @@ end
     N = mdims(V)
     Expr(:block,:(out = Values(map(tr,value(X)))),
         Expr(:call,:(Chain{V}),[isodd(N-k) ? :(@inbounds out[$(N-k+1)]) : :(@inbounds -out[$(N-k+1)]) for k ∈ list(1,N)]...))
+end
+function characteristic_exact(X::TensorNested{V},::Val{M}) where {V,M}
+    N = mdims(V)
+    c = tr(compound(X,Val(N-M+1)))
+    isodd(N-M) ? c : -c
 end
 
 gerschgorin(x::DiagonalOperator{V}) where V = zero(Chain{V,1,Int})
