@@ -1234,6 +1234,9 @@ end
 @generated function eigpolys(x::Chain{V,1}) where V
     Expr(:call,:(Chain{V}),[:(eigpolys(x,Val($i))) for i ∈ list(1,mdims(V))]...)
 end
+@generated function eigpolys(x::Multivector{V}) where V
+    Expr(:call,:(Chain{V}),[:(eigpolys(x,Val($i))) for i ∈ list(1,mdims(V))]...)
+end
 eigpolys(X,G::Int) = eigpolys(X,Val(G))
 eigpolys(::TensorAlgebra{V} where V,::Val{0}) = 1
 function eigpolys(X::TensorNested{V},::Val{G}) where {V,G}
@@ -1246,7 +1249,10 @@ function eigpolys(X::TensorNested{V},::Val{G}) where {V,G}
     end
 end
 function eigpolys(x::Chain{V,1},g::Val{G}) where {V,G}
-    mdims(V)≠G ? sum(value(eigprods(x,g)))/binomial(mdims(V),G) : prod(value(x))
+    ndims(V)≠G ? scalar(compound(DiagonalOperator(x),g)) : prod(value(x))
+end
+function eigpolys(x::Multivector{V},g::Val{G}) where {V,G}
+    ndims(V)≠G ? scalar(DiagonalOperator(x(g))) : eigpolys(x(Val(1)),g)
 end
 eigpolys(X::Outermorphism,G::Val{1}) = scalar(TensorOperator(@inbounds value(x)[1]))
 eigpolys(X::Endomorphism{V,<:Simplex} where V,::Val{1}) = scalar(X)
@@ -1254,10 +1260,10 @@ eigpolys(X::DiagonalMorphism,::Val{1}) = scalar(X)
 eigpolys(X::DiagonalMorphism,G::Val) = eigpolys(value(X),G)
 eigpolys(X::DiagonalMorphism) = eigpolys(value(X))
 eigpolys(X::DiagonalOutermorphism,G::Val{1}) = scalar(DiagonalOperator(value(X)(G)))
-eigpolys(X::DiagonalOutermorphism,G::Val) = eigpolys(value(X)(Val(1)),G)
-eigpolys(X::DiagonalOutermorphism) = eigpolys(value(X)(Val(1)))
+eigpolys(X::DiagonalOutermorphism,G::Val) = eigpolys(value(X),G)
+eigpolys(X::DiagonalOutermorphism) = eigpolys(value(X))
 
-eigprods(X,G::Int) = eigprods(X,Val(G))
+#=eigprods(X,G::Int) = eigprods(X,Val(G))
 eigprods(X::TensorNested) = eigprods(eigvalsreal(X))
 eigprods(X::TensorNested{V},g::Val{G}) where {V,G} = mdims(V)≠G ? eigprods(eigvalsreal(X),g) : ∧(X)
 eigprods(X::TensorAlgebra{V},::Val{0}) where V = Chain{V,0}(1)
@@ -1272,7 +1278,7 @@ end
 function getprod(n,i,g)
     ind = indices(basis(Λ(Submanifold(n)).b[i+binomsum(n,g)]))
     Expr(:call,:*,[:(@inbounds value(x)[$j]) for j ∈ ind]...)
-end
+end=#
 
 #=function getmult(n,i)
     Expr(:block,:(gp = $(getpairs(n,i))),
