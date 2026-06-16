@@ -520,6 +520,7 @@ end
     Expr(:call,:DiagonalOperator,Expr(:call,:(Multivector{V}),Expr(:call,Values,1,[Expr(:call,:*,[:(@inbounds m.v[$i]) for i ∈ indices(j)]...) for j ∈ indexbasis(mdims(V))[list(2,tdims(V))]]...)))
 end
 
+cofactor(t::DiagonalOperator) = adjugate(t)
 function adjugate(t::DiagonalMorphism{V}) where V
     DiagonalOperator(Chain{V}(reverse(value(value(compound(t,Val(mdims(V)-1)))))))
 end
@@ -601,7 +602,7 @@ function invdet(t::TensorOperator{V,W,<:Chain} where {V,W})
     TensorOperator(i),d
 end
 Base.log(t::Endomorphism{V,<:Chain}) where V = Endomorphism{V}(log(Matrix(t)))
-for op ∈ (:(Base.inv),:adjugate)
+for op ∈ (:(Base.inv),:adjugate,:cofactor)
     @eval $op(t::TensorOperator{V,W,<:Chain} where {V,W}) = TensorOperator($op(value(t)))
 end
 for op ∈ (:(Base.exp),:(Base.expm1))
@@ -770,7 +771,7 @@ function invdet(t::Outermorphism)
     i,d = invdet(@inbounds value(t)[1])
     Outermorphism(i),d
 end
-for op ∈ (:adjugate,:(Base.inv),:(Base.exp),:(Base.expm1),:(Base.log))
+for op ∈ (:adjugate,:cofactor,:(Base.inv),:(Base.exp),:(Base.expm1),:(Base.log))
     @eval $op(t::Outermorphism) = Outermorphism($op(@inbounds value(t)[1]))
 end
 

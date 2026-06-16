@@ -17,7 +17,7 @@ export pseudoabs, pseudoabs2, pseudosqrt, pseudocbrt, pseudoinv, pseudoscalar
 export pseudocos, pseudosin, pseudotan, pseudocosh, pseudosinh, pseudotanh
 export coabs, coabs2, cosqrt, cocbrt, coinv, coscalar, coexp, colog, cometric, codot, @co
 export cocos, cosin, cotan, cocosh, cosinh, cotanh
-export vandermonde, pfaffian, invdet, adjugate, volumes, compound, companion
+export vandermonde, pfaffian, invdet, adjugate, cofactor, volumes, compound, companion
 
 ## exponential & logarithm function
 
@@ -802,6 +802,15 @@ end=#
     return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(_transpose($out,$W)))
 end
 
+@generated function cofactor(t::Values{M,<:Chain{V,1}}) where {M,V}
+    W = M≠mdims(V) ? Submanifold(M) : V
+    isone(M) && (return :(Chain{$W}(Values(inv(@inbounds t[1])))))
+    M > mdims(V) && (return :(tt = _transpose(t,$W); transpose(tt⋅adjugate(Chain{$W,1}(t)⋅tt))))
+    xy,val = _inv(M,mdims(V))
+    out = M≠mdims(V) ? :(vector.($val)) : :(.!($val))
+    return Expr(:block,:((x1,y1)=@inbounds (t[1],t[end])),xy...,:(Chain{$W}($out)))
+end
+
 @generated function gradient(T::Values{M,<:Chain{V,1}}) where {M,V}
     W = M≠mdims(V) ? Submanifold(M) : V; N = mdims(V)-1
     M < mdims(V) && (return :(ct = Chain{$W,1}(T); map(↓(V),ct⋅inv(_transpose(T,$W)⋅ct))))
@@ -843,6 +852,7 @@ Base.in(v::Chain{V,1},t::Chain{W,1,<:Chain{V,1}}) where {V,W} = v ∈ value(t)
 Base.inv(t::Chain{V,1,<:Chain{W,1}},g=nothing) where {W,V} = inv(value(t))
 invdet(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = invdet(value(t))
 adjugate(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = adjugate(value(t))
+cofactor(t::Chain{V,1,<:Chain{W,1}}) where {W,V} = cofactor(value(t))
 gradient(t::Chain{V,1,<:Chain{W,1}}) where {V,W} = gradient(value(t))
 
 @generated approx(x,y::Chain{V}) where V = :(polynom(x,$(Val(mdims(V))))⋅y)
