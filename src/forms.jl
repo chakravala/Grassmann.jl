@@ -503,6 +503,8 @@ matrix(m::DiagonalOperator) = matrix(TensorOperator(m))
 getindex(t::DiagonalOperator,i::Int,j::Int) = i≠j ? zero(valuetype(value(t))) : value(value(t))[i]
 getindex(t::DiagonalOperator,i::Int) = value(t)(i)
 
+Base.:(==)(a::DiagonalOperator,b::DiagonalOperator) = value(a) == value(b)
+
 Base.zero(t::DiagonalOperator) = DiagonalOperator(zero(value(t)))
 Base.zero(t::Type{<:DiagonalOperator{V,T}}) where {V,T} = DiagonalOperator(zero(T))
 
@@ -653,6 +655,8 @@ end
     Expr(:call,:(Multivector{V}),[:(t[$i,$i]) for i ∈ list(1,1<<mdims(V))]...)
 end
 
+Base.:(==)(a::TensorOperator,b::TensorOperator) = value(a) == value(b)
+
 _axes(t::TensorOperator) = (Base.OneTo(length(t.v)),Base.OneTo(length(t.v)))
 _axes(t::TensorOperator{V,W,T}) where {V,W,G,L,S<:Chain{W,L},T<:Chain{V,G,S}} = (Base.OneTo(gdims(S)),Base.OneTo(gdims(T)))
 _axes(t::TensorOperator{V,W,T}) where {V,W,S<:Multivector{W},T<:TensorAlgebra{V,S}} = (Base.OneTo(tdims(S)),Base.OneTo(tdims(T)))
@@ -747,6 +751,8 @@ function ∧(m::Outermorphism{V}) where V
         Chain{V,length(value(m))}(Real.(out))
     end
 end
+
+Base.:(==)(a::Outermorphism,b::Outermorphism) = value(a) == value(b)
 
 Base.zero(t::Outermorphism{V}) where V = Outermorphism{V}(zero.(value(t)))
 @generated function Base.zero(t::Type{<:Outermorphism{V,T}}) where {V,T}
