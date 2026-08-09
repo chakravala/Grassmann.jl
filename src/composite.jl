@@ -1002,7 +1002,7 @@ for op ∈ (:mod2pi,:rem2pi,:rad2deg,:deg2rad,:round)
         Base.$op(a::Chain{V,G,T};args...) where {V,G,T} = Chain{V,G}($op.(value(a);args...))
         Base.$op(a::Spinor{V,T};args...) where {V,T} = Spinor{V}($op.(value(a);args...))
         Base.$op(a::CoSpinor{V,T};args...) where {V,T} = CoSpinor{V}($op.(value(a);args...))
-        Base.$op(a::Multivector{V,T};args...) where {V,T} = Multivector{V}($op.(alue(a);args...))
+        Base.$op(a::Multivector{V,T};args...) where {V,T} = Multivector{V}($op.(value(a);args...))
     end
 end
 Base.isfinite(a::Chain) = prod(isfinite.(value(a)))

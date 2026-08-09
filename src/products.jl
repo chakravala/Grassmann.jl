@@ -1821,7 +1821,7 @@ for reverse ∈ (:reverse,:involute,:conj,:clifford,:antireverse)
             Couple{V,B}(realvalue(z),$p($g(B)) ? -imagvalue(z) : imagvalue(z))
         end
         function $reverse(z::PseudoCouple{V,B}) where {V,B}
-            PseudoCouple{V,B}($p($g(B)) ? -realvalue(z) : reavalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z))
+            PseudoCouple{V,B}($p($g(B)) ? -realvalue(z) : realvalue(z),$p($g(V)) ? -imagvalue(z) : imagvalue(z))
         end
         function $reverse(z::Phasor{V,<:TensorGraded}) where V
             B = basis(angle(z))
