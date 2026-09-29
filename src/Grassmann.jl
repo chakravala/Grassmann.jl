@@ -288,7 +288,7 @@ end
 
 # mesh
 
-export column, columns
+export column
 
 column(t,i=1) = getindex.(value(t),i)
 columns(t,i=1,j=mdims(Manifold(t))) = column.(Ref(value(t)),list(i,j))

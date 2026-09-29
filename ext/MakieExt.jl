@@ -16,15 +16,16 @@ module MakieExt
 using Grassmann
 isdefined(Grassmann, :Requires) ? (import Grassmann: Makie) : (using Makie)
 
-Makie.convert_arguments(P::Makie.PointBased, a::Vector{<:Chain}) = Makie.convert_arguments(P, Makie.Point.(a))
+Makie.convert_arguments(P::Makie.PointBased, a::AbstractArray{<:Chain}) = Makie.convert_arguments(P, Makie.Point.(a))
 Makie.convert_single_argument(a::Chain) = convert_arguments(P,Makie.Point(a))
+Makie.convert_single_argument(a::TensorTerm) = convert_arguments(P,value(a))
+Makie.convert_single_argument(a::Chain{V,G,T,1} where {V,G,T}) = convert_arguments(P,a[1])
+
 Makie.arrows(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows(Makie.Point.(↓(V).(p)),Makie.Point.(value(v));args...)
 Makie.arrows!(p::Vector{<:Chain{V}},v;args...) where V = Makie.arrows!(Makie.Point.(↓(V).(p)),Makie.Point.(value(v));args...)
-Makie.lines(p::Vector{<:TensorAlgebra};args...) = Makie.lines(Makie.Point.(p);args...)
-Makie.lines!(p::Vector{<:TensorAlgebra};args...) = Makie.lines!(Makie.Point.(p);args...)
-Makie.lines(p::Vector{<:TensorTerm};args...) = Makie.lines(value.(p);args...)
-Makie.lines!(p::Vector{<:TensorTerm};args...) = Makie.lines!(value.(p);args...)
-Makie.lines(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines(getindex.(p,1);args...)
-Makie.lines!(p::Vector{<:Chain{V,G,T,1} where {V,G,T}};args...) = Makie.lines!(getindex.(p,1);args...)
+
+Makie.convert_arguments(P::Type{<:Makie.Lines}, p::AbstractVector{<:TensorAlgebra}) = (Makie.Point.(p),)
+Makie.convert_arguments(P::Type{<:Makie.Lines}, p::AbstractVector{<:TensorTerm}) = (value.(p),)
+Makie.convert_arguments(P::Type{<:Makie.Lines}, p::AbstractVector{<:Chain{V,G,T,1} where {V,G,T}}) = (getindex.(p,1),)
 
 end # module
