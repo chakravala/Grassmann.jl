@@ -16,6 +16,11 @@ module FewSpecialFunctionsExt
 using Grassmann
 isdefined(Grassmann, :Requires) ? (import Grassmann: FewSpecialFunctions) : (using FewSpecialFunctions)
 
+for fun ∈ (:dawson,)
+    @eval begin
+        FewSpecialFunctions.$fun(x::TensorTerm{V,0}) where V = Single{V}(FewSpecialFunctions.$fun(Real(x)))
+    end
+end
 for fun ∈ (:η,:FresnelC,:FresnelS,:FresnelE,:Ci_complex)
     @eval begin
         FewSpecialFunctions.$fun(x::TensorTerm{V}) where V = FewSpecialFunctions.$fun(Couple(x))
@@ -23,6 +28,13 @@ for fun ∈ (:η,:FresnelC,:FresnelS,:FresnelE,:Ci_complex)
         FewSpecialFunctions.$fun(x::Couple{V,B}) where {V,B} = Couple{V,B}(FewSpecialFunctions.$fun(Complex(x)))
         FewSpecialFunctions.$fun(x::Chain) = vectorize(FewSpecialFunctions.$fun(complexify(x)))
         FewSpecialFunctions.$fun(x::Phasor) = FewSpecialFunctions.$fun(complexify(x))
+    end
+end
+for fun ∈ (:U,:V,:W,:U_scaled,:V_scaled,:dU,:dV,:dW,:ParabolicCylinderD,:dParabolicCylinderD,:FermiDiracIntegral,:FermiDiracIntegralNorm,:Clausen,:voigt,:BoseEinsteinIntegral,:BoseEinsteinIntegralNorm)
+    @eval begin
+        FewSpecialFunctions.$fun(x,y::TensorTerm{V,0}) where V = Single{V}(FewSpecialFunctions.$fun(x,Real(y)))
+        FewSpecialFunctions.$fun(x::TensorTerm{V,0},y) where V = Single{V}(FewSpecialFunctions.$fun(Real(x),y))
+        FewSpecialFunctions.$fun(x::TensorTerm{V,0},y::TensorTerm{V,0}) where V = Single{V}(FewSpecialFunctions.$fun(Real(x),Real(y)))
     end
 end
 for fun ∈ (:C,:η)
@@ -48,7 +60,7 @@ for fun ∈ (:C,:η)
         FewSpecialFunctions.$fun(x::TensorTerm{V},y::Couple{V,B}) where {V,B} = FewSpecialFunctions.$fun(Couple(x),y)
     end
 end
-for fun ∈ (:F,:G,:H⁺,:H⁻,:MarcumQ,:dQdb,:F_clausen)
+for fun ∈ (:F,:G,:H⁺,:H⁻,:θ,:MarcumQ,:dQdb,:F_clausen,:WhittakerM,:WhittakerW,:dWhittakerM,:dWhittakerW)
     @eval begin
         FewSpecialFunctions.$fun(x::TensorTerm{V},y,z) where V = FewSpecialFunctions.$fun(Couple(x),y,z)
         FewSpecialFunctions.$fun(x::TensorTerm{V,0},y,z) where V = Single{V}(FewSpecialFunctions.$fun(Real(x),k,z))
