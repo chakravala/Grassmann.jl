@@ -7,7 +7,7 @@ export sylvester, characteristic, eigen, eigvecs, eigvals, eigpolys, eigprods, e
 export eigvalsreal, eigvalscomplex, eigvecsreal, eigvecscomplex, eigenreal, eigencomplex
 export discriminant, disc, discriminantreal, discreal, discriminantcomplex, disccomplex
 export MetricTensor, metrictensor, metricextensor, InducedMetric
-export vandermondereal, vandermondecomplex
+export vandermondereal, vandermondecomplex, gradedoperator
 export @TensorOperator, @Endomorphism, @Outermorphism, @SpectralOperator
 import LinearAlgebra: eigvals, eigvecs, eigen, diag
 
@@ -393,6 +393,9 @@ macro SpectralOperator(ex)
     SpectralOperator(eval(ex))
 end
 
+eigvec(P::Projector) = P.v
+eigval(P::Projector) = P.λ
+
 (P::Projector)(x) = contraction(P,x)
 function (T::Projector{V})(x::TensorAlgebra{V},y::TensorAlgebra{V}) where V
     vecdot(contraction(T,x),y)
@@ -457,6 +460,7 @@ Base.expm1(P::Dyadic) = expm1(Endomorphism(P))
 Base.exp(P::Dyadic) = exp(Endomorphism(P))
 Base.log(P::Dyadic) = log(Endomorphism(P))
 LinearAlgebra.tr(P::Dyadic) = value(P.x)⋅value(P.y)
+LinearAlgebra.det(P::Dyadic{V}) where V = Chain{V,0}(mdims(V)≠1 ? 0 : (@inbounds P.x[1]*P.y[1]))
 
 getindex(P::Dyadic,i::Int,j::Int) = P.x[i]*P.y[j]
 Base.transpose(P::Dyadic) = Dyadic(P.y,P.x)
@@ -563,7 +567,10 @@ end
 const Endomorphism{V,T<:TensorAlgebra{V,<:TensorAlgebra{V}}} = TensorOperator{V,V,T}
 Endomorphism(t::TensorAlgebra{V,<:TensorAlgebra{V}}) where V = TensorOperator{V,V}(t)
 for op ∈ (:TensorOperator,:Endomorphism)
-    @eval $op(t::Vararg{Chain{V,G,T,N},N}) where {V,G,T,N} = $op(Chain{V,G}(t...))
+    @eval begin
+        $op(t::Vararg{Chain{V,G,T,N},N}) where {V,G,T,N} = $op(Chain{V,G}(t...))
+        $op(t1::Chain{V,G,T,N},t2::Chain{V,G,T,N},t::Vararg{Chain{V,G,T,N}}) where {V,G,T,N} = $op(Chain(t1,t2,t...))
+    end
     for typ ∈ (:Spinor,:CoSpinor,:Multivector)
         @eval $op(t::Vararg{$typ{V,T,N},N}) where {V,T,N} = $op($typ{V}(t...))
     end
@@ -599,6 +606,7 @@ DirectSum.:⊕(t::Chain{V,G}...) where {V,G} = TensorOperator(t...)
 Base.zero(t::TensorOperator) = TensorOperator(zero(value(t)))
 Base.zero(t::Type{<:TensorOperator{V,W,T}}) where {V,W,T} = TensorOperator(zero(T))
 
+Base.in(v::Chain{V,1},t::TensorOperator) where V = v ∈ value(t)
 function invdet(t::TensorOperator{V,W,<:Chain} where {V,W})
     i,d = invdet(value(t))
     TensorOperator(i),d
@@ -950,6 +958,8 @@ contraction_mat(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G
 contraction(x::Chain{W,L,<:Chain{V,G},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
 contraction(x::Chain{W,L,<:Multivector{V},N},y::Chain{V,G,T,N}) where {W,L,N,V,G,T} = Multivector{V}(matmul(value(x),value(y)))
 contraction(x::Multivector{W,<:Chain{V,G},N},y::Multivector{V,T,N}) where {W,N,V,G,T} = Chain{V,G}(matmul(value(x),value(y)))
+contraction(x::Multivector{W,<:Multivector{V},N},y::TensorGraded{V}) where {W,N,V} = contraction(x,Multivector(y))
+contraction(x::Multivector{W,<:Multivector{V},N},y::AbstractSpinor{V}) where {W,N,V} = contraction(x,Multivector(y))
 contraction(x::Multivector{W,<:Multivector{V},N},y::Multivector{V,T,N}) where {W,N,V,T} = Multivector{V}(matmul(value(x),value(y)))
 @inline @generated function matmul(x::Values{N,<:Single{V,G}},y::Values{N}) where {N,V,G}
     Expr(:call,:Values,[Expr(:call,:+,:(@inbounds y[$i]*value(x[$i]))) for i ∈ list(1,N)]...)
@@ -1121,6 +1131,7 @@ for F ∈ Fields
         end
     end
 end
+*(a::TensorNested,b::TensorNested) = contraction(a,b)
 
 Base.map(fn, x::DiagonalOperator) = DiagonalOperator(map(fn,value(x)))
 Base.map(fn, x::TensorOperator{V,W,<:Chain{V,G}}) where {V,W,G} = TensorOperator(Chain{V,G}(map.(fn,value(value(x)))))
@@ -1196,11 +1207,11 @@ end
 end
 
 function operator(fun,V,::Val{G}=Val(1)) where G
-    TensorOperator(Chain{V,G}(fun.(chainbasis(V,G))))
+    TensorOperator(Chain{V,G}(fun.(Chain.(chainbasis(V,G)))))
 end
 operator(fun,V,G::Int) = operator(fun,V,Val(G))
 #gradedoperator(fun,V) = outermorphism(operator(fun,V))
-#gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Λ(V).b)))
+gradedoperator(fun,V) = TensorOperator(Multivector{V}(fun.(Multivector.(Λ(V).b))))
 
 @pure odddyad(V) = AntiSpinor.(oddbasis(V))
 @pure oddbasis(V) = evenbasis(V,false)
